@@ -12,14 +12,26 @@
   },
   "dependencies": {
     "@repo/ui": "*",
+    "@tabler/icons-react": "^3.40.0",
+    "@tailwindcss/postcss": "^4.2.1",
+    "bcryptjs": "^3.0.2",
+    "clsx": "^2.1.1",
+    "db": "*",
+    "jose": "^6.0.11",
     "next": "16.1.5",
+    "nodemailer": "^8.0.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.2.1",
+    "zod": "^3.25.67"
   },
   "devDependencies": {
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^22.15.3",
+    "@types/nodemailer": "^7.0.11",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "eslint": "^9.39.1",
