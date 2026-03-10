@@ -35,11 +35,6 @@ model AboutParagraph {
   sortOrder Int
 }
 
-enum ScoreType {
-  CGPA
-  PERCENTAGE
-}
-
 model Education {
   id          String     @id @default(uuid())
   institution String
@@ -61,22 +56,22 @@ model Skill {
   sortOrder   Int
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  experiences Experience[]
-  projects    Project[]
+  experiences Experience[] @relation("ExperienceToSkill")
+  projects    Project[]    @relation("ProjectToSkill")
 }
 
 model Experience {
-  id           String             @id @default(uuid())
-  company      String
-  position     String
-  location     String
-  startDate    String
-  endDate      String
-  isCurrent    Boolean            @default(false)
-  website      String?
-  sortOrder    Int
-  bullets      ExperienceBullet[]
-  skills       Skill[]
+  id        String             @id @default(uuid())
+  company   String
+  position  String
+  location  String
+  startDate String
+  endDate   String
+  isCurrent Boolean            @default(false)
+  website   String?
+  sortOrder Int
+  bullets   ExperienceBullet[]
+  skills    Skill[]            @relation("ExperienceToSkill")
 }
 
 model ExperienceBullet {
@@ -93,10 +88,10 @@ model Project {
   summary   String
   github    String?
   live      String?
-  images    String[]
   sortOrder Int
+  images    String[]
   bullets   ProjectBullet[]
-  skills    Skill[]
+  skills    Skill[]         @relation("ProjectToSkill")
 }
 
 model ProjectBullet {
@@ -105,12 +100,6 @@ model ProjectBullet {
   sortOrder Int
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-}
-
-enum ImageOrientation {
-  LANDSCAPE
-  PORTRAIT
-  SQUARE
 }
 
 model Blog {
@@ -122,10 +111,10 @@ model Blog {
   image            String
   imageOrientation ImageOrientation @default(LANDSCAPE)
   color            String
-  show             Boolean          @default(true)
   sortOrder        Int
   publishedAt      DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
+  show             Boolean          @default(true)
 }
 
 model Quote {
@@ -157,17 +146,30 @@ model SiteConfig {
   value String
 }
 
-enum AdminRole {
-  OWNER
-  ADMIN
-}
-
 model AdminUser {
   id        String    @id @default(uuid())
   email     String    @unique
+  username  String    @unique
   password  String
   name      String
   role      AdminRole @default(ADMIN)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+}
+
+enum ScoreType {
+  CGPA
+  PERCENTAGE
+}
+
+enum ImageOrientation {
+  LANDSCAPE
+  PORTRAIT
+  SQUARE
+}
+
+enum AdminRole {
+  OWNER
+  ADMIN
+  SUB_ADMIN
 }

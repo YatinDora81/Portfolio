@@ -727,6 +727,7 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
   await prisma.adminUser.create({
     data: {
       email: "yatin.dora81@gmail.com",
+      username: "yatin",
       password: hashedPassword,
       name: "Yatin Dora",
       role: "OWNER",
