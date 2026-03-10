@@ -147,14 +147,17 @@ model SiteConfig {
 }
 
 model AdminUser {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  username  String    @unique
-  password  String
-  name      String
-  role      AdminRole @default(ADMIN)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id             String    @id @default(uuid())
+  email          String    @unique
+  username       String    @unique
+  password       String
+  name           String
+  role           AdminRole @default(ADMIN)
+  failedAttempts Int       @default(0)
+  otp            String?
+  otpExpiresAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 enum ScoreType {

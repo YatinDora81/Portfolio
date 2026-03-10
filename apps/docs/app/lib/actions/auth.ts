@@ -5,12 +5,16 @@ import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { signToken } from "@/lib/auth";
 import { getSession, setSessionCookie, clearSessionCookie } from "@/lib/session";
-import { sendResetEmail } from "@/lib/mail";
+import { sendResetEmail, sendOtpEmail } from "@/lib/mail";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import crypto from "crypto";
 
 if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
 const RESET_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
+
+const MAX_FAILED_ATTEMPTS = 3;
+const OTP_EXPIRY_MINUTES = 5;
 
 export async function login(formData: FormData) {
   const identifier = formData.get("identifier") as string;
@@ -20,7 +24,6 @@ export async function login(formData: FormData) {
     return { error: "Username/email and password are required" };
   }
 
-  // Try email first, then fall back to username
   const user = identifier.includes("@")
     ? await prisma.adminUser.findUnique({ where: { email: identifier } })
     : await prisma.adminUser.findUnique({ where: { username: identifier } });
@@ -29,10 +32,109 @@ export async function login(formData: FormData) {
     return { error: "Invalid credentials" };
   }
 
+  // Check if account is locked due to too many failed attempts
+  if (user.failedAttempts >= MAX_FAILED_ATTEMPTS) {
+    return {
+      error: "Account locked due to too many failed attempts. Please use OTP to login.",
+      locked: true,
+      email: user.email,
+    };
+  }
+
   const isValid = await bcrypt.compare(password, user.password);
   if (!isValid) {
-    return { error: "Invalid credentials" };
+    const newAttempts = user.failedAttempts + 1;
+    await prisma.adminUser.update({
+      where: { id: user.id },
+      data: { failedAttempts: newAttempts },
+    });
+
+    if (newAttempts >= MAX_FAILED_ATTEMPTS) {
+      return {
+        error: "Account locked due to too many failed attempts. Please use OTP to login.",
+        locked: true,
+        email: user.email,
+      };
+    }
+
+    const remaining = MAX_FAILED_ATTEMPTS - newAttempts;
+    return {
+      error: `Invalid credentials. ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.`,
+    };
   }
+
+  // Successful login — reset failed attempts
+  await prisma.adminUser.update({
+    where: { id: user.id },
+    data: { failedAttempts: 0, otp: null, otpExpiresAt: null },
+  });
+
+  const token = await signToken({ userId: user.id, email: user.email, role: user.role });
+  await setSessionCookie(token);
+  redirect("/dashboard");
+}
+
+export async function sendLoginOtp(formData: FormData) {
+  const email = formData.get("email") as string;
+  if (!email) return { error: "Email is required" };
+
+  const user = await prisma.adminUser.findUnique({ where: { email } });
+  if (!user) {
+    // Don't reveal if user exists
+    return { success: true };
+  }
+
+  if (user.failedAttempts < MAX_FAILED_ATTEMPTS) {
+    return { error: "OTP login is only available after 3 failed password attempts." };
+  }
+
+  // Generate 6-digit OTP
+  const otp = crypto.randomInt(100000, 999999).toString();
+  const hashedOtp = await bcrypt.hash(otp, 10);
+
+  await prisma.adminUser.update({
+    where: { id: user.id },
+    data: {
+      otp: hashedOtp,
+      otpExpiresAt: new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000),
+    },
+  });
+
+  await sendOtpEmail(user.email, otp);
+  return { success: true };
+}
+
+export async function verifyLoginOtp(formData: FormData) {
+  const email = formData.get("email") as string;
+  const otp = formData.get("otp") as string;
+
+  if (!email || !otp) {
+    return { error: "Email and OTP are required" };
+  }
+
+  const user = await prisma.adminUser.findUnique({ where: { email } });
+  if (!user || !user.otp || !user.otpExpiresAt) {
+    return { error: "Invalid or expired OTP" };
+  }
+
+  if (new Date() > user.otpExpiresAt) {
+    await prisma.adminUser.update({
+      where: { id: user.id },
+      data: { otp: null, otpExpiresAt: null },
+    });
+    return { error: "OTP has expired. Please request a new one." };
+  }
+
+  const isValid = await bcrypt.compare(otp, user.otp);
+  if (!isValid) {
+    return { error: "Invalid OTP" };
+  }
+
+  // Successful OTP login — reset everything
+  await prisma.adminUser.update({
+    where: { id: user.id },
+    data: { failedAttempts: 0, otp: null, otpExpiresAt: null },
+  });
 
   const token = await signToken({ userId: user.id, email: user.email, role: user.role });
   await setSessionCookie(token);
@@ -130,7 +232,7 @@ export async function resetPassword(token: string, newPassword: string, confirmP
   const hashedPassword = await bcrypt.hash(newPassword, 10);
   await prisma.adminUser.update({
     where: { id: payload.userId },
-    data: { password: hashedPassword },
+    data: { password: hashedPassword, failedAttempts: 0, otp: null, otpExpiresAt: null },
   });
 
   return { success: true };
