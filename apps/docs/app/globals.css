@@ -27,13 +27,13 @@
 :root {
   --primary: #2563eb;
   --primary-foreground: #ffffff;
-  --sidebar: #0f172a;
-  --sidebar-foreground: #f8fafc;
-  --sidebar-accent: #1e293b;
-  --sidebar-muted: #94a3b8;
+  --sidebar: #0c1222;
+  --sidebar-foreground: #f1f5f9;
+  --sidebar-accent: #1a2744;
+  --sidebar-muted: #8b9dc3;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --success: #16a34a;
+  --success: #059669;
   --warning: #d97706;
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
@@ -48,12 +48,12 @@
   --primary: #3b82f6;
   --primary-foreground: #ffffff;
   --sidebar: #030712;
-  --sidebar-foreground: #f8fafc;
+  --sidebar-foreground: #f1f5f9;
   --sidebar-accent: #111827;
   --sidebar-muted: #9ca3af;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --success: #22c55e;
+  --success: #10b981;
   --warning: #f59e0b;
   --muted: #1e293b;
   --muted-foreground: #94a3b8;
@@ -67,4 +67,49 @@
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Smooth scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 999px;
+  opacity: 0.3;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  opacity: 0.5;
+}
+
+/* Dialog animation */
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-dialog-in {
+  animation: dialog-in 0.2s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.15s ease-out;
 }

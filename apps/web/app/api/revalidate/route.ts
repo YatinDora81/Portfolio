@@ -1,7 +1,8 @@
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
-const REVALIDATE_SECRET = process.env.REVALIDATE_SECRET || "portfolio-revalidate-secret";
+if (!process.env.REVALIDATE_SECRET) throw new Error("REVALIDATE_SECRET environment variable is required");
+const REVALIDATE_SECRET = process.env.REVALIDATE_SECRET;
 
 export async function POST(request: NextRequest) {
   const { secret } = await request.json();
