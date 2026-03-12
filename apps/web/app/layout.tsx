@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import OnekoCat from "./components/OnekoCat";
+import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
   title: "Yatin Dora",
@@ -35,6 +36,7 @@ export default function RootLayout({
       <body>
         {children}
         <OnekoCat />
+        <Analytics />
       </body>
     </html>
   );
