@@ -2,7 +2,8 @@ import type { ComponentType } from "react";
 import {
   IconDashboard, IconSettings, IconSparkles,
   IconInfoCircle, IconCode, IconBriefcase, IconFolder,
-  IconArticle, IconQuote, IconMail, IconUsers, IconMessage, IconLink
+  IconArticle, IconQuote, IconMail, IconUsers, IconMessage, IconLink,
+  IconSend
 } from "@tabler/icons-react";
 
 export interface NavItem {
@@ -23,6 +24,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "Dashboard", href: "/dashboard", icon: IconDashboard },
       { label: "Messages", href: "/messages", icon: IconMessage },
+      { label: "Refer Emails", href: "/refer-emails", icon: IconSend },
     ],
   },
   {
