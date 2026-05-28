@@ -20,11 +20,11 @@ export function ReferEmailsRefreshButton() {
           setMessage("Sheet reloaded (Supabase tracking not configured)");
         } else if (result.updated > 0) {
           setMessage(
-            `Synced ${result.updated} open${result.updated === 1 ? "" : "s"} from Supabase → Sheet`,
+            `Synced ${result.updated} open${result.updated === 1 ? "" : "s"} from Supabase → Sheet${result.utmChecked ? " · UTM checked" : ""}`,
           );
         } else {
           setMessage(
-            `Sheet up to date · ${result.supabaseRows} tracking row${result.supabaseRows === 1 ? "" : "s"}`,
+            `Sheet up to date · ${result.supabaseRows} tracking row${result.supabaseRows === 1 ? "" : "s"}${result.utmChecked ? ` · UTM hits: ${result.utmStats?.total ?? 0}` : ""}`,
           );
         }
         router.refresh();
