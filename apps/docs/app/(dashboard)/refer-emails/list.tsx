@@ -110,6 +110,7 @@ function useAutoSync(fetchedAt: string) {
 
 type FilterKey = "all" | "sent" | "pending" | "failed" | "opened" | "portfolioVisited";
 type SortKey = "recent" | "name" | "opens" | "sno" | "status";
+type PageSize = 100 | 200 | 500 | 800;
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "recent", label: "Recently updated" },
@@ -869,6 +870,8 @@ export function ReferEmailsList({
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [sort, setSort] = useState<SortKey>("recent");
+  const [pageSize, setPageSize] = useState<PageSize>(100);
+  const [page, setPage] = useState(1);
   const { isPending, secondsUntilNext, triggerSync } = useAutoSync(fetchedAt);
 
   const openRate =
@@ -917,6 +920,18 @@ export function ReferEmailsList({
     });
     return sorted;
   }, [contacts, search, filter, sort]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filter, sort, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, filtered.length);
+  const pageRows = filtered.slice(startIndex, endIndex);
+  const rangeStart = filtered.length === 0 ? 0 : startIndex + 1;
+  const rangeEnd = filtered.length === 0 ? 0 : endIndex;
 
   const counts = useMemo(
     () => ({
@@ -1079,10 +1094,51 @@ export function ReferEmailsList({
           />
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <span className="inline-flex h-8 items-center text-[11px] leading-none text-muted-foreground tabular-nums">
-              <span className="font-bold text-foreground">{filtered.length}</span>
-              <span className="mx-1 text-muted-foreground/50">/</span>
-              {counts.all}
+              <span className="font-bold text-foreground">{rangeStart}</span>
+              <span className="mx-1 text-muted-foreground/50">-</span>
+              <span className="font-bold text-foreground">{rangeEnd}</span>
+              <span className="mx-1 text-muted-foreground/50">of</span>
+              {filtered.length}
             </span>
+            <div className="relative">
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value) as PageSize)}
+                className="h-8 appearance-none rounded-full border border-border bg-background pl-2.5 pr-7 text-[11px] font-semibold leading-none outline-none transition-[border-color,box-shadow] focus:border-primary focus:ring-2 focus:ring-primary/15"
+                aria-label="Rows per page"
+                title="Rows per page"
+              >
+                <option value={100}>100 rows</option>
+                <option value={200}>200 rows</option>
+                <option value={500}>500 rows</option>
+                <option value={800}>800 rows</option>
+              </select>
+              <IconChevronDown
+                size={12}
+                className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+            </div>
+            <div className="inline-flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage <= 1}
+                className="inline-flex h-8 items-center rounded-full border border-border bg-card px-2.5 text-[11px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted"
+              >
+                Prev
+              </button>
+              <span className="text-[11px] text-muted-foreground tabular-nums px-1">
+                {safePage}/{totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage >= totalPages}
+                className="inline-flex h-8 items-center rounded-full border border-border bg-card px-2.5 text-[11px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted"
+              >
+                Next
+              </button>
+            </div>
             <button
               type="button"
               onClick={triggerSync}
@@ -1114,7 +1170,7 @@ export function ReferEmailsList({
 
       {/* List */}
       <div className="space-y-2">
-        {filtered.map((c) => (
+        {pageRows.map((c) => (
           <ContactRow key={`${c.sno}-${c.email}`} c={c} />
         ))}
         {filtered.length === 0 && (
@@ -1140,6 +1196,33 @@ export function ReferEmailsList({
           </Card>
         )}
       </div>
+
+      {/* Bottom Pagination */}
+      {filtered.length > 0 && (
+        <Card className="p-3">
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage <= 1}
+              className="inline-flex h-8 items-center rounded-full border border-border bg-card px-2.5 text-[11px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted"
+            >
+              Prev
+            </button>
+            <span className="text-[11px] text-muted-foreground tabular-nums px-1">
+              {safePage}/{totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage >= totalPages}
+              className="inline-flex h-8 items-center rounded-full border border-border bg-card px-2.5 text-[11px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted"
+            >
+              Next
+            </button>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
