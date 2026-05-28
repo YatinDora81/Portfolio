@@ -14,8 +14,8 @@ export default function UtmTrackerBeacon() {
     const term = url.searchParams.get("utm_term");
     const messageId = url.searchParams.get("mid");
 
-    // Only track when all core outreach UTMs are present.
-    if (!source || !medium || !campaign || !content) return;
+    // Track when source+medium+campaign are present; content can be empty.
+    if (!source || !medium || !campaign) return;
 
     const fingerprint = JSON.stringify({
       source,

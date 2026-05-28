@@ -439,14 +439,19 @@ function ContactRow({ c }: { c: SheetContact }) {
   const [expanded, setExpanded] = useState(false);
   const opened = c.openCount > 0;
   const portfolioVisited = (c.portfolioVisitCount ?? 0) > 0;
+  const sentOpenTooltip =
+    c.status === "sent" || opened
+      ? [
+          c.status === "sent" ? `Email Send: ${timeAgo(c.sentAt)}` : null,
+          opened ? `Email Opened: ${timeAgo(c.lastOpenedAt)}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : "";
   const portfolioTooltip = portfolioVisited
     ? [
-        `Portfolio visited ${c.portfolioVisitCount} time${(c.portfolioVisitCount ?? 0) > 1 ? "s" : ""}`,
-        c.sentAt ? `Email sent: ${formatDate(c.sentAt)}` : null,
-        c.lastPortfolioVisitedAt ? `Last portfolio visit: ${formatDate(c.lastPortfolioVisitedAt)}` : null,
-        c.lastPortfolioVisitedAt && c.sentAt
-          ? `Timeline: ${timeAgo(c.sentAt)} (sent) -> ${timeAgo(c.lastPortfolioVisitedAt)} (visit)`
-          : null,
+        `Portolio Open: ${c.portfolioVisitCount} visit${(c.portfolioVisitCount ?? 0) > 1 ? "s" : ""}`,
+        c.lastPortfolioVisitedAt ? `Last Visit: ${timeAgo(c.lastPortfolioVisitedAt)}` : null,
       ]
         .filter(Boolean)
         .join("\n")
@@ -458,7 +463,7 @@ function ContactRow({ c }: { c: SheetContact }) {
   return (
     <div className="group/row relative">
       <Card
-        className={`p-0 overflow-hidden transition-all duration-200 ${
+        className={`p-0 overflow-visible transition-all duration-200 ${
           expanded
             ? "border-primary/40 shadow-md shadow-primary/5"
             : "hover:border-border hover:shadow-md hover:shadow-black/[0.04]"
@@ -559,42 +564,47 @@ function ContactRow({ c }: { c: SheetContact }) {
               </span>
 
               {(c.status === "sent" || opened) && (
-                <div className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border/60 bg-card/80 px-2.5">
-                  {c.status === "sent" && (
-                    <span
-                      className="inline-flex items-center gap-1 leading-none"
-                      title={`Sent ${formatDate(c.sentAt)}`}
-                    >
-                      <IconSend size={11} className="shrink-0 text-emerald-500" stroke={2.2} />
-                      <span className="text-[11px] font-medium tabular-nums">
-                        {timeAgo(c.sentAt)}
+                <div className="relative z-20 group/timeline">
+                  <div className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border/60 bg-card/80 px-2.5">
+                    {c.status === "sent" && (
+                      <span className="inline-flex items-center gap-1 leading-none">
+                        <IconSend size={11} className="shrink-0 text-emerald-500" stroke={2.2} />
+                        <span className="text-[11px] font-medium tabular-nums">
+                          {timeAgo(c.sentAt)}
+                        </span>
                       </span>
-                    </span>
-                  )}
-                  {c.status === "sent" && opened && (
-                    <span className="text-muted-foreground/40 text-[10px] leading-none">·</span>
-                  )}
-                  {opened && (
-                    <span
-                      className="inline-flex items-center gap-1 leading-none"
-                      title={`Last opened ${formatDate(c.lastOpenedAt)}`}
-                    >
-                      <IconEye size={11} className="shrink-0 text-blue-500" stroke={2.2} />
-                      <span className="text-[11px] font-medium tabular-nums text-blue-600 dark:text-blue-400">
-                        {timeAgo(c.lastOpenedAt)}
+                    )}
+                    {c.status === "sent" && opened && (
+                      <span className="text-muted-foreground/40 text-[10px] leading-none">·</span>
+                    )}
+                    {opened && (
+                      <span className="inline-flex items-center gap-1 leading-none">
+                        <IconEye size={11} className="shrink-0 text-blue-500" stroke={2.2} />
+                        <span className="text-[11px] font-medium tabular-nums text-blue-600 dark:text-blue-400">
+                          {timeAgo(c.lastOpenedAt)}
+                        </span>
                       </span>
-                    </span>
+                    )}
+                  </div>
+                  {sentOpenTooltip && (
+                    <div className="pointer-events-none absolute right-0 bottom-full z-30 mb-2 w-64 rounded-lg border border-border bg-card/95 px-3 py-2 text-[11px] leading-relaxed text-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover/timeline:opacity-100">
+                      <p className="whitespace-pre-line">{sentOpenTooltip}</p>
+                    </div>
                   )}
                 </div>
               )}
               {portfolioVisited && (
-                <span
-                  className="inline-flex h-8 items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 text-[11px] font-semibold leading-none text-cyan-700 dark:text-cyan-300"
-                  title={portfolioTooltip}
-                >
-                  <IconWorld size={11} stroke={2.2} className="shrink-0" />
-                  {c.portfolioVisitCount} visit{(c.portfolioVisitCount ?? 0) > 1 ? "s" : ""}
-                </span>
+                <div className="relative z-20 group/portfolio">
+                  <span className="inline-flex h-8 items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 text-[11px] font-semibold leading-none text-cyan-700 dark:text-cyan-300">
+                    <IconWorld size={11} stroke={2.2} className="shrink-0" />
+                    {c.portfolioVisitCount} visit{(c.portfolioVisitCount ?? 0) > 1 ? "s" : ""}
+                  </span>
+                  {portfolioTooltip && (
+                    <div className="pointer-events-none absolute right-0 bottom-full z-30 mb-2 w-72 rounded-lg border border-border bg-card/95 px-3 py-2 text-[11px] leading-relaxed text-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover/portfolio:opacity-100">
+                      <p className="whitespace-pre-line">{portfolioTooltip}</p>
+                    </div>
+                  )}
+                </div>
               )}
 
               {c.error && !opened && (
@@ -921,7 +931,7 @@ export function ReferEmailsList({
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 overflow-x-hidden">
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard

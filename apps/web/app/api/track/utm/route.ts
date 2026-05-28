@@ -28,10 +28,10 @@ export async function POST(request: Request) {
     const messageId = clean(body.messageId);
     const path = clean(body.path);
 
-    // Insert only when all 4 core UTM params are present.
-    if (!source || !medium || !campaign || !content) {
+    // Insert when source+medium+campaign are present; content is optional.
+    if (!source || !medium || !campaign) {
       return Response.json(
-        { skipped: true, reason: "Missing required utm_source/utm_medium/utm_campaign/utm_content" },
+        { skipped: true, reason: "Missing required utm_source/utm_medium/utm_campaign" },
         { status: 200 },
       );
     }
