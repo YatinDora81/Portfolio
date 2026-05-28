@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,8 @@ interface TrackerRow {
   visitedAt: string;
 }
 
+const AUTO_SYNC_INTERVAL_MS = 40_000;
+
 function short(v: string | null, n = 42) {
   if (!v) return "—";
   return v.length > n ? `${v.slice(0, n)}…` : v;
@@ -39,6 +42,10 @@ function decodeUrlSafeBase64(value: string | null): string | null {
 }
 
 export function TrackerTable({ rows }: { rows: TrackerRow[] }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const lastSyncedAtRef = useRef(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [q, setQ] = useState("");
   const [sortBy, setSortBy] = useState<
     "date_newest" | "date_oldest" | "source_az" | "medium_az" | "campaign_az"
@@ -47,6 +54,55 @@ export function TrackerTable({ rows }: { rows: TrackerRow[] }) {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [mediumFilter, setMediumFilter] = useState("all");
   const [campaignFilter, setCampaignFilter] = useState("all");
+
+  useEffect(() => {
+    lastSyncedAtRef.current = Date.now();
+  }, [rows]);
+
+  useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, []);
+
+  const triggerSync = () => {
+    startTransition(() => {
+      router.refresh();
+      lastSyncedAtRef.current = Date.now();
+    });
+  };
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (typeof document === "undefined" || document.visibilityState === "visible") {
+          triggerSync();
+        }
+        schedule();
+      }, AUTO_SYNC_INTERVAL_MS);
+    };
+
+    schedule();
+
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      const elapsed = Date.now() - lastSyncedAtRef.current;
+      if (elapsed >= AUTO_SYNC_INTERVAL_MS) triggerSync();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const secondsUntilNext = Math.ceil(
+    Math.max(0, AUTO_SYNC_INTERVAL_MS - (now - lastSyncedAtRef.current)) / 1000,
+  );
 
   const sourceOptions = useMemo(() => {
     const values = Array.from(new Set(rows.map((r) => r.source).filter(Boolean) as string[])).sort((a, b) =>
@@ -174,6 +230,9 @@ export function TrackerTable({ rows }: { rows: TrackerRow[] }) {
               onChange={setDecodeContent}
               label="Decode content"
             />
+            <Badge variant="outline">
+              {isPending ? "Syncing…" : `Sync in ${secondsUntilNext}s`}
+            </Badge>
             <Badge variant="outline">{filtered.length} rows</Badge>
           </div>
         </div>
