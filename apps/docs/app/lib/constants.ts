@@ -3,7 +3,7 @@ import {
   IconDashboard, IconSettings, IconSparkles,
   IconInfoCircle, IconCode, IconBriefcase, IconFolder,
   IconArticle, IconQuote, IconMail, IconUsers, IconMessage, IconLink,
-  IconSend
+  IconSend, IconChartBar
 } from "@tabler/icons-react";
 
 export interface NavItem {
@@ -25,6 +25,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Dashboard", href: "/dashboard", icon: IconDashboard },
       { label: "Messages", href: "/messages", icon: IconMessage },
       { label: "Refer Emails", href: "/refer-emails", icon: IconSend },
+      { label: "Tracker", href: "/tracker", icon: IconChartBar },
     ],
   },
   {

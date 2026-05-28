@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import OnekoCat from "./components/OnekoCat";
+import ClarityAnalytics from "./components/ClarityAnalytics";
+import UtmTrackerBeacon from "./components/UtmTrackerBeacon";
 import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
@@ -37,6 +39,8 @@ export default function RootLayout({
         {children}
         <OnekoCat />
         <Analytics />
+        <ClarityAnalytics />
+        <UtmTrackerBeacon />
       </body>
     </html>
   );

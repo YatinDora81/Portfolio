@@ -41,6 +41,8 @@ export interface SheetContact {
   error: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  portfolioVisitCount?: number;
+  lastPortfolioVisitedAt?: string | null;
 }
 
 export interface SheetStats {

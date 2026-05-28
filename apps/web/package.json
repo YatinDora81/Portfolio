@@ -12,6 +12,7 @@
     "db:generate": "bunx prisma generate --schema=../../packages/db/prisma/schema.prisma"
   },
   "dependencies": {
+    "@microsoft/clarity": "^1.0.2",
     "@repo/ui": "*",
     "@tabler/icons-react": "^3.40.0",
     "@tailwindcss/postcss": "^4.2.1",

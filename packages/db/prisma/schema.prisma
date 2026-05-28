@@ -146,6 +146,26 @@ model SiteConfig {
   value String
 }
 
+/// Generic UTM hit log — one row per portfolio page load that arrives with utm_* params.
+model UtmTracker {
+  id        String   @id @default(uuid())
+  source    String? // utm_source     e.g. "email"
+  medium    String? // utm_medium     e.g. "referral_outreach"
+  campaign  String? // utm_campaign   e.g. "sde1_outreach"
+  content   String? // utm_content    e.g. "ZG9yYXlhdGluMUBnbWFpbC5jb20" (base64 -> dorayatin1@gmail.com)
+  term      String? // utm_term       e.g. "variant_a"
+  messageId String? // mid            e.g. "fa7d6c94-bae7-4086-9a51-5f092f94c921"
+  path      String? // landing path   e.g. "/projects"
+  referrer  String? // HTTP Referer   e.g. "https://mail.google.com/"
+  userAgent String? // raw UA string  e.g. "Mozilla/5.0 ..."
+  visitedAt DateTime @default(now()) // server time (UTC)
+
+  @@index([content])
+  @@index([campaign])
+  @@index([messageId])
+  @@index([visitedAt])
+}
+
 model AdminUser {
   id             String    @id @default(uuid())
   email          String    @unique

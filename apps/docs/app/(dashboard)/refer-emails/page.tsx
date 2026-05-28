@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { prisma } from "db";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,17 @@ import { ReferEmailsRefreshButton } from "./refresh-button";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+function decodeUrlSafeBase64(value: string): string | null {
+  try {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+    const decoded = Buffer.from(normalized + padding, "base64").toString("utf-8").trim().toLowerCase();
+    return decoded.includes("@") ? decoded : null;
+  } catch {
+    return null;
+  }
+}
 
 export default async function ReferEmailsPage() {
   let data;
@@ -51,6 +63,41 @@ export default async function ReferEmailsPage() {
     );
   }
 
+  const utmHits = await prisma.utmTracker.findMany({
+    where: { content: { not: null } },
+    select: { content: true, visitedAt: true },
+    orderBy: { visitedAt: "desc" },
+    take: 20000,
+  });
+
+  const visitsByEmail = new Map<string, { count: number; lastVisitedAt: string }>();
+  for (const hit of utmHits) {
+    if (!hit.content) continue;
+    const decoded = decodeUrlSafeBase64(hit.content);
+    if (!decoded) continue;
+    const existing = visitsByEmail.get(decoded);
+    if (!existing) {
+      visitsByEmail.set(decoded, {
+        count: 1,
+        lastVisitedAt: hit.visitedAt.toISOString(),
+      });
+    } else {
+      existing.count += 1;
+      if (new Date(hit.visitedAt).getTime() > new Date(existing.lastVisitedAt).getTime()) {
+        existing.lastVisitedAt = hit.visitedAt.toISOString();
+      }
+    }
+  }
+
+  const contactsWithPortfolioVisits = data.contacts.map((c) => {
+    const v = visitsByEmail.get(c.email.toLowerCase());
+    return {
+      ...c,
+      portfolioVisitCount: v?.count ?? 0,
+      lastPortfolioVisitedAt: v?.lastVisitedAt ?? null,
+    };
+  });
+
   return (
     <div>
       <PageHeader
@@ -66,7 +113,7 @@ export default async function ReferEmailsPage() {
       </PageHeader>
 
       <ReferEmailsList
-        contacts={data.contacts}
+        contacts={contactsWithPortfolioVisits}
         stats={data.stats}
         fetchedAt={data.fetchedAt}
       />

@@ -27,6 +27,7 @@ import {
   IconSparkles,
   IconArrowUpRight,
   IconLoader2,
+  IconWorld,
 } from "@tabler/icons-react";
 import type { SheetContact, SheetStats, ContactStatus } from "@/lib/sheet";
 import { syncReferEmails } from "@/lib/actions/refer-emails";
@@ -107,7 +108,7 @@ function useAutoSync(fetchedAt: string) {
   return { isPending, secondsUntilNext, triggerSync };
 }
 
-type FilterKey = "all" | "sent" | "pending" | "failed" | "opened";
+type FilterKey = "all" | "sent" | "pending" | "failed" | "opened" | "portfolioVisited";
 type SortKey = "recent" | "name" | "opens" | "sno" | "status";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
@@ -437,6 +438,19 @@ function FilterPill({
 function ContactRow({ c }: { c: SheetContact }) {
   const [expanded, setExpanded] = useState(false);
   const opened = c.openCount > 0;
+  const portfolioVisited = (c.portfolioVisitCount ?? 0) > 0;
+  const portfolioTooltip = portfolioVisited
+    ? [
+        `Portfolio visited ${c.portfolioVisitCount} time${(c.portfolioVisitCount ?? 0) > 1 ? "s" : ""}`,
+        c.sentAt ? `Email sent: ${formatDate(c.sentAt)}` : null,
+        c.lastPortfolioVisitedAt ? `Last portfolio visit: ${formatDate(c.lastPortfolioVisitedAt)}` : null,
+        c.lastPortfolioVisitedAt && c.sentAt
+          ? `Timeline: ${timeAgo(c.sentAt)} (sent) -> ${timeAgo(c.lastPortfolioVisitedAt)} (visit)`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : "";
   const gradient = gradientFor(c.email || c.name || "x");
   const theme = STATUS_THEME[c.status];
   const StatusIcon = theme.icon;
@@ -502,6 +516,15 @@ function ContactRow({ c }: { c: SheetContact }) {
                     {c.openCount}
                   </span>
                 )}
+                {portfolioVisited && (
+                  <span
+                    className="md:hidden inline-flex items-center gap-0.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white"
+                    title={portfolioTooltip}
+                  >
+                    <IconWorld size={9} stroke={2.4} />
+                    {c.portfolioVisitCount}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-1.5 mt-1 text-[12px] text-muted-foreground flex-wrap">
                 <span className="truncate font-medium text-foreground/70">
@@ -563,6 +586,15 @@ function ContactRow({ c }: { c: SheetContact }) {
                     </span>
                   )}
                 </div>
+              )}
+              {portfolioVisited && (
+                <span
+                  className="inline-flex h-8 items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 text-[11px] font-semibold leading-none text-cyan-700 dark:text-cyan-300"
+                  title={portfolioTooltip}
+                >
+                  <IconWorld size={11} stroke={2.2} className="shrink-0" />
+                  {c.portfolioVisitCount} visit{(c.portfolioVisitCount ?? 0) > 1 ? "s" : ""}
+                </span>
               )}
 
               {c.error && !opened && (
@@ -731,6 +763,17 @@ function ContactRow({ c }: { c: SheetContact }) {
               <Meta icon={IconSend} label="Sent At" value={formatDate(c.sentAt)} />
               <Meta icon={IconCalendar} label="Created" value={formatDate(c.createdAt)} />
               <Meta icon={IconClock} label="Updated" value={formatDate(c.updatedAt)} />
+              <Meta
+                icon={IconWorld}
+                label="Portfolio Visits"
+                value={`${c.portfolioVisitCount ?? 0}`}
+                accent={(c.portfolioVisitCount ?? 0) > 0 ? "primary" : undefined}
+              />
+              <Meta
+                icon={IconEye}
+                label="Last Portfolio Visit"
+                value={timeAgo(c.lastPortfolioVisitedAt ?? null)}
+              />
             </div>
 
             {/* Actions */}
@@ -824,6 +867,8 @@ export function ReferEmailsList({
     stats.total > 0 ? Math.round((stats.sent / stats.total) * 100) : 0;
   const failRate =
     stats.total > 0 ? Math.round((stats.failed / stats.total) * 100) : 0;
+  const portfolioVisitors = contacts.filter((c) => (c.portfolioVisitCount ?? 0) > 0).length;
+  const totalPortfolioVisits = contacts.reduce((sum, c) => sum + (c.portfolioVisitCount ?? 0), 0);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -840,6 +885,7 @@ export function ReferEmailsList({
       );
     }
     if (filter === "opened") arr = arr.filter((c) => c.openCount > 0);
+    else if (filter === "portfolioVisited") arr = arr.filter((c) => (c.portfolioVisitCount ?? 0) > 0);
     else if (filter !== "all") arr = arr.filter((c) => c.status === filter);
 
     const sorted = [...arr];
@@ -869,6 +915,7 @@ export function ReferEmailsList({
       pending: contacts.filter((c) => c.status === "pending").length,
       failed: contacts.filter((c) => c.status === "failed").length,
       opened: contacts.filter((c) => c.openCount > 0).length,
+      portfolioVisited: contacts.filter((c) => (c.portfolioVisitCount ?? 0) > 0).length,
     }),
     [contacts],
   );
@@ -924,6 +971,14 @@ export function ReferEmailsList({
           hint={`${stats.uniqueOpens}/${stats.sent} opened`}
           accent="from-violet-500 to-fuchsia-600"
           glowColor="rgba(139,92,246,0.45)"
+        />
+        <StatCard
+          icon={IconWorld}
+          label="Portfolio Visits"
+          value={totalPortfolioVisits}
+          hint={`${portfolioVisitors} contacts visited`}
+          accent="from-cyan-500 to-blue-600"
+          glowColor="rgba(6,182,212,0.45)"
         />
       </div>
 
@@ -997,6 +1052,17 @@ export function ReferEmailsList({
             label={
               <span className="inline-flex items-center gap-1">
                 <IconFlame size={11} stroke={2.5} /> Opened
+              </span>
+            }
+            tone="primary"
+          />
+          <FilterPill
+            active={filter === "portfolioVisited"}
+            onClick={() => setFilter("portfolioVisited")}
+            count={counts.portfolioVisited}
+            label={
+              <span className="inline-flex items-center gap-1">
+                <IconWorld size={11} stroke={2.5} /> Portfolio Visited
               </span>
             }
             tone="primary"
