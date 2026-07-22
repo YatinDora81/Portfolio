@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useCat } from "./CatProvider";
 
 const SPRITE_SIZE = 32;
 const SPEED = 10;
@@ -26,6 +27,7 @@ const SPRITES: Record<string, [number, number][]> = {
 export default function NekoCat() {
   const catRef = useRef<HTMLDivElement>(null);
   const [isDesktop, setIsDesktop] = useState(false);
+  const { showCat } = useCat();
 
   useEffect(() => {
     // Disable on mobile/tablet (<=1024px)
@@ -114,7 +116,7 @@ export default function NekoCat() {
     };
   }, []);
 
-  if (!isDesktop) return null;
+  if (!isDesktop || !showCat) return null;
 
   return (
     <div

@@ -158,3 +158,40 @@
   from { width: 0%; }
   to { width: 100%; }
 }
+
+/* Navbar cat toggle — playful paw */
+@keyframes pawWiggle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(-16deg) scale(1.08); }
+  50% { transform: rotate(12deg) scale(1.1); }
+  80% { transform: rotate(-6deg) scale(1.04); }
+}
+@keyframes pawPounce {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.4) rotate(-10deg); }
+  70% { transform: scale(0.92) rotate(4deg); }
+  100% { transform: scale(1); }
+}
+@keyframes pawGlow {
+  0%, 100% { filter: drop-shadow(0 0 1px rgba(245, 158, 11, 0.25)); }
+  50% { filter: drop-shadow(0 0 7px rgba(245, 158, 11, 0.8)); }
+}
+
+.paw {
+  display: inline-flex;
+  transition: transform 0.25s ease, color 0.3s ease;
+  will-change: transform;
+}
+.paw-btn:hover .paw { animation: pawWiggle 0.55s ease; }
+.paw-btn:active .paw { animation: pawPounce 0.32s ease; }
+.paw-btn.on .paw {
+  color: #f59e0b;
+  animation: pawGlow 2.4s ease-in-out infinite;
+}
+.paw-btn.on:hover .paw { animation: pawWiggle 0.55s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .paw-btn:hover .paw,
+  .paw-btn:active .paw,
+  .paw-btn.on .paw { animation: none; }
+}

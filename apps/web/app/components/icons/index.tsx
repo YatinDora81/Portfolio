@@ -69,6 +69,32 @@ export function MapPinIcon({ className = "size-4" }: { className?: string }) {
   );
 }
 
+export function PawIcon({
+  className = "size-5",
+  filled = false,
+}: {
+  className?: string;
+  filled?: boolean;
+}) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={filled ? 0 : 1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <ellipse cx="5.6" cy="12.3" rx="1.9" ry="2.5" />
+      <ellipse cx="9.7" cy="7.8" rx="2" ry="2.7" />
+      <ellipse cx="14.3" cy="7.8" rx="2" ry="2.7" />
+      <ellipse cx="18.4" cy="12.3" rx="1.9" ry="2.5" />
+      <path d="M12 12.4c-3.1 0-5.6 2.1-5.6 4.8 0 2 1.7 3.4 3.9 3.4 1 0 1.2-.4 1.7-.4s.7.4 1.7.4c2.2 0 3.9-1.4 3.9-3.4 0-2.7-2.5-4.8-5.5-4.8Z" />
+    </svg>
+  );
+}
+
 export function GraduationCapIcon({ className = "size-4" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

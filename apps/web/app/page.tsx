@@ -1,5 +1,6 @@
 
 import { ThemeProvider } from './components/common/ThemeProvider';
+import { CatProvider } from './components/common/CatProvider';
 import NekoCat from './components/common/NekoCat';
 import Navbar from './components/common/Navbar';
 import Hero from './components/landing/Hero';
@@ -40,6 +41,7 @@ export default async function Home() {
 
   return (
     <ThemeProvider>
+      <CatProvider>
       <div className="min-h-screen bg-background text-foreground">
         <NekoCat />
         <BackgroundLines />
@@ -77,6 +79,7 @@ export default async function Home() {
           <Footer socialLinks={contactData.socialLinks} copyrightName={siteConfig.copyrightName} />
         </div>
       </div>
+      </CatProvider>
     </ThemeProvider>
   );
 }
