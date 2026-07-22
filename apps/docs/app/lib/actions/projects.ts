@@ -9,6 +9,7 @@ interface ProjectData {
   summary: string;
   github: string | null;
   live: string | null;
+  logoUrl: string | null;
   images: string[];
   skillIds: string[];
   bullets: { id?: string; content: string; sortOrder: number }[];
@@ -22,6 +23,7 @@ export async function createProject(data: ProjectData) {
       summary: data.summary,
       github: data.github || null,
       live: data.live || null,
+      logoUrl: data.logoUrl || null,
       images: data.images.filter(Boolean),
       sortOrder: count,
       skills: { connect: data.skillIds.map((id) => ({ id })) },
@@ -43,6 +45,7 @@ export async function updateProject(id: string, data: ProjectData) {
         summary: data.summary,
         github: data.github || null,
         live: data.live || null,
+        logoUrl: data.logoUrl || null,
         images: data.images.filter(Boolean),
         skills: { set: data.skillIds.map((sid) => ({ id: sid })) },
       },

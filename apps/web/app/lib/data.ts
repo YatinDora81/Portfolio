@@ -92,6 +92,7 @@ export async function getExperiences() {
     endDate: exp.endDate,
     isCurrent: exp.isCurrent,
     website: exp.website,
+    logoUrl: exp.logoUrl,
     bullets: exp.bullets.map((b) => b.content),
     technologies: exp.skills.map((s) => s.name),
   }));
@@ -110,6 +111,7 @@ export async function getProjects() {
     summary: p.summary,
     github: p.github,
     live: p.live,
+    logoUrl: p.logoUrl,
     images: p.images,
     bullets: p.bullets.map((b) => b.content),
     technologies: p.skills.map((s) => ({ name: s.name, iconKey: s.iconKey })),

@@ -27,6 +27,7 @@ interface ExperienceData {
   bullets: string[];
   technologies: string[];
   website: string | null;
+  logoUrl: string | null;
 }
 
 function parseBullet(content: string) {
@@ -45,6 +46,7 @@ function ExperienceCard({ exp, alwaysRevealed = false }: { exp: ExperienceData; 
   const [revealed, setRevealed] = useState(alwaysRevealed);
 
   const bullets = exp.bullets.map(parseBullet);
+  const logo = exp.logoUrl;
 
   return (
     <div
@@ -54,6 +56,17 @@ function ExperienceCard({ exp, alwaysRevealed = false }: { exp: ExperienceData; 
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
+            {logo && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logo}
+                alt=""
+                aria-hidden
+                width={24}
+                height={24}
+                className="size-6 shrink-0 rounded object-contain"
+              />
+            )}
             {exp.website ? (
               <a
                 href={exp.website}

@@ -161,7 +161,7 @@ async function seed() {
       startDate: "July 2025",
       endDate: "Present",
       isCurrent: true,
-      website: "https://wiingy.com",
+      website: "https://wiingy.com", logoUrl: "/logos/wiingy.png",
       sortOrder: 0,
       skills: {
         connect: connectSkills([
@@ -200,7 +200,7 @@ async function seed() {
       startDate: "January 2025",
       endDate: "July 2025",
       isCurrent: false,
-      website: "https://nykaa.com",
+      website: "https://nykaa.com", logoUrl: "/logos/nykaa.png",
       sortOrder: 1,
       skills: {
         connect: connectSkills([
@@ -238,6 +238,7 @@ async function seed() {
       summary: "Real-time collaborative drawing app enabling multi-user live drawing sessions.",
       github: "https://github.com/yatindora/draw-and-connect",
       live: "https://drawsheet.vercel.app",
+      logoUrl: "/logos/drawsheet.png",
       image: "/projects/drawsheet.png",
       sortOrder: 0,
       skills: {
@@ -259,6 +260,7 @@ async function seed() {
       summary: "AI-powered job application platform with message generation, templates, and tracking.",
       github: "https://github.com/yatindora/next-move-app",
       live: "https://nextmove-yatin.vercel.app",
+      logoUrl: "/logos/nextmove.png",
       image: "/projects/nextmove.png",
       sortOrder: 1,
       skills: {
@@ -280,6 +282,7 @@ async function seed() {
       summary: "Real-time messaging platform for teams and friends with typing indicators and file sharing.",
       github: "https://github.com/yatindora/draw-and-connect",
       live: "https://connect-yatin.vercel.app",
+      logoUrl: "/logos/connect.png",
       image: "/projects/connect.png",
       sortOrder: 2,
       skills: {
@@ -301,6 +304,7 @@ async function seed() {
       summary: "AI-powered movie and TV show recommendation app with personalized suggestions and search.",
       github: "https://github.com/YatinDora81/Netflix-GPT",
       live: "https://netflix-gpt-uysk.vercel.app",
+      logoUrl: "/logos/netflix-gpt.png",
       image: "/projects/netflix-gpt.png",
       sortOrder: 3,
       skills: {
@@ -322,6 +326,7 @@ async function seed() {
       summary: "URL shortener with analytics to track clicks and usage statistics.",
       github: "https://github.com/YatinDora81/URL_Shortner",
       live: "https://url-shortner-git-main-yatindora81s-projects.vercel.app",
+      logoUrl: "/logos/trimrr.png",
       image: "/projects/trimrr.png",
       sortOrder: 4,
       skills: {

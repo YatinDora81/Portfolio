@@ -12,6 +12,7 @@ interface ExperienceData {
   endDate: string;
   isCurrent: boolean;
   website: string | null;
+  logoUrl: string | null;
   skillIds: string[];
   bullets: { id?: string; content: string; sortOrder: number }[];
 }
@@ -27,6 +28,7 @@ export async function createExperience(data: ExperienceData) {
       endDate: data.endDate,
       isCurrent: data.isCurrent,
       website: data.website || null,
+      logoUrl: data.logoUrl || null,
       sortOrder: count,
       skills: { connect: data.skillIds.map((id) => ({ id })) },
       bullets: {
@@ -50,6 +52,7 @@ export async function updateExperience(id: string, data: ExperienceData) {
         endDate: data.endDate,
         isCurrent: data.isCurrent,
         website: data.website || null,
+        logoUrl: data.logoUrl || null,
         skills: { set: data.skillIds.map((sid) => ({ id: sid })) },
       },
     });

@@ -31,6 +31,7 @@ interface ProjectData {
   technologies: TechSkill[];
   github: string | null;
   live: string | null;
+  logoUrl: string | null;
   images: string[];
 }
 
@@ -105,22 +106,35 @@ function ProjectCard({ project, alwaysRevealed = false }: { project: ProjectData
   const bullets = project.bullets.map(parseBullet);
   const hasMore = bullets.length > visibleCount;
   const [revealed, setRevealed] = useState(alwaysRevealed);
+  const logo = project.logoUrl;
 
   return (
     <div
       className="group/card rounded-xl border border-border bg-card p-4 sm:p-6 transition-all duration-300 hover:border-foreground/20"
       onMouseEnter={() => { if (!isMobile && hasMore && !revealed) setRevealed(true); }}
     >
-      <div className="flex items-center justify-between">
-        {project.live ? (
-          <a href={project.live} target="_blank" rel="noopener noreferrer" className="text-lg font-semibold group-hover/card:text-foreground transition-colors hover:underline underline-offset-4">
-            {project.title}
-          </a>
-        ) : (
-          <h3 className="text-lg font-semibold group-hover/card:text-foreground transition-colors">
-            {project.title}
-          </h3>
-        )}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          {logo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logo}
+              alt=""
+              aria-hidden
+              height={24}
+              className="h-6 w-auto max-w-12 shrink-0 rounded object-contain"
+            />
+          )}
+          {project.live ? (
+            <a href={project.live} target="_blank" rel="noopener noreferrer" className="truncate text-lg font-semibold group-hover/card:text-foreground transition-colors hover:underline underline-offset-4">
+              {project.title}
+            </a>
+          ) : (
+            <h3 className="truncate text-lg font-semibold group-hover/card:text-foreground transition-colors">
+              {project.title}
+            </h3>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           {project.live && (
             <a href={project.live} target="_blank" rel="noopener noreferrer" className="text-secondary hover:text-foreground transition-colors" title="Live Demo">

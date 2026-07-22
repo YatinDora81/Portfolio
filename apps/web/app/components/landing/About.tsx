@@ -34,6 +34,8 @@ interface AboutProps {
   paragraphs: string[];
   education: EducationEntry[];
   resumeUrl?: string;
+  /** company name (lower-cased) -> logo url, sourced from the Experience rows */
+  companyLogos?: Record<string, string>;
 }
 
 const DEFAULT_RESUME_URL =
@@ -41,16 +43,35 @@ const DEFAULT_RESUME_URL =
 
 /* ---------- markdown-bold -> spans ---------- */
 
-function BoldText({ text }: { text: string }) {
+/**
+ * Renders `**bold**` CMS markup. When a bolded run names a company we have a
+ * logo for, its mark is shown inline just before the name — the lookup comes
+ * from the same `logoUrl` field the Experience section uses, so it stays
+ * CMS-driven and there is nothing to keep in sync here.
+ */
+function BoldText({ text, logos }: { text: string; logos?: Record<string, string> }) {
   return (
     <>
-      {text.split(/\*\*(.*?)\*\*/g).map((part, i) =>
-        i % 2 === 1 ? (
-          <span key={i} className="font-semibold text-foreground">{part}</span>
-        ) : (
-          <span key={i}>{part}</span>
-        )
-      )}
+      {text.split(/\*\*(.*?)\*\*/g).map((part, i) => {
+        if (i % 2 === 0) return <span key={i}>{part}</span>;
+        const logo = logos?.[part.trim().toLowerCase()];
+        return (
+          <span key={i} className="font-semibold text-foreground">
+            {logo && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logo}
+                alt=""
+                aria-hidden
+                width={16}
+                height={16}
+                className="mr-1 inline-block size-4 rounded-[3px] object-contain align-[-0.2em]"
+              />
+            )}
+            {part}
+          </span>
+        );
+      })}
     </>
   );
 }
@@ -113,9 +134,11 @@ function Prompt() {
 function Terminal({
   paragraphs,
   resumeUrl,
+  logos,
 }: {
   paragraphs: string[];
   resumeUrl?: string;
+  logos?: Record<string, string>;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -388,7 +411,7 @@ function Terminal({
     if (l.t === 'about')
       return (
         <p key={i} className="m-0 whitespace-pre-wrap text-secondary">
-          <BoldText text={l.v} />
+          <BoldText text={l.v} logos={logos} />
         </p>
       );
     return (
@@ -453,7 +476,7 @@ function Terminal({
                 },
               }}
             >
-              <BoldText text={p} />
+              <BoldText text={p} logos={logos} />
             </motion.p>
           ))}
         </div>
@@ -635,14 +658,18 @@ function ScoreRing({
 
 /* ---------- main ---------- */
 
-export default function About({ paragraphs, education, resumeUrl }: AboutProps) {
+export default function About({ paragraphs, education, resumeUrl, companyLogos }: AboutProps) {
   const reduceMotion = useReducedMotion() ?? false;
 
   return (
     <Container className="mt-16 animate-fade-in-blur animate-delay-1">
       <SectionHeading subHeading="About" heading="Who I am" />
 
-      <Terminal paragraphs={paragraphs} resumeUrl={resumeUrl || DEFAULT_RESUME_URL} />
+      <Terminal
+        paragraphs={paragraphs}
+        resumeUrl={resumeUrl || DEFAULT_RESUME_URL}
+        logos={companyLogos}
+      />
 
       {/* ── Education timeline (id lets the terminal navigate here) ── */}
       {education.length > 0 && (

@@ -69,6 +69,7 @@ model Experience {
   endDate   String
   isCurrent Boolean            @default(false)
   website   String?
+  logoUrl   String?
   sortOrder Int
   bullets   ExperienceBullet[]
   skills    Skill[]            @relation("ExperienceToSkill")
@@ -88,6 +89,7 @@ model Project {
   summary   String
   github    String?
   live      String?
+  logoUrl   String?
   sortOrder Int
   images    String[]
   bullets   ProjectBullet[]

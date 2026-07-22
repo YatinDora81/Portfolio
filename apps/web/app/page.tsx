@@ -39,6 +39,14 @@ export default async function Home() {
       getSiteConfig(),
     ]);
 
+  // Company marks for the About terminal, reusing the logos already set on the
+  // Experience rows so there's only one place in the CMS to maintain them.
+  const companyLogos = Object.fromEntries(
+    experiences
+      .filter((e) => e.logoUrl)
+      .map((e) => [e.company.trim().toLowerCase(), e.logoUrl as string])
+  );
+
   return (
     <ThemeProvider>
       <CatProvider>
@@ -63,6 +71,7 @@ export default async function Home() {
               paragraphs={aboutData.paragraphs}
               education={aboutData.education}
               resumeUrl={siteConfig.resumeUrl}
+              companyLogos={companyLogos}
             />
             <Skills skills={skills} />
             <Experience experiences={experiences} />

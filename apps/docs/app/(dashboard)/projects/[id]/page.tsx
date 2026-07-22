@@ -20,6 +20,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
         summary: project.summary,
         github: project.github,
         live: project.live,
+        logoUrl: project.logoUrl,
         images: project.images,
         skillIds: project.skills.map(s => s.id),
         bullets: project.bullets.map(b => ({ id: b.id, content: b.content, sortOrder: b.sortOrder })),

@@ -13,7 +13,7 @@ import { IconPlus, IconTrash, IconArrowUp, IconArrowDown } from "@tabler/icons-r
 interface Bullet { id?: string; content: string; sortOrder: number }
 interface ProjectData {
   id: string; title: string; summary: string;
-  github: string | null; live: string | null; images: string[];
+  github: string | null; live: string | null; logoUrl: string | null; images: string[];
   skillIds: string[]; bullets: Bullet[];
 }
 
@@ -29,6 +29,7 @@ export function ProjectForm({ project, allSkills }: {
   const [summary, setSummary] = useState(project?.summary || "");
   const [github, setGithub] = useState(project?.github || "");
   const [live, setLive] = useState(project?.live || "");
+  const [logoUrl, setLogoUrl] = useState(project?.logoUrl || "");
   const [images, setImages] = useState<string[]>(project?.images?.length ? project.images : [""]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>(project?.skillIds || []);
   const [bullets, setBullets] = useState<Bullet[]>(project?.bullets || [{ content: "", sortOrder: 0 }]);
@@ -38,6 +39,7 @@ export function ProjectForm({ project, allSkills }: {
       title, summary,
       github: github || null,
       live: live || null,
+      logoUrl: logoUrl || null,
       images: images.filter(Boolean),
       skillIds: selectedSkills,
       bullets: bullets.map((b, i) => ({ ...b, sortOrder: i })),
@@ -64,6 +66,7 @@ export function ProjectForm({ project, allSkills }: {
             <Input label="GitHub URL" value={github} onChange={e => setGithub(e.target.value)} />
             <Input label="Live URL" value={live} onChange={e => setLive(e.target.value)} />
           </div>
+          <Input label="Logo URL (optional)" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="/logos/my-project.png or https://…" />
 
           <div>
             <label className="block text-sm font-medium mb-2">Image URLs</label>

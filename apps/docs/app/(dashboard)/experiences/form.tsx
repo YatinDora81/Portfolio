@@ -14,7 +14,7 @@ interface Bullet { id?: string; content: string; sortOrder: number }
 interface ExperienceData {
   id: string; company: string; position: string; location: string;
   startDate: string; endDate: string; isCurrent: boolean;
-  website: string | null; skillIds: string[]; bullets: Bullet[];
+  website: string | null; logoUrl: string | null; skillIds: string[]; bullets: Bullet[];
 }
 
 export function ExperienceForm({ experience, allSkills }: {
@@ -32,6 +32,7 @@ export function ExperienceForm({ experience, allSkills }: {
   const [endDate, setEndDate] = useState(experience?.endDate || "");
   const [isCurrent, setIsCurrent] = useState(experience?.isCurrent || false);
   const [website, setWebsite] = useState(experience?.website || "");
+  const [logoUrl, setLogoUrl] = useState(experience?.logoUrl || "");
   const [selectedSkills, setSelectedSkills] = useState<string[]>(experience?.skillIds || []);
   const [bullets, setBullets] = useState<Bullet[]>(experience?.bullets || [{ content: "", sortOrder: 0 }]);
 
@@ -39,6 +40,7 @@ export function ExperienceForm({ experience, allSkills }: {
     const data = {
       company, position, location, startDate, endDate, isCurrent,
       website: website || null,
+      logoUrl: logoUrl || null,
       skillIds: selectedSkills,
       bullets: bullets.map((b, i) => ({ ...b, sortOrder: i })),
     };
@@ -67,6 +69,7 @@ export function ExperienceForm({ experience, allSkills }: {
             <Input label="Start Date" value={startDate} onChange={e => setStartDate(e.target.value)} placeholder="e.g. July 2025" required />
             <Input label="End Date" value={endDate} onChange={e => setEndDate(e.target.value)} placeholder="e.g. Present" required />
           </div>
+          <Input label="Logo URL (optional)" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="/logos/my-company.png or https://…" />
           <div className="flex items-center gap-4">
             <Input label="Website (optional)" value={website} onChange={e => setWebsite(e.target.value)} className="flex-1" />
             <label className="flex items-center gap-2 mt-6 text-sm cursor-pointer">
