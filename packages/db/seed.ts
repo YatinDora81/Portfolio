@@ -51,7 +51,9 @@ async function seed() {
       { name: "LinkedIn", href: "https://www.linkedin.com/in/yatin-dora/", iconKey: "linkedin", detail: "/in/yatin-dora", sortOrder: 0 },
       { name: "GitHub", href: "https://github.com/YatinDora81", iconKey: "github", detail: "@YatinDora81", sortOrder: 1 },
       { name: "LeetCode", href: "https://leetcode.com/yatindora/", iconKey: "leetcode", detail: "@yatindora", sortOrder: 2 },
-      { name: "Email", href: "mailto:yatin.dora81@gmail.com", iconKey: "email", detail: "yatin.dora81@gmail.com", sortOrder: 3 },
+      { name: "LeetCode 2", href: "https://leetcode.com/u/Yatin_dora_sde/", iconKey: "leetcode", detail: "@Yatin_dora_sde", sortOrder: 3 },
+      { name: "X", href: "https://x.com/YatinDora", iconKey: "x", detail: "@YatinDora", sortOrder: 4 },
+      { name: "Email", href: "mailto:yatin.dora81@gmail.com", iconKey: "email", detail: "yatin.dora81@gmail.com", sortOrder: 5 },
     ],
   });
   console.log("Social links seeded");

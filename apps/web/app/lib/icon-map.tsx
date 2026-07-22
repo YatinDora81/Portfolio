@@ -8,7 +8,7 @@ import {
   ReduxIcon, ZustandIcon, JwtIcon, OAuthIcon, ClerkIcon, PostmanIcon, SwaggerIcon, EslintPrettierIcon,
   S3Icon, EC2Icon, CloudflareIcon, BashIcon, NpmIcon, AgileIcon, NotionIcon, GoogleApisIcon,
 } from '@/components/icons/skills';
-import { GithubIcon, LinkedInIcon, MailIcon, LeetCodeIcon } from '@/components/icons';
+import { GithubIcon, LinkedInIcon, MailIcon, LeetCodeIcon, XIcon } from '@/components/icons';
 
 export const skillIconMap: Record<string, React.ReactNode> = {
   'React': <ReactIcon />,
@@ -73,6 +73,8 @@ export const skillIconMap: Record<string, React.ReactNode> = {
 
 export const socialIconMap: Record<string, (props: { className?: string }) => React.ReactNode> = {
   linkedin: (props) => <LinkedInIcon {...props} />,
+  x: (props) => <XIcon {...props} />,
+  twitter: (props) => <XIcon {...props} />,
   github: (props) => <GithubIcon {...props} />,
   leetcode: (props) => <LeetCodeIcon {...props} />,
   email: (props) => <MailIcon {...props} />,

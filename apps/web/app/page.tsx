@@ -76,7 +76,7 @@ export default async function Home() {
               availabilityDetail={siteConfig.availabilityDetail}
             />
           </main>
-          <Footer socialLinks={contactData.socialLinks} copyrightName={siteConfig.copyrightName} />
+          <Footer copyrightName={siteConfig.copyrightName} />
         </div>
       </div>
       </CatProvider>
