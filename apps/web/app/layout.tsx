@@ -7,7 +7,7 @@ import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
   title: "Yatin Dora",
-  description: "Yatin Dora - Full-Stack Developer. Building scalable web applications with React, Next.js, Node.js, TypeScript, and Go.",
+  description: "Yatin Dora - Software Developer. Building scalable web applications with React, Next.js, Node.js, TypeScript, and Go.",
 };
 
 export default function RootLayout({

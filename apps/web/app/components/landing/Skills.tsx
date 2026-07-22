@@ -116,25 +116,19 @@ function ElementCard({
         style={
           hovered
             ? {
-                borderColor: hexToRgba(c, 0.9),
-                boxShadow: `0 14px 30px -12px ${hexToRgba(
-                  c,
-                  0.55,
-                )}, inset 0 0 0 1px ${hexToRgba(c, 0.45)}`,
-                transform: 'translateY(-5px) scale(1.06)',
+                background: hexToRgba(c, isDark ? 0.1 : 0.08),
+                transform: 'translateY(-3px) scale(1.04)',
               }
             : undefined
         }
         className={[
           'group/card relative flex aspect-square w-[70px] flex-col justify-between overflow-hidden',
-          'rounded-xl border border-border bg-card p-1.5 sm:w-[78px]',
-          // light mode: cards float off the white bg; dark mode: border does the work
-          'shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_12px_-4px_rgba(0,0,0,0.08)] dark:shadow-none',
-          'transition-[transform,border-color,box-shadow,opacity,filter] duration-300 ease-out will-change-transform',
+          'rounded-lg border-0 bg-transparent p-1.5 sm:w-[78px]',
+          'transition-[transform,background-color,opacity,filter] duration-300 ease-out will-change-transform',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20',
           dimmed
             ? 'pointer-events-none scale-90 opacity-15 grayscale'
-            : 'hover:-translate-y-1',
+            : 'hover:-translate-y-0.5 hover:bg-foreground/[0.03]',
         ].join(' ')}
       >
         {/* category accent hairline */}
@@ -149,7 +143,7 @@ function ElementCard({
 
         {/* atomic number + element symbol */}
         <span className="flex w-full items-start justify-between pt-1">
-          <span className="font-mono text-[8px] leading-none text-secondary">
+          {/* <span className="font-mono text-[8px] leading-none text-secondary">
             {pad(skill.number)}
           </span>
           <span
@@ -157,7 +151,7 @@ function ElementCard({
             style={{ color: hovered ? c : hexToRgba(c, 0.6) }}
           >
             {skill.symbol}
-          </span>
+          </span> */}
         </span>
 
         <span className="flex size-6 items-center justify-center self-center transition-transform duration-300 group-hover/card:scale-110 sm:size-7">
@@ -180,7 +174,7 @@ function ElementCard({
         {/* brand-colored spotlight */}
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-xl opacity-0 transition-opacity duration-300 group-hover/card:opacity-100"
+          className="pointer-events-none absolute inset-0 rounded-lg opacity-0 transition-opacity duration-300 group-hover/card:opacity-100"
           style={{
             background: `radial-gradient(circle at 50% 0%, ${hexToRgba(
               c,
@@ -259,8 +253,6 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
       })),
   ];
 
-  const visibleCount =
-    filter === null ? enriched.length : counts.get(filter) ?? 0;
   const hoveredSkill =
     hovered !== null ? enriched.find((s) => s.number === hovered) : undefined;
   const hoveredColor = hoveredSkill ? tune(hoveredSkill.color, isDark) : '';
@@ -339,7 +331,7 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
 
         {/* Live readout — stable height, shows the hovered element */}
         <div className="mt-6 flex h-5 items-center justify-center gap-2 font-mono text-[11px] text-secondary">
-          {hoveredSkill ? (
+          {hoveredSkill && (
             <>
               <span
                 className="size-1.5 shrink-0 rounded-full"
@@ -352,10 +344,6 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
               <span aria-hidden>—</span>
               <span>{categoryLabel[hoveredSkill.category]}</span>
             </>
-          ) : (
-            <span>
-              {visibleCount}/{enriched.length} elements · hover to inspect
-            </span>
           )}
         </div>
       </Container>

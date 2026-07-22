@@ -23,7 +23,7 @@ async function seed() {
   // ── Hero Titles ──
   await prisma.heroTitle.createMany({
     data: [
-      { title: "Full-Stack Developer", sortOrder: 0 },
+      { title: "Software Developer", sortOrder: 0 },
       { title: "Frontend Engineer", sortOrder: 1 },
       { title: "Backend Engineer", sortOrder: 2 },
       { title: "DevOps Enthusiast", sortOrder: 3 },
@@ -63,7 +63,7 @@ async function seed() {
     data: [
       {
         content:
-          "I'm a **Full-Stack Developer** with experience building production-grade web applications. Currently working at **Wiingy** as an SDE, where I architect scheduling platforms, modernize databases, and implement AI-powered search.",
+          "I'm a **Software Developer** with experience building production-grade web applications. Currently working at **Wiingy** as an SDE, where I architect scheduling platforms, modernize databases, and implement AI-powered search.",
         sortOrder: 0,
       },
       {

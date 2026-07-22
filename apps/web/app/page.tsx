@@ -62,6 +62,7 @@ export default async function Home() {
             <About
               paragraphs={aboutData.paragraphs}
               education={aboutData.education}
+              resumeUrl={siteConfig.resumeUrl}
             />
             <Skills skills={skills} />
             <Experience experiences={experiences} />
