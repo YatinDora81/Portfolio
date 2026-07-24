@@ -3,7 +3,7 @@ import "./globals.css";
 import OnekoCat from "./components/OnekoCat";
 import ClarityAnalytics from "./components/ClarityAnalytics";
 import UtmTrackerBeacon from "./components/UtmTrackerBeacon";
-import { Analytics } from '@vercel/analytics/next';
+import VercelAnalytics from "./components/VercelAnalytics";
 
 export const metadata: Metadata = {
   title: "Yatin Dora",
@@ -38,7 +38,7 @@ export default function RootLayout({
       <body>
         {children}
         <OnekoCat />
-        <Analytics />
+        <VercelAnalytics />
         <ClarityAnalytics />
         <UtmTrackerBeacon />
       </body>
