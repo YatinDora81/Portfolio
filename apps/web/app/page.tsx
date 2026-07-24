@@ -25,6 +25,15 @@ import {
   getSiteConfig,
 } from './lib/data';
 
+function quoteOfDay(quotes: { quote: string; author: string }[]) {
+  if (quotes.length === 0) return null;
+  const now = new Date();
+  const start = Date.UTC(now.getUTCFullYear(), 0, 0);
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const dayOfYear = Math.floor((today - start) / 86_400_000);
+  return quotes[dayOfYear % quotes.length] ?? null;
+}
+
 export default async function Home() {
   const [heroData, aboutData, skills, experiences, projects, blogs, quotes, contactData, siteConfig] =
     await Promise.all([
@@ -46,6 +55,11 @@ export default async function Home() {
       .filter((e) => e.logoUrl)
       .map((e) => [e.company.trim().toLowerCase(), e.logoUrl as string])
   );
+
+  // Pick the "thought of the day" on the server (deterministic day-of-year index)
+  // so only ONE quote is serialized into the payload instead of all ~28, and there's
+  // no post-hydration flash. Stable within the 24h revalidation window.
+  const thought = quoteOfDay(quotes);
 
   return (
     <ThemeProvider>
@@ -77,7 +91,7 @@ export default async function Home() {
             <Experience experiences={experiences} />
             <Projects projects={projects} />
             {blogs.length > 0 && <Blogs blogs={blogs} />}
-            <ThoughtOfTheDay quotes={quotes} />
+            <ThoughtOfTheDay quote={thought} />
             <Contact
               purposes={contactData.purposes}
               socialLinks={contactData.socialLinks}

@@ -5,6 +5,11 @@ import { ThemeProvider } from '@/components/common/ThemeProvider';
 import BackgroundLines from '@/components/common/BackgroundLines';
 import BlogContent from './BlogContent';
 
+export async function generateStaticParams() {
+  const blogs = await getBlogs();
+  return blogs.map((b) => ({ slug: b.slug }));
+}
+
 export default async function BlogPage({
   params,
 }: {

@@ -1,6 +1,3 @@
-'use client';
-
-import { useState, useEffect } from 'react';
 import Container from '../common/Container';
 
 interface Quote {
@@ -8,22 +5,10 @@ interface Quote {
   author: string;
 }
 
-function getToday() {
-  const now = new Date();
-  return now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
-}
-
-export default function ThoughtOfTheDay({ quotes }: { quotes: Quote[] }) {
-  const [thought, setThought] = useState(quotes[0]);
-
-  useEffect(() => {
-    if (quotes.length > 0) {
-      const index = getToday() % quotes.length;
-      setThought(quotes[index]!);
-    }
-  }, [quotes]);
-
-  if (!thought) return null;
+// Server component: the day's quote is picked server-side in page.tsx and passed
+// in, so only one quote ships in the payload and there's no post-hydration swap.
+export default function ThoughtOfTheDay({ quote }: { quote: Quote | null }) {
+  if (!quote) return null;
 
   return (
     <Container className="mt-20 animate-fade-in-blur animate-delay-6">
@@ -32,10 +17,10 @@ export default function ThoughtOfTheDay({ quotes }: { quotes: Quote[] }) {
           Thought of the Day
         </span>
         <blockquote className="text-base sm:text-lg font-medium leading-relaxed italic text-foreground/90">
-          &ldquo;{thought.quote}&rdquo;
+          &ldquo;{quote.quote}&rdquo;
         </blockquote>
         <p className="mt-3 text-sm text-secondary">
-          — {thought.author}
+          — {quote.author}
         </p>
       </div>
     </Container>

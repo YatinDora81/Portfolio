@@ -129,6 +129,8 @@ export async function getBlogs() {
       image: true,
       imageOrientation: true,
       color: true,
+      publishedAt: true,
+      updatedAt: true,
     },
   });
   return blogs.map((b) => ({
@@ -138,6 +140,8 @@ export async function getBlogs() {
     image: b.image,
     imageOrientation: b.imageOrientation as string,
     color: b.color,
+    publishedAt: b.publishedAt,
+    updatedAt: b.updatedAt,
   }));
 }
 
@@ -152,11 +156,15 @@ export async function getBlogBySlug(slug: string) {
     image: blog.image,
     imageOrientation: blog.imageOrientation as string,
     color: blog.color,
+    publishedAt: blog.publishedAt,
+    updatedAt: blog.updatedAt,
   };
 }
 
 export async function getQuotes() {
-  const quotes = await prisma.quote.findMany();
+  // Stable ordering so the day-of-year "thought of the day" pick is deterministic
+  // across queries and deployments (Postgres has no implicit row order otherwise).
+  const quotes = await prisma.quote.findMany({ orderBy: { id: "asc" } });
   return quotes.map((q) => ({ quote: q.quote, author: q.author }));
 }
 
