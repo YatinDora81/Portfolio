@@ -125,7 +125,7 @@ export default function NekoCat() {
       style={{
         width: SPRITE_SIZE,
         height: SPRITE_SIZE,
-        backgroundImage: "url(https://raw.githubusercontent.com/adryd325/oneko.js/14bab15a755d0e35cd4ae19c931b96f8f2e24c99/oneko.gif)",
+        backgroundImage: "url(/oneko/oneko.gif)",
         imageRendering: "pixelated",
       }}
     />
