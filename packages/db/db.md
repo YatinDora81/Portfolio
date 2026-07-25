@@ -142,10 +142,11 @@ Key-value store for site-wide configuration that was previously hardcoded in fro
 **Keys:**
 | Key | Used In | Description |
 |-----|---------|-------------|
-| `name` | Hero | First name shown in hero heading ("Hi, I'm {name} —") and avatar alt text |
+| `name` | Hero | Full name shown on the hero nameplate (split on whitespace, trailing dot appended) and used as avatar alt text |
 | `tagline` | Hero | Sentence after the skill badges in hero bio |
 | `intro` | Hero | Text before inline skill badges ("I build scalable web apps using") |
 | `avatarUrl` | Hero | Path to avatar image (e.g. "/mine/avatar.png") |
+| `heroPhotos` | Hero | Comma-separated photo paths for the name-hover peek deck (e.g. "/mine/avatar.png,/mine/avatar-2.png"). Gliding across the nameplate flips through them; one entry means no flipping. Falls back to `avatarUrl` when unset |
 | `resumeUrl` | Hero | Path to resume PDF (e.g. "/Yatin-SDE-1.pdf") |
 | `navbarLogo` | Navbar | Logo text in the navbar (e.g. "Yatin.Dora") |
 | `contactEmail` | Contact | Email address used in the mailto link of the contact form |

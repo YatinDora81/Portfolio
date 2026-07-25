@@ -715,10 +715,11 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
   // ── Site Config ──
   await prisma.siteConfig.createMany({
     data: [
-      { key: "name", value: "Yatin" },
+      { key: "name", value: "Yatin Dora" },
       { key: "tagline", value: "Ship it, scale it, make it smarter, keep learning — that's the loop I live in." },
       { key: "intro", value: "I build scalable web apps using" },
       { key: "avatarUrl", value: "/mine/avatar.png" },
+      { key: "heroPhotos", value: "/mine/avatar.png,/mine/avatar2.jpeg" },
       { key: "resumeUrl", value: "https://drive.google.com/file/d/1eljvOFwiltQbn6EvSiTv1fwjDipTSVI1/view?usp=sharing" },
       { key: "navbarLogo", value: "Yatin.Dora" },
       { key: "contactEmail", value: "yatin.dora81@gmail.com" },

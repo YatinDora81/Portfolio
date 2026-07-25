@@ -6,6 +6,8 @@ export interface SiteConfig {
   tagline: string;
   intro: string;
   avatarUrl: string;
+  /** Hero peek-deck photos. Empty means "just the avatar" — Hero handles the fallback. */
+  heroPhotos: string[];
   resumeUrl: string;
   navbarLogo: string;
   contactEmail: string;
@@ -22,6 +24,12 @@ export async function getSiteConfig(): Promise<SiteConfig> {
     tagline: map.get("tagline") ?? "",
     intro: map.get("intro") ?? "",
     avatarUrl: cdnUrl(map.get("avatarUrl") ?? ""),
+    // Stored as one comma-separated string so it stays a plain SiteConfig row.
+    heroPhotos: (map.get("heroPhotos") ?? "")
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map((p) => cdnUrl(p)),
     resumeUrl: map.get("resumeUrl") ?? "",
     navbarLogo: map.get("navbarLogo") ?? "",
     contactEmail: map.get("contactEmail") ?? "",

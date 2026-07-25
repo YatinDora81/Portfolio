@@ -1,176 +1,145 @@
-'use client';
-
-import { useState, useEffect } from 'react';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
-import SkillBadge from '../common/SkillBadge';
 import { MapPinIcon } from '../icons';
+import { skillIconMap } from '@/lib/icon-map';
 
-function useIsMobile(breakpoint = 1024) {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < breakpoint);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, [breakpoint]);
-  return isMobile;
-}
-
-interface ExperienceData {
+export interface ExperienceData {
   company: string;
   position: string;
   location: string;
   startDate: string;
   endDate: string;
   isCurrent: boolean;
-  bullets: string[];
-  technologies: string[];
   website: string | null;
   logoUrl: string | null;
+  bullets: string[];
+  technologies: string[];
 }
 
+/* Bold-lead bullets: "**scan line** rest of the detail".
+   NOTE: identical to the parseBullet in landing/Projects.tsx — duplicated on
+   purpose because that file is owned by another agent this pass. The Integrate
+   phase should hoist one copy into a shared module. */
 function parseBullet(content: string) {
   const match = content.match(/^\*\*(.*?)\*\*\s?(.*)/s);
   if (match) return { highlight: match[1]!, detail: match[2]! };
   return { highlight: content, detail: '' };
 }
 
-const INITIAL_COUNT = 2;
+const MONTHS = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+];
 
-function ExperienceCard({ exp, alwaysRevealed = false }: { exp: ExperienceData; alwaysRevealed?: boolean }) {
-  const isMobile = useIsMobile();
-  const mobileVisibleCount = INITIAL_COUNT + 1;
-  const visibleCount = isMobile ? mobileVisibleCount : INITIAL_COUNT;
-  const hasMore = exp.bullets.length > visibleCount;
-  const [revealed, setRevealed] = useState(alwaysRevealed);
+/** Absolute month index for a "July 2025"-style string; NaN when unparseable. */
+function monthOrdinal(value: string): number {
+  if (/present|current|now/i.test(value)) {
+    const now = new Date();
+    return now.getFullYear() * 12 + now.getMonth();
+  }
+  const parts = value.trim().toLowerCase().split(/\s+/);
+  const year = Number(parts[1]);
+  if (!Number.isFinite(year)) return NaN;
+  const token = parts[0] ?? '';
+  const month = token.length >= 3 ? MONTHS.findIndex((m) => m.startsWith(token)) : -1;
+  return year * 12 + (month === -1 ? 0 : month);
+}
 
-  const bullets = exp.bullets.map(parseBullet);
-  const logo = exp.logoUrl;
+/**
+ * LinkedIn-style inclusive tenure: "July 2025" → "Present" gives "1 yr 1 mo".
+ * startDate/endDate are plain strings in this schema (Experience.startDate /
+ * .endDate are `String` in prisma, seeded as "July 2025" / "Present"), so this
+ * parses month names rather than Date objects. Returns '' when unparseable so
+ * the pill is simply omitted.
+ */
+function tenure(start: string, end: string, isCurrent: boolean): string {
+  const from = monthOrdinal(start);
+  const to = isCurrent ? monthOrdinal('present') : monthOrdinal(end);
+  const months = to - from + 1;
+  if (!(months > 0)) return '';
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  const out: string[] = [];
+  if (years) out.push(`${years} yr${years > 1 ? 's' : ''}`);
+  if (rest) out.push(`${rest} mo${rest > 1 ? 's' : ''}`);
+  return out.join(' ');
+}
+
+function ExperienceCard({ exp }: { exp: ExperienceData }) {
+  const duration = tenure(exp.startDate, exp.endDate, exp.isCurrent);
+  const endLabel = exp.isCurrent ? exp.endDate || 'Present' : exp.endDate;
 
   return (
-    <div
-      className="group/card flex flex-col gap-4 rounded-xl border border-transparent p-4 -mx-4 transition-colors duration-300 hover:border-border hover:bg-card"
-      onMouseEnter={() => { if (!isMobile && hasMore && !revealed) setRevealed(true); }}
-    >
-      <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2">
-            {logo && (
+    <div className="xp-card">
+      <span className={exp.isCurrent ? 'xp-node live' : 'xp-node'} aria-hidden />
+
+      <div className="xp-top">
+        <div>
+          <div className="xp-co">
+            {exp.logoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={logo}
+                src={exp.logoUrl}
                 alt=""
                 aria-hidden
                 width={24}
                 height={24}
-                className="size-6 shrink-0 rounded object-contain"
+                loading="lazy"
+                decoding="async"
               />
             )}
             {exp.website ? (
-              <a
-                href={exp.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-lg font-bold hover:underline underline-offset-4"
-              >
+              <a href={exp.website} target="_blank" rel="noopener noreferrer">
                 {exp.company}
               </a>
             ) : (
-              <h3 className="text-lg font-bold">{exp.company}</h3>
+              <h3 className="xp-name">{exp.company}</h3>
             )}
             {exp.isCurrent && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-green-500/10 px-2 py-0.5 text-xs text-green-600 dark:text-green-400">
-                <span className="size-1.5 animate-pulse rounded-full bg-green-500" />
+              <span className="xp-cur">
+                <i />
                 Current
               </span>
             )}
           </div>
-          <p className="text-secondary text-sm">{exp.position}</p>
+          <p className="xp-pos">{exp.position}</p>
         </div>
-        <div className="text-secondary flex flex-col text-sm sm:text-right">
-          <span>{exp.startDate} - {exp.endDate}</span>
-          <span className="inline-flex items-center gap-1 sm:justify-end">
-            <MapPinIcon className="size-3" />
+
+        <div className="xp-when">
+          <span className="dates">
+            {exp.startDate} - {endLabel}
+            {duration && <span className="xp-dur mono">{duration}</span>}
+          </span>
+          <span className="loc">
+            <MapPinIcon className="" />
             {exp.location}
           </span>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {exp.technologies.map((tech) => (
-          <SkillBadge key={tech} name={tech} />
-        ))}
-      </div>
-
-      <ul className="space-y-3 text-sm leading-relaxed">
-        {bullets.slice(0, visibleCount).map((bullet, i) => (
-          <li key={i} className="flex gap-3">
-            <span className="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/40" />
-            <span className="text-secondary">
-              <span className="text-foreground font-medium">{bullet.highlight}</span>
-              {' '}{bullet.detail}
+      {/* every achievement visible — the bold lead is the scan line */}
+      <ul className="bullets">
+        {exp.bullets.map(parseBullet).map((bullet, i) => (
+          <li key={i}>
+            <i />
+            <span>
+              <b>{bullet.highlight}</b> {bullet.detail}
             </span>
           </li>
         ))}
-
-        {!isMobile && hasMore && !revealed && (
-          <div className="relative">
-            <ul className="space-y-3 blur-[3px] opacity-50 select-none">
-              {bullets.slice(visibleCount).map((bullet, i) => (
-                <li key={i + visibleCount} className="flex gap-3">
-                  <span className="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/40" />
-                  <span className="text-secondary">
-                    <span className="text-foreground font-medium">{bullet.highlight}</span>
-                    {' '}{bullet.detail}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-secondary pointer-events-none">
-              Show more
-            </span>
-          </div>
-        )}
-
-        {hasMore && revealed && (
-          <ul className="space-y-3">
-            {bullets.slice(visibleCount).map((bullet, i) => (
-              <li
-                key={i + visibleCount}
-                className="flex gap-3 animate-fade-in-blur"
-                style={{ animationDelay: `${(i + 1) * 80}ms` }}
-              >
-                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/40" />
-                <span className="text-secondary">
-                  <span className="text-foreground font-medium">{bullet.highlight}</span>
-                  {' '}{bullet.detail}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
       </ul>
 
-      {isMobile && hasMore && !revealed && (
-        <div className="relative">
-          <ul className="space-y-3 text-sm leading-relaxed blur-[3px] opacity-50 select-none">
-            {bullets.slice(visibleCount, visibleCount + 1).map((bullet, i) => (
-              <li key={i} className="flex gap-3">
-                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/40" />
-                <span className="text-secondary">
-                  <span className="text-foreground font-medium">{bullet.highlight}</span>
-                  {' '}{bullet.detail}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <button
-            onClick={() => setRevealed(true)}
-            className="absolute inset-0 flex items-center justify-center cursor-pointer bg-transparent border-none"
-          >
-            <span className="text-xs font-medium text-secondary">Show more +</span>
-          </button>
+      {exp.technologies.length > 0 && (
+        <div className="xp-badges">
+          {exp.technologies.map((tech) => {
+            const icon = skillIconMap[tech];
+            return (
+              <span key={tech} className="badge skill-inner-shadow">
+                {icon && <span className="bi">{icon}</span>}
+                {tech}
+              </span>
+            );
+          })}
         </div>
       )}
     </div>
@@ -182,9 +151,10 @@ export default function Experience({ experiences }: { experiences: ExperienceDat
     <section id="experience">
       <Container className="mt-20 animate-fade-in-blur animate-delay-2">
         <SectionHeading subHeading="Career" heading="Experience" />
-        <div className="mt-6 flex flex-col gap-6">
-          {experiences.map((exp, i) => (
-            <ExperienceCard key={exp.company} exp={exp} alwaysRevealed={i === 0} />
+        <div className="xp-list">
+          <span className="xp-rail" aria-hidden />
+          {experiences.map((exp) => (
+            <ExperienceCard key={`${exp.company}-${exp.startDate}`} exp={exp} />
           ))}
         </div>
       </Container>

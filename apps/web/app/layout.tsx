@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { SITE_URL, SITE_NAME } from "./lib/site";
 import OnekoCat from "./components/OnekoCat";
@@ -13,6 +13,15 @@ const inter = Inter({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-inter",
+});
+
+// Terminal/metadata voice used by `.mono` (availability chip, role line, tenure
+// pills, project hints, the cat-wire divider). Exposes --font-jetbrains-mono,
+// which globals.css maps onto the --font-mono theme token.
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-jetbrains-mono",
 });
 
 const DESCRIPTION =
@@ -55,7 +64,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${inter.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         {/* Warm up the asset CDN connection ahead of the first image request. */}
         <link rel="preconnect" href="https://cdn.yatindora.in" crossOrigin="anonymous" />

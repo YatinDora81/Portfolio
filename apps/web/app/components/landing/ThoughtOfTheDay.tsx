@@ -10,8 +10,12 @@ interface Quote {
 export default function ThoughtOfTheDay({ quote }: { quote: Quote | null }) {
   if (!quote) return null;
 
+  // Deliberately no `cv-auto`: the card is ~130px, but content-visibility reserves
+  // the 600px intrinsic size until it scrolls in, so the placeholder collapsed and
+  // yanked everything below it upward. Skipping also applies paint containment,
+  // which clipped the badge where it straddles the card's top border.
   return (
-    <Container className="cv-auto mt-20 animate-fade-in-blur animate-delay-6">
+    <Container className="mt-20 animate-fade-in-blur animate-delay-6">
       <div className="relative rounded-xl border border-border bg-card p-5 sm:p-8 text-center">
         <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-background px-3 text-xs font-medium text-secondary uppercase tracking-wider">
           Thought of the Day

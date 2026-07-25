@@ -15,6 +15,8 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo,
+    Consolas, 'Liberation Mono', monospace;
 }
 
 :root {
@@ -49,6 +51,11 @@
   * {
     border-color: var(--border);
   }
+  /* The hero's scroll cue and the About terminal's navigation commands both
+     jump by hash — glide instead of teleporting. Disabled under reduced motion. */
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     background-color: var(--background);
     color: var(--foreground);
@@ -65,6 +72,13 @@
 
 .text-secondary {
   color: #909092;
+}
+
+/* The "terminal voice" — used by the availability chip, hero role line, socials,
+   tenure pills, project hints/links and the cat-wire divider. Unlayered on
+   purpose so it beats Tailwind's preflight and any utility font-family. */
+.mono {
+  font-family: var(--font-mono);
 }
 
 @keyframes fadeInBlur {
@@ -198,6 +212,662 @@
 }
 .paw-btn.on:hover .paw { animation: pawWiggle 0.55s ease; }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION STYLES — merged from app/css/{hero,experience,projects}.css.
+
+   Everything below is deliberately UNLAYERED: Tailwind's preflight lives in
+   `@layer base`, and unlayered rules beat layered ones regardless of order.
+   Wrapping any of this in @layer would let `img { height: auto }` collapse
+   `.peek-stack img` and `.pj-thumb img`.
+
+   Every @keyframes in this file is defined exactly once. Pre-existing:
+   fadeInBlur, gradientShift, pawWiggle, pawPounce, pawGlow.
+   Added below: heroPing, heroCaret, pawStep, xpPing, pingPulse.
+   All reduced-motion overrides live in the single block at the end of the file.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────────────────────────────────────────
+   HERO — "The Title Card"
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* sizing: the false-floor fix — the next section peeks above the fold */
+.hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 82svh;
+  overflow: hidden;
+}
+.hero .hcontainer {
+  margin: 0 auto;
+  max-width: 48rem;
+  padding: 6.5rem 1rem 2rem;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+  position: relative;
+}
+@media (min-width: 640px) {
+  .hero .hcontainer {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+/* top row — availability left, socials + location right */
+.toprow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.topright {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.55rem;
+}
+@media (max-width: 640px) {
+  .topright { align-items: flex-start; }
+}
+.loc-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #909092;
+}
+.loc-line svg { width: 12px; height: 12px; flex: none; }
+
+/* availability — quiet monochrome pulse */
+.avail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #909092;
+}
+.avail i {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: var(--foreground);
+  flex: none;
+}
+.avail i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  animation: heroPing 2.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes heroPing {
+  0% { transform: scale(1); opacity: 0.6; }
+  70%, 100% { transform: scale(3.2); opacity: 0; }
+}
+
+/* socials — icon pill that reveals its label on hover */
+.socs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.soc {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--background) 60%, transparent);
+  color: #909092;
+  transition: color 0.45s cubic-bezier(.4,0,.2,1), border-color 0.45s cubic-bezier(.4,0,.2,1);
+}
+.soc:hover {
+  color: var(--foreground);
+  border-color: color-mix(in srgb, var(--foreground) 25%, transparent);
+}
+.soc svg { width: 16px; height: 16px; }
+/* The pill widens and the label fades in behind it. Two things keep this from
+   feeling snappy: max-width sits just above the longest label so the curve maps
+   onto visible motion instead of running past the clip, and the easing is a
+   gentle in-out — an ease-out-quint here covers most of the distance in the
+   first quarter of the duration, which reads as fast no matter how long it is. */
+.soc .lbl {
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 11px;
+  text-transform: lowercase;
+  opacity: 0;
+  transition:
+    max-width 0.8s cubic-bezier(.4,0,.2,1),
+    padding 0.8s cubic-bezier(.4,0,.2,1),
+    opacity 0.2s ease;
+}
+.soc:hover .lbl {
+  max-width: 6rem;
+  padding-left: 6px;
+  opacity: 1;
+  transition:
+    max-width 0.8s cubic-bezier(.4,0,.2,1),
+    padding 0.8s cubic-bezier(.4,0,.2,1),
+    opacity 0.45s ease 0.15s;
+}
+
+/* the nameplate — one solid masthead; hover it and the photo peeks out */
+.namewrap { position: relative; margin-top: 2.75rem; }
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2.9rem, 12.5vw, 6.4rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  cursor: default;
+  user-select: none;
+}
+.hero h1 .dot { color: #909092; }
+
+/* the photo that trails the cursor across the letters */
+.peek {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: clamp(120px, 15vw, 164px);
+  aspect-ratio: 4 / 5;
+  height: auto;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 44px -14px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+  will-change: transform, opacity;
+  transition: opacity 0.28s ease;
+  background: var(--muted);
+}
+.peek.on { opacity: 1; }
+.peek-hint { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .peek-hint {
+    display: inline;
+    color: #909092;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    margin-left: 0.75rem;
+    opacity: 0.8;
+  }
+}
+
+/* touch / reduced-motion fallback: a static fanned deck instead of the trail */
+.peek-stack {
+  display: none;
+  position: relative;
+  height: 114px;
+  margin: 2rem 0 -0.5rem;
+}
+.peek-stack img {
+  position: absolute;
+  top: 0;
+  width: 86px;
+  height: 104px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, 0.35);
+  background: var(--muted);
+}
+.peek-stack img:nth-child(1) { left: 0; transform: rotate(-6deg); z-index: 1; }
+.peek-stack img:nth-child(2) { left: 62px; transform: rotate(3deg) translateY(-4px); z-index: 3; }
+.peek-stack img:nth-child(3) { left: 124px; transform: rotate(-2deg); z-index: 2; }
+html.no-peek .peek,
+html.no-peek .peek-hint { display: none; }
+html.no-peek .peek-stack { display: block; }
+/* no-JS / pre-hydration fallback for touch devices (html.no-peek is set by JS) */
+@media (hover: none), (pointer: coarse) {
+  .peek-stack { display: block; }
+  .peek { display: none; }
+}
+
+/* role line — "//" + the rotating title + terminal caret */
+.roleline {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.5rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+.roleline .slash { user-select: none; color: #909092; }
+@media (max-width: 640px) {
+  .roleline { font-size: 1rem; }
+}
+.caret {
+  display: inline-block;
+  width: 0.52em;
+  height: 1.05em;
+  background: var(--foreground);
+  opacity: 0.85;
+  animation: heroCaret 1.1s steps(1) infinite;
+  transform: translateY(0.12em);
+}
+@keyframes heroCaret {
+  50% { opacity: 0; }
+}
+/* the rotation itself: 400ms cross-fade, matching the previous hero */
+.roleword {
+  display: inline-block;
+  transition: opacity 0.4s ease-in-out, filter 0.4s ease-in-out, transform 0.4s ease-in-out;
+}
+.roleword.is-out {
+  opacity: 0;
+  filter: blur(6px);
+  transform: translateY(-0.5rem);
+}
+
+/* intro sentence with inline skill chips */
+.intro {
+  margin: 1.75rem 0 0;
+  max-width: 42rem;
+  font-size: 1.06rem;
+  line-height: 2;
+  color: #909092;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 0.5rem;
+  border: 1px dashed var(--border);
+  background: var(--muted);
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 500;
+  vertical-align: middle;
+  cursor: default;
+  transition: transform 0.2s, border-color 0.2s;
+}
+.chip:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--foreground) 30%, transparent);
+}
+.chip .ci { width: 16px; height: 16px; flex-shrink: 0; display: inline-flex; }
+.chip .ci svg { width: 100%; height: 100%; }
+
+/* actions */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s, border-color 0.2s, opacity 0.2s;
+}
+.btn:hover { transform: translateY(-2px); }
+.btn:active { transform: translateY(0); }
+.btn svg { width: 16px; height: 16px; }
+.btn-ghost { border: 1px solid var(--border); background: var(--background); }
+.btn-ghost:hover { background: var(--muted); }
+.btn-ghost svg { transition: transform 0.3s; }
+.btn-ghost:hover svg { transform: rotate(-6deg); }
+.btn-solid { background: var(--foreground); color: var(--background); border: none; }
+.btn-solid:hover { opacity: 0.9; }
+.btn-solid svg { transition: transform 0.2s; }
+.btn-solid:hover svg { transform: translateX(2px); }
+
+/* scroll cue — paw prints leading down to the cat on the wire */
+.cue {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px 1.35rem;
+  color: #909092;
+  transition: color 0.25s;
+}
+.cue:hover { color: var(--foreground); }
+.cue i { display: block; line-height: 0; opacity: var(--o); }
+.cue svg { width: 13px; height: 13px; display: block; }
+.cue i:nth-child(1) { --o: 0.3; transform: translateX(-6px) rotate(-14deg); }
+.cue i:nth-child(2) { --o: 0.55; transform: translateX(6px) rotate(12deg); }
+.cue i:nth-child(3) { --o: 0.85; transform: translateX(-4px) rotate(-8deg); }
+/* gentle "walking" pulse — opacity only, zero movement */
+@keyframes pawStep {
+  0%, 55%, 100% { opacity: var(--o); }
+  18% { opacity: 1; }
+}
+.cue i { animation: pawStep 2.6s ease-in-out infinite; }
+.cue i:nth-child(2) { animation-delay: 0.35s; }
+.cue i:nth-child(3) { animation-delay: 0.7s; }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   BRIDGE — the cat-on-a-wire divider between Hero and About.
+   `body.cat-on` is toggled by CatProvider, so shooing the cat with the navbar
+   paw takes it off the wire too and leaves a plain interpunct behind.
+   ─────────────────────────────────────────────────────────────────────────── */
+#bridge { margin-top: 2.5rem; }
+.cw {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: #909092;
+}
+.cw::before,
+.cw::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+.cw .cat,
+.cw .dot {
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  user-select: none;
+  transform: translateY(-1px);
+}
+.cw .cat { display: none; }
+body.cat-on .cw .cat { display: inline-block; }
+body.cat-on .cw .dot { display: none; }
+@media (hover: hover) {
+  .cw:hover .cat { animation: pawWiggle 0.55s ease; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   EXPERIENCE — timeline
+   ─────────────────────────────────────────────────────────────────────────── */
+.xp-list {
+  margin-top: 1.5rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2.25rem;
+  padding-left: 1.75rem;
+}
+
+.xp-rail {
+  position: absolute;
+  left: 5px;
+  top: 10px;
+  bottom: 10px;
+  width: 1px;
+  background: var(--border);
+}
+
+.xp-card { position: relative; }
+
+.xp-node {
+  position: absolute;
+  left: calc(-1.75rem + 1px);
+  top: 7px;
+  width: 9px;
+  height: 9px;
+  border-radius: 9999px;
+  background: var(--background);
+  border: 1.5px solid color-mix(in srgb, var(--foreground) 55%, transparent);
+}
+
+.xp-node.live { border-color: #22c55e; }
+
+.xp-node.live::after {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  border: 1.5px solid #22c55e;
+  animation: xpPing 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes xpPing {
+  0%   { transform: scale(1);   opacity: 0.9; }
+  75%,
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+.xp-top {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .xp-top { flex-direction: row; justify-content: space-between; }
+}
+
+.xp-co {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.xp-co img {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* Reference always renders the company as a link. Real data has a nullable
+   `website`, so .xp-name is the non-linked <h3> fallback, styled identically. */
+.xp-co a,
+.xp-co .xp-name {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.xp-co .xp-name { margin: 0; }
+
+.xp-co a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.xp-cur {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+  background: rgba(34, 197, 94, 0.1);
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  color: #16a34a;
+}
+
+.dark .xp-cur { color: #4ade80; }
+
+.xp-cur i {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #22c55e;
+  animation: pingPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pingPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+.xp-pos {
+  margin: 2px 0 0;
+  font-size: 0.875rem;
+  color: #909092;
+}
+
+.xp-when {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.875rem;
+  color: #909092;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .xp-when { text-align: right; align-items: flex-end; }
+}
+
+.xp-when .dates {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.xp-dur {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  border: 1px dashed var(--border);
+  border-radius: 9999px;
+  padding: 2px 8px;
+  color: #909092;
+  white-space: nowrap;
+}
+
+.xp-when .loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.xp-when svg { width: 12px; height: 12px; }
+
+/* ── shared by Experience + Projects: bullet list ── */
+.bullets {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+.bullets li { display: flex; gap: 0.75rem; }
+
+.bullets li i {
+  margin-top: 8px;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--foreground) 40%, transparent);
+}
+
+.bullets li span { color: #909092; }
+.bullets li b { font-weight: 500; color: var(--foreground); }
+
+/* ── shared by Experience + Projects: tech badges ── */
+.xp-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: var(--muted);
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  transition: transform 0.2s;
+}
+
+.badge:hover { transform: scale(1.05); }
+
+.badge .bi {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+.badge .bi svg { width: 100%; height: 100%; }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   PROJECTS — compact hover-expand rows
+   ─────────────────────────────────────────────────────────────────────────── */
+.pj-list{margin-top:1.25rem;display:flex;flex-direction:column}
+.pj-row{position:relative;display:grid;grid-template-columns:176px minmax(0,1fr);gap:1.15rem;align-items:start;padding:1.25rem 1rem;margin:0 -1rem;border-radius:.75rem;border:1px solid transparent;transition:background-color .25s,border-color .25s}
+@media(hover:hover){.pj-row:hover{background:var(--card);border-color:var(--border)}}
+@media(max-width:600px){.pj-row{grid-template-columns:1fr;gap:.85rem}.pj-thumb{max-width:230px}}
+.pj-thumb{display:block;border:1px solid var(--border);border-radius:.5rem;overflow:hidden;background:var(--muted);aspect-ratio:16/10;transition:border-color .25s,transform .25s}
+.pj-row:hover .pj-thumb{border-color:color-mix(in srgb,var(--foreground) 28%,transparent);transform:translateY(-2px)}
+.pj-thumb img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
+.pj-title{display:flex;align-items:center;gap:.5rem;min-width:0;flex-wrap:wrap}
+.pj-title .pl{height:20px;width:auto;max-width:40px;border-radius:4px;object-fit:contain;flex-shrink:0}
+/* `.pj-name` is the added no-link fallback — reference assumed live||github always exists */
+.pj-title a,.pj-title .pj-name{font-size:1.05rem;font-weight:700;letter-spacing:-.01em;display:inline-flex;align-items:center;gap:.4rem}
+.pj-title a svg{width:14px;height:14px;flex-shrink:0;color:#909092;transition:transform .22s,color .22s}
+.pj-row:hover .pj-title a svg{transform:translate(3px,-3px);color:var(--foreground)}
+.pj-sum{margin:.4rem 0 0;font-size:.875rem;line-height:1.65;color:#909092}
+.pj-row .bullets{margin-top:.8rem;gap:.55rem;font-size:.83rem}
+
+/* hover-expand cards @ 525ms + staggered highlights */
+.pj-row.expand{cursor:pointer}
+.pj-hint{position:absolute;top:1.1rem;right:1rem;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#909092;opacity:0;transition:opacity .25s;pointer-events:none}
+@media(hover:hover){.pj-row:hover .pj-hint{opacity:.9}}
+.pj-row.open .pj-hint{opacity:0!important}
+.pj-x{display:grid;grid-template-rows:0fr;transition:grid-template-rows .525s cubic-bezier(.22,1,.36,1)}
+.pj-xin{overflow:hidden;min-height:0;opacity:0;transform:translateY(-4px);transition:opacity .37s ease,transform .37s ease}
+.pj-row.open .pj-x,.pj-row.expand:focus-within .pj-x{grid-template-rows:1fr}
+.pj-row.open .pj-xin,.pj-row.expand:focus-within .pj-xin{opacity:1;transform:none;transition-delay:.09s}
+@media(hover:hover){
+  .pj-row.expand:hover .pj-x{grid-template-rows:1fr}
+  .pj-row.expand:hover .pj-xin{opacity:1;transform:none;transition-delay:.09s}
+}
+/* stagger — bullets cascade in 120ms apart, starting after the box begins opening */
+.rv-stagger li{opacity:0;transform:translateY(6px);transition:opacity .4s ease,transform .4s ease}
+.pj-row.open .rv-stagger li,.pj-row.expand:focus-within .rv-stagger li{opacity:1;transform:none;transition-delay:calc(.09s + var(--i)*.12s)}
+@media(hover:hover){
+  .pj-row.expand:hover .rv-stagger li{opacity:1;transform:none;transition-delay:calc(.09s + var(--i)*.12s)}
+}
+.pj-chips{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.85rem}
+.pj-links{display:flex;gap:1.1rem;margin-top:.7rem}
+.pj-links a{display:inline-flex;align-items:center;gap:.4rem;font-size:.75rem;letter-spacing:.02em;color:#909092;transition:color .2s}
+.pj-links a:hover{color:var(--foreground)}
+.pj-links svg{width:13px;height:13px}
+.pj-chips .badge{font-size:.72rem;padding:2px 9px;gap:5px}
+.pj-chips .badge .bi{width:12px;height:12px}
+.pj-div{display:flex;align-items:center;gap:1rem;color:#909092;font-size:10px;letter-spacing:.25em;text-transform:uppercase;margin:1.5rem 0 .25rem}
+.pj-div::before,.pj-div::after{content:"";height:1px;background:var(--border);flex:1}
+
+/* shared: "Show More" button (Projects + Blogs) */
+.show-more{margin:2rem auto 0;display:flex;align-items:center;gap:.5rem;border-radius:.5rem;border:1px solid var(--border);background:transparent;padding:10px 20px;font-size:.875rem;font-weight:500;color:#909092;cursor:pointer;transition:border-color .2s,color .2s}
+.show-more:hover{border-color:color-mix(in srgb,var(--foreground) 30%,transparent);color:var(--foreground)}
+.show-more svg{width:16px;height:16px}
+
 @media (prefers-reduced-motion: reduce) {
   .paw-btn:hover .paw,
   .paw-btn:active .paw,
@@ -220,4 +890,39 @@
   /* Stop the infinite hero-title gradient sweep. */
   .title-gradient,
   .dark .title-gradient { animation: none; }
+
+  /* ── section additions (spec §5) ─────────────────────────────────────── */
+
+  /* Hash jumps land instantly instead of gliding. */
+  html { scroll-behavior: auto; }
+
+  /* Every looping animation the new sections add: the availability ripple,
+     the terminal caret, the walking paw cue, the cat on the wire, the "now"
+     ping ring and its pulsing dot. */
+  .avail i::after,
+  .caret,
+  .cue i,
+  .cw .cat,
+  .xp-cur i,
+  .xp-node.live::after { animation: none !important; }
+
+  /* The cursor-trailing hero photo is pure motion — swap in the static deck. */
+  .peek { display: none !important; }
+  .peek-stack { display: block; }
+
+  /* Hover/expand choreography collapses to instant state changes; project
+     bullets are shown outright rather than cascading in. */
+  .roleword,
+  .chip,
+  .btn:hover,
+  .soc,
+  .soc .lbl,
+  .badge,
+  .pj-x,
+  .pj-xin { transition: none !important; }
+  .rv-stagger li {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
 }

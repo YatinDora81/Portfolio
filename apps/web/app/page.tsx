@@ -3,6 +3,7 @@ import { ThemeProvider } from './components/common/ThemeProvider';
 import { CatProvider } from './components/common/CatProvider';
 import MotionProvider from './components/common/MotionProvider';
 import Navbar from './components/common/Navbar';
+import Bridge from './components/common/Bridge';
 import Hero from './components/landing/Hero';
 import About from './components/landing/About';
 import Skills from './components/landing/Skills';
@@ -102,8 +103,11 @@ export default async function Home() {
               tagline={siteConfig.tagline}
               intro={siteConfig.intro}
               avatarUrl={siteConfig.avatarUrl}
+              photos={siteConfig.heroPhotos}
               resumeUrl={siteConfig.resumeUrl}
+              availabilityStatus={siteConfig.availabilityStatus}
             />
+            <Bridge />
             <About
               paragraphs={aboutData.paragraphs}
               education={aboutData.education}

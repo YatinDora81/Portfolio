@@ -28,7 +28,14 @@ export function CatProvider({ children }: { children: React.ReactNode }) {
   // The visible cat is the #oneko element injected by /oneko/oneko.js (loaded
   // from the root layout, outside this provider). Drive its visibility here so
   // the toggle works no matter when the script finishes creating it.
+  //
+  // `body.cat-on` mirrors the same state for the CSS-only cats — right now the
+  // `=^..^=` sitting on the Hero/About divider wire, which falls back to a plain
+  // interpunct when the cat is shooed away. Runs in an effect, so the server
+  // HTML never carries the class and there's nothing to hydrate-mismatch.
   useEffect(() => {
+    document.body.classList.toggle('cat-on', showCat);
+
     const apply = (el: HTMLElement | null) => {
       if (el) el.style.display = showCat ? '' : 'none';
     };

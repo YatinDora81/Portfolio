@@ -661,8 +661,10 @@ function ScoreRing({
 export default function About({ paragraphs, education, resumeUrl, companyLogos }: AboutProps) {
   const reduceMotion = useReducedMotion() ?? false;
 
+  // `id` is the hero scroll cue's target; mt-11 is the spec's 2.75rem gap,
+  // measured from the cat-wire bridge that now sits directly above.
   return (
-    <Container className="cv-auto mt-16 animate-fade-in-blur animate-delay-1">
+    <Container id="about" className="cv-auto mt-11 animate-fade-in-blur animate-delay-1">
       <SectionHeading subHeading="About" heading="Who I am" />
 
       <Terminal
