@@ -11,10 +11,13 @@ export function PreviewFrame({ children, label = "Portfolio Preview", className 
 }) {
   return (
     <div className={cn("mt-6", className)}>
-      <div className="flex items-center gap-2 mb-3">
-        <IconEye size={16} className="text-muted-foreground" />
-        <span className="text-sm font-medium text-muted-foreground">{label}</span>
-        <span className="text-[10px] text-muted-foreground/60 ml-auto">How it looks on your site</span>
+      {/* Frame chrome follows the admin theme; the pane below stays pinned to the
+          portfolio's own dark palette because that's what it's simulating. */}
+      <div className="card-h" style={{ border: "none", padding: "0 2px 10px" }}>
+        <IconEye size={14} style={{ color: "var(--faint)" }} />
+        <span className="card-t">{label}</span>
+        <div className="sp" />
+        <span className="card-n">how it looks on your site</span>
       </div>
       <div
         className="rounded-xl overflow-hidden shadow-lg"

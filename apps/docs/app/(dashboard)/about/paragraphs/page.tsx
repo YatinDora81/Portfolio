@@ -10,8 +10,12 @@ export default async function AboutParagraphsPage() {
     prisma.education.findMany({ orderBy: { sortOrder: "asc" } }),
   ]);
   return (
-    <div>
-      <PageHeader title="About Paragraphs" description="Bio text in the about section (supports **bold** markdown)" />
+    <div className="view">
+      <PageHeader
+        eyebrow="section 02"
+        title="About paragraphs"
+        description="The bio copy in the about section. Wrap text in **double asterisks** to bold it."
+      />
       <AboutParagraphsTable paragraphs={paragraphs.map(p => ({ id: p.id, content: p.content, sortOrder: p.sortOrder }))} />
       <PreviewFrame label="About Preview">
         <AboutPreview

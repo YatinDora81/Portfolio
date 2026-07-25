@@ -19,8 +19,12 @@ export default async function SocialLinksPage() {
   const avatarUrl = config.get("avatarUrl") ?? "";
 
   return (
-    <div>
-      <PageHeader title="Social Links" description="Links shown in hero, contact, and footer" />
+    <div className="view">
+      <PageHeader
+        eyebrow="site-wide · hero + footer"
+        title="Social links"
+        description="Profiles rendered in the hero, contact block and footer. Order here is the order on site."
+      />
       <SocialLinksTable links={links.map(l => ({ id: l.id, name: l.name, href: l.href, iconKey: l.iconKey, detail: l.detail, sortOrder: l.sortOrder }))} />
       <PreviewFrame label="Hero Preview">
         <HeroPreview

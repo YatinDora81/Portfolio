@@ -2,19 +2,30 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Card } from "@/components/ui/card";
+import { Card, CardHead } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/shared/page-header";
+import { cn } from "@/lib/utils";
 import { createExperience, updateExperience } from "@/lib/actions/experiences";
-import { IconPlus, IconTrash, IconArrowUp, IconArrowDown } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconChevronUp, IconChevronDown, IconTag } from "@tabler/icons-react";
 
 interface Bullet { id?: string; content: string; sortOrder: number }
 interface ExperienceData {
   id: string; company: string; position: string; location: string;
   startDate: string; endDate: string; isCurrent: boolean;
   website: string | null; logoUrl: string | null; skillIds: string[]; bullets: Bullet[];
+}
+
+/** `**highlight**` runs render in the ink colour, mirroring the live site. */
+function renderBullet(text: string) {
+  return text.split(/\*\*(.*?)\*\*/g).map((part, i) =>
+    i % 2 === 1
+      ? <b key={i} style={{ color: "var(--ink)", fontWeight: 600 }}>{part}</b>
+      : <span key={i}>{part}</span>
+  );
 }
 
 export function ExperienceForm({ experience, allSkills }: {
@@ -56,111 +67,164 @@ export function ExperienceForm({ experience, allSkills }: {
   };
 
   return (
-    <div>
-      <PageHeader title={isEditing ? "Edit Experience" : "New Experience"} />
-      <Card>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Company" value={company} onChange={e => setCompany(e.target.value)} required />
-            <Input label="Position" value={position} onChange={e => setPosition(e.target.value)} required />
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <Input label="Location" value={location} onChange={e => setLocation(e.target.value)} required />
-            <Input label="Start Date" value={startDate} onChange={e => setStartDate(e.target.value)} placeholder="e.g. July 2025" required />
-            <Input label="End Date" value={endDate} onChange={e => setEndDate(e.target.value)} placeholder="e.g. Present" required />
-          </div>
-          <Input label="Logo URL (optional)" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="/logos/my-company.png or https://…" />
-          <div className="flex items-center gap-4">
-            <Input label="Website (optional)" value={website} onChange={e => setWebsite(e.target.value)} className="flex-1" />
-            <label className="flex items-center gap-2 mt-6 text-sm cursor-pointer">
-              <input type="checkbox" checked={isCurrent} onChange={e => setIsCurrent(e.target.checked)} />
-              Current position
-            </label>
-          </div>
+    <div className="view">
+      <PageHeader
+        eyebrow="section 04"
+        title={isEditing ? "Edit role" : "New role"}
+        description="One entry on the work timeline — the header line, the period, and the bullets underneath."
+      />
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Skills</label>
-            <div className="flex flex-wrap gap-2">
-              {allSkills.map(s => (
-                <button key={s.id} type="button" onClick={() => toggleSkill(s.id)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                    selectedSkills.includes(s.id)
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background border-border text-muted-foreground hover:border-foreground/30"
-                  }`}
-                >
-                  {s.name}
-                </button>
-              ))}
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Card flush>
+          <CardHead title="Role" />
+          <div className="card-b">
+            <div className="f-row">
+              <Input label="Company" value={company} onChange={e => setCompany(e.target.value)} required />
+              <Input label="Position" value={position} onChange={e => setPosition(e.target.value)} required />
+            </div>
+            <div className="f-row">
+              <Input label="Location" value={location} onChange={e => setLocation(e.target.value)} required />
+              <Input label="Website" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://…" mono />
+            </div>
+            <div className="f-row">
+              <Input label="Start date" value={startDate} onChange={e => setStartDate(e.target.value)} placeholder="e.g. July 2025" required />
+              <Input label="End date" value={endDate} onChange={e => setEndDate(e.target.value)} placeholder="e.g. Present" required />
+            </div>
+            <Input
+              label="Logo URL"
+              value={logoUrl}
+              onChange={e => setLogoUrl(e.target.value)}
+              placeholder="/logos/my-company.png or https://…"
+              hint="Optional. Shown next to the company name on the site."
+              mono
+            />
+            <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+              <Switch checked={isCurrent} onChange={setIsCurrent} label="Current position" />
+              <span className="f-hint" style={{ marginTop: 0 }}>
+                Marks the role as ongoing — the timeline dot turns amber.
+              </span>
             </div>
           </div>
+        </Card>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Bullet Points</label>
-            <div className="space-y-3">
+        <Card flush>
+          <CardHead
+            title="Bullet points"
+            count={bullets.length}
+            right={
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => setBullets([...bullets, { content: "", sortOrder: bullets.length }])}
+              >
+                <IconPlus size={13} stroke={1.7} /> Add bullet
+              </Button>
+            }
+          />
+          {bullets.length === 0 ? (
+            <div className="empty">
+              <div className="empty-ic"><IconPlus size={18} stroke={1.5} /></div>
+              <b>No bullet points</b>
+              <span>Add the two or three lines that describe what you shipped in this role.</span>
+            </div>
+          ) : (
+            <div className="rows">
               {bullets.map((b, i) => (
-                <div key={i} className="group relative flex gap-3 rounded-lg border border-border bg-muted/30 p-3 transition-colors hover:border-foreground/20">
-                  <div className="flex flex-col items-center gap-1 pt-1">
-                    <span className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
-                      {i + 1}
-                    </span>
-                    <div className="flex flex-col gap-0.5 mt-1">
-                      <button type="button" disabled={i === 0}
-                        onClick={() => {
-                          const arr = [...bullets];
-                          [arr[i - 1], arr[i]] = [arr[i]!, arr[i - 1]!];
-                          setBullets(arr);
-                        }}
-                        className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed border-none bg-transparent">
-                        <IconArrowUp size={14} />
-                      </button>
-                      <button type="button" disabled={i === bullets.length - 1}
-                        onClick={() => {
-                          const arr = [...bullets];
-                          [arr[i], arr[i + 1]] = [arr[i + 1]!, arr[i]!];
-                          setBullets(arr);
-                        }}
-                        className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed border-none bg-transparent">
-                        <IconArrowDown size={14} />
-                      </button>
+                <div key={i} className="row" style={{ alignItems: "flex-start" }}>
+                  <div className="row-i" style={{ marginTop: 9 }}>{String(i + 1).padStart(2, "0")}</div>
+                  <div className="row-main">
+                    <Textarea
+                      value={b.content}
+                      onChange={e => {
+                        const newBullets = [...bullets];
+                        newBullets[i] = { ...b, content: e.target.value };
+                        setBullets(newBullets);
+                      }}
+                      placeholder="Use **bold** for the part that should stand out"
+                      rows={2}
+                      style={{ minHeight: 62 }}
+                    />
+                    <div className="f-hint" style={{ lineHeight: 1.55 }}>
+                      {b.content ? renderBullet(b.content) : "Preview appears here as you type."}
                     </div>
                   </div>
-                  <div className="flex-1 space-y-2">
-                    <Textarea value={b.content} onChange={e => {
-                      const newBullets = [...bullets];
-                      newBullets[i] = { ...b, content: e.target.value };
-                      setBullets(newBullets);
-                    }} placeholder="Use **bold** for highlights" rows={2} className="bg-background" />
-                    {b.content && (
-                      <p className="text-xs text-muted-foreground px-1">
-                        {b.content.split(/(\*\*.*?\*\*)/).map((part, j) =>
-                          part.startsWith("**") && part.endsWith("**")
-                            ? <span key={j} className="font-semibold text-foreground">{part.slice(2, -2)}</span>
-                            : <span key={j}>{part}</span>
-                        )}
-                      </p>
-                    )}
+                  <div className="row-acts" style={{ marginTop: 6 }}>
+                    <button
+                      type="button"
+                      className="ibtn"
+                      aria-label="Move bullet up"
+                      disabled={i === 0}
+                      onClick={() => {
+                        const arr = [...bullets];
+                        [arr[i - 1], arr[i]] = [arr[i]!, arr[i - 1]!];
+                        setBullets(arr);
+                      }}
+                    >
+                      <IconChevronUp size={14} stroke={1.6} />
+                    </button>
+                    <button
+                      type="button"
+                      className="ibtn"
+                      aria-label="Move bullet down"
+                      disabled={i === bullets.length - 1}
+                      onClick={() => {
+                        const arr = [...bullets];
+                        [arr[i], arr[i + 1]] = [arr[i + 1]!, arr[i]!];
+                        setBullets(arr);
+                      }}
+                    >
+                      <IconChevronDown size={14} stroke={1.6} />
+                    </button>
+                    <button
+                      type="button"
+                      className="ibtn warn"
+                      aria-label="Remove bullet"
+                      onClick={() => setBullets(bullets.filter((_, j) => j !== i))}
+                    >
+                      <IconTrash size={13} stroke={1.5} />
+                    </button>
                   </div>
-                  <Button variant="ghost" size="sm" className="mt-1 text-muted-foreground hover:text-destructive"
-                    onClick={() => setBullets(bullets.filter((_, j) => j !== i))}>
-                    <IconTrash size={16} />
-                  </Button>
                 </div>
               ))}
-              <Button variant="outline" size="sm" onClick={() => setBullets([...bullets, { content: "", sortOrder: bullets.length }])}>
-                <IconPlus size={14} /> Add Bullet
-              </Button>
             </div>
-          </div>
-        </div>
+          )}
+        </Card>
 
-        <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={() => router.push("/experiences")}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={pending}>
-            {pending ? "Saving..." : isEditing ? "Update" : "Create"}
+        <Card flush>
+          <CardHead title="Skills" count={selectedSkills.length} />
+          <div className="card-b">
+            {allSkills.length === 0 ? (
+              <div className="hint"><IconTag size={13} stroke={1.5} /> No skills defined yet — add them in section 05.</div>
+            ) : (
+              <>
+                <div className="pskills" style={{ gap: 6 }}>
+                  {allSkills.map(s => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => toggleSkill(s.id)}
+                      className={cn("filt", selectedSkills.includes(s.id) && "on")}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+                <div className="f-hint" style={{ marginTop: 10 }}>
+                  Selected skills render as the tech chips under this role.
+                </div>
+              </>
+            )}
+          </div>
+        </Card>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <Button variant="ghost" type="button" onClick={() => router.push("/experiences")}>Cancel</Button>
+          <Button type="button" onClick={handleSubmit} disabled={pending}>
+            {pending ? "Saving…" : isEditing ? "Update role" : "Create role"}
           </Button>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

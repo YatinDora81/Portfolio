@@ -1,20 +1,26 @@
 import { cn } from "@/lib/utils";
 
-export function PageHeader({ title, description, children, className }: {
+/**
+ * The `.vh` view head — mono eyebrow, display title, one-line rationale.
+ * `eyebrow` is optional so existing callers keep rendering unchanged.
+ */
+export function PageHeader({ title, description, eyebrow, children, className }: {
   title: string;
   description?: string;
+  eyebrow?: string;
   children?: React.ReactNode;
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-center justify-between mb-8", className)}>
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-        {description && (
-          <p className="text-muted-foreground text-sm mt-1.5 max-w-xl">{description}</p>
-        )}
+    <div className={cn("vh", className)}>
+      <div className="vh-row">
+        <div>
+          {eyebrow && <div className="eyebrow">{eyebrow}</div>}
+          <h1>{title}</h1>
+          {description && <p>{description}</p>}
+        </div>
+        {children && <div className="row-acts" style={{ gap: 8 }}>{children}</div>}
       </div>
-      {children && <div className="flex items-center gap-2">{children}</div>}
     </div>
   );
 }

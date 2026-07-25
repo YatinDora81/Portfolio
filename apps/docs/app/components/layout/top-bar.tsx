@@ -1,21 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { usePathname } from "next/navigation";
+import {
+  IconLogout, IconLock, IconSun, IconMoon, IconMenu2, IconWorld, IconSearch,
+  IconRefresh, IconCheck,
+} from "@tabler/icons-react";
 import { logout, changePassword } from "@/lib/actions/auth";
-import { IconLogout, IconLock, IconSun, IconMoon } from "@tabler/icons-react";
+import { publishSite } from "@/lib/actions/publish";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/theme-provider";
+import { matchNav } from "@/lib/nav";
+import { cn } from "@/lib/utils";
 
-export function TopBar({ user }: { user: { userId: string; email: string; role: string } }) {
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/$/, "");
+
+export function TopBar({ user, onBurger, onPalette, toast }: {
+  user: { userId: string; email: string; role: string };
+  onBurger: () => void;
+  onPalette: () => void;
+  toast: (msg: string, tone?: "good" | "bad") => void;
+}) {
   const { theme, toggleTheme } = useTheme();
+  const pathname = usePathname();
+  const nav = matchNav(pathname);
+
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [busy, startPublish] = useTransition();
 
   function openDialog() {
     setOpen(true);
@@ -36,93 +54,96 @@ export function TopBar({ user }: { user: { userId: string; email: string; role: 
     formData.set("confirmPassword", confirmPassword);
     const result = await changePassword(formData);
     setLoading(false);
-    if (result?.error) {
-      setError(result.error);
-    } else {
-      setOpen(false);
-    }
+    if (result?.error) setError(result.error);
+    else { setOpen(false); toast("Password updated"); }
+  }
+
+  function publish() {
+    startPublish(async () => {
+      const res = await publishSite();
+      if (res.ok) toast(`Published — ${SITE.replace(/^https?:\/\//, "")} revalidated`);
+      else toast(res.error || "Publish failed", "bad");
+    });
   }
 
   return (
     <>
-      <header className="h-14 border-b border-border/60 bg-card/80 backdrop-blur-xl flex items-center justify-between px-6 shrink-0 sticky top-0 z-10">
-        <div />
-        <div className="flex items-center gap-1">
-          <span className="text-[13px] text-muted-foreground mr-2">{user.email}</span>
-          <span className="text-[10px] bg-primary/10 text-primary font-semibold px-2.5 py-1 rounded-full mr-2 uppercase tracking-wide">
-            {user.role === "SUB_ADMIN" ? "Sub Admin" : user.role === "OWNER" ? "Owner" : "Admin"}
-          </span>
+      <div className="tb">
+        {busy ? <span className="pubbar" aria-hidden="true" /> : null}
+        <button className="tb-burger" onClick={onBurger} aria-label="Menu"><IconMenu2 size={18} /></button>
 
+        <div className="tb-crumb" key={pathname}>
+          <div className="tb-eyebrow">{nav?.eyebrow ?? "control room"}</div>
+          <div className="tb-title">{nav?.label ?? "Admin"}</div>
+        </div>
+
+        <div className="tb-right">
           <button
-            type="button"
+            className="ibtn"
             onClick={toggleTheme}
-            className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-150 cursor-pointer"
-            title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+            title={theme === "light" ? "Switch to dark" : "Switch to light"}
+            aria-label="Toggle theme"
           >
-            {theme === "light" ? <IconMoon size={16} stroke={1.5} /> : <IconSun size={16} stroke={1.5} />}
+            {theme === "light" ? <IconMoon size={15} /> : <IconSun size={15} />}
           </button>
 
-          <button
-            type="button"
-            onClick={openDialog}
-            className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-150 cursor-pointer"
-            title="Change password"
-          >
-            <IconLock size={16} stroke={1.5} />
+          <button className="ibtn" onClick={openDialog} title="Change password" aria-label="Change password">
+            <IconLock size={15} />
           </button>
 
-          <form action={logout}>
-            <button
-              type="submit"
-              className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-150 cursor-pointer"
-              title="Logout"
-            >
-              <IconLogout size={16} stroke={1.5} />
+          <a className="tb-live" href={SITE} target="_blank" rel="noreferrer">
+            <IconWorld size={14} /><span>View live</span>
+          </a>
+
+          <button className="tb-search" onClick={onPalette}>
+            <IconSearch size={13} /> <span className="lbl">Search…</span>
+            <span className="kbd" style={{ marginLeft: "auto" }}>⌘K</span>
+          </button>
+
+          <button className={cn("pub", !busy && "dirty")} onClick={publish} disabled={busy}>
+            {busy ? <IconRefresh size={13} className="spin" /> : <span className="pub-dot" />}
+            {busy ? "Publishing…" : "Publish"}
+          </button>
+
+          <form action={logout} style={{ display: "flex" }}>
+            <button className="ibtn warn" type="submit" title="Log out" aria-label="Log out">
+              <IconLogout size={15} />
             </button>
           </form>
         </div>
-      </header>
+      </div>
 
-      <Dialog open={open} onClose={() => setOpen(false)} title="Change Password">
-        <form onSubmit={handleChangePassword} className="space-y-4">
-          <Input
-            name="currentPassword"
-            type="password"
-            label="Current Password"
-            placeholder="Enter current password"
-            required
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-          />
-          <Input
-            name="newPassword"
-            type="password"
-            label="New Password"
-            placeholder="Enter new password (min 6 characters)"
-            required
-            minLength={6}
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-          />
-          <Input
-            name="confirmPassword"
-            type="password"
-            label="Confirm New Password"
-            placeholder="Confirm new password"
-            required
-            minLength={6}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-          />
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Change password"
+        icon={IconLock}
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button type="submit" form="change-password" disabled={loading}>
+              <IconCheck size={13} /> {loading ? "Updating…" : "Update password"}
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Updating..." : "Update Password"}
-            </Button>
-          </div>
+          </>
+        }
+      >
+        <form id="change-password" onSubmit={handleChangePassword}>
+          <Input
+            name="currentPassword" type="password" label="Current password"
+            placeholder="Enter current password" required
+            value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)}
+          />
+          <Input
+            name="newPassword" type="password" label="New password"
+            placeholder="At least 6 characters" required minLength={6}
+            value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+          />
+          <Input
+            name="confirmPassword" type="password" label="Confirm new password"
+            placeholder="Repeat it" required minLength={6}
+            value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+            error={error || undefined}
+          />
         </form>
       </Dialog>
     </>

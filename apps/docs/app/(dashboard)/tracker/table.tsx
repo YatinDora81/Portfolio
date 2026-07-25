@@ -2,11 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardHead } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Select } from "@/components/ui/select";
+import { IconSearch, IconChartBar, IconRefresh, IconLoader2 } from "@tabler/icons-react";
 
 interface TrackerRow {
   id: string;
@@ -23,6 +21,14 @@ interface TrackerRow {
 }
 
 const AUTO_SYNC_INTERVAL_MS = 40_000;
+
+/** Compact `.sel` sizing for the filter strip — `.sel` is full width by default. */
+const SEL_STYLE: React.CSSProperties = {
+  width: "auto",
+  minWidth: 132,
+  padding: "5px 28px 5px 10px",
+  fontSize: 12,
+};
 
 function short(v: string | null, n = 42) {
   if (!v) return "—";
@@ -167,137 +173,183 @@ export function TrackerTable({ rows }: { rows: TrackerRow[] }) {
   }, [q, rows, sortBy, sourceFilter, mediumFilter, campaignFilter]);
 
   return (
-    <div className="space-y-4">
-      <Card className="p-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="flex-1">
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search source, medium, campaign, content, path, message id…"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="w-44">
-              <Select
-                options={[
-                  { value: "date_newest", label: "Date: Newest" },
-                  { value: "date_oldest", label: "Date: Oldest" },
-                  { value: "source_az", label: "Source: A-Z" },
-                  { value: "medium_az", label: "Medium: A-Z" },
-                  { value: "campaign_az", label: "Campaign: A-Z" },
-                ]}
-                value={sortBy}
-                onChange={(e) =>
-                  setSortBy(
-                    e.target.value as
-                      | "date_newest"
-                      | "date_oldest"
-                      | "source_az"
-                      | "medium_az"
-                      | "campaign_az",
-                  )
-                }
-                className="h-10 py-0 leading-none"
-              />
-            </div>
-            <div className="w-44">
-              <Select
-                options={sourceOptions}
-                value={sourceFilter}
-                onChange={(e) => setSourceFilter(e.target.value)}
-                className="h-10 py-0 leading-none"
-              />
-            </div>
-            <div className="w-44">
-              <Select
-                options={mediumOptions}
-                value={mediumFilter}
-                onChange={(e) => setMediumFilter(e.target.value)}
-                className="h-10 py-0 leading-none"
-              />
-            </div>
-            <div className="w-44">
-              <Select
-                options={campaignOptions}
-                value={campaignFilter}
-                onChange={(e) => setCampaignFilter(e.target.value)}
-                className="h-10 py-0 leading-none"
-              />
-            </div>
-            <Switch
-              checked={decodeContent}
-              onChange={setDecodeContent}
-              label="Decode content"
-            />
-            <Badge variant="outline">
-              {isPending ? "Syncing…" : `Sync in ${secondsUntilNext}s`}
-            </Badge>
-            <Badge variant="outline">{filtered.length} rows</Badge>
-          </div>
-        </div>
-      </Card>
+    <Card flush>
+      <CardHead
+        title="UTM hits"
+        count={filtered.length}
+        right={
+          <button
+            type="button"
+            className="btn"
+            onClick={triggerSync}
+            disabled={isPending}
+            title="Refresh now — auto-refreshes every 40s"
+          >
+            {isPending ? (
+              <IconLoader2 size={13} className="spin" />
+            ) : (
+              <IconRefresh size={13} stroke={1.6} />
+            )}
+            <span style={{ fontFamily: "var(--mono)", fontSize: 11 }}>
+              {isPending ? "syncing…" : `sync in ${secondsUntilNext}s`}
+            </span>
+          </button>
+        }
+      />
 
-      <Card className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-muted/40 border-b border-border">
-              <tr className="text-left">
-                <th className="px-3 py-2 font-semibold">Visited</th>
-                <th className="px-3 py-2 font-semibold">Source</th>
-                <th className="px-3 py-2 font-semibold">Medium</th>
-                <th className="px-3 py-2 font-semibold">Campaign</th>
-                <th className="px-3 py-2 font-semibold">Content</th>
-                <th className="px-3 py-2 font-semibold">Term</th>
-                <th className="px-3 py-2 font-semibold">Message ID</th>
-                <th className="px-3 py-2 font-semibold">Path</th>
-                <th className="px-3 py-2 font-semibold">Referrer</th>
-                <th className="px-3 py-2 font-semibold">User Agent</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id} className="border-b border-border/60 align-top">
-                  <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                    {new Date(r.visitedAt).toLocaleString()}
-                  </td>
-                  <td className="px-3 py-2">{r.source || "—"}</td>
-                  <td className="px-3 py-2">{r.medium || "—"}</td>
-                  <td className="px-3 py-2">{r.campaign || "—"}</td>
-                  <td
-                    className="px-3 py-2 font-mono text-xs"
-                    title={decodeContent ? decodeUrlSafeBase64(r.content) || r.content || "" : r.content || ""}
-                  >
-                    {decodeContent
-                      ? short(decodeUrlSafeBase64(r.content) || r.content, 36)
-                      : short(r.content, 36)}
-                  </td>
-                  <td className="px-3 py-2">{r.term || "—"}</td>
-                  <td className="px-3 py-2 font-mono text-xs" title={r.messageId || ""}>
-                    {short(r.messageId, 24)}
-                  </td>
-                  <td className="px-3 py-2" title={r.path || ""}>
-                    {short(r.path, 28)}
-                  </td>
-                  <td className="px-3 py-2" title={r.referrer || ""}>
-                    {short(r.referrer, 36)}
-                  </td>
-                  <td className="px-3 py-2" title={r.userAgent || ""}>
-                    {short(r.userAgent, 42)}
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">
-                    No UTM tracker rows found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      <div className="filters">
+        <div style={{ position: "relative", flex: "1 1 260px", minWidth: 200 }}>
+          <IconSearch
+            size={14}
+            style={{
+              position: "absolute",
+              left: 11,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "var(--faint)",
+              pointerEvents: "none",
+            }}
+          />
+          <input
+            className="in"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search source, medium, campaign, content, path, message id…"
+            style={{ padding: "6px 12px 6px 32px", fontSize: 12.5 }}
+          />
         </div>
-      </Card>
-    </div>
+
+        <select
+          className="sel"
+          aria-label="Sort hits"
+          value={sortBy}
+          onChange={(e) =>
+            setSortBy(
+              e.target.value as
+                | "date_newest"
+                | "date_oldest"
+                | "source_az"
+                | "medium_az"
+                | "campaign_az",
+            )
+          }
+          style={SEL_STYLE}
+        >
+          <option value="date_newest">Date: Newest</option>
+          <option value="date_oldest">Date: Oldest</option>
+          <option value="source_az">Source: A-Z</option>
+          <option value="medium_az">Medium: A-Z</option>
+          <option value="campaign_az">Campaign: A-Z</option>
+        </select>
+
+        <select
+          className="sel"
+          aria-label="Filter by source"
+          value={sourceFilter}
+          onChange={(e) => setSourceFilter(e.target.value)}
+          style={SEL_STYLE}
+        >
+          {sourceOptions.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+
+        <select
+          className="sel"
+          aria-label="Filter by medium"
+          value={mediumFilter}
+          onChange={(e) => setMediumFilter(e.target.value)}
+          style={SEL_STYLE}
+        >
+          {mediumOptions.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+
+        <select
+          className="sel"
+          aria-label="Filter by campaign"
+          value={campaignFilter}
+          onChange={(e) => setCampaignFilter(e.target.value)}
+          style={SEL_STYLE}
+        >
+          {campaignOptions.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+
+        <Switch checked={decodeContent} onChange={setDecodeContent} label="Decode content" />
+      </div>
+
+      <div className="tbl-scroll">
+        <table className="tbl" style={{ minWidth: 1100 }}>
+          <thead>
+            <tr>
+              <th>Visited</th>
+              <th>Source</th>
+              <th>Medium</th>
+              <th>Campaign</th>
+              <th>Content</th>
+              <th>Term</th>
+              <th>Message ID</th>
+              <th>Path</th>
+              <th>Referrer</th>
+              <th>User agent</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={r.id}>
+                <td style={{ whiteSpace: "nowrap", fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--dim)" }}>
+                  {new Date(r.visitedAt).toLocaleString()}
+                </td>
+                <td>{r.source ? <span className="chip">{r.source}</span> : "—"}</td>
+                <td>{r.medium ? <span className="chip">{r.medium}</span> : "—"}</td>
+                <td>{r.campaign || "—"}</td>
+                <td
+                  style={{ fontFamily: "var(--mono)", fontSize: 11.5 }}
+                  title={decodeContent ? decodeUrlSafeBase64(r.content) || r.content || "" : r.content || ""}
+                >
+                  {decodeContent
+                    ? short(decodeUrlSafeBase64(r.content) || r.content, 36)
+                    : short(r.content, 36)}
+                </td>
+                <td>{r.term || "—"}</td>
+                <td style={{ fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--dim)" }} title={r.messageId || ""}>
+                  {short(r.messageId, 24)}
+                </td>
+                <td style={{ fontFamily: "var(--mono)", fontSize: 11.5 }} title={r.path || ""}>
+                  {short(r.path, 28)}
+                </td>
+                <td style={{ color: "var(--dim)" }} title={r.referrer || ""}>
+                  {short(r.referrer, 36)}
+                </td>
+                <td style={{ color: "var(--faint)", fontSize: 12 }} title={r.userAgent || ""}>
+                  {short(r.userAgent, 42)}
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={10} style={{ padding: 0 }}>
+                  <div className="empty">
+                    <div className="empty-ic"><IconChartBar size={18} stroke={1.5} /></div>
+                    <b>No UTM hits</b>
+                    <span>Nothing matches these filters yet — tagged links show up here within seconds of a visit.</span>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ padding: "11px 16px", borderTop: "1px solid var(--line2)" }}>
+        <div className="hint">
+          <IconRefresh size={13} stroke={1.5} />
+          Auto-refreshes every {AUTO_SYNC_INTERVAL_MS / 1000}s while this tab is visible · showing {filtered.length} of {rows.length} captured hits.
+        </div>
+      </div>
+    </Card>
   );
 }

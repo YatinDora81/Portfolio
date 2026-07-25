@@ -1,20 +1,24 @@
 import { cn } from "@/lib/utils";
 
+// `.chip` modifiers standing in for the old semantic variants.
 const variants = {
-  default: "bg-primary/10 text-primary border border-primary/15",
-  success: "bg-success/10 text-success border border-success/15",
-  warning: "bg-warning/10 text-warning border border-warning/15",
-  destructive: "bg-destructive/10 text-destructive border border-destructive/15",
-  outline: "border border-border text-muted-foreground",
+  default: "",
+  success: "on",
+  warning: "amb",
+  destructive: "amb",
+  outline: "off",
 };
 
-export function Badge({ children, variant = "default", className }: {
+export function Badge({ children, variant = "default", dot, className }: {
   children: React.ReactNode;
   variant?: keyof typeof variants;
+  /** Leading status dot, as on the Live/Draft chips. */
+  dot?: boolean;
   className?: string;
 }) {
   return (
-    <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium", variants[variant], className)}>
+    <span className={cn("chip", variants[variant], className)}>
+      {dot && <span className="dot" />}
       {children}
     </span>
   );

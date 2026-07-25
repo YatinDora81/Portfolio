@@ -35,7 +35,7 @@ export function ReferEmailsRefreshButton() {
   };
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
       <Button
         type="button"
         variant="outline"
@@ -45,14 +45,23 @@ export function ReferEmailsRefreshButton() {
         title="Sync Supabase open counts to Google Sheet, then reload"
       >
         {isPending ? (
-          <IconLoader2 size={14} className="animate-spin" />
+          <IconLoader2 size={14} className="spin" />
         ) : (
           <IconRefresh size={14} />
         )}
-        {isPending ? "Syncing…" : "Sync & Refresh"}
+        {isPending ? "Syncing…" : "Sync & refresh"}
       </Button>
       {message && (
-        <p className="text-[10px] text-muted-foreground max-w-[14rem] text-right leading-snug">
+        <p
+          style={{
+            fontFamily: "var(--mono)",
+            fontSize: 9.5,
+            color: "var(--faint)",
+            maxWidth: "16rem",
+            textAlign: "right",
+            lineHeight: 1.6,
+          }}
+        >
           {message}
         </p>
       )}

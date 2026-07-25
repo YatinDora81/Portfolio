@@ -1,21 +1,18 @@
 import { redirect } from "next/navigation";
+import { prisma } from "db";
 import { getSession } from "@/lib/session";
-import { Sidebar } from "@/components/layout/sidebar";
-import { TopBar } from "@/components/layout/top-bar";
+import { Shell } from "@/components/layout/shell";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect("/login");
 
+  // Drives the Inbox badge in the sidebar.
+  const unread = await prisma.contactMessage.count({ where: { read: false } });
+
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar user={session} />
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-          {children}
-        </main>
-      </div>
-    </div>
+    <Shell user={session} unread={unread}>
+      {children}
+    </Shell>
   );
 }

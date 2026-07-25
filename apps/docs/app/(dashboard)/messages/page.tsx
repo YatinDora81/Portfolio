@@ -10,10 +10,15 @@ export default async function MessagesPage() {
   const unreadCount = messages.filter(m => !m.read).length;
 
   return (
-    <div>
+    <div className="view">
       <PageHeader
-        title="Messages"
-        description={unreadCount > 0 ? `${unreadCount} unread message${unreadCount > 1 ? "s" : ""}` : "All caught up"}
+        eyebrow="contact form → you"
+        title="Inbox"
+        description={
+          unreadCount > 0
+            ? `${unreadCount} unread — everything people send through the site's contact form lands here.`
+            : "All caught up. Everything people send through the site's contact form lands here."
+        }
       />
       <MessagesList
         messages={messages.map(m => ({

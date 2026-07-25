@@ -11,6 +11,8 @@ import { ReferEmailsRefreshButton } from "./refresh-button";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const CODE: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: 11, color: "var(--dim)" };
+
 function decodeUrlSafeBase64(value: string): string | null {
   try {
     const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -33,28 +35,39 @@ export default async function ReferEmailsPage() {
 
   if (error || !data) {
     return (
-      <div>
+      <div className="view">
         <PageHeader
-          title="Refer Emails"
-          description="Outreach contacts synced from Google Sheets"
+          eyebrow="outreach · campaign sheet"
+          title="Refer emails"
+          description="Outreach contacts synced from Google Sheets."
         />
-        <Card className="p-8 border-destructive/30 bg-destructive/[0.03]">
-          <div className="flex items-start gap-3">
-            <div className="rounded-xl bg-destructive/10 p-2.5 text-destructive shrink-0">
-              <IconAlertTriangle size={20} stroke={1.5} />
+        <Card>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <div
+              style={{
+                background: "var(--bad-soft)",
+                color: "var(--bad)",
+                borderRadius: 10,
+                padding: 9,
+                display: "grid",
+                placeItems: "center",
+                flex: "none",
+              }}
+            >
+              <IconAlertTriangle size={18} stroke={1.6} />
             </div>
-            <div className="min-w-0">
-              <h3 className="font-semibold text-destructive">
+            <div style={{ minWidth: 0 }}>
+              <div className="card-t" style={{ color: "var(--bad)" }}>
                 Could not load the campaign sheet
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1">{error}</p>
-              <p className="text-xs text-muted-foreground mt-3">
-                Check Google Sheet vars (<code className="font-mono text-foreground/80">GOOGLE_SHEET_*</code>,{" "}
-                <code className="font-mono text-foreground/80">GOOGLE_CLIENT_EMAIL</code>,{" "}
-                <code className="font-mono text-foreground/80">GOOGLE_PRIVATE_KEY</code>) and Supabase tracking (
-                <code className="font-mono text-foreground/80">SUPABASE_URL</code>,{" "}
-                <code className="font-mono text-foreground/80">SUPABASE_SERVICE_ROLE_KEY</code>) in{" "}
-                <code className="font-mono text-foreground/80">apps/docs/.env</code>.
+              </div>
+              <p style={{ fontSize: 13, color: "var(--dim)", marginTop: 5 }}>{error}</p>
+              <p style={{ fontSize: 12, color: "var(--faint)", marginTop: 12, lineHeight: 1.7 }}>
+                Check Google Sheet vars (<code style={CODE}>GOOGLE_SHEET_*</code>,{" "}
+                <code style={CODE}>GOOGLE_CLIENT_EMAIL</code>,{" "}
+                <code style={CODE}>GOOGLE_PRIVATE_KEY</code>) and Supabase tracking (
+                <code style={CODE}>SUPABASE_URL</code>,{" "}
+                <code style={CODE}>SUPABASE_SERVICE_ROLE_KEY</code>) in{" "}
+                <code style={CODE}>apps/docs/.env</code>.
               </p>
             </div>
           </div>
@@ -99,15 +112,16 @@ export default async function ReferEmailsPage() {
   });
 
   return (
-    <div>
+    <div className="view wide">
       <PageHeader
-        title="Refer Emails"
-        description={`${data.stats.total} contacts in "${data.sheetTitle}" · synced from Google Sheets`}
+        eyebrow="outreach · campaign sheet"
+        title="Refer emails"
+        description={`${data.stats.total} contacts in "${data.sheetTitle}", synced from Google Sheets with open and portfolio-visit tracking.`}
       >
         <ReferEmailsRefreshButton />
         <Link href={data.sheetUrl} target="_blank" rel="noopener noreferrer">
           <Button variant="outline" size="sm">
-            <IconExternalLink size={14} /> Open Sheet
+            <IconExternalLink size={14} /> Open sheet
           </Button>
         </Link>
       </PageHeader>

@@ -1,9 +1,10 @@
 import { prisma } from "db";
 import { PageHeader } from "@/components/shared/page-header";
-import { Card } from "@/components/ui/card";
+import { Card, CardHead } from "@/components/ui/card";
 import { PreviewFrame, LinksPreview } from "@/components/preview";
-import { SocialLinksTable } from "../social-links/table";
+import { SocialLinksList } from "./social-links-list";
 import { ResumeForm } from "./resume-form";
+import { IconArrowUpRight } from "@tabler/icons-react";
 
 export default async function LinksPage() {
   const [links, siteConfigRows] = await Promise.all([
@@ -16,36 +17,43 @@ export default async function LinksPage() {
   const contactEmail = config.get("contactEmail") ?? "";
 
   return (
-    <div>
+    <div className="view">
       <PageHeader
+        eyebrow="site-wide · hero + footer"
         title="Links"
-        description="Manage all your external links — social profiles, resume, and more. Changes apply everywhere on your portfolio."
+        description="Every outbound link on the portfolio — social profiles and the resume. Changes apply everywhere."
       />
 
-      {/* Resume URL */}
-      <Card className="mb-6">
-        <h3 className="text-sm font-semibold mb-3">Resume / CV Link</h3>
-        <p className="text-xs text-muted-foreground mb-3">
-          This link is used for the &quot;Resume / CV&quot; button in the hero section.
-        </p>
-        <ResumeForm resumeUrl={resumeUrl} />
-      </Card>
+      <div className="grid gap-3">
+        {/* Resume URL */}
+        <Card flush>
+          <CardHead
+            title="Resume / CV"
+            right={
+              resumeUrl ? (
+                <a className="btn ghost" href={resumeUrl} target="_blank" rel="noopener noreferrer">
+                  <IconArrowUpRight size={13} stroke={1.5} className="nudge" /> Open
+                </a>
+              ) : undefined
+            }
+          />
+          <div className="card-b">
+            <ResumeForm resumeUrl={resumeUrl} />
+          </div>
+        </Card>
 
-      {/* Social Links */}
-      <h3 className="text-sm font-semibold mb-3">Social Links</h3>
-      <p className="text-xs text-muted-foreground mb-3">
-        Displayed in the hero section, contact sidebar, and footer.
-      </p>
-      <SocialLinksTable
-        links={links.map((l) => ({
-          id: l.id,
-          name: l.name,
-          href: l.href,
-          iconKey: l.iconKey,
-          detail: l.detail,
-          sortOrder: l.sortOrder,
-        }))}
-      />
+        {/* Social Links */}
+        <SocialLinksList
+          links={links.map((l) => ({
+            id: l.id,
+            name: l.name,
+            href: l.href,
+            iconKey: l.iconKey,
+            detail: l.detail,
+            sortOrder: l.sortOrder,
+          }))}
+        />
+      </div>
 
       {/* Preview */}
       <PreviewFrame label="Links Preview — How they appear across your portfolio">

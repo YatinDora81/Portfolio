@@ -1,70 +1,92 @@
 "use client";
 
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardHead } from "@/components/ui/card";
+import { Button, IconButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
 import { DeleteButton } from "@/components/shared/delete-button";
 import { createContactPurpose, updateContactPurpose, deleteContactPurpose } from "@/lib/actions/contact-purposes";
-import { IconPlus, IconEdit } from "@tabler/icons-react";
+import { IconPlus, IconPencil, IconGripVertical, IconInbox } from "@tabler/icons-react";
 
 interface Purpose { id: string; label: string; emoji: string; sortOrder: number }
+
+const FORM_ID = "contact-purpose-form";
 
 export function ContactPurposesTable({ purposes }: { purposes: Purpose[] }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Purpose | null>(null);
 
-  return (
-    <Card>
-      <div className="flex justify-end mb-4">
-        <Button size="sm" onClick={() => { setEditing(null); setDialogOpen(true); }}>
-          <IconPlus size={16} /> Add Purpose
-        </Button>
-      </div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border text-left text-muted-foreground">
-            <th className="pb-3 font-medium">#</th>
-            <th className="pb-3 font-medium">Emoji</th>
-            <th className="pb-3 font-medium">Label</th>
-            <th className="pb-3 font-medium text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {purposes.map((p, i) => (
-            <tr key={p.id} className="border-b border-border last:border-0">
-              <td className="py-3 text-muted-foreground">{i + 1}</td>
-              <td className="py-3 text-xl">{p.emoji}</td>
-              <td className="py-3">{p.label}</td>
-              <td className="py-3 text-right">
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => { setEditing(p); setDialogOpen(true); }}>
-                    <IconEdit size={16} />
-                  </Button>
-                  <DeleteButton label={`"${p.label}"`} onDelete={async () => { await deleteContactPurpose(p.id); }} />
-                </div>
-              </td>
-            </tr>
-          ))}
-          {purposes.length === 0 && (
-            <tr><td colSpan={4} className="py-8 text-center text-muted-foreground">No purposes yet</td></tr>
-          )}
-        </tbody>
-      </table>
+  const openNew = () => { setEditing(null); setDialogOpen(true); };
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={editing ? "Edit Purpose" : "Add Purpose"}>
-        <form action={async (formData) => {
-          if (editing) await updateContactPurpose(editing.id, formData);
-          else await createContactPurpose(formData);
-          setDialogOpen(false);
-        }} className="space-y-4">
-          <Input name="emoji" label="Emoji" defaultValue={editing?.emoji || ""} required />
-          <Input name="label" label="Label" defaultValue={editing?.label || ""} required />
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" type="button" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button type="submit">{editing ? "Update" : "Create"}</Button>
+  return (
+    <Card flush>
+      <CardHead
+        title="Purpose chips"
+        count={purposes.length}
+        right={
+          <Button size="sm" onClick={openNew}>
+            <IconPlus size={14} stroke={1.8} /> Add purpose
+          </Button>
+        }
+      />
+
+      {purposes.length === 0 ? (
+        <div className="empty">
+          <div className="empty-ic"><IconInbox size={18} stroke={1.5} /></div>
+          <b>No purposes yet</b>
+          <span>Visitors pick one of these chips before writing you a message.</span>
+          <Button size="sm" onClick={openNew}><IconPlus size={14} stroke={1.8} /> Add the first purpose</Button>
+        </div>
+      ) : (
+        <div className="rows">
+          {purposes.map((p, i) => (
+            <div key={p.id} className="row">
+              <IconGripVertical size={14} className="row-grip" />
+              <div className="row-i">{String(i + 1).padStart(2, "0")}</div>
+              <span style={{ fontSize: 16, lineHeight: 1, flex: "none" }} aria-hidden>{p.emoji}</span>
+              <div className="row-main">
+                <div className="row-t">{p.label}</div>
+              </div>
+              <div className="row-acts">
+                <IconButton
+                  aria-label={`Edit ${p.label}`}
+                  onClick={() => { setEditing(p); setDialogOpen(true); }}
+                >
+                  <IconPencil size={13} stroke={1.5} />
+                </IconButton>
+                <DeleteButton label={`"${p.label}"`} onDelete={async () => { await deleteContactPurpose(p.id); }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        title={editing ? "Edit purpose" : "Add purpose"}
+        icon={IconInbox}
+        footer={
+          <>
+            <Button variant="ghost" type="button" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button type="submit" form={FORM_ID}>{editing ? "Save changes" : "Create purpose"}</Button>
+          </>
+        }
+      >
+        <form
+          id={FORM_ID}
+          action={async (formData) => {
+            if (editing) await updateContactPurpose(editing.id, formData);
+            else await createContactPurpose(formData);
+            setDialogOpen(false);
+          }}
+        >
+          <div className="f-row" style={{ gridTemplateColumns: "88px 1fr" }}>
+            <Input name="emoji" label="Emoji" defaultValue={editing?.emoji || ""} required />
+            <Input name="label" label="Label" defaultValue={editing?.label || ""} required />
           </div>
+          <div className="f-hint">Shown as a chip above the contact form — one emoji, a short label.</div>
         </form>
       </Dialog>
     </Card>

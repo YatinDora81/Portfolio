@@ -19,8 +19,12 @@ export default async function HeroSkillBadgesPage() {
   const avatarUrl = config.get("avatarUrl") ?? "";
 
   return (
-    <div>
-      <PageHeader title="Hero Skill Badges" description="Inline skill badges in the hero bio" />
+    <div className="view">
+      <PageHeader
+        eyebrow="section 01 · top of the page"
+        title="Hero badges"
+        description="The small skill badges that sit inline in the hero bio, in this order."
+      />
       <HeroSkillBadgesTable badges={badges.map(b => ({ id: b.id, name: b.name, iconKey: b.iconKey, sortOrder: b.sortOrder }))} />
       <PreviewFrame label="Hero Preview">
         <HeroPreview

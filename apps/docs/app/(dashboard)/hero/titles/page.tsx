@@ -19,8 +19,12 @@ export default async function HeroTitlesPage() {
   const avatarUrl = config.get("avatarUrl") ?? "";
 
   return (
-    <div>
-      <PageHeader title="Hero Titles" description="Rotating titles in the hero section" />
+    <div className="view">
+      <PageHeader
+        eyebrow="section 01 · top of the page"
+        title="Hero titles"
+        description="The line that cycles under your name in the hero. Order here is the order visitors see."
+      />
       <HeroTitlesTable titles={titles.map(t => ({ id: t.id, title: t.title, sortOrder: t.sortOrder }))} />
       <PreviewFrame label="Hero Preview">
         <HeroPreview

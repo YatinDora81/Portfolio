@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/shared/page-header";
 import { createProject, updateProject } from "@/lib/actions/projects";
-import { IconPlus, IconTrash, IconArrowUp, IconArrowDown } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconChevronUp, IconChevronDown, IconCheck } from "@tabler/icons-react";
 
 interface Bullet { id?: string; content: string; sortOrder: number }
 interface ProjectData {
@@ -56,120 +56,209 @@ export function ProjectForm({ project, allSkills }: {
   };
 
   return (
-    <div>
-      <PageHeader title={isEditing ? "Edit Project" : "New Project"} />
-      <Card>
-        <div className="space-y-4">
-          <Input label="Title" value={title} onChange={e => setTitle(e.target.value)} required />
-          <Textarea label="Summary" value={summary} onChange={e => setSummary(e.target.value)} required rows={2} />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="GitHub URL" value={github} onChange={e => setGithub(e.target.value)} />
-            <Input label="Live URL" value={live} onChange={e => setLive(e.target.value)} />
-          </div>
-          <Input label="Logo URL (optional)" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="/logos/my-project.png or https://…" />
+    <div className="view">
+      <PageHeader
+        eyebrow="section 05"
+        title={isEditing ? "Edit project" : "New project"}
+        description="Title and summary are what the card shows; bullets open up underneath it."
+      />
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Image URLs</label>
-            <div className="space-y-2">
-              {images.map((img, i) => (
-                <div key={i} className="flex gap-2">
-                  <Input value={img} onChange={e => {
+      <Card>
+        <Input label="Title" value={title} onChange={e => setTitle(e.target.value)} required />
+        <Textarea
+          label="Summary"
+          value={summary}
+          onChange={e => setSummary(e.target.value)}
+          required
+          rows={2}
+          hint="One or two lines — this is the tagline under the project title."
+        />
+
+        <div className="f-row">
+          <Input label="GitHub URL" mono value={github} onChange={e => setGithub(e.target.value)} placeholder="https://github.com/…" />
+          <Input label="Live URL" mono value={live} onChange={e => setLive(e.target.value)} placeholder="https://…" />
+        </div>
+
+        <Input
+          label="Logo URL"
+          mono
+          value={logoUrl}
+          onChange={e => setLogoUrl(e.target.value)}
+          placeholder="/logos/my-project.png or https://…"
+          hint="Optional. Shown as the mark on the project cover."
+        />
+
+        {/* ---- images ---- */}
+        <div className="f">
+          <label>Image URLs</label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {images.map((img, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="row-i">{String(i + 1).padStart(2, "0")}</span>
+                <input
+                  className="in mono"
+                  style={{ flex: 1, minWidth: 0 }}
+                  value={img}
+                  onChange={e => {
                     const newImages = [...images];
                     newImages[i] = e.target.value;
                     setImages(newImages);
-                  }} placeholder="https://example.com/image.png" className="flex-1" />
-                  <Button variant="ghost" size="sm" className="mt-1 text-destructive"
-                    onClick={() => setImages(images.filter((_, j) => j !== i))}>
-                    <IconTrash size={16} />
-                  </Button>
-                </div>
-              ))}
-              <Button variant="outline" size="sm" onClick={() => setImages([...images, ""])}>
-                <IconPlus size={14} /> Add Image
+                  }}
+                  placeholder="https://example.com/image.png"
+                />
+                <button
+                  type="button"
+                  className="ibtn warn"
+                  aria-label={`Remove image ${i + 1}`}
+                  onClick={() => setImages(images.filter((_, j) => j !== i))}
+                >
+                  <IconTrash size={14} stroke={1.5} />
+                </button>
+              </div>
+            ))}
+            <div>
+              <Button type="button" variant="outline" size="sm" onClick={() => setImages([...images, ""])}>
+                <IconPlus size={14} /> Add image
               </Button>
             </div>
           </div>
+          <div className="f-hint">The first image becomes the card cover.</div>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Skills</label>
-            <div className="flex flex-wrap gap-2">
-              {allSkills.map(s => (
-                <button key={s.id} type="button" onClick={() => toggleSkill(s.id)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                    selectedSkills.includes(s.id)
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background border-border text-muted-foreground hover:border-foreground/30"
-                  }`}
+        {/* ---- skills ---- */}
+        <div className="f">
+          <label>Skills</label>
+          <div className="pskills">
+            {allSkills.map(s => {
+              const on = selectedSkills.includes(s.id);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleSkill(s.id)}
+                  style={{ padding: 0, borderRadius: 99 }}
                 >
-                  {s.name}
+                  <span className={on ? "chip amb" : "chip off"}>
+                    {on && <IconCheck size={11} stroke={2} />}
+                    {s.name}
+                  </span>
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
+          <div className="f-hint">
+            {selectedSkills.length} selected — these render as the stack chips on the card.
+          </div>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Bullet Points</label>
-            <div className="space-y-3">
-              {bullets.map((b, i) => (
-                <div key={i} className="group relative flex gap-3 rounded-lg border border-border bg-muted/30 p-3 transition-colors hover:border-foreground/20">
-                  <div className="flex flex-col items-center gap-1 pt-1">
-                    <span className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
-                      {i + 1}
-                    </span>
-                    <div className="flex flex-col gap-0.5 mt-1">
-                      <button type="button" disabled={i === 0}
-                        onClick={() => {
-                          const arr = [...bullets];
-                          [arr[i - 1], arr[i]] = [arr[i]!, arr[i - 1]!];
-                          setBullets(arr);
-                        }}
-                        className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed border-none bg-transparent">
-                        <IconArrowUp size={14} />
-                      </button>
-                      <button type="button" disabled={i === bullets.length - 1}
-                        onClick={() => {
-                          const arr = [...bullets];
-                          [arr[i], arr[i + 1]] = [arr[i + 1]!, arr[i]!];
-                          setBullets(arr);
-                        }}
-                        className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed border-none bg-transparent">
-                        <IconArrowDown size={14} />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <Textarea value={b.content} onChange={e => {
+        {/* ---- bullets ---- */}
+        <div className="f">
+          <label>Bullet points</label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {bullets.map((b, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "flex-start",
+                  padding: "10px 11px",
+                  border: "1px solid var(--line2)",
+                  borderRadius: "var(--r2)",
+                  background: "var(--bg1)",
+                }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, paddingTop: 2 }}>
+                  <span className="row-i" style={{ width: "auto" }}>{String(i + 1).padStart(2, "0")}</span>
+                  <button
+                    type="button"
+                    className="ibtn"
+                    disabled={i === 0}
+                    aria-label="Move bullet up"
+                    onClick={() => {
+                      const arr = [...bullets];
+                      [arr[i - 1], arr[i]] = [arr[i]!, arr[i - 1]!];
+                      setBullets(arr);
+                    }}
+                  >
+                    <IconChevronUp size={13} stroke={1.5} />
+                  </button>
+                  <button
+                    type="button"
+                    className="ibtn"
+                    disabled={i === bullets.length - 1}
+                    aria-label="Move bullet down"
+                    onClick={() => {
+                      const arr = [...bullets];
+                      [arr[i], arr[i + 1]] = [arr[i + 1]!, arr[i]!];
+                      setBullets(arr);
+                    }}
+                  >
+                    <IconChevronDown size={13} stroke={1.5} />
+                  </button>
+                </div>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <textarea
+                    className="ta"
+                    rows={2}
+                    style={{ minHeight: 64, background: "var(--card)" }}
+                    value={b.content}
+                    onChange={e => {
                       const newBullets = [...bullets];
                       newBullets[i] = { ...b, content: e.target.value };
                       setBullets(newBullets);
-                    }} placeholder="Use **bold** for highlights" rows={2} className="bg-background" />
-                    {b.content && (
-                      <p className="text-xs text-muted-foreground px-1">
-                        {b.content.split(/(\*\*.*?\*\*)/).map((part, j) =>
-                          part.startsWith("**") && part.endsWith("**")
-                            ? <span key={j} className="font-semibold text-foreground">{part.slice(2, -2)}</span>
-                            : <span key={j}>{part}</span>
-                        )}
-                      </p>
-                    )}
-                  </div>
-                  <Button variant="ghost" size="sm" className="mt-1 text-muted-foreground hover:text-destructive"
-                    onClick={() => setBullets(bullets.filter((_, j) => j !== i))}>
-                    <IconTrash size={16} />
-                  </Button>
+                    }}
+                    placeholder="Use **bold** for highlights"
+                  />
+                  {b.content && (
+                    <p className="f-hint" style={{ marginTop: 6, lineHeight: 1.5 }}>
+                      {b.content.split(/(\*\*.*?\*\*)/).map((part, j) =>
+                        part.startsWith("**") && part.endsWith("**")
+                          ? <b key={j} style={{ color: "var(--ink)", fontWeight: 600 }}>{part.slice(2, -2)}</b>
+                          : <span key={j}>{part}</span>
+                      )}
+                    </p>
+                  )}
                 </div>
-              ))}
-              <Button variant="outline" size="sm" onClick={() => setBullets([...bullets, { content: "", sortOrder: bullets.length }])}>
-                <IconPlus size={14} /> Add Bullet
+
+                <button
+                  type="button"
+                  className="ibtn warn"
+                  aria-label={`Remove bullet ${i + 1}`}
+                  onClick={() => setBullets(bullets.filter((_, j) => j !== i))}
+                >
+                  <IconTrash size={14} stroke={1.5} />
+                </button>
+              </div>
+            ))}
+            <div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setBullets([...bullets, { content: "", sortOrder: bullets.length }])}
+              >
+                <IconPlus size={14} /> Add bullet
               </Button>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={() => router.push("/projects")}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={pending}>
-            {pending ? "Saving..." : isEditing ? "Update" : "Create"}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+            marginTop: 4,
+            paddingTop: 14,
+            borderTop: "1px solid var(--line2)",
+          }}
+        >
+          <Button type="button" variant="outline" onClick={() => router.push("/projects")}>Cancel</Button>
+          <Button type="button" onClick={handleSubmit} disabled={pending}>
+            {pending ? "Saving…" : isEditing ? "Update project" : "Create project"}
           </Button>
         </div>
       </Card>

@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardHead } from "@/components/ui/card";
+import { Button, IconButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Dialog } from "@/components/ui/dialog";
 import { DeleteButton } from "@/components/shared/delete-button";
 import { createEducation, updateEducation, deleteEducation } from "@/lib/actions/about";
-import { IconPlus, IconEdit } from "@tabler/icons-react";
+import { IconPlus, IconPencil, IconGripVertical, IconSchool } from "@tabler/icons-react";
 
 interface Entry {
   id: string; institution: string; location: string; degree: string;
@@ -16,78 +16,116 @@ interface Entry {
   startYear: string; endYear: string; sortOrder: number;
 }
 
+const FORM_ID = "education-form";
+
+/** "9.1 / 10 CGPA" or "88 %" — null when the entry carries no score. */
+function scoreLabel(e: Entry) {
+  if (!e.score) return null;
+  const total = e.scoreTotal ? ` / ${e.scoreTotal}` : "";
+  const unit = e.scoreType === "PERCENTAGE" ? " %" : e.scoreType === "CGPA" ? " CGPA" : "";
+  return `${e.score}${total}${unit}`;
+}
+
 export function EducationTable({ entries }: { entries: Entry[] }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Entry | null>(null);
 
+  const openNew = () => { setEditing(null); setDialogOpen(true); };
+
   return (
-    <Card>
-      <div className="flex justify-end mb-4">
-        <Button size="sm" onClick={() => { setEditing(null); setDialogOpen(true); }}>
-          <IconPlus size={16} /> Add Education
-        </Button>
-      </div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border text-left text-muted-foreground">
-            <th className="pb-3 font-medium">Institution</th>
-            <th className="pb-3 font-medium">Degree</th>
-            <th className="pb-3 font-medium">Score</th>
-            <th className="pb-3 font-medium">Years</th>
-            <th className="pb-3 font-medium text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((e) => (
-            <tr key={e.id} className="border-b border-border last:border-0">
-              <td className="py-3">
-                <div className="font-medium">{e.institution}</div>
-                <div className="text-xs text-muted-foreground">{e.location}</div>
-              </td>
-              <td className="py-3 text-muted-foreground">{e.degree}</td>
-              <td className="py-3 text-muted-foreground">
-                {e.score ? `${e.score}${e.scoreTotal ? `/${e.scoreTotal}` : ""}` : "—"}
-              </td>
-              <td className="py-3 text-muted-foreground">{e.startYear} - {e.endYear}</td>
-              <td className="py-3 text-right">
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => { setEditing(e); setDialogOpen(true); }}>
-                    <IconEdit size={16} />
-                  </Button>
+    <Card flush>
+      <CardHead
+        title="Education entries"
+        count={entries.length}
+        right={
+          <Button size="sm" onClick={openNew}>
+            <IconPlus size={14} stroke={1.8} /> Add education
+          </Button>
+        }
+      />
+
+      {entries.length === 0 ? (
+        <div className="empty">
+          <div className="empty-ic"><IconSchool size={18} stroke={1.5} /></div>
+          <b>No education entries yet</b>
+          <span>These appear as a timeline beside the about section&apos;s bio.</span>
+          <Button size="sm" onClick={openNew}><IconPlus size={14} stroke={1.8} /> Add the first entry</Button>
+        </div>
+      ) : (
+        <div className="rows">
+          {entries.map((e, i) => {
+            const score = scoreLabel(e);
+            return (
+              <div key={e.id} className="row">
+                <IconGripVertical size={14} className="row-grip" />
+                <div className="row-i">{String(i + 1).padStart(2, "0")}</div>
+                <div className="row-main">
+                  <div className="row-t">{e.institution}</div>
+                  <div className="row-m">
+                    {e.degree} · {e.location} · {e.startYear}–{e.endYear}
+                  </div>
+                </div>
+                {score ? <span className="chip">{score}</span> : null}
+                <div className="row-acts">
+                  <IconButton
+                    aria-label={`Edit ${e.institution}`}
+                    onClick={() => { setEditing(e); setDialogOpen(true); }}
+                  >
+                    <IconPencil size={13} stroke={1.5} />
+                  </IconButton>
                   <DeleteButton label={`"${e.institution}"`} onDelete={async () => { await deleteEducation(e.id); }} />
                 </div>
-              </td>
-            </tr>
-          ))}
-          {entries.length === 0 && (
-            <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No education entries yet</td></tr>
-          )}
-        </tbody>
-      </table>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={editing ? "Edit Education" : "Add Education"} className="max-w-xl">
-        <form action={async (formData) => {
-          if (editing) await updateEducation(editing.id, formData);
-          else await createEducation(formData);
-          setDialogOpen(false);
-        }} className="space-y-4">
+      <Dialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        title={editing ? "Edit education" : "Add education"}
+        icon={IconSchool}
+        wide
+        footer={
+          <>
+            <Button variant="ghost" type="button" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button type="submit" form={FORM_ID}>{editing ? "Save changes" : "Create entry"}</Button>
+          </>
+        }
+      >
+        <form
+          id={FORM_ID}
+          action={async (formData) => {
+            if (editing) await updateEducation(editing.id, formData);
+            else await createEducation(formData);
+            setDialogOpen(false);
+          }}
+        >
           <Input name="institution" label="Institution" defaultValue={editing?.institution || ""} required />
-          <Input name="location" label="Location" defaultValue={editing?.location || ""} required />
-          <Input name="degree" label="Degree" defaultValue={editing?.degree || ""} required />
-          <div className="grid grid-cols-3 gap-3">
-            <Select name="scoreType" label="Score Type" defaultValue={editing?.scoreType || ""}
-              options={[{ value: "", label: "None" }, { value: "CGPA", label: "CGPA" }, { value: "PERCENTAGE", label: "Percentage" }]} />
+          <div className="f-row">
+            <Input name="location" label="Location" defaultValue={editing?.location || ""} required />
+            <Input name="degree" label="Degree" defaultValue={editing?.degree || ""} required />
+          </div>
+          <div className="f-row" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
+            <Select
+              name="scoreType"
+              label="Score type"
+              defaultValue={editing?.scoreType || ""}
+              options={[
+                { value: "", label: "None" },
+                { value: "CGPA", label: "CGPA" },
+                { value: "PERCENTAGE", label: "Percentage" },
+              ]}
+            />
             <Input name="score" label="Score" defaultValue={editing?.score || ""} />
             <Input name="scoreTotal" label="Total" defaultValue={editing?.scoreTotal || ""} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input name="startYear" label="Start Year" defaultValue={editing?.startYear || ""} required />
-            <Input name="endYear" label="End Year" defaultValue={editing?.endYear || ""} required />
+          <div className="f-row">
+            <Input name="startYear" label="Start year" defaultValue={editing?.startYear || ""} required />
+            <Input name="endYear" label="End year" defaultValue={editing?.endYear || ""} required />
           </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" type="button" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button type="submit">{editing ? "Update" : "Create"}</Button>
-          </div>
+          <div className="f-hint">Leave the score fields blank if you&apos;d rather not publish a grade.</div>
         </form>
       </Dialog>
     </Card>

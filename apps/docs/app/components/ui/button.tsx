@@ -1,20 +1,20 @@
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
 
+// Maps the app's existing variant names onto the control-room `.btn` modifiers,
+// so every call site keeps working untouched.
 const variants = {
-  primary:
-    "bg-primary text-primary-foreground shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/25 hover:brightness-110 active:brightness-95",
-  destructive:
-    "bg-destructive text-destructive-foreground shadow-sm shadow-destructive/20 hover:shadow-md hover:shadow-destructive/25 hover:brightness-110 active:brightness-95",
-  outline:
-    "border border-border bg-card hover:bg-muted text-foreground shadow-sm hover:shadow",
-  ghost: "hover:bg-muted text-foreground",
+  primary: "pri",
+  destructive: "danger",
+  outline: "",
+  ghost: "ghost",
 };
 
+// `.btn` carries its own padding; sizes only nudge it.
 const sizes = {
-  sm: "h-8 px-3 text-xs rounded-lg",
-  md: "h-9 px-4 text-sm rounded-lg",
-  lg: "h-10 px-6 text-sm rounded-lg",
+  sm: "text-[12px] px-[10px] py-[5px]",
+  md: "",
+  lg: "text-[13.5px] px-4 py-[9px]",
 };
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -24,16 +24,20 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "primary", size = "md", ...props }, ref) => (
-    <button
-      ref={ref}
-      className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none",
-        variants[variant],
-        sizes[size],
-        className
-      )}
-      {...props}
-    />
+    <button ref={ref} className={cn("btn", variants[variant], sizes[size], className)} {...props} />
   )
 );
 Button.displayName = "Button";
+
+/** Bare icon button — the `.ibtn` used in row action clusters. */
+export const IconButton = forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "default" | "warn" | "amber" }
+>(({ className, tone = "default", ...props }, ref) => (
+  <button
+    ref={ref}
+    className={cn("ibtn", tone === "warn" && "warn", tone === "amber" && "amber", className)}
+    {...props}
+  />
+));
+IconButton.displayName = "IconButton";

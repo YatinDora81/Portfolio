@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Card } from "@/components/ui/card";
+import { useState, useTransition } from "react";
+import { cn } from "@/lib/utils";
+import { Card, CardHead } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -9,77 +10,141 @@ import { Dialog } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { DeleteButton } from "@/components/shared/delete-button";
 import { createSkill, updateSkill, toggleSkillVisibility, deleteSkill } from "@/lib/actions/skills";
-import { IconPlus, IconEdit } from "@tabler/icons-react";
+import { IconPlus, IconPencil, IconEye, IconEyeOff, IconCpu } from "@tabler/icons-react";
 
 interface Skill { id: string; name: string; iconKey: string; show: boolean; sortOrder: number }
 
-export function SkillsTable({ skills }: { skills: Skill[] }) {
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<Skill | null>(null);
+/**
+ * Skills have no `category` column, so the grouping key is the one real axis the
+ * data gives us: whether a skill is published to the grid or kept around purely
+ * as a relation tag. Sort order inside each group is the query's sortOrder.
+ */
+function groupSkills(skills: Skill[]) {
+  return [
+    { key: "grid", title: "in the skills grid", rows: skills.filter(s => s.show) },
+    { key: "hidden", title: "hidden · tags only", rows: skills.filter(s => !s.show) },
+  ].filter(g => g.rows.length > 0);
+}
+
+function SkillChip({ skill }: { skill: Skill }) {
+  const [pending, startTransition] = useTransition();
 
   return (
-    <Card>
-      <div className="flex justify-end mb-4">
-        <Button size="sm" onClick={() => { setEditing(null); setDialogOpen(true); }}>
-          <IconPlus size={16} /> Add Skill
-        </Button>
+    <div className={cn("skill", !skill.show && "hid")}>
+      <div>
+        <div className="skill-n">{skill.name}</div>
+        {/* Only worth surfacing when it diverges from the name — that mismatch is
+            what decides which icon the site renders. */}
+        {skill.iconKey !== skill.name && <div className="skill-u">{skill.iconKey}</div>}
       </div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border text-left text-muted-foreground">
-            <th className="pb-3 font-medium">#</th>
-            <th className="pb-3 font-medium">Name</th>
-            <th className="pb-3 font-medium">Icon Key</th>
-            <th className="pb-3 font-medium">Visible</th>
-            <th className="pb-3 font-medium text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {skills.map((s, i) => (
-            <tr key={s.id} className="border-b border-border last:border-0">
-              <td className="py-3 text-muted-foreground">{i + 1}</td>
-              <td className="py-3 font-medium">{s.name}</td>
-              <td className="py-3 font-mono text-xs text-muted-foreground">{s.iconKey}</td>
-              <td className="py-3">
-                <Switch checked={s.show} onChange={async (val) => { await toggleSkillVisibility(s.id, val); }} />
-              </td>
-              <td className="py-3 text-right">
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => { setEditing(s); setDialogOpen(true); }}>
-                    <IconEdit size={16} />
-                  </Button>
-                  <DeleteButton label={`"${s.name}"`} onDelete={async () => { await deleteSkill(s.id); }} />
-                </div>
-              </td>
-            </tr>
-          ))}
-          {skills.length === 0 && (
-            <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No skills yet</td></tr>
-          )}
-        </tbody>
-      </table>
+      <button
+        className="ibtn"
+        disabled={pending}
+        aria-label={skill.show ? `Hide ${skill.name}` : `Show ${skill.name}`}
+        title={skill.show ? "Hide from the grid" : "Show in the grid"}
+        onClick={() => startTransition(async () => { await toggleSkillVisibility(skill.id, !skill.show); })}
+      >
+        {skill.show ? <IconEye size={13} stroke={1.5} /> : <IconEyeOff size={13} stroke={1.5} />}
+      </button>
+      <SkillEditButton skill={skill} />
+      <DeleteButton
+        label={`"${skill.name}"`}
+        sub="This also drops it from every project and experience it's tagged on. There's no undo here."
+        onDelete={async () => { await deleteSkill(skill.id); }}
+      />
+    </div>
+  );
+}
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={editing ? "Edit Skill" : "Add Skill"}>
-        <form action={async (formData) => {
+/** Edit opens the same dialog as Add, seeded with this skill. */
+function SkillEditButton({ skill }: { skill: Skill }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button className="ibtn" onClick={() => setOpen(true)} aria-label={`Edit ${skill.name}`} title="Edit">
+        <IconPencil size={13} stroke={1.5} />
+      </button>
+      {open && <SkillDialog onClose={() => setOpen(false)} editing={skill} />}
+    </>
+  );
+}
+
+/** Mounted only while open, so `show` always re-seeds from the row being edited. */
+function SkillDialog({ onClose, editing }: { onClose: () => void; editing: Skill | null }) {
+  const [show, setShow] = useState(editing?.show ?? true);
+
+  return (
+    <Dialog open onClose={onClose} title={editing ? "Edit skill" : "Add skill"} icon={IconCpu}>
+      <form
+        action={async (formData) => {
           if (editing) await updateSkill(editing.id, formData);
           else await createSkill(formData);
-          setDialogOpen(false);
-        }} className="space-y-4">
+          onClose();
+        }}
+      >
+        <div className="f-row">
           <Input name="name" label="Name" defaultValue={editing?.name || ""} required />
-          <Input name="iconKey" label="Icon Key" defaultValue={editing?.iconKey || ""} required />
-          <div className="flex items-center gap-2">
-            <input type="hidden" name="show" value={editing?.show !== false ? "true" : "false"} />
-            <label className="text-sm">
-              <input type="checkbox" name="show" value="true" defaultChecked={editing?.show !== false} className="mr-2" />
-              Show in skills grid
-            </label>
+          <Input name="iconKey" label="Icon key" mono defaultValue={editing?.iconKey || ""} required hint="Usually identical to the name." />
+        </div>
+        {/* Deliberately not a `.f` wrapper: `.f label` would restyle the Switch's
+            own caption into the mono field-label face. */}
+        <div style={{ marginBottom: 14 }}>
+          {/* Single source of truth for `show` — the action reads this one field. */}
+          <input type="hidden" name="show" value={show ? "true" : "false"} />
+          <Switch
+            checked={show}
+            onChange={setShow}
+            label={show ? "Shown in the skills grid" : "Hidden — stays usable as a tag"}
+          />
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, paddingTop: 4 }}>
+          <Button variant="ghost" type="button" onClick={onClose}>Cancel</Button>
+          <Button type="submit">{editing ? "Save changes" : "Create skill"}</Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+export function SkillsTable({ skills }: { skills: Skill[] }) {
+  const [addOpen, setAddOpen] = useState(false);
+  const groups = groupSkills(skills);
+
+  return (
+    <Card flush>
+      <CardHead
+        title="Skills"
+        count={skills.length}
+        right={
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <IconPlus size={14} /> Add skill
+          </Button>
+        }
+      />
+
+      <div className="card-b">
+        {groups.map((g, gi) => (
+          <div key={g.key} className="skill-cat" style={gi === groups.length - 1 ? { marginBottom: 0 } : undefined}>
+            <div className="skill-cat-h">
+              <div className="skill-cat-t">{g.title}</div>
+              <div className="skill-cat-n">/ {String(g.rows.length).padStart(2, "0")}</div>
+            </div>
+            <div className="skill-wrap">
+              {g.rows.map(s => <SkillChip key={s.id} skill={s} />)}
+            </div>
           </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" type="button" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button type="submit">{editing ? "Update" : "Create"}</Button>
+        ))}
+
+        {skills.length === 0 && (
+          <div className="empty">
+            <div className="empty-ic"><IconCpu size={20} stroke={1.5} /></div>
+            <b>No skills yet</b>
+            <span>Add the tools you actually work with — they fill the skills grid and become tags on projects and experience.</span>
           </div>
-        </form>
-      </Dialog>
+        )}
+      </div>
+
+      {addOpen && <SkillDialog onClose={() => setAddOpen(false)} editing={null} />}
     </Card>
   );
 }

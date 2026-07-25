@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { updateResumeUrl } from "@/lib/actions/links";
-import { IconCheck, IconExternalLink } from "@tabler/icons-react";
+import { IconCheck, IconDeviceFloppy } from "@tabler/icons-react";
 
 export function ResumeForm({ resumeUrl }: { resumeUrl: string }) {
   const [url, setUrl] = useState(resumeUrl);
@@ -19,32 +20,26 @@ export function ResumeForm({ resumeUrl }: { resumeUrl: string }) {
   };
 
   return (
-    <div className="flex gap-2">
-      <input
+    <div>
+      <Input
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         placeholder="https://drive.google.com/..."
-        className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+        label="Resume URL"
+        mono
+        hint="Drives the “Resume / CV” button in the hero. Paste a public share link."
       />
-      {url && (
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-        >
-          <IconExternalLink size={16} />
-        </a>
-      )}
-      <Button onClick={handleSave} disabled={pending || url === resumeUrl} size="sm">
-        {saved ? (
-          <><IconCheck size={16} /> Saved</>
-        ) : pending ? (
-          "Saving..."
-        ) : (
-          "Save"
+      <div className="row-acts" style={{ justifyContent: "flex-end", gap: 8 }}>
+        {saved && (
+          <span className="hint" style={{ color: "var(--good)" }}>
+            <IconCheck size={13} /> Saved
+          </span>
         )}
-      </Button>
+        {!saved && url !== resumeUrl && <span className="hint">Unsaved changes</span>}
+        <Button onClick={handleSave} disabled={pending || url === resumeUrl}>
+          <IconDeviceFloppy size={13} /> {pending ? "Saving…" : "Save"}
+        </Button>
+      </div>
     </div>
   );
 }

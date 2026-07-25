@@ -26,8 +26,12 @@ export default async function SiteConfigPage() {
   const configMap = Object.fromEntries(configs.map(c => [c.key, c.value]));
 
   return (
-    <div>
-      <PageHeader title="Site Config" description="Global site settings" />
+    <div className="view">
+      <PageHeader
+        eyebrow="site-wide"
+        title="Site Config"
+        description="The strings the whole portfolio reads from — hero copy, avatar, contact and footer."
+      />
       <SiteConfigForm configs={CONFIG_KEYS.map(k => ({ ...k, value: configMap[k.key] || "" }))} />
       <PreviewFrame label="Hero Preview (affected by config changes)">
         <HeroPreview

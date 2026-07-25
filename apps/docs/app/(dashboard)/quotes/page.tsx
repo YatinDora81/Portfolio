@@ -6,8 +6,12 @@ import { PreviewFrame, QuotesPreview } from "@/components/preview";
 export default async function QuotesPage() {
   const quotes = await prisma.quote.findMany();
   return (
-    <div>
-      <PageHeader title="Quotes" description="Daily rotating quotes on the portfolio" />
+    <div className="view">
+      <PageHeader
+        eyebrow="section 07"
+        title="Quotes"
+        description="The thought-of-the-day line on the portfolio — the top entry is the one visitors see today."
+      />
       <QuotesTable quotes={quotes.map(q => ({ id: q.id, quote: q.quote, author: q.author }))} />
       <PreviewFrame label="Quotes Preview">
         <QuotesPreview

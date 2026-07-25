@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* Control-room design system — tokens + component classes for the whole admin. */
+@import './control-room.css';
 
 @custom-variant dark (&:is(.dark *));
 

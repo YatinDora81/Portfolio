@@ -12,10 +12,11 @@ export default async function TrackerPage() {
   });
 
   return (
-    <div>
+    <div className="view wide">
       <PageHeader
+        eyebrow="outreach · attribution"
         title="Tracker"
-        description={`${rows.length} latest UTM hits captured from website URLs`}
+        description={`Every UTM-tagged visit the site captured — ${rows.length} most recent hits.`}
       />
       <TrackerTable
         rows={rows.map((r) => ({

@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { DeleteButton } from "@/components/shared/delete-button";
 import { markMessageRead, markMessageUnread, deleteMessage } from "@/lib/actions/messages";
-import { IconMail, IconMailOpened, IconChevronDown } from "@tabler/icons-react";
+import {
+  IconArrowLeft,
+  IconCornerUpLeft,
+  IconInboxOff,
+  IconMail,
+  IconMailOpened,
+} from "@tabler/icons-react";
 
 interface Message {
   id: string;
@@ -32,86 +37,35 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString();
 }
 
-function MessageCard({ msg }: { msg: Message }) {
-  const [expanded, setExpanded] = useState(false);
+/** Two letters for the `.mava` tile — first + last word of the sender's name. */
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
+}
 
-  const handleExpand = async () => {
-    setExpanded(!expanded);
-    if (!expanded && !msg.read) {
-      await markMessageRead(msg.id);
-    }
-  };
+/**
+ * Stable hue per sender so the same person always gets the same avatar colour.
+ * `.mava` ships no background of its own — dark mode just desaturates whatever
+ * we set here — so the pair is computed rather than pulled from a token.
+ */
+function avatarStyle(name: string): React.CSSProperties {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  return { background: `hsl(${h} 64% 88%)`, color: `hsl(${h} 58% 27%)` };
+}
 
-  return (
-    <Card className={`p-0 overflow-hidden transition-all ${!msg.read ? "border-primary/30 bg-primary/[0.02]" : ""}`}>
-      <button
-        onClick={handleExpand}
-        className="w-full text-left p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-      >
-        <div className="flex items-start gap-3">
-          <div className={`mt-0.5 shrink-0 ${!msg.read ? "text-primary" : "text-muted-foreground"}`}>
-            {msg.read ? <IconMailOpened size={18} /> : <IconMail size={18} />}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className={`text-sm ${!msg.read ? "font-semibold" : "font-medium"}`}>{msg.name}</span>
-              {msg.purpose && <Badge variant="outline">{msg.purpose}</Badge>}
-              {!msg.read && <Badge variant="default">New</Badge>}
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{msg.email}</p>
-            {!expanded && (
-              <p className="text-sm text-muted-foreground mt-1 truncate">{msg.message}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">{timeAgo(msg.createdAt)}</span>
-            <IconChevronDown size={14} className={`text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
-          </div>
-        </div>
-      </button>
-
-      {expanded && (
-        <div className="px-4 pb-4 border-t border-border">
-          <div className="pt-3 pl-[30px]">
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.message}</p>
-            <div className="mt-4 flex items-center gap-2">
-              <a
-                href={`mailto:${msg.email}?subject=Re: ${msg.purpose ? `[${msg.purpose}] ` : ""}Contact from ${msg.name}`}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-90"
-              >
-                Reply
-              </a>
-              {msg.read ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async (e) => { e.stopPropagation(); await markMessageUnread(msg.id); }}
-                >
-                  Mark unread
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async (e) => { e.stopPropagation(); await markMessageRead(msg.id); }}
-                >
-                  Mark read
-                </Button>
-              )}
-              <DeleteButton
-                label={`message from "${msg.name}"`}
-                onDelete={async () => { await deleteMessage(msg.id); }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-    </Card>
-  );
+function replyHref(msg: Message) {
+  return `mailto:${msg.email}?subject=Re: ${msg.purpose ? `[${msg.purpose}] ` : ""}Contact from ${msg.name}`;
 }
 
 export function MessagesList({ messages }: { messages: Message[] }) {
   const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const unreadCount = messages.filter(m => !m.read).length;
+  const readCount = messages.length - unreadCount;
 
   const filtered = messages.filter(m => {
     if (filter === "unread") return !m.read;
@@ -119,34 +73,148 @@ export function MessagesList({ messages }: { messages: Message[] }) {
     return true;
   });
 
-  return (
-    <div>
-      <div className="flex gap-1 mb-4">
-        {(["all", "unread", "read"] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-              filter === f
-                ? "bg-foreground text-background"
-                : "text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {f === "all" ? `All (${messages.length})` : f === "unread" ? `Unread (${messages.filter(m => !m.read).length})` : `Read (${messages.filter(m => m.read).length})`}
-          </button>
-        ))}
-      </div>
+  const selected = messages.find(m => m.id === selectedId) ?? null;
 
-      <div className="space-y-2">
-        {filtered.map(msg => (
-          <MessageCard key={msg.id} msg={msg} />
-        ))}
-        {filtered.length === 0 && (
-          <Card className="p-8 text-center text-muted-foreground">
-            {filter === "unread" ? "No unread messages" : filter === "read" ? "No read messages" : "No messages yet"}
-          </Card>
+  const openMessage = async (msg: Message) => {
+    setSelectedId(msg.id);
+    if (!msg.read) await markMessageRead(msg.id);
+  };
+
+  const filters: { key: typeof filter; label: string; n: number }[] = [
+    { key: "all", label: "All", n: messages.length },
+    { key: "unread", label: "Unread", n: unreadCount },
+    { key: "read", label: "Read", n: readCount },
+  ];
+
+  return (
+    <div className={cn("inbox", selected && "reading")}>
+      {/* ---------- left: the list ---------- */}
+      <Card flush className="msg-listcard">
+        <div className="filters">
+          {filters.map(f => (
+            <button
+              key={f.key}
+              type="button"
+              className={cn("filt", filter === f.key && "on")}
+              onClick={() => setFilter(f.key)}
+            >
+              {f.label} {f.n}
+            </button>
+          ))}
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="empty">
+            <div className="empty-ic">
+              <IconInboxOff size={18} stroke={1.5} />
+            </div>
+            <b>
+              {filter === "unread"
+                ? "No unread messages"
+                : filter === "read"
+                  ? "Nothing read yet"
+                  : "No messages yet"}
+            </b>
+            <span>
+              {filter === "all"
+                ? "Anything sent through the site's contact form shows up here."
+                : "Try the All filter to see the rest of the inbox."}
+            </span>
+          </div>
+        ) : (
+          <div className="msg-list">
+            {filtered.map(msg => (
+              <button
+                key={msg.id}
+                type="button"
+                className={cn("msg-it", selectedId === msg.id && "sel")}
+                onClick={() => openMessage(msg)}
+              >
+                <span className={msg.read ? "msg-read" : "msg-unread"} />
+                <span className="mava" style={avatarStyle(msg.name)}>
+                  {initials(msg.name)}
+                </span>
+                <span className="flex-1 min-w-0 block">
+                  <span className="msg-who">
+                    <span className="truncate">{msg.name}</span>
+                    <span className="msg-when">{timeAgo(msg.createdAt)}</span>
+                  </span>
+                  <span className="msg-prev">{msg.message}</span>
+                  {msg.purpose && <span className="msg-pill block">{msg.purpose}</span>}
+                </span>
+              </button>
+            ))}
+          </div>
         )}
-      </div>
+      </Card>
+
+      {/* ---------- right: the reading pane ---------- */}
+      <Card flush className="msg-panecard">
+        {selected ? (
+          <>
+            <div className="card-h">
+              <button
+                type="button"
+                className="ibtn"
+                onClick={() => setSelectedId(null)}
+                aria-label="Back to the message list"
+                title="Back to list"
+              >
+                <IconArrowLeft size={15} stroke={1.5} />
+              </button>
+              <span className="mava" style={avatarStyle(selected.name)}>
+                {initials(selected.name)}
+              </span>
+              <div className="min-w-0">
+                <div className="card-t truncate">{selected.name}</div>
+                <div className="card-n truncate">
+                  {selected.email} · {new Date(selected.createdAt).toLocaleString()}
+                </div>
+              </div>
+              <div className="sp" />
+              {selected.purpose && <span className="chip">{selected.purpose}</span>}
+              <a className="btn pri" href={replyHref(selected)}>
+                <IconCornerUpLeft size={13} stroke={1.5} /> Reply
+              </a>
+              <button
+                type="button"
+                className="ibtn"
+                title="Mark unread"
+                aria-label="Mark unread"
+                onClick={async () => {
+                  await markMessageUnread(selected.id);
+                  setSelectedId(null);
+                }}
+              >
+                <IconMail size={15} stroke={1.5} />
+              </button>
+              <DeleteButton
+                label={`message from "${selected.name}"`}
+                sub="This deletes the message permanently. There's no undo here."
+                onDelete={async () => {
+                  await deleteMessage(selected.id);
+                  setSelectedId(null);
+                }}
+              />
+            </div>
+            <div className="card-b">
+              <div className="msg-body">{selected.message}</div>
+            </div>
+          </>
+        ) : (
+          <div className="empty">
+            <div className="empty-ic">
+              <IconMailOpened size={18} stroke={1.5} />
+            </div>
+            <b>{messages.length === 0 ? "Inbox zero" : "Nothing open"}</b>
+            <span>
+              {messages.length === 0
+                ? "No one has written in yet. New contact-form messages land here."
+                : "Pick a message on the left to read it in full and reply."}
+            </span>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
