@@ -1,13 +1,15 @@
 import Link from 'next/link';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
+import MotionProvider from '@/components/common/MotionProvider';
 import BackgroundLines from '@/components/common/BackgroundLines';
 
 export default function BlogNotFound() {
   return (
     <ThemeProvider>
+      <MotionProvider>
       <div className="min-h-screen bg-background text-foreground">
         <BackgroundLines />
-        <div className="pointer-events-none fixed inset-0 z-[1] bg-background/50 backdrop-blur-[1px]" />
+        <div className="pointer-events-none fixed inset-0 z-[1] bg-background/50" />
 
         <div className="relative z-[2] flex flex-col items-center justify-center min-h-screen px-5">
           <div className="text-center max-w-md">
@@ -28,6 +30,7 @@ export default function BlogNotFound() {
           </div>
         </div>
       </div>
+      </MotionProvider>
     </ThemeProvider>
   );
 }

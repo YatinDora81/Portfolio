@@ -78,8 +78,6 @@ function tune(hex: string, isDark: boolean): string {
   return `#${d(r)}${d(g)}${d(b)}`;
 }
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
 function ElementCard({
   skill,
   index,

@@ -1,13 +1,49 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getBlogBySlug, getBlogs } from '@/lib/data';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
+import MotionProvider from '@/components/common/MotionProvider';
 import BackgroundLines from '@/components/common/BackgroundLines';
 import BlogContent from './BlogContent';
 
 export async function generateStaticParams() {
   const blogs = await getBlogs();
   return blogs.map((b) => ({ slug: b.slug }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const blog = await getBlogBySlug(slug);
+  if (!blog) return { title: 'Blog not found' };
+
+  const description = blog.description ?? undefined;
+  return {
+    title: blog.title,
+    description,
+    alternates: { canonical: `/blog/${slug}` },
+    openGraph: {
+      type: 'article',
+      url: `/blog/${slug}`,
+      title: blog.title,
+      description,
+      ...(blog.publishedAt
+        ? { publishedTime: new Date(blog.publishedAt).toISOString() }
+        : {}),
+      ...(blog.updatedAt
+        ? { modifiedTime: new Date(blog.updatedAt).toISOString() }
+        : {}),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: blog.title,
+      description,
+    },
+  };
 }
 
 export default async function BlogPage({
@@ -24,9 +60,10 @@ export default async function BlogPage({
 
   return (
     <ThemeProvider>
+      <MotionProvider>
       <div className="min-h-screen bg-background text-foreground">
         <BackgroundLines />
-        <div className="pointer-events-none fixed inset-0 z-[1] bg-background/50 backdrop-blur-[1px]" />
+        <div className="pointer-events-none fixed inset-0 z-[1] bg-background/50" />
 
         <div className="relative z-[2]">
           {/* Back button */}
@@ -121,6 +158,7 @@ export default async function BlogPage({
           </div>
         </div>
       </div>
+      </MotionProvider>
     </ThemeProvider>
   );
 }

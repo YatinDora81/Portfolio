@@ -145,7 +145,7 @@ Key-value store for site-wide configuration that was previously hardcoded in fro
 | `name` | Hero | First name shown in hero heading ("Hi, I'm {name} —") and avatar alt text |
 | `tagline` | Hero | Sentence after the skill badges in hero bio |
 | `intro` | Hero | Text before inline skill badges ("I build scalable web apps using") |
-| `avatarUrl` | Hero | Path to avatar image (e.g. "/avatar.png") |
+| `avatarUrl` | Hero | Path to avatar image (e.g. "/mine/avatar.png") |
 | `resumeUrl` | Hero | Path to resume PDF (e.g. "/Yatin-SDE-1.pdf") |
 | `navbarLogo` | Navbar | Logo text in the navbar (e.g. "Yatin.Dora") |
 | `contactEmail` | Contact | Email address used in the mailto link of the contact form |

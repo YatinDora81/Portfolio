@@ -1,7 +1,7 @@
 
 import { ThemeProvider } from './components/common/ThemeProvider';
 import { CatProvider } from './components/common/CatProvider';
-import NekoCat from './components/common/NekoCat';
+import MotionProvider from './components/common/MotionProvider';
 import Navbar from './components/common/Navbar';
 import Hero from './components/landing/Hero';
 import About from './components/landing/About';
@@ -24,6 +24,7 @@ import {
   getContactData,
   getSiteConfig,
 } from './lib/data';
+import { SITE_URL, SITE_NAME, absoluteUrl } from './lib/site';
 
 function quoteOfDay(quotes: { quote: string; author: string }[]) {
   if (quotes.length === 0) return null;
@@ -61,13 +62,35 @@ export default async function Home() {
   // no post-hydration flash. Stable within the 24h revalidation window.
   const thought = quoteOfDay(quotes);
 
+  // Person structured data for rich results (knowledge panel, sameAs linking).
+  const sameAs = Array.from(
+    new Set(
+      [...heroData.socialLinks, ...contactData.socialLinks]
+        .map((l) => l.href)
+        .filter((href): href is string => Boolean(href))
+    )
+  );
+  const personLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: siteConfig.name || SITE_NAME,
+    url: SITE_URL,
+    ...(siteConfig.avatarUrl ? { image: absoluteUrl(siteConfig.avatarUrl) } : {}),
+    jobTitle: heroData.titles[0] ?? "Software Developer",
+    ...(sameAs.length ? { sameAs } : {}),
+  };
+
   return (
     <ThemeProvider>
       <CatProvider>
+      <MotionProvider>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(personLd) }}
+      />
       <div className="min-h-screen bg-background text-foreground">
-        <NekoCat />
         <BackgroundLines />
-        <div className="pointer-events-none fixed inset-0 z-[1] bg-background/50 backdrop-blur-[1px]" />
+        <div className="pointer-events-none fixed inset-0 z-[1] bg-background/50" />
         <div className="relative z-[2]">
           <Navbar logo={siteConfig.navbarLogo} hasBlogs={blogs.length > 0} />
           <main>
@@ -103,6 +126,7 @@ export default async function Home() {
           <Footer copyrightName={siteConfig.copyrightName} />
         </div>
       </div>
+      </MotionProvider>
       </CatProvider>
     </ThemeProvider>
   );

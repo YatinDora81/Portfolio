@@ -1,5 +1,5 @@
 import { IconEye } from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
+import { cn, cdnUrl } from "@/lib/utils";
 
 // ─── Preview Frame ───────────────────────────────────────────────
 // Dark-themed container that mimics the portfolio's dark mode
@@ -63,7 +63,7 @@ export function HeroPreview({ titles, name, tagline, intro, skills, socialLinks,
       <div className="size-14 rounded-full bg-[#262626] border-2 border-[rgba(255,255,255,0.1)] ring-2 ring-[#262626] ring-offset-2 ring-offset-[#0a0a0a] overflow-hidden">
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt={name} className="size-14 object-cover" />
+          <img src={cdnUrl(avatarUrl)} alt={name} className="size-14 object-cover" />
         ) : (
           <div className="size-14 flex items-center justify-center text-[#a3a3a3] text-xl font-bold">
             {name?.[0] || "?"}
@@ -401,7 +401,7 @@ export function BlogsPreview({ blogs }: { blogs: BlogData[] }) {
             {b.image && (
               <div className="h-16 overflow-hidden bg-[#262626]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={b.image} alt={b.title} className="w-full h-full object-cover opacity-80" />
+                <img src={cdnUrl(b.image)} alt={b.title} className="w-full h-full object-cover opacity-80" />
               </div>
             )}
             <div className="p-2">

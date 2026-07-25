@@ -27,6 +27,7 @@
     "tailwindcss": "^4.2.1"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.11",
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
     "@types/node": "^22.15.3",

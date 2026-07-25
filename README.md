@@ -115,6 +115,13 @@ DATABASE_URL=
 REVALIDATE_SECRET=
 ```
 
+> **`DATABASE_URL` must use Neon's pooled connection string** (the host ends in
+> `-pooler`, e.g. `...-pooler.<region>.aws.neon.tech`). The web app runs on
+> serverless/edge functions that open many short-lived connections; the pooled
+> endpoint (PgBouncer) prevents exhausting Postgres connection limits under
+> ISR/on-demand rendering. Use the direct (non-pooler) URL only for migrations
+> (`prisma migrate`/`db push`). The env value is set in Vercel, not in code.
+
 **Docs App (`apps/docs/.env`):**
 ```env
 DATABASE_URL=

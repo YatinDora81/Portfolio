@@ -1,4 +1,5 @@
 import { prisma } from "db";
+import { cdnUrl } from "./site";
 
 export interface SiteConfig {
   name: string;
@@ -20,7 +21,7 @@ export async function getSiteConfig(): Promise<SiteConfig> {
     name: map.get("name") ?? "",
     tagline: map.get("tagline") ?? "",
     intro: map.get("intro") ?? "",
-    avatarUrl: map.get("avatarUrl") ?? "",
+    avatarUrl: cdnUrl(map.get("avatarUrl") ?? ""),
     resumeUrl: map.get("resumeUrl") ?? "",
     navbarLogo: map.get("navbarLogo") ?? "",
     contactEmail: map.get("contactEmail") ?? "",
@@ -92,7 +93,7 @@ export async function getExperiences() {
     endDate: exp.endDate,
     isCurrent: exp.isCurrent,
     website: exp.website,
-    logoUrl: exp.logoUrl,
+    logoUrl: cdnUrl(exp.logoUrl),
     bullets: exp.bullets.map((b) => b.content),
     technologies: exp.skills.map((s) => s.name),
   }));
@@ -111,8 +112,8 @@ export async function getProjects() {
     summary: p.summary,
     github: p.github,
     live: p.live,
-    logoUrl: p.logoUrl,
-    images: p.images,
+    logoUrl: cdnUrl(p.logoUrl),
+    images: p.images.map((img) => cdnUrl(img)),
     bullets: p.bullets.map((b) => b.content),
     technologies: p.skills.map((s) => ({ name: s.name, iconKey: s.iconKey })),
   }));
@@ -137,7 +138,7 @@ export async function getBlogs() {
     slug: b.slug,
     title: b.title,
     description: b.description,
-    image: b.image,
+    image: cdnUrl(b.image),
     imageOrientation: b.imageOrientation as string,
     color: b.color,
     publishedAt: b.publishedAt,
@@ -153,7 +154,7 @@ export async function getBlogBySlug(slug: string) {
     title: blog.title,
     description: blog.description,
     content: blog.content,
-    image: blog.image,
+    image: cdnUrl(blog.image),
     imageOrientation: blog.imageOrientation as string,
     color: blog.color,
     publishedAt: blog.publishedAt,

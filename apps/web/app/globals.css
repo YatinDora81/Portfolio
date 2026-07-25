@@ -14,7 +14,7 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
 }
 
 :root {
@@ -92,6 +92,19 @@
 .animate-delay-5 { animation-delay: 0.5s; }
 .animate-delay-6 { animation-delay: 0.6s; }
 
+/* Skip layout/paint for below-the-fold sections until they scroll near the
+   viewport. contain-intrinsic-size reserves an estimated height so the
+   scrollbar doesn't jump; `auto` lets the browser remember the real size. */
+.cv-auto,
+#skills,
+#experience,
+#projects,
+#blogs,
+#contact {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
+
 .skill-inner-shadow {
   box-shadow:
     inset 0 1px 2px rgba(0, 0, 0, 0.08),
@@ -154,11 +167,6 @@
   background-clip: text;
 }
 
-@keyframes story-progress {
-  from { width: 0%; }
-  to { width: 100%; }
-}
-
 /* Navbar cat toggle — playful paw */
 @keyframes pawWiggle {
   0%, 100% { transform: rotate(0deg) scale(1); }
@@ -194,4 +202,22 @@
   .paw-btn:hover .paw,
   .paw-btn:active .paw,
   .paw-btn.on .paw { animation: none; }
+
+  /* Entrance blur/translate fades can trigger vestibular discomfort — show
+     content immediately instead. opacity:1 also guards against the base
+     opacity:0 ever stranding content if animations are otherwise suppressed. */
+  .animate-fade-in-blur {
+    animation: none;
+    opacity: 1;
+  }
+  .animate-delay-1,
+  .animate-delay-2,
+  .animate-delay-3,
+  .animate-delay-4,
+  .animate-delay-5,
+  .animate-delay-6 { animation-delay: 0s; }
+
+  /* Stop the infinite hero-title gradient sweep. */
+  .title-gradient,
+  .dark .title-gradient { animation: none; }
 }

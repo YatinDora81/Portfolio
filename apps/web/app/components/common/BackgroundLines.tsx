@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { motion } from 'motion/react';
+import React, { useMemo } from 'react';
+import { m as motion, useReducedMotion } from 'motion/react';
 
 const paths = [
   "M-380 -189C-380 -189 -312 216 152 343C616 470 684 875 684 875",
@@ -59,6 +59,20 @@ const paths = [
 const allPathsD = paths.join('');
 
 export default React.memo(function BackgroundLines() {
+  const reduce = useReducedMotion();
+
+  // Precompute each beam's random timing/target ONCE, so render stays pure
+  // (no Math.random() during render -> deterministic, no hydration surprises).
+  const beams = useMemo(
+    () =>
+      paths.map(() => ({
+        y2: `${93 + Math.random() * 8}%`,
+        duration: Math.random() * 5 + 5,
+        delay: Math.random() * 2,
+      })),
+    []
+  );
+
   return (
     <div className="pointer-events-none fixed inset-0 z-0">
       <svg
@@ -75,45 +89,51 @@ export default React.memo(function BackgroundLines() {
           strokeOpacity="0.05"
           strokeWidth="0.5"
         />
-        {paths.map((path, index) => (
-          <motion.path
-            key={`beam-${index}`}
-            d={path}
-            stroke={`url(#bg-beam-gradient-${index})`}
-            strokeOpacity="0.4"
-            strokeWidth="0.5"
-          />
-        ))}
-        <defs>
-          {paths.map((_path, index) => (
-            <motion.linearGradient
-              id={`bg-beam-gradient-${index}`}
-              key={`bg-gradient-${index}`}
-              initial={{
-                x1: '0%',
-                x2: '0%',
-                y1: '0%',
-                y2: '0%',
-              }}
-              animate={{
-                x1: ['0%', '100%'],
-                x2: ['0%', '95%'],
-                y1: ['0%', '100%'],
-                y2: ['0%', `${93 + Math.random() * 8}%`],
-              }}
-              transition={{
-                duration: Math.random() * 5 + 5,
-                ease: 'easeInOut',
-                repeat: Infinity,
-                delay: Math.random() * 2,
-              }}
-            >
-              <stop stopColor="#18CCFC" stopOpacity="0" />
-              <stop stopColor="#18CCFC" />
-              <stop offset="32.5%" stopColor="#6344F5" />
-              <stop offset="100%" stopColor="#AE48FF" stopOpacity="0" />
-            </motion.linearGradient>
+        {/* Animated beam sweep — skipped entirely under prefers-reduced-motion,
+            leaving only the faint static lines above. The beam paths never
+            animate themselves (only their gradients do), so they are plain
+            <path> elements rather than 50 motion component instances. */}
+        {!reduce &&
+          paths.map((path, index) => (
+            <path
+              key={`beam-${index}`}
+              d={path}
+              stroke={`url(#bg-beam-gradient-${index})`}
+              strokeOpacity="0.4"
+              strokeWidth="0.5"
+            />
           ))}
+        <defs>
+          {!reduce &&
+            beams.map((beam, index) => (
+              <motion.linearGradient
+                id={`bg-beam-gradient-${index}`}
+                key={`bg-gradient-${index}`}
+                initial={{
+                  x1: '0%',
+                  x2: '0%',
+                  y1: '0%',
+                  y2: '0%',
+                }}
+                animate={{
+                  x1: ['0%', '100%'],
+                  x2: ['0%', '95%'],
+                  y1: ['0%', '100%'],
+                  y2: ['0%', beam.y2],
+                }}
+                transition={{
+                  duration: beam.duration,
+                  ease: 'easeInOut',
+                  repeat: Infinity,
+                  delay: beam.delay,
+                }}
+              >
+                <stop stopColor="#18CCFC" stopOpacity="0" />
+                <stop stopColor="#18CCFC" />
+                <stop offset="32.5%" stopColor="#6344F5" />
+                <stop offset="100%" stopColor="#AE48FF" stopOpacity="0" />
+              </motion.linearGradient>
+            ))}
           <radialGradient
             id="bg-lines-radial"
             cx="0"

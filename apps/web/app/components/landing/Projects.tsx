@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { m as motion, AnimatePresence } from 'motion/react';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
 import { GithubIcon, ExternalLinkIcon } from '../icons';

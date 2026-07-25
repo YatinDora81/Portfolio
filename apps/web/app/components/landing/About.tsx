@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { motion, useInView, useReducedMotion } from 'motion/react';
+import { m as motion, useInView, useReducedMotion } from 'motion/react';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
 import { GraduationCapIcon, MapPinIcon } from '../icons';
@@ -662,7 +662,7 @@ export default function About({ paragraphs, education, resumeUrl, companyLogos }
   const reduceMotion = useReducedMotion() ?? false;
 
   return (
-    <Container className="mt-16 animate-fade-in-blur animate-delay-1">
+    <Container className="cv-auto mt-16 animate-fade-in-blur animate-delay-1">
       <SectionHeading subHeading="About" heading="Who I am" />
 
       <Terminal
