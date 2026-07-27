@@ -620,6 +620,32 @@ body.cat-on .cw .dot { display: none; }
 
 .xp-card { position: relative; }
 
+/* borderless spotlight glow — hugs the card without touching the layout */
+.xp-card::before {
+  content: "";
+  position: absolute;
+  inset: -0.7rem -1rem;
+  border-radius: 16px;
+  pointer-events: none;
+  background: radial-gradient(
+    480px circle at var(--mx, 50%) var(--my, 50%),
+    color-mix(in srgb, var(--foreground) 3.5%, transparent),
+    transparent 45%
+  );
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+@media (hover: hover) {
+  .xp-card { transition: opacity 0.3s ease; }
+  .xp-card:hover::before { opacity: 1; }
+  /* hover one role → the others step back */
+  .xp-list:has(.xp-card:hover) .xp-card:not(:hover) { opacity: 0.5; }
+  /* the node grows gently with its card */
+  .xp-node { transition: transform 0.25s ease; }
+  .xp-card:hover .xp-node { transform: scale(1.35); }
+}
+
 .xp-node {
   position: absolute;
   left: calc(-1.75rem + 1px);
@@ -736,6 +762,9 @@ body.cat-on .cw .dot { display: none; }
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
 }
 
 .xp-dur {
@@ -755,6 +784,158 @@ body.cat-on .cw .dot { display: none; }
 }
 
 .xp-when svg { width: 12px; height: 12px; }
+
+/* ── the log: em-dash markers + scan-line leads + metric anchors ──
+   (Experience only; Projects keeps .bullets) */
+.xp-log {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+.xp-log li { display: grid; grid-template-columns: 24px 1fr; column-gap: 0.7rem; }
+
+/* One text line tall, dash centred inside it — pinning the height to the log's
+   own line-height keeps the marker on the first line's midline without
+   depending on the font's baseline metrics. */
+.xp-ln {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  height: 1.65em;
+  line-height: 1;
+  user-select: none;
+}
+
+.xp-ln::after {
+  content: "\2014";
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1;
+  color: color-mix(in srgb, #909092 62%, transparent);
+  transition: color 0.2s;
+}
+
+.xp-log li > span:last-child { color: #909092; transition: transform 0.2s ease; }
+.xp-log b { font-weight: 500; color: var(--foreground); }
+
+@media (hover: hover) {
+  .xp-log li:hover .xp-ln::after { color: var(--foreground); }
+  .xp-log li:hover > span:last-child { transform: translateX(2px); }
+}
+
+/* quantified wins hold recruiter gaze ~2x longer — numbers get the
+   terminal voice so they anchor the scan */
+.xp-metric {
+  font-style: normal;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  font-size: 0.94em;
+  color: var(--foreground);
+  letter-spacing: -0.01em;
+}
+
+/* entrance: bullets cascade once when the card scrolls into view
+   (same fadeInBlur DNA as the hero) */
+.xp-card .xp-log li { opacity: 0; transform: translateY(6px); filter: blur(4px); }
+
+.xp-card.in .xp-log li {
+  opacity: 1;
+  transform: none;
+  filter: blur(0);
+  transition: opacity 0.45s ease, transform 0.45s ease, filter 0.45s ease;
+  transition-delay: calc(var(--i) * 0.06s);
+}
+
+/* ── the fold: bullets 4..n stay in the DOM, height animates 0fr→1fr ── */
+.xp-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.xp-fold > div { overflow: hidden; min-height: 0; }
+.xp-fold .xp-log { margin-top: 0.75rem; }
+.xp-card.open .xp-fold { grid-template-rows: 1fr; }
+
+/* folded bullets skip the entrance cascade; they stagger in on expand */
+.xp-fold .xp-log li { opacity: 0; transform: translateY(6px); filter: blur(4px); transition: none; }
+
+.xp-card.open .xp-fold .xp-log li {
+  opacity: 1;
+  transform: none;
+  filter: blur(0);
+  transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
+  transition-delay: calc(0.12s + var(--i) * 0.05s);
+}
+
+/* truncation affordance: last visible line dissolves into the page */
+.xp-veil {
+  height: 30px;
+  margin-top: -30px;
+  position: relative;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--background) 82%, transparent) 62%,
+    var(--background) 100%
+  );
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.xp-card.open .xp-veil { opacity: 0; }
+
+/* toggle — hairline divider, same flanking-line language as .pj-div */
+.xp-more {
+  margin: 0.55rem 0 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: #909092;
+  background: transparent;
+  border: 0;
+  padding: 8px 0;
+  cursor: pointer;
+  transition: color 0.25s;
+}
+
+.xp-more::before,
+.xp-more::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+  transition: background 0.25s;
+}
+
+.xp-more .lbl { display: inline-flex; align-items: center; gap: 0.55ch; }
+.xp-more svg { width: 12px; height: 12px; transition: transform 0.3s ease; }
+.xp-more:hover { color: var(--foreground); }
+
+.xp-more:hover::before,
+.xp-more:hover::after {
+  background: color-mix(in srgb, var(--foreground) 25%, transparent);
+}
+
+.xp-more:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--foreground) 40%, transparent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.xp-card.open .xp-more svg { transform: rotate(180deg); }
 
 /* ── shared by Experience + Projects: bullet list ── */
 .bullets {
@@ -782,15 +963,18 @@ body.cat-on .cw .dot { display: none; }
 .bullets li span { color: #909092; }
 .bullets li b { font-weight: 500; color: var(--foreground); }
 
-/* ── shared by Experience + Projects: tech badges ── */
+/* ── Experience: tech badges ──
+   Metadata about the role, so they sit under the position line and above the
+   log — compact, and no top divider now that nothing precedes them. */
 .xp-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px dashed var(--border);
+  gap: 0.35rem;
+  margin-top: 0.8rem;
 }
+
+.xp-badges .badge { font-size: 0.72rem; padding: 2px 9px; gap: 5px; }
+.xp-badges .badge .bi { width: 12px; height: 12px; }
 
 .badge {
   display: inline-flex;
@@ -905,6 +1089,26 @@ body.cat-on .cw .dot { display: none; }
   .cw .cat,
   .xp-cur i,
   .xp-node.live::after { animation: none !important; }
+
+  /* Experience "commit history": no spotlight, no sibling dim, no cascade —
+     the fold still opens, it just snaps instead of sliding. */
+  .xp-card,
+  .xp-node,
+  .xp-log li > span:last-child,
+  .xp-more svg { transition: none !important; }
+
+  .xp-card::before { display: none; }
+  .xp-list:has(.xp-card:hover) .xp-card:not(:hover) { opacity: 1; }
+
+  .xp-fold { transition: none; }
+
+  .xp-card .xp-log li,
+  .xp-fold .xp-log li {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+  }
 
   /* The cursor-trailing hero photo is pure motion — swap in the static deck. */
   .peek { display: none !important; }
