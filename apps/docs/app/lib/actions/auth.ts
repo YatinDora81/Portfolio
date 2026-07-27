@@ -149,21 +149,33 @@ export async function changePassword(formData: FormData) {
   const currentPassword = formData.get("currentPassword") as string;
   const newPassword = formData.get("newPassword") as string;
   const confirmPassword = formData.get("confirmPassword") as string;
-  const adminOverride = formData.get("adminOverride") === "true";
 
   const isOwnPassword = session.userId === targetUserId;
 
-  // Only OWNER and ADMIN can change other users' passwords
-  if (!isOwnPassword && session.role === "SUB_ADMIN") {
-    return { error: "You can only change your own password" };
+  // Resetting someone else's password means you must strictly outrank them.
+  // Checking only for SUB_ADMIN let an ADMIN reset the OWNER's password and
+  // take the account — a lower role must never be able to seize a higher one.
+  if (!isOwnPassword) {
+    const LEVEL: Record<string, number> = { OWNER: 3, ADMIN: 2, SUB_ADMIN: 1 };
+    const target = await prisma.adminUser.findUnique({
+      where: { id: targetUserId },
+      select: { role: true },
+    });
+    if (!target) return { error: "User not found" };
+    if ((LEVEL[session.role] ?? 0) <= (LEVEL[target.role] ?? 0)) {
+      return { error: "You don't have permission to change this password" };
+    }
   }
 
   if (!newPassword || !confirmPassword) {
     return { error: "New password fields are required" };
   }
 
-  // Current password required only when changing own password without admin override
-  if (isOwnPassword && !adminOverride && !currentPassword) {
+  // Changing your OWN password always costs the current one. The override is
+  // derived from who you are, not read from the form — as a client field it let
+  // anyone skip verification on their own account.
+  const adminOverride = !isOwnPassword;
+  if (isOwnPassword && !currentPassword) {
     return { error: "Current password is required" };
   }
 

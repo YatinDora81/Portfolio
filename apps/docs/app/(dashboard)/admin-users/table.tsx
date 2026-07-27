@@ -160,7 +160,7 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
                           <DeleteButton
                             label={`"${u.name}"`}
                             sub="This revokes their access to the control room immediately. There's no undo here."
-                            onDelete={async () => { await deleteAdminUser(u.id, currentUser.userId); }}
+                            onDelete={async () => { await deleteAdminUser(u.id); }}
                           />
                         </>
                       ) : null}
