@@ -249,7 +249,7 @@ async function seed() {
       github: "https://github.com/YatinDora81/Grill",
       live: "https://grill.yatindora.in",
       logoUrl: "/logos/grill.png",
-      image: "/projects/grill.jpg",
+      images: ["/projects/grill.jpg"],
       sortOrder: 0,
       skills: {
         connect: connectSkills(["Next.js", "TypeScript", "Python", "FastAPI", "PostgreSQL", "Prisma", "Docker", "Turborepo"]),
@@ -271,7 +271,7 @@ async function seed() {
       github: "https://github.com/yatindora/draw-and-connect",
       live: "https://drawsheet.vercel.app",
       logoUrl: "/logos/drawsheet.png",
-      image: "/projects/drawsheet.png",
+      images: ["/projects/drawsheet.png"],
       sortOrder: 1,
       skills: {
         connect: connectSkills(["Next.js", "Node.js", "Express.js", "PostgreSQL", "Prisma", "WebSocket"]),
@@ -293,7 +293,7 @@ async function seed() {
       github: "https://github.com/yatindora/next-move-app",
       live: "https://nextmove-yatin.vercel.app",
       logoUrl: "/logos/nextmove.png",
-      image: "/projects/nextmove.png",
+      images: ["/projects/nextmove.png"],
       sortOrder: 2,
       skills: {
         connect: connectSkills(["Next.js", "Express.js", "TypeScript", "PostgreSQL", "Prisma", "Redis", "Docker"]),
@@ -315,7 +315,7 @@ async function seed() {
       github: "https://github.com/yatindora/draw-and-connect",
       live: "https://connect-yatin.vercel.app",
       logoUrl: "/logos/connect.png",
-      image: "/projects/connect.png",
+      images: ["/projects/connect.png"],
       sortOrder: 3,
       skills: {
         connect: connectSkills(["Next.js", "React", "TypeScript", "Express.js", "WebSocket", "Prisma", "Turborepo"]),
@@ -337,7 +337,7 @@ async function seed() {
       github: "https://github.com/YatinDora81/Netflix-GPT",
       live: "https://netflix-gpt-uysk.vercel.app",
       logoUrl: "/logos/netflix-gpt.png",
-      image: "/projects/netflix-gpt.png",
+      images: ["/projects/netflix-gpt.png"],
       sortOrder: 4,
       skills: {
         connect: connectSkills(["React", "Node.js", "Express.js", "MongoDB", "Docker"]),
@@ -359,7 +359,7 @@ async function seed() {
       github: "https://github.com/YatinDora81/URL_Shortner",
       live: "https://url-shortner-git-main-yatindora81s-projects.vercel.app",
       logoUrl: "/logos/trimrr.png",
-      image: "/projects/trimrr.png",
+      images: ["/projects/trimrr.png"],
       sortOrder: 5,
       skills: {
         connect: connectSkills(["React", "JavaScript", "Node.js", "Express.js", "MongoDB"]),
