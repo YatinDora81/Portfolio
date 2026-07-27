@@ -660,6 +660,26 @@ select.sel option { background: var(--card); color: var(--ink) }
 .ipick-clear { font-family: var(--mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint) }
 .ipick-clear:hover { color: var(--bad) }
 
+/* ---------- terminal command reference ---------- */
+.cmd-tbl td { vertical-align: top }
+.cmd-name { font-family: var(--mono); font-size: 12.5px; color: var(--ink); white-space: nowrap }
+.cmd-prompt { color: var(--good) }
+.cmd-alias { font-family: var(--mono); font-size: 9.5px; color: var(--faint); margin-top: 3px }
+.cmd-sum { font-size: 13px; color: var(--ink) }
+.cmd-out { font-size: 12px; color: var(--faint); margin-top: 3px; line-height: 1.55; max-width: 62ch }
+.cmd-tbl .chip { white-space: nowrap; gap: 5px }
+
+.cmd-note {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 11px 0; border-bottom: 1px solid var(--line2)
+}
+.cmd-note b { display: block; font-size: 13px; margin-bottom: 2px }
+.cmd-note span { font-size: 12.5px; color: var(--dim); line-height: 1.6 }
+.cmd-note code {
+  font-family: var(--mono); font-size: 11.5px; background: var(--bg1);
+  border: 1px solid var(--line2); border-radius: 5px; padding: 1px 5px; color: var(--ink)
+}
+
 /* ---------- drag-to-reorder ----------
    Pointer-driven (see lib/use-sortable.ts), so the handle must opt out of
    touch scrolling or a drag on mobile just scrolls the page instead. */

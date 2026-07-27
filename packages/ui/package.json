@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "exports": {
+    "./terminal": "./src/terminal.ts",
     "./*": "./src/*.tsx"
   },
   "scripts": {

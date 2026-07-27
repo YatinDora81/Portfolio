@@ -5,6 +5,10 @@ import { m as motion, useInView, useReducedMotion } from 'motion/react';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
 import { GraduationCapIcon, MapPinIcon } from '@repo/ui/icons/brand';
+import {
+  TERMINAL_COMMANDS, NAV_COMMANDS as ALL_NAV_COMMANDS, findCommand,
+  type TerminalCommand,
+} from '@repo/ui/terminal';
 
 /**
  * About — drop-in replacement (interactive terminal edition).
@@ -97,15 +101,11 @@ const TYPE_SPEED = 0.055;
 const OUTPUT_START = TYPE_START + CMD.length * TYPE_SPEED + 0.3;
 const OUTPUT_STAGGER = 0.22;
 
-// Section commands. Update here if you ever rename section ids.
-const NAV_COMMANDS: { cmd: string; target: string; label: string }[] = [
-  { cmd: 'skills', target: '#skills', label: 'Skills' },
-  { cmd: 'experience', target: '#experience', label: 'Experience' },
-  { cmd: 'projects', target: '#projects', label: 'Projects' },
-  { cmd: 'education', target: '#education', label: 'Education' },
-  { cmd: 'blogs', target: '#blogs', label: 'Blogs' },
-  { cmd: 'contact', target: '#contact', label: 'Contact' },
-];
+// Sections come from the shared command table, which the admin also renders as
+// a reference page — so there is one list, not two that drift.
+const NAV_COMMANDS = ALL_NAV_COMMANDS.map((c) => ({
+  cmd: c.cmd, target: c.target, label: c.label,
+}));
 
 type Line =
   | { t: 'in'; v: string }
@@ -198,13 +198,11 @@ function Terminal({
     setNavCmds(NAV_COMMANDS.filter((c) => document.querySelector(c.target)));
   }, [ready]);
 
+  // Nav entries are filtered to what's on the page; the rest come straight
+  // from the manifest, minus the easter eggs.
   const allCommands = [
     ...navCmds.map((c) => c.cmd),
-    'whoami',
-    'resume',
-    'help',
-    'ls',
-    'clear',
+    ...TERMINAL_COMMANDS.filter((c) => c.kind !== 'nav' && c.discoverable).map((c) => c.cmd),
   ];
 
   const suggestion =
@@ -258,13 +256,17 @@ function Terminal({
    * mobile, keep the keyboard covering the thing you just scrolled to).
    *
    * Everything that answers inside the terminal — `ls`, `help`, `whoami`,
-   * `cat`, `clear`, and every error — returns false and keeps the caret, since
-   * you're plainly still working here and the next thing you do is type again.
+   * `cat`, `clear`, and every error — keeps the caret, since you're plainly
+   * still working here and the next thing you do is type again.
+   *
+   * Returns the command that ran (null for blank input, unknown words and
+   * failures). The caller reads `keepsFocus` off it rather than deciding here,
+   * so the admin's terminal reference documents the real behaviour.
    */
-  const run = (raw: string): boolean => {
+  const run = (raw: string): TerminalCommand | null => {
     const trimmed = raw.trim();
     push({ t: 'in', v: raw });
-    if (!trimmed) return false;
+    if (!trimmed) return null;
 
     setHist((h) => [...h, raw]);
     setHistIdx(null);
@@ -273,40 +275,39 @@ function Terminal({
 
     if (name === 'clear') {
       setLines([]);
-      return false;
+      return findCommand('clear') ?? null;
     }
     if (name === 'help') {
       push(
         { t: 'out', v: 'available commands:' },
         ...navCmds.map((c) => ({ t: 'out' as const, v: `  ${c.cmd.padEnd(12)}→ jump to ${c.label}` })),
-        { t: 'out', v: `  ${'whoami'.padEnd(12)}→ who is this guy` },
-        { t: 'out', v: `  ${'resume'.padEnd(12)}→ open my resume` },
-        { t: 'out', v: `  ${'ls'.padEnd(12)}→ list sections` },
-        { t: 'out', v: `  ${'clear'.padEnd(12)}→ clean this mess` },
+        ...TERMINAL_COMMANDS.filter((c) => c.kind !== 'nav' && c.discoverable).map((c) => ({
+          t: 'out' as const, v: `  ${c.cmd.padEnd(12)}→ ${c.summary}`,
+        })),
         { t: 'hint', v: '# tip: Tab autocompletes (or indents), ↑ replays history, Esc exits' }
       );
-      return false;
+      return findCommand('help') ?? null;
     }
     if (name === 'ls') {
       push({ t: 'out', v: navCmds.map((c) => c.cmd).join('  ') });
-      return false;
+      return findCommand('ls') ?? null;
     }
     if (name === 'whoami') {
       push(...paragraphs.map((p) => ({ t: 'about' as const, v: p })));
-      return false;
+      return findCommand('whoami') ?? null;
     }
     if (name === 'resume' || name === 'cv') {
       push({ t: 'out', v: '→ opening resume…' });
       if (resumeUrl) window.open(resumeUrl, '_blank', 'noopener,noreferrer');
-      return true;
+      return findCommand('resume') ?? null;
     }
     if (name === 'sudo') {
       push({ t: 'err', v: '[sudo] password for yatin: ✗ — nice try 😉' });
-      return false;
+      return findCommand('sudo') ?? null;
     }
     if (name === 'cat') {
       push({ t: 'out', v: '🐾 the cat is in the navbar, not in the terminal' });
-      return false;
+      return findCommand('cat') ?? null;
     }
 
     const nav = navCmds.find((c) => c.cmd === name);
@@ -314,28 +315,28 @@ function Terminal({
       const el = document.querySelector(nav.target);
       if (!el) {
         push({ t: 'err', v: `section ${nav.target} not found on this page` });
-        return false;
+        return null;
       }
       push({ t: 'out', v: `→ taking you to ${nav.label}…` });
       setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
-      return true;
+      return findCommand(name) ?? null;
     }
 
     push(
       { t: 'err', v: `zsh: command not found: ${name}` },
       { t: 'hint', v: "# type 'help' to see available commands" }
     );
-    return false;
+    return null;
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      const navigated = run(value);
+      const cmd = run(value);
       setBuffer('');
-      // Only let go of the prompt when the command actually moved you (also
-      // closes the mobile keyboard). Anything that answered in-place keeps the
-      // caret, so `ls` → `skills` is one uninterrupted flow.
-      if (navigated) inputRef.current?.blur();
+      // The manifest decides. Only commands that moved you release the prompt
+      // (which also closes the mobile keyboard); anything that answered
+      // in-place keeps the caret, so `ls` → `skills` is one unbroken flow.
+      if (cmd && !cmd.keepsFocus) inputRef.current?.blur();
       return;
     }
     if (e.key === 'Escape') {
