@@ -29,10 +29,20 @@ export default function Contact({ purposes, socialLinks, contactEmail, availabil
   const [form, setForm] = useState({ name: '', email: '', purpose: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState(false);
+
+  const openMailtoFallback = () => {
+    const subject = form.purpose
+      ? `[${form.purpose}] Contact from ${form.name}`
+      : `Portfolio Contact from ${form.name}`;
+    const mailtoLink = `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(form.message)}%0A%0AFrom: ${encodeURIComponent(form.name)} (${encodeURIComponent(form.email)})`;
+    window.open(mailtoLink, '_blank');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSending(true);
+    setError(false);
     try {
       const res = await fetch('/api/contact', {
         method: 'POST',
@@ -43,14 +53,15 @@ export default function Contact({ purposes, socialLinks, contactEmail, availabil
         setSubmitted(true);
         setForm({ name: '', email: '', purpose: '', message: '' });
         setTimeout(() => setSubmitted(false), 3000);
+      } else {
+        // fetch RESOLVES on 4xx/5xx — the catch below never sees a rejected
+        // message, so without this branch the send failed in total silence.
+        setError(true);
       }
     } catch {
-      // fallback to mailto
-      const subject = form.purpose
-        ? `[${form.purpose}] Contact from ${form.name}`
-        : `Portfolio Contact from ${form.name}`;
-      const mailtoLink = `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(form.message)}%0A%0AFrom: ${encodeURIComponent(form.name)} (${encodeURIComponent(form.email)})`;
-      window.open(mailtoLink, '_blank');
+      // Network-level failure: the request never reached the server, so hand
+      // the visitor their mail client rather than losing what they wrote.
+      openMailtoFallback();
       setSubmitted(true);
       setTimeout(() => setSubmitted(false), 3000);
     } finally {
@@ -113,6 +124,26 @@ export default function Contact({ purposes, socialLinks, contactEmail, availabil
               className="w-full rounded-lg border border-border bg-card px-3.5 py-2.5 text-sm text-foreground outline-none focus:border-foreground/30 focus:ring-1 focus:ring-foreground/10 transition-all resize-none placeholder:text-muted-foreground/50"
               placeholder="Tell me about your project or idea..."
             />
+
+            {error && (
+              <div
+                role="alert"
+                className="flex items-start gap-2.5 rounded-lg border border-red-500/30 bg-red-500/5 px-3.5 py-2.5 text-sm text-foreground"
+              >
+                <svg className="size-4 shrink-0 mt-0.5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>
+                  That didn&apos;t send — your message is still here, nothing was lost.{' '}
+                  <button
+                    type="button"
+                    onClick={openMailtoFallback}
+                    className="underline underline-offset-2 hover:opacity-70"
+                  >
+                    Email it instead
+                  </button>
+                  .
+                </span>
+              </div>
+            )}
 
             <button
               type="submit"
