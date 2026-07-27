@@ -1,6 +1,6 @@
 'use client';
 
-import { skillIconMap } from '@/lib/icon-map';
+import { skillIconMap } from '@repo/ui/icons/registry';
 
 export default function SkillBadge({ name }: { name: string }) {
   const icon = skillIconMap[name];

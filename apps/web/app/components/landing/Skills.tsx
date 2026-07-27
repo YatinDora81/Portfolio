@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
 import { useTheme } from '../common/ThemeProvider';
-import { skillIconMap } from '@/lib/icon-map';
+import { skillIconMap } from '@repo/ui/icons/registry';
 import {
   getSkillMeta,
   skillCategories,

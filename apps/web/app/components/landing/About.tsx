@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { m as motion, useInView, useReducedMotion } from 'motion/react';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
-import { GraduationCapIcon, MapPinIcon } from '../icons';
+import { GraduationCapIcon, MapPinIcon } from '@repo/ui/icons/brand';
 
 /**
  * About — drop-in replacement (interactive terminal edition).

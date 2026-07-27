@@ -3,8 +3,8 @@
 import { useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
-import { GithubIcon, ExternalLinkIcon } from '../icons';
-import { skillIconMap } from '@/lib/icon-map';
+import { GithubIcon, ExternalLinkIcon } from '@repo/ui/icons/brand';
+import { skillIconMap } from '@repo/ui/icons/registry';
 
 interface TechSkill {
   name: string;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { skillIconMap, socialIconMap } from '@/lib/icon-map';
+import { skillIconMap, socialIconMap } from '@repo/ui/icons/registry';
 
 interface HeroProps {
   titles: string[];

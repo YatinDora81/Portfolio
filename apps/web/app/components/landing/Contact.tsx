@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
-import { socialIconMap } from '@/lib/icon-map';
+import { socialIconMap } from '@repo/ui/icons/registry';
 
 interface Purpose {
   label: string;

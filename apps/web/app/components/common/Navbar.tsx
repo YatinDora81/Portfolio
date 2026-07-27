@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTheme } from './ThemeProvider';
 import { useCat } from './CatProvider';
-import { SunIcon, MoonIcon, PawIcon } from '../icons';
+import { SunIcon, MoonIcon, PawIcon } from '@repo/ui/icons/brand';
 import {
   Navbar as NavbarWrapper,
   NavBody,

@@ -1,7 +1,7 @@
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
-import { MapPinIcon } from '../icons';
-import { skillIconMap } from '@/lib/icon-map';
+import { MapPinIcon } from '@repo/ui/icons/brand';
+import { skillIconMap } from '@repo/ui/icons/registry';
 
 export interface ExperienceData {
   company: string;
