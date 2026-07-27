@@ -47,3 +47,19 @@ export async function deleteHeroSkillBadge(id: string) {
   revalidatePath("/hero/skill-badges");
   revalidatePortfolio();
 }
+
+/**
+ * Rewrites every badge's sortOrder from the order of `ids`. The hero sentence
+ * reads them in that order ("React, Next.js and TypeScript"), so the last two
+ * positions are the ones that get the "and" — worth reordering deliberately.
+ * One transaction so a half-applied order can never reach the site.
+ */
+export async function reorderHeroSkillBadges(ids: string[]) {
+  await prisma.$transaction(
+    ids.map((id, sortOrder) =>
+      prisma.heroSkillBadge.update({ where: { id }, data: { sortOrder } })
+    )
+  );
+  revalidatePath("/hero/skill-badges");
+  revalidatePortfolio();
+}

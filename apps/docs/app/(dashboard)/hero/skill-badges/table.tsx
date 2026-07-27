@@ -1,13 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Card, CardHead } from "@/components/ui/card";
 import { Button, IconButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
 import { DeleteButton } from "@/components/shared/delete-button";
-import { createHeroSkillBadge, updateHeroSkillBadge, deleteHeroSkillBadge } from "@/lib/actions/hero";
-import { IconPlus, IconPencil, IconGripVertical, IconTag, IconAlertTriangle } from "@tabler/icons-react";
+import {
+  createHeroSkillBadge, updateHeroSkillBadge, deleteHeroSkillBadge, reorderHeroSkillBadges,
+} from "@/lib/actions/hero";
+import {
+  IconPlus, IconPencil, IconGripVertical, IconTag, IconAlertTriangle,
+  IconChevronUp, IconChevronDown,
+} from "@tabler/icons-react";
 import { findSkillIcon } from "@repo/ui/icons/registry";
 import { IconPicker } from "@/components/shared/icon-picker";
 import { cn } from "@/lib/utils";
@@ -19,8 +24,16 @@ const FORM_ID = "hero-badge-form";
 export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Badge | null>(null);
+  const [pending, startTransition] = useTransition();
 
   const openNew = () => { setEditing(null); setDialogOpen(true); };
+
+  /** Swap a badge with its neighbour and persist the whole order. */
+  const move = (from: number, to: number) => {
+    const ids = badges.map((b) => b.id);
+    [ids[from], ids[to]] = [ids[to]!, ids[from]!];
+    startTransition(async () => { await reorderHeroSkillBadges(ids); });
+  };
 
   return (
     <Card flush>
@@ -57,6 +70,22 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
                 <div className="row-m">{icon ? `icon · ${b.iconKey}` : `no icon for "${b.iconKey}" — renders blank`}</div>
               </div>
               <div className="row-acts">
+                <IconButton
+                  className="move"
+                  aria-label={`Move ${b.name} earlier`}
+                  disabled={i === 0 || pending}
+                  onClick={() => move(i, i - 1)}
+                >
+                  <IconChevronUp size={13} stroke={1.6} />
+                </IconButton>
+                <IconButton
+                  className="move"
+                  aria-label={`Move ${b.name} later`}
+                  disabled={i === badges.length - 1 || pending}
+                  onClick={() => move(i, i + 1)}
+                >
+                  <IconChevronDown size={13} stroke={1.6} />
+                </IconButton>
                 <IconButton
                   aria-label={`Edit ${b.name}`}
                   onClick={() => { setEditing(b); setDialogOpen(true); }}
