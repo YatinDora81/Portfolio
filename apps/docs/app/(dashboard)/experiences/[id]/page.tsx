@@ -24,6 +24,7 @@ export default async function EditExperiencePage({ params }: { params: Promise<{
         isCurrent: experience.isCurrent,
         website: experience.website,
         logoUrl: experience.logoUrl,
+        visibleBullets: experience.visibleBullets,
         skillIds: experience.skills.map(s => s.id),
         bullets: experience.bullets.map(b => ({ id: b.id, content: b.content, sortOrder: b.sortOrder })),
       }}

@@ -71,6 +71,9 @@ model Experience {
   website   String?
   logoUrl   String?
   sortOrder Int
+  /// How many bullets the site shows before the "+ N more" toggle. Per-role
+  /// because a headline job earns a longer scan layer than a short internship.
+  visibleBullets Int           @default(4)
   bullets   ExperienceBullet[]
   skills    Skill[]            @relation("ExperienceToSkill")
 }

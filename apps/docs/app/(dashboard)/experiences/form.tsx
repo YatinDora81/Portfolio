@@ -16,7 +16,8 @@ interface Bullet { id?: string; content: string; sortOrder: number }
 interface ExperienceData {
   id: string; company: string; position: string; location: string;
   startDate: string; endDate: string; isCurrent: boolean;
-  website: string | null; logoUrl: string | null; skillIds: string[]; bullets: Bullet[];
+  website: string | null; logoUrl: string | null; visibleBullets: number;
+  skillIds: string[]; bullets: Bullet[];
 }
 
 /** `**highlight**` runs render in the ink colour, mirroring the live site. */
@@ -44,6 +45,7 @@ export function ExperienceForm({ experience, allSkills }: {
   const [isCurrent, setIsCurrent] = useState(experience?.isCurrent || false);
   const [website, setWebsite] = useState(experience?.website || "");
   const [logoUrl, setLogoUrl] = useState(experience?.logoUrl || "");
+  const [visibleBullets, setVisibleBullets] = useState(experience?.visibleBullets ?? 4);
   const [selectedSkills, setSelectedSkills] = useState<string[]>(experience?.skillIds || []);
   const [bullets, setBullets] = useState<Bullet[]>(experience?.bullets || [{ content: "", sortOrder: 0 }]);
 
@@ -52,6 +54,7 @@ export function ExperienceForm({ experience, allSkills }: {
       company, position, location, startDate, endDate, isCurrent,
       website: website || null,
       logoUrl: logoUrl || null,
+      visibleBullets,
       skillIds: selectedSkills,
       bullets: bullets.map((b, i) => ({ ...b, sortOrder: i })),
     };
@@ -122,6 +125,36 @@ export function ExperienceForm({ experience, allSkills }: {
               </Button>
             }
           />
+
+          {/* Per-role scan layer. Lives with the bullets because the number
+              only means anything relative to how many there are. */}
+          <div className="filters">
+            <label
+              htmlFor="visibleBullets"
+              style={{
+                fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: ".14em",
+                textTransform: "uppercase", color: "var(--faint)",
+              }}
+            >
+              Show first
+            </label>
+            <input
+              id="visibleBullets"
+              className="in mono"
+              type="number"
+              min={1}
+              max={30}
+              value={visibleBullets}
+              onChange={(e) => setVisibleBullets(Math.max(1, Number(e.target.value) || 1))}
+              style={{ width: 62, padding: "5px 8px", fontSize: 12.5 }}
+            />
+            <span style={{ fontSize: 12, color: "var(--faint)" }}>
+              {bullets.length > visibleBullets
+                ? `then the site folds the other ${bullets.length - visibleBullets} behind a “+ ${bullets.length - visibleBullets} more” toggle.`
+                : "every bullet fits — the site shows no toggle for this role."}
+            </span>
+          </div>
+
           {bullets.length === 0 ? (
             <div className="empty">
               <div className="empty-ic"><IconPlus size={18} stroke={1.5} /></div>

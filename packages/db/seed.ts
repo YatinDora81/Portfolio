@@ -170,6 +170,7 @@ async function seed() {
       startDate: "July 2025",
       endDate: "Present",
       isCurrent: true,
+      visibleBullets: 3,
       website: "https://wiingy.com", logoUrl: "/logos/wiingy.png",
       sortOrder: 0,
       skills: {

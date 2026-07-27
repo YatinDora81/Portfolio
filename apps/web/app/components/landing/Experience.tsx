@@ -4,19 +4,19 @@
  * Experience — "commit history"
  *
  * The 6–12 bullet problem: recruiter eye-tracking shows the first bullet gets
- * read ~3.5x more than the fourth and dense walls get skipped, so roles with
- * more than FOLD_AFTER bullets show a MAX_VISIBLE scan layer and fold the rest
- * behind a count-labelled hairline toggle. Folded bullets stay in the DOM
+ * read ~3.5x more than the fourth and dense walls get skipped, so a role shows
+ * its first `visibleBullets` as a scan layer and folds the rest behind a
+ * count-labelled hairline toggle. Folded bullets stay in the DOM
  * (grid-rows 0fr→1fr) so SSR/SEO sees every line. Bullet markers are em
  * dashes in the terminal voice, numeric tokens render as mono "metric anchors"
  * (quantified lines hold recruiter gaze ~2x longer), and the tech chips sit
  * ABOVE the bullets — chips are metadata, they describe the role, and the
  * recruiter scan checks the stack before reading bullet one. Hover: cursor
- * spotlight + sibling dim. Roles with ≤ FOLD_AFTER bullets render everything
- * with no toggle.
+ * spotlight + sibling dim. A role with no more bullets than its limit renders
+ * everything with no toggle.
  *
- * CMS note: only the first MAX_VISIBLE bullets are visible pre-expand — keep
- * each role's strongest, most quantified achievements at sortOrder 1–3.
+ * CMS note: `visibleBullets` is set per role in the admin (default 4) — keep
+ * each role's strongest, most quantified achievements in those first slots.
  */
 
 import { useId, useRef, useState } from 'react';
@@ -35,13 +35,14 @@ export interface ExperienceData {
   isCurrent: boolean;
   website: string | null;
   logoUrl: string | null;
+  /** Bullets shown before the toggle — set per role in the admin. */
+  visibleBullets: number;
   bullets: string[];
   technologies: string[];
 }
 
-/** Scan layer size when a role overflows, and the overflow threshold. */
-const MAX_VISIBLE = 3;
-const FOLD_AFTER = 4;
+/** Used when a role predates the per-role column, or it's been zeroed out. */
+const DEFAULT_VISIBLE_BULLETS = 4;
 
 /* Bold-lead bullets: "**scan line** rest of the detail".
    NOTE: identical to the parseBullet in landing/Projects.tsx — duplicated on
@@ -127,9 +128,10 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
   const duration = tenure(exp.startDate, exp.endDate, exp.isCurrent);
   const endLabel = exp.isCurrent ? exp.endDate || 'Present' : exp.endDate;
 
-  const overflows = exp.bullets.length > FOLD_AFTER;
-  const head = overflows ? exp.bullets.slice(0, MAX_VISIBLE) : exp.bullets;
-  const rest = overflows ? exp.bullets.slice(MAX_VISIBLE) : [];
+  const visible = exp.visibleBullets > 0 ? exp.visibleBullets : DEFAULT_VISIBLE_BULLETS;
+  const overflows = exp.bullets.length > visible;
+  const head = overflows ? exp.bullets.slice(0, visible) : exp.bullets;
+  const rest = overflows ? exp.bullets.slice(visible) : [];
 
   const [open, setOpen] = useState(false);
   const foldId = useId();
@@ -250,7 +252,7 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
             <div>
               <ul className="xp-log">
                 {rest.map((bullet, i) => (
-                  <LogLine key={i} bullet={bullet} index={i + MAX_VISIBLE} />
+                  <LogLine key={i} bullet={bullet} index={i + visible} />
                 ))}
               </ul>
             </div>

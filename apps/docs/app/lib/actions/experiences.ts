@@ -13,6 +13,7 @@ interface ExperienceData {
   isCurrent: boolean;
   website: string | null;
   logoUrl: string | null;
+  visibleBullets: number;
   skillIds: string[];
   bullets: { id?: string; content: string; sortOrder: number }[];
 }
@@ -29,6 +30,7 @@ export async function createExperience(data: ExperienceData) {
       isCurrent: data.isCurrent,
       website: data.website || null,
       logoUrl: data.logoUrl || null,
+      visibleBullets: data.visibleBullets,
       sortOrder: count,
       skills: { connect: data.skillIds.map((id) => ({ id })) },
       bullets: {
@@ -53,6 +55,7 @@ export async function updateExperience(id: string, data: ExperienceData) {
         isCurrent: data.isCurrent,
         website: data.website || null,
         logoUrl: data.logoUrl || null,
+        visibleBullets: data.visibleBullets,
         skills: { set: data.skillIds.map((sid) => ({ id: sid })) },
       },
     });

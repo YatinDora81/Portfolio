@@ -102,6 +102,7 @@ export async function getExperiences() {
     isCurrent: exp.isCurrent,
     website: exp.website,
     logoUrl: cdnUrl(exp.logoUrl),
+    visibleBullets: exp.visibleBullets,
     bullets: exp.bullets.map((b) => b.content),
     technologies: exp.skills.map((s) => s.name),
   }));
