@@ -27,6 +27,9 @@ interface Opt {
   label: string;
   group: string;
   aliases?: string[];
+  /** Hidden keywords from the registry — matched, never displayed. Omitting
+   *  these silently narrowed the picker vs the /icons page, which passes them. */
+  search?: string;
   node: React.ReactNode;
 }
 
@@ -37,6 +40,7 @@ function toOpts(kind: Kind): Opt[] {
       label: e.label,
       group: "Social & contact",
       aliases: e.aliases,
+      search: e.search,
       node: <span className="ico-sw ink sm"><e.Icon /></span>,
     }));
   }
@@ -45,6 +49,7 @@ function toOpts(kind: Kind): Opt[] {
     label: e.key,
     group: e.group,
     aliases: e.aliases,
+    search: e.search,
     node: <span className="ico-sw sm"><e.Icon /></span>,
   }));
 }
@@ -179,7 +184,10 @@ export function IconPicker({
       {required && (
         <input
           tabIndex={-1}
-          aria-hidden="true"
+          /* Deliberately NOT aria-hidden: constraint validation focuses THIS
+             node to report "please fill out this field", and a hidden target
+             leaves a screen-reader user with an error they can't perceive. */
+          aria-label={`${label} — required`}
           required
           value={value}
           onChange={() => {}}

@@ -41,9 +41,14 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
 
   const openNew = () => { setEditing(null); setDialogOpen(true); };
 
-  /** Swap a badge with its neighbour and persist the whole order. */
+  /**
+   * Swap a badge with its neighbour and persist the whole order. Indices are
+   * `rows` indices, and `rows` drops ids that no longer exist in `badges` — so
+   * it is NOT positionally aligned with `order`. Building the payload from
+   * `rows` keeps one index space and can't commit a stale id.
+   */
   const move = (from: number, to: number) => {
-    const ids = [...order];
+    const ids = rows.map((b) => b.id);
     [ids[from], ids[to]] = [ids[to]!, ids[from]!];
     commit(ids);
   };
