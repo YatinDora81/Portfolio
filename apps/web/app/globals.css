@@ -845,6 +845,21 @@ body.cat-on .cw .dot { display: none; }
    (same fadeInBlur DNA as the hero) */
 .xp-card .xp-log li { opacity: 0; transform: translateY(6px); filter: blur(4px); }
 
+/* The `.in` class that reveals them is added by an IntersectionObserver, so
+   without JS every bullet would stay at opacity 0. Show them outright, and
+   unfold the overflow too — the toggle can't run either. */
+@media (scripting: none) {
+  .xp-card .xp-log li,
+  .xp-fold .xp-log li {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+  .xp-fold { grid-template-rows: 1fr; }
+  .xp-veil,
+  .xp-more { display: none; }
+}
+
 .xp-card.in .xp-log li {
   opacity: 1;
   transform: none;
