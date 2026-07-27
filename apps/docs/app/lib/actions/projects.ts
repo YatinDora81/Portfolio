@@ -16,7 +16,8 @@ interface ProjectData {
 }
 
 export async function createProject(data: ProjectData) {
-  const count = await prisma.project.count();
+  const { _max } = await prisma.project.aggregate({ _max: { sortOrder: true } });
+  const count = (_max.sortOrder ?? -1) + 1;
   await prisma.project.create({
     data: {
       title: data.title,

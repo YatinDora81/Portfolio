@@ -6,9 +6,9 @@ import { SocialLinksTable } from "./table";
 
 export default async function SocialLinksPage() {
   const [titles, skillBadges, links, siteConfigRows] = await Promise.all([
-    prisma.heroTitle.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.heroSkillBadge.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.socialLink.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.heroTitle.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.heroSkillBadge.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.socialLink.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
     prisma.siteConfig.findMany(),
   ]);
 

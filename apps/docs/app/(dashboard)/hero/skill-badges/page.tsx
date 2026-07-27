@@ -6,9 +6,9 @@ import { HeroSkillBadgesTable } from "./table";
 
 export default async function HeroSkillBadgesPage() {
   const [titles, badges, socialLinks, siteConfigRows] = await Promise.all([
-    prisma.heroTitle.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.heroSkillBadge.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.socialLink.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.heroTitle.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.heroSkillBadge.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.socialLink.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
     prisma.siteConfig.findMany(),
   ]);
 

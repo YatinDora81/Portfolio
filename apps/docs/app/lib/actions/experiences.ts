@@ -19,7 +19,8 @@ interface ExperienceData {
 }
 
 export async function createExperience(data: ExperienceData) {
-  const count = await prisma.experience.count();
+  const { _max } = await prisma.experience.aggregate({ _max: { sortOrder: true } });
+  const count = (_max.sortOrder ?? -1) + 1;
   await prisma.experience.create({
     data: {
       company: data.company,

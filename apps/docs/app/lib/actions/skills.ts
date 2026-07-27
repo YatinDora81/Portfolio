@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { revalidatePortfolio } from "@/lib/revalidate";
 
 export async function createSkill(formData: FormData) {
-  const count = await prisma.skill.count();
+  const { _max } = await prisma.skill.aggregate({ _max: { sortOrder: true } });
+  const count = (_max.sortOrder ?? -1) + 1;
   await prisma.skill.create({
     data: {
       name: formData.get("name") as string,

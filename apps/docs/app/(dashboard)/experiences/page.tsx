@@ -21,8 +21,8 @@ function renderBullet(text: string) {
 
 export default async function ExperiencesPage() {
   const experiences = await prisma.experience.findMany({
-    orderBy: { sortOrder: "asc" },
-    include: { bullets: { orderBy: { sortOrder: "asc" } }, skills: { select: { name: true } } },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    include: { bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }, skills: { select: { name: true } } },
   });
 
   return (

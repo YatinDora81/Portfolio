@@ -18,7 +18,7 @@ const readMins = (content: string) =>
   Math.max(1, Math.round(content.trim().split(/\s+/).filter(Boolean).length / 200));
 
 export default async function BlogsPage() {
-  const blogs = await prisma.blog.findMany({ orderBy: { sortOrder: "asc" } });
+  const blogs = await prisma.blog.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] });
 
   return (
     <div className="view">

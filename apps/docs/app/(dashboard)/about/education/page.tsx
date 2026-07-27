@@ -6,8 +6,8 @@ import { AboutPreview } from "@/components/preview";
 
 export default async function EducationPage() {
   const [education, paragraphs] = await Promise.all([
-    prisma.education.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.aboutParagraph.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.education.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.aboutParagraph.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
   ]);
   return (
     <div className="view">

@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { revalidatePortfolio } from "@/lib/revalidate";
 
 export async function createContactPurpose(formData: FormData) {
-  const count = await prisma.contactPurpose.count();
+  const { _max } = await prisma.contactPurpose.aggregate({ _max: { sortOrder: true } });
+  const count = (_max.sortOrder ?? -1) + 1;
   await prisma.contactPurpose.create({
     data: {
       label: formData.get("label") as string,

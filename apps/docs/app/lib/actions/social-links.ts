@@ -9,7 +9,8 @@ export async function createSocialLink(formData: FormData) {
   const href = formData.get("href") as string;
   const iconKey = formData.get("iconKey") as string;
   const detail = (formData.get("detail") as string) || null;
-  const count = await prisma.socialLink.count();
+  const { _max } = await prisma.socialLink.aggregate({ _max: { sortOrder: true } });
+  const count = (_max.sortOrder ?? -1) + 1;
   await prisma.socialLink.create({ data: { name, href, iconKey, detail, sortOrder: count } });
   revalidatePath("/social-links");
   revalidatePath("/links");

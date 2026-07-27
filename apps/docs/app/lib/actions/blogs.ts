@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { revalidatePortfolio } from "@/lib/revalidate";
 
 export async function createBlog(formData: FormData) {
-  const count = await prisma.blog.count();
+  const { _max } = await prisma.blog.aggregate({ _max: { sortOrder: true } });
+  const count = (_max.sortOrder ?? -1) + 1;
   await prisma.blog.create({
     data: {
       slug: formData.get("slug") as string,

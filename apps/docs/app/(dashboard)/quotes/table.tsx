@@ -12,7 +12,7 @@ import { IconPlus, IconPencil, IconQuote } from "@tabler/icons-react";
 
 interface Quote { id: string; quote: string; author: string }
 
-export function QuotesTable({ quotes }: { quotes: Quote[] }) {
+export function QuotesTable({ quotes, todayIndex }: { quotes: Quote[]; todayIndex: number }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Quote | null>(null);
   const [saving, setSaving] = useState(false);
@@ -41,7 +41,7 @@ export function QuotesTable({ quotes }: { quotes: Quote[] }) {
       ) : (
         <div>
           {quotes.map((q, i) => (
-            <div key={q.id} className={i === 0 ? "qcard today" : "qcard"}>
+            <div key={q.id} className={i === todayIndex ? "qcard today" : "qcard"}>
               <span className="row-i" style={{ marginTop: 4 }}>
                 {String(i + 1).padStart(2, "0")}
               </span>
@@ -49,7 +49,7 @@ export function QuotesTable({ quotes }: { quotes: Quote[] }) {
                 <div className="qtext">&ldquo;{q.quote}&rdquo;</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 5, flexWrap: "wrap" }}>
                   <span className="qauth" style={{ marginTop: 0 }}>— {q.author}</span>
-                  {i === 0 && (
+                  {i === todayIndex && (
                     <span className="chip amb"><span className="dot" /> showing today</span>
                   )}
                 </div>

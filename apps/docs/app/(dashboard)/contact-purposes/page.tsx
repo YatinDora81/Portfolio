@@ -5,8 +5,8 @@ import { PreviewFrame, ContactPreview } from "@/components/preview";
 
 export default async function ContactPurposesPage() {
   const [purposes, socialLinks, siteConfigs] = await Promise.all([
-    prisma.contactPurpose.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.socialLink.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.contactPurpose.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.socialLink.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
     prisma.siteConfig.findMany(),
   ]);
 

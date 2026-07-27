@@ -18,9 +18,9 @@ const CONFIG_KEYS = [
 export default async function SiteConfigPage() {
   const [configs, titles, skillBadges, socialLinks] = await Promise.all([
     prisma.siteConfig.findMany(),
-    prisma.heroTitle.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.heroSkillBadge.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.socialLink.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.heroTitle.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.heroSkillBadge.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.socialLink.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
   ]);
 
   const configMap = Object.fromEntries(configs.map(c => [c.key, c.value]));

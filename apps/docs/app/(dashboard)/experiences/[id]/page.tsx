@@ -6,11 +6,11 @@ export default async function EditExperiencePage({ params }: { params: Promise<{
   const { id } = await params;
   const experience = await prisma.experience.findUnique({
     where: { id },
-    include: { bullets: { orderBy: { sortOrder: "asc" } }, skills: { select: { id: true } } },
+    include: { bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }, skills: { select: { id: true } } },
   });
   if (!experience) notFound();
 
-  const allSkills = await prisma.skill.findMany({ orderBy: { sortOrder: "asc" } });
+  const allSkills = await prisma.skill.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] });
 
   return (
     <ExperienceForm

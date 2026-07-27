@@ -4,7 +4,7 @@ import { SkillsTable } from "./table";
 import { PreviewFrame, SkillsPreview } from "@/components/preview";
 
 export default async function SkillsPage() {
-  const skills = await prisma.skill.findMany({ orderBy: { sortOrder: "asc" } });
+  const skills = await prisma.skill.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] });
   return (
     <div className="view">
       <PageHeader

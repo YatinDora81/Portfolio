@@ -11,9 +11,9 @@ import { IconLibrary } from "./gallery";
  */
 export default async function IconsPage() {
   const [skills, badges, links] = await Promise.all([
-    prisma.skill.findMany({ select: { name: true, iconKey: true }, orderBy: { sortOrder: "asc" } }),
-    prisma.heroSkillBadge.findMany({ select: { name: true, iconKey: true }, orderBy: { sortOrder: "asc" } }),
-    prisma.socialLink.findMany({ select: { name: true, iconKey: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.skill.findMany({ select: { name: true, iconKey: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.heroSkillBadge.findMany({ select: { name: true, iconKey: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.socialLink.findMany({ select: { name: true, iconKey: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
   ]);
 
   /** Usage is counted against the CANONICAL key, so aliases roll up together. */

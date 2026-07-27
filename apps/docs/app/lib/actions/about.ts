@@ -6,7 +6,8 @@ import { revalidatePortfolio } from "@/lib/revalidate";
 
 export async function createAboutParagraph(formData: FormData) {
   const content = formData.get("content") as string;
-  const count = await prisma.aboutParagraph.count();
+  const { _max } = await prisma.aboutParagraph.aggregate({ _max: { sortOrder: true } });
+  const count = (_max.sortOrder ?? -1) + 1;
   await prisma.aboutParagraph.create({ data: { content, sortOrder: count } });
   revalidatePath("/about/paragraphs");
   revalidatePortfolio();
@@ -26,7 +27,8 @@ export async function deleteAboutParagraph(id: string) {
 }
 
 export async function createEducation(formData: FormData) {
-  const count = await prisma.education.count();
+  const { _max } = await prisma.education.aggregate({ _max: { sortOrder: true } });
+  const count = (_max.sortOrder ?? -1) + 1;
   await prisma.education.create({
     data: {
       institution: formData.get("institution") as string,

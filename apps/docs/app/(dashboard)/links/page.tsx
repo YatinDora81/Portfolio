@@ -8,7 +8,7 @@ import { IconArrowUpRight } from "@tabler/icons-react";
 
 export default async function LinksPage() {
   const [links, siteConfigRows] = await Promise.all([
-    prisma.socialLink.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.socialLink.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
     prisma.siteConfig.findMany(),
   ]);
 

@@ -6,7 +6,8 @@ import { revalidatePortfolio } from "@/lib/revalidate";
 
 export async function createHeroTitle(formData: FormData) {
   const title = formData.get("title") as string;
-  const count = await prisma.heroTitle.count();
+  const { _max } = await prisma.heroTitle.aggregate({ _max: { sortOrder: true } });
+  const count = (_max.sortOrder ?? -1) + 1;
   await prisma.heroTitle.create({ data: { title, sortOrder: count } });
   revalidatePath("/hero/titles");
   revalidatePortfolio();
@@ -28,7 +29,8 @@ export async function deleteHeroTitle(id: string) {
 export async function createHeroSkillBadge(formData: FormData) {
   const name = formData.get("name") as string;
   const iconKey = formData.get("iconKey") as string;
-  const count = await prisma.heroSkillBadge.count();
+  const { _max } = await prisma.heroSkillBadge.aggregate({ _max: { sortOrder: true } });
+  const count = (_max.sortOrder ?? -1) + 1;
   await prisma.heroSkillBadge.create({ data: { name, iconKey, sortOrder: count } });
   revalidatePath("/hero/skill-badges");
   revalidatePortfolio();

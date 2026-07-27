@@ -41,9 +41,9 @@ export async function getSiteConfig(): Promise<SiteConfig> {
 
 export async function getHeroData() {
   const [titles, skills, socialLinks] = await Promise.all([
-    prisma.heroTitle.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.heroSkillBadge.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.socialLink.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.heroTitle.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.heroSkillBadge.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.socialLink.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
   ]);
   return {
     titles: titles.map((t) => t.title),
@@ -59,8 +59,8 @@ export async function getHeroData() {
 
 export async function getAboutData() {
   const [paragraphs, education] = await Promise.all([
-    prisma.aboutParagraph.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.education.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.aboutParagraph.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.education.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
   ]);
   return {
     paragraphs: paragraphs.map((p) => p.content),
@@ -80,16 +80,16 @@ export async function getAboutData() {
 export async function getSkills() {
   const skills = await prisma.skill.findMany({
     where: { show: true },
-    orderBy: { sortOrder: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
   });
   return skills.map((s) => ({ name: s.name, iconKey: s.iconKey }));
 }
 
 export async function getExperiences() {
   const experiences = await prisma.experience.findMany({
-    orderBy: { sortOrder: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     include: {
-      bullets: { orderBy: { sortOrder: "asc" } },
+      bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
       skills: { select: { name: true } },
     },
   });
@@ -110,9 +110,9 @@ export async function getExperiences() {
 
 export async function getProjects() {
   const projects = await prisma.project.findMany({
-    orderBy: { sortOrder: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     include: {
-      bullets: { orderBy: { sortOrder: "asc" } },
+      bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
       skills: { select: { name: true, iconKey: true } },
     },
   });
@@ -131,7 +131,7 @@ export async function getProjects() {
 export async function getBlogs() {
   const blogs = await prisma.blog.findMany({
     where: { show: true },
-    orderBy: { sortOrder: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     select: {
       slug: true,
       title: true,
@@ -180,8 +180,8 @@ export async function getQuotes() {
 
 export async function getContactData() {
   const [purposes, socialLinks] = await Promise.all([
-    prisma.contactPurpose.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.socialLink.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.contactPurpose.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.socialLink.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
   ]);
   return {
     purposes: purposes.map((p) => ({ label: p.label, emoji: p.emoji })),

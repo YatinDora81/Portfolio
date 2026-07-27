@@ -424,10 +424,12 @@ export function BlogsPreview({ blogs }: { blogs: BlogData[] }) {
 
 // ─── Quotes Preview ──────────────────────────────────────────────
 
-export function QuotesPreview({ quotes }: { quotes: { quote: string; author: string }[] }) {
-  const today = new Date();
-  const dayIndex = (today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate());
-  const thought = quotes.length > 0 ? quotes[dayIndex % quotes.length]! : null;
+export function QuotesPreview({ quotes, todayIndex = 0 }: { quotes: { quote: string; author: string }[]; todayIndex?: number }) {
+  // The index is computed once by the page using the SAME UTC day-of-year
+  // formula the site uses. This component used to invent a third formula
+  // (year*10000 + month*100 + day), so the preview, the admin badge and the
+  // live site could each show a different quote on the same day.
+  const thought = quotes.length > 0 ? quotes[todayIndex] ?? quotes[0]! : null;
 
   return (
     <div>
