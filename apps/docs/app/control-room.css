@@ -23,6 +23,11 @@
   --blue: #64748B;
   --grad: linear-gradient(135deg, #7A6BF0, #5646D6);
   --gridc: rgba(17, 17, 22, .06); --tickc: rgba(17, 17, 22, .3);
+  /* Categorical chart series. Deliberately theme-independent: hue encodes the
+     *source*, so a series keeps its identity when the theme changes, and status
+     tokens (--good/--amber) stay reserved for state. Validated all-pairs against
+     #FFFFFF, #161B22 and #1F1F23 — worst CVD ΔE 12.6, worst normal-vision ΔE 18.3. */
+  --ch1: #14A79A; --ch2: #E4610E; --ch3: #8B5CF6; --ch4: #BE185D;
   --card: #FFFFFF; --panel: rgba(255, 255, 255, .96); --chipG: rgba(255, 255, 255, .9);
   --veil: rgba(17, 17, 22, .4); --accT: #5B4BD6; --goodT: #15803D; --vioT: #55606E; --vioS: rgba(100, 116, 139, .12);
   --pri: #6A5AE0; --priFg: #FFFFFF;
@@ -821,3 +826,27 @@ select.sel option { background: var(--card); color: var(--ink) }
 .thm-sw i { width: 5px; height: 5px; border-radius: 99px; display: block }
 .thm-it .ck { margin-left: auto; opacity: 0; flex: none }
 .thm-it.on .ck { opacity: 1 }
+
+/* ---------- UTM tracer chart ---------- */
+.utm-legend { display: flex; gap: 12px; margin-left: auto; flex-wrap: wrap }
+.lg-it { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: var(--dim) }
+.lg-dot { width: 8px; height: 8px; border-radius: 3px; flex: none }
+/* Range picker strip. `.in` is width:100%, so the date fields are sized down to
+   match `SEL_STYLE` in the tracker table and the strip wraps inside `.card-h`. */
+.utm-range { display: flex; align-items: center; gap: 6px; flex-wrap: wrap }
+.utm-range .in { width: auto; padding: 5px 10px; font-size: 12px }
+/* Nothing else in the app declares `color-scheme`, so the UA keeps painting the date
+   field's calendar button with its light-scheme (near-black) glyph — invisible on the
+   dark `--well`. Scoped to these inputs so light mode and the custom scrollbars are untouched. */
+.dark .utm-range .in { color-scheme: dark }
+.utm-wrap { position: relative; padding: 8px 10px 4px }
+.utm-wrap .recharts-cartesian-axis-tick text { font-family: var(--mono); font-size: 9px; fill: var(--faint); letter-spacing: .04em }
+.utm-wrap .recharts-surface { overflow: visible }
+.utm-tip { background: var(--panel); border: 1px solid var(--line2);
+  border-radius: 10px; padding: 8px 11px; box-shadow: var(--shadow);
+  min-width: 132px; backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6) }
+.utm-tip .d { font-family: var(--mono); font-size: 9px; color: var(--faint); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 5px }
+.utm-tip .r { display: flex; align-items: center; gap: 8px; justify-content: space-between;
+  font-family: var(--mono); font-size: 10.5px; color: var(--dim); line-height: 1.7 }
+.utm-tip .r b { color: var(--ink); font-weight: 600 }
+.utm-empty { padding: 34px 16px; text-align: center; font-size: 12.5px; color: var(--faint) }

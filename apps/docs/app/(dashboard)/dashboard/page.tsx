@@ -3,6 +3,8 @@ import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardHead } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import UtmTracerChart from "@/components/utm-tracer-chart";
+import { getUtmSeries } from "@/lib/utm";
 import {
   IconInbox, IconPencil, IconFolderCode, IconCpu, IconPlus, IconSparkles,
   IconSettings2, IconArrowUpRight, IconUser, IconQuote, IconTag, IconLink,
@@ -18,6 +20,7 @@ async function getDashboardData() {
     totalProjects, projectsWithLive,
     visibleSkills, totalSkills,
     heroTitles, aboutParagraphs, quotes, contactPurposes, socialLinks,
+    utm,
   ] = await Promise.all([
     prisma.contactMessage.count({ where: { read: false } }),
     prisma.contactMessage.count(),
@@ -33,6 +36,7 @@ async function getDashboardData() {
     prisma.quote.count(),
     prisma.contactPurpose.count(),
     prisma.socialLink.count(),
+    getUtmSeries(14),
   ]);
 
   return {
@@ -41,6 +45,7 @@ async function getDashboardData() {
     totalProjects, projectsWithLive,
     visibleSkills, totalSkills,
     heroTitles, aboutParagraphs, quotes, contactPurposes, socialLinks,
+    utm,
   };
 }
 
@@ -120,6 +125,8 @@ export default async function DashboardPage() {
           </div>
         </Link>
       </div>
+
+      <UtmTracerChart data={d.utm} />
 
       <div className="dash-grid">
         <div className="flex flex-col gap-3.5">
