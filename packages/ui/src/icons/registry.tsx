@@ -8,7 +8,7 @@ import {
   JiraIcon, VercelIcon, LinuxIcon, NginxIcon, HtmlCssIcon, ReduxIcon, ZustandIcon,
   JwtIcon, OAuthIcon, ClerkIcon, PostmanIcon, SwaggerIcon, EslintPrettierIcon,
   S3Icon, EC2Icon, CloudflareIcon, BashIcon, NpmIcon, AgileIcon, NotionIcon,
-  GoogleApisIcon,
+  GoogleApisIcon, PythonIcon, FastAPIIcon, GeminiIcon, BunIcon, CloudflareR2Icon,
 } from "./skills";
 import { GithubIcon, LinkedInIcon, MailIcon, LeetCodeIcon, XIcon } from "./brand";
 
@@ -28,6 +28,7 @@ export const ICON_GROUPS = [
   "Frontend",
   "Backend",
   "Databases & ORM",
+  "AI & LLM",
   "DevOps & Cloud",
   "Testing & Quality",
   "Auth",
@@ -53,6 +54,7 @@ export const SKILL_ICONS: SkillIconEntry[] = [
   { key: "TypeScript", group: "Languages", Icon: TypeScriptIcon, search: "ts" },
   { key: "JavaScript", group: "Languages", Icon: JavaScriptIcon, search: "js ecmascript" },
   { key: "Java", group: "Languages", Icon: JavaIcon },
+  { key: "Python", group: "Languages", Icon: PythonIcon, search: "py fastapi ml ai" },
   { key: "Go", group: "Languages", Icon: GoIcon, search: "golang" },
   { key: "SQL", group: "Languages", Icon: SQLIcon, search: "query" },
   { key: "Bash", group: "Languages", Icon: BashIcon, search: "shell sh zsh terminal" },
@@ -72,6 +74,7 @@ export const SKILL_ICONS: SkillIconEntry[] = [
   { key: "WebSocket", group: "Backend", aliases: ["WebSockets"], Icon: WebSocketIcon, search: "ws realtime socket" },
   { key: "Kafka", group: "Backend", Icon: KafkaIcon, search: "queue stream events" },
   { key: "Zod", group: "Backend", Icon: ZodIcon, search: "validation schema" },
+  { key: "FastAPI", group: "Backend", Icon: FastAPIIcon, search: "python asgi uvicorn api" },
 
   // ---- Databases & ORM ----
   { key: "PostgreSQL", group: "Databases & ORM", Icon: PostgreSQLIcon, search: "postgres pg" },
@@ -81,12 +84,16 @@ export const SKILL_ICONS: SkillIconEntry[] = [
   { key: "Prisma", group: "Databases & ORM", Icon: PrismaIcon, search: "orm" },
   { key: "Drizzle", group: "Databases & ORM", aliases: ["Drizzle ORM"], Icon: DrizzleIcon, search: "orm" },
 
+  // ---- AI & LLM ----
+  { key: "Gemini", group: "AI & LLM", Icon: GeminiIcon, search: "google llm ai model" },
+
   // ---- DevOps & Cloud ----
   { key: "Docker", group: "DevOps & Cloud", Icon: DockerIcon, search: "container" },
   { key: "AWS", group: "DevOps & Cloud", Icon: AWSIcon, search: "amazon cloud" },
   { key: "AWS S3", group: "DevOps & Cloud", Icon: S3Icon, search: "amazon bucket storage" },
   { key: "AWS EC2", group: "DevOps & Cloud", Icon: EC2Icon, search: "amazon compute instance" },
   { key: "Cloudflare", group: "DevOps & Cloud", Icon: CloudflareIcon, search: "cdn dns edge" },
+  { key: "Cloudflare R2", group: "DevOps & Cloud", Icon: CloudflareR2Icon, search: "object storage bucket s3" },
   { key: "Vercel", group: "DevOps & Cloud", Icon: VercelIcon, search: "hosting deploy" },
   { key: "Linux", group: "DevOps & Cloud", Icon: LinuxIcon, search: "unix ubuntu server" },
   { key: "Nginx", group: "DevOps & Cloud", Icon: NginxIcon, search: "proxy webserver" },
@@ -111,7 +118,8 @@ export const SKILL_ICONS: SkillIconEntry[] = [
   // ---- Tools & Practices ----
   { key: "Git", group: "Tools & Practices", Icon: GitIcon, search: "version control" },
   { key: "GitHub", group: "Tools & Practices", aliases: ["GitHub Actions"], Icon: GitHubSkillIcon, search: "git repo actions" },
-  { key: "npm/yarn", group: "Tools & Practices", Icon: NpmIcon, search: "package manager pnpm bun" },
+  { key: "npm/yarn", group: "Tools & Practices", Icon: NpmIcon, search: "package manager pnpm" },
+  { key: "Bun", group: "Tools & Practices", Icon: BunIcon, search: "runtime package manager bunjs" },
   { key: "Jira", group: "Tools & Practices", Icon: JiraIcon, search: "tickets atlassian" },
   { key: "Notion", group: "Tools & Practices", Icon: NotionIcon, search: "docs notes" },
   { key: "Agile", group: "Tools & Practices", Icon: AgileIcon, search: "scrum sprint kanban" },
