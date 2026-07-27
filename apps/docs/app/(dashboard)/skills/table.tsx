@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { DeleteButton } from "@/components/shared/delete-button";
+import { IconPicker } from "@/components/shared/icon-picker";
 import { createSkill, updateSkill, toggleSkillVisibility, deleteSkill } from "@/lib/actions/skills";
-import { IconPlus, IconPencil, IconEye, IconEyeOff, IconCpu } from "@tabler/icons-react";
+import { IconPlus, IconPencil, IconEye, IconEyeOff, IconCpu, IconAlertTriangle } from "@tabler/icons-react";
+import { findSkillIcon } from "@repo/ui/icons/registry";
 
 interface Skill { id: string; name: string; iconKey: string; show: boolean; sortOrder: number }
 
@@ -28,9 +30,15 @@ function groupSkills(skills: Skill[]) {
 
 function SkillChip({ skill }: { skill: Skill }) {
   const [pending, startTransition] = useTransition();
+  const icon = findSkillIcon(skill.iconKey);
 
   return (
     <div className={cn("skill", !skill.show && "hid")}>
+      {/* The glyph the site will actually draw — a broken key reads as a warning
+          here instead of as an empty gap on the live page. */}
+      <span className={cn("ico-sw sm", !icon && "ink")} style={!icon ? { color: "var(--bad)" } : undefined}>
+        {icon ? <icon.Icon /> : <IconAlertTriangle size={12} stroke={1.8} />}
+      </span>
       <div>
         <div className="skill-n">{skill.name}</div>
         {/* Only worth surfacing when it diverges from the name — that mismatch is
@@ -84,7 +92,13 @@ function SkillDialog({ onClose, editing }: { onClose: () => void; editing: Skill
       >
         <div className="f-row">
           <Input name="name" label="Name" defaultValue={editing?.name || ""} required />
-          <Input name="iconKey" label="Icon key" mono defaultValue={editing?.iconKey || ""} required hint="Usually identical to the name." />
+          <IconPicker
+            kind="skill"
+            label="Icon"
+            defaultValue={editing?.iconKey || ""}
+            required
+            hint="Usually the same as the name — browse them all under Icon library."
+          />
         </div>
         {/* Deliberately not a `.f` wrapper: `.f label` would restyle the Switch's
             own caption into the mono field-label face. */}

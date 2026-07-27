@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
 import { DeleteButton } from "@/components/shared/delete-button";
+import { IconPicker } from "@/components/shared/icon-picker";
 import { createSocialLink, updateSocialLink, deleteSocialLink } from "@/lib/actions/social-links";
-import { IconPlus, IconPencil, IconArrowUpRight, IconLink } from "@tabler/icons-react";
+import { IconPlus, IconPencil, IconArrowUpRight, IconLink, IconAlertTriangle } from "@tabler/icons-react";
+import { findSocialIcon } from "@repo/ui/icons/registry";
+import { cn } from "@/lib/utils";
 
 interface Link { id: string; name: string; href: string; iconKey: string; detail: string | null; sortOrder: number }
 
@@ -35,14 +38,19 @@ export function SocialLinksList({ links }: { links: Link[] }) {
         </div>
       ) : (
         <div className="rows">
-          {links.map((l, i) => (
+          {links.map((l, i) => {
+            const icon = findSocialIcon(l.iconKey);
+            return (
             <div className="row" key={l.id}>
               <div className="row-i">{String(i + 1).padStart(2, "0")}</div>
+              <span className="ico-sw ink sm" style={!icon ? { color: "var(--bad)" } : undefined}>
+                {icon ? <icon.Icon /> : <IconAlertTriangle size={12} stroke={1.8} />}
+              </span>
               <div className="row-main">
                 <div className="row-t">{l.name}</div>
                 <div className="row-m">{l.href}{l.detail ? ` · ${l.detail}` : ""}</div>
               </div>
-              <span className="chip off">{l.iconKey}</span>
+              <span className={cn("chip", icon ? "off" : "amb")}>{l.iconKey}</span>
               <div className="row-acts">
                 <a
                   className="ibtn"
@@ -63,7 +71,8 @@ export function SocialLinksList({ links }: { links: Link[] }) {
                 <DeleteButton label={`"${l.name}"`} onDelete={async () => { await deleteSocialLink(l.id); }} />
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -80,11 +89,11 @@ export function SocialLinksList({ links }: { links: Link[] }) {
         }}>
           <Input name="name" label="Name" defaultValue={editing?.name || ""} required />
           <Input name="href" label="URL" mono defaultValue={editing?.href || ""} required />
-          <Input
-            name="iconKey"
-            label="Icon Key"
-            mono
-            hint="Matches the icon the portfolio renders for this link."
+          <IconPicker
+            key={editing?.id ?? "new"}
+            kind="social"
+            label="Icon"
+            hint="Drawn in the hero, the contact sidebar and the footer."
             defaultValue={editing?.iconKey || ""}
             required
           />

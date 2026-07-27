@@ -555,6 +555,111 @@ select.sel option { background: var(--card); color: var(--ink) }
 .dark .mava { filter: saturate(.85) brightness(.9) }
 .dark .sb-mark, .dark .lg-mark, .dark .ava { box-shadow: 0 4px 12px -4px rgba(0, 0, 0, .5) }
 
+/* ---------- icon library — reference grid + picker ----------
+   Sits after the dark block on purpose: the swatch rules below need to win
+   over `.dark .card`-style overrides without a specificity fight. */
+
+/* Brand glyphs ship their own hardcoded hex, and a few knock white shapes out
+   of a coloured field — so the swatch behind them stays light in BOTH themes.
+   On a dark card, Linux (#333 on transparent) would otherwise vanish. */
+.ico-sw {
+  width: 30px; height: 30px; flex: none; padding: 5px; border-radius: 8px;
+  display: grid; place-items: center; background: #FFFFFF; border: 1px solid var(--line2)
+}
+.ico-sw svg { width: 100%; height: 100%; display: block }
+.dark .ico-sw { background: #F1F1F4; border-color: rgba(255, 255, 255, .09) }
+/* Social marks are currentColor line art — they want ink, not a light swatch. */
+.ico-sw.ink { background: var(--bg1); border-color: var(--line2); color: var(--ink) }
+.dark .ico-sw.ink { background: rgba(255, 255, 255, .06); color: var(--ink) }
+.ico-sw.sm { width: 24px; height: 24px; padding: 4px; border-radius: 7px }
+
+/* ---- reference grid ---- */
+.ico-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 8px }
+.ico-cell {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; text-align: left;
+  padding: 8px 10px; border: 1px solid var(--line2); border-radius: var(--r2); background: var(--card);
+  transition: border-color .14s, background .14s
+}
+.ico-cell:hover { border-color: var(--c1); background: var(--bg1) }
+.ico-cell-m { flex: 1; min-width: 0 }
+.ico-k { font-family: var(--mono); font-size: 11.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.ico-a {
+  font-family: var(--mono); font-size: 9px; color: var(--faint); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis
+}
+.ico-cp { flex: none; color: var(--faint); opacity: 0; transition: opacity .14s }
+.ico-cell:hover .ico-cp { opacity: 1 }
+.ico-cell.copied { border-color: var(--good); background: var(--good-soft) }
+.ico-cell.copied .ico-cp { opacity: 1; color: var(--good) }
+/* Used-count pip — how many DB rows point at this key right now. */
+.ico-n {
+  font-family: var(--mono); font-size: 9px; color: var(--accT); background: var(--accS);
+  border-radius: 99px; padding: 1px 6px; flex: none; line-height: 1.6
+}
+
+/* ---- unresolved-key callout ---- */
+.ico-warn {
+  display: flex; gap: 10px; align-items: flex-start; padding: 11px 13px; margin-bottom: 14px;
+  border-radius: var(--r2); background: var(--amber-soft); border: 1px solid var(--amber);
+  color: var(--ambT); font-size: 12.5px; line-height: 1.55
+}
+.ico-warn b { display: block; font-size: 13px; margin-bottom: 3px }
+.ico-warn code {
+  font-family: var(--mono); font-size: 11px; background: var(--card);
+  border: 1px solid var(--line2); border-radius: 5px; padding: 1px 5px; color: var(--ink)
+}
+
+/* ---- picker ---- */
+.ipick { position: relative }
+.ipick-btn {
+  display: flex; align-items: center; gap: 9px; width: 100%; min-height: 38px; text-align: left;
+  padding: 5px 10px; border-radius: 10px; background: var(--card); border: 1px solid var(--line);
+  transition: border-color .14s, box-shadow .14s
+}
+.ipick-btn:hover { border-color: var(--c1) }
+.ipick-btn[aria-expanded='true'] { border-color: var(--c1); box-shadow: 0 0 0 3px var(--accS) }
+.dark .ipick-btn { box-shadow: none }
+.dark .ipick-btn[aria-expanded='true'] { box-shadow: 0 0 0 3px var(--accS) }
+.ipick-v {
+  flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis
+}
+.ipick-v.ph { color: var(--faint) }
+.ipick-chev { flex: none; color: var(--faint); transition: transform .16s }
+.ipick-btn[aria-expanded='true'] .ipick-chev { transform: rotate(180deg) }
+
+/* Portalled to <body> and fixed-positioned — the dialogs it lives in have an
+   `overflow-y: auto` body that would otherwise clip it. */
+.ipick-pop {
+  position: fixed; z-index: 120; background: var(--panel);
+  backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid var(--line); border-radius: var(--r3); box-shadow: var(--shadow);
+  overflow: hidden; animation: pop .16s both; display: flex; flex-direction: column
+}
+.ipick-s { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-bottom: 1px solid var(--line2); flex: none }
+.ipick-s input { flex: 1; min-width: 0; background: none; border: none; outline: none; font-size: 13.5px; color: var(--ink) }
+.ipick-s input::placeholder { color: var(--faint) }
+.ipick-l { overflow-y: auto; padding: 6px; flex: 1 }
+.ipick-gh {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--faint); padding: 9px 8px 5px
+}
+.ipick-it {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px;
+  border-radius: var(--r1); text-align: left; color: var(--dim)
+}
+.ipick-it.hot { background: var(--bg2); color: var(--ink) }
+.ipick-it.on { background: var(--accS); color: var(--accT) }
+.ipick-k { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.ipick-none { padding: 18px 14px; font-size: 12.5px; color: var(--faint); text-align: center }
+.ipick-f {
+  flex: none; border-top: 1px solid var(--line2); padding: 8px 11px; display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint)
+}
+.ipick-f .sp { flex: 1 }
+.ipick-clear { font-family: var(--mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint) }
+.ipick-clear:hover { color: var(--bad) }
+
 /* ---------- responsive ---------- */
 .sb-veil { display: none }
 @media (max-width: 1080px) {

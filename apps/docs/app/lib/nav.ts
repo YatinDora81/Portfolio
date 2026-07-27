@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import {
   IconLayoutGrid, IconInbox, IconSparkles, IconUser, IconCpu, IconBriefcase,
   IconFolderCode, IconPencil, IconQuote, IconTag, IconSettings2, IconShieldCheck,
-  IconLink, IconSend, IconChartBar, IconSchool, IconBadge,
+  IconLink, IconSend, IconChartBar, IconSchool, IconBadge, IconPalette,
 } from "@tabler/icons-react";
 
 export type NavIcon = ComponentType<{ size?: number; className?: string; stroke?: number }>;
@@ -47,6 +47,7 @@ export const NAV_SITE: NavLink[] = [
   { href: "/links", label: "Social & resume", icon: IconLink, eyebrow: "site-wide · hero + footer" },
   { href: "/site-config", label: "Site config", icon: IconSettings2, eyebrow: "site-wide" },
   { href: "/admin-users", label: "Admins & roles", icon: IconShieldCheck, eyebrow: "access control" },
+  { href: "/icons", label: "Icon library", icon: IconPalette, eyebrow: "reference · icon keys" },
 ];
 
 export const ALL_NAV: NavLink[] = [...NAV_TOP, ...NAV_CONTENT, ...NAV_SITE];

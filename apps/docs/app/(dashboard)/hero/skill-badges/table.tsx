@@ -7,7 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
 import { DeleteButton } from "@/components/shared/delete-button";
 import { createHeroSkillBadge, updateHeroSkillBadge, deleteHeroSkillBadge } from "@/lib/actions/hero";
-import { IconPlus, IconPencil, IconGripVertical, IconTag } from "@tabler/icons-react";
+import { IconPlus, IconPencil, IconGripVertical, IconTag, IconAlertTriangle } from "@tabler/icons-react";
+import { findSkillIcon } from "@repo/ui/icons/registry";
+import { IconPicker } from "@/components/shared/icon-picker";
+import { cn } from "@/lib/utils";
 
 interface Badge { id: string; name: string; iconKey: string; sortOrder: number }
 
@@ -40,13 +43,18 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
         </div>
       ) : (
         <div className="rows">
-          {badges.map((b, i) => (
+          {badges.map((b, i) => {
+            const icon = findSkillIcon(b.iconKey);
+            return (
             <div key={b.id} className="row">
               <IconGripVertical size={14} className="row-grip" />
               <div className="row-i">{String(i + 1).padStart(2, "0")}</div>
+              <span className={cn("ico-sw sm", !icon && "ink")} style={!icon ? { color: "var(--bad)" } : undefined}>
+                {icon ? <icon.Icon /> : <IconAlertTriangle size={12} stroke={1.8} />}
+              </span>
               <div className="row-main">
                 <div className="row-t mono">{b.name}</div>
-                <div className="row-m">icon · {b.iconKey}</div>
+                <div className="row-m">{icon ? `icon · ${b.iconKey}` : `no icon for "${b.iconKey}" — renders blank`}</div>
               </div>
               <div className="row-acts">
                 <IconButton
@@ -58,7 +66,8 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
                 <DeleteButton label={`"${b.name}"`} onDelete={async () => { await deleteHeroSkillBadge(b.id); }} />
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -83,13 +92,15 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
           }}
         >
           <Input name="name" label="Name" defaultValue={editing?.name || ""} required />
-          <Input
-            name="iconKey"
-            label="Icon key"
-            mono
+          {/* Hero badges have no name-fallback on the site — an unknown key here
+              renders a blank gap mid-sentence, so pick rather than type. */}
+          <IconPicker
+            key={editing?.id ?? "new"}
+            kind="skill"
+            label="Icon"
             defaultValue={editing?.iconKey || ""}
             required
-            hint="Must match an icon key the portfolio already knows about."
+            hint="The hero bio draws this inline next to the name."
           />
         </form>
       </Dialog>
