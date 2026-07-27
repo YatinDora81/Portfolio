@@ -32,7 +32,11 @@ export default function RootLayout({
             __html: `
           (function() {
             var theme = localStorage.getItem('admin-theme');
-            if (theme === 'dark') document.documentElement.classList.add('dark');
+            // Mirror THEME_CLASS in theme-provider.tsx, including its migration of
+            // the legacy 'dark' value to Dark2 — the palette lives on theme-*, so
+            // adding a bare 'dark' here would paint light tokens under dark rules.
+            var t = theme === 'dark1' ? 'theme-gh' : (theme === 'dark2' || theme === 'dark') ? 'theme-zinc' : '';
+            if (t) document.documentElement.classList.add('dark', t);
           })();
         `,
           }}

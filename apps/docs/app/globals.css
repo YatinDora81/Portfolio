@@ -27,43 +27,25 @@
 }
 
 :root {
-  --primary: #2563eb;
-  --primary-foreground: #ffffff;
-  --sidebar: #0c1222;
-  --sidebar-foreground: #f1f5f9;
-  --sidebar-accent: #1a2744;
-  --sidebar-muted: #8b9dc3;
-  --destructive: #dc2626;
+  /* Bridge shadcn-style names onto the control-room design system so
+     Tailwind utilities (bg-background, text-foreground, …) always match
+     the active theme. Never redefine control-room token names here. */
+  --primary: var(--pri);
+  --primary-foreground: var(--priFg);
+  --sidebar: var(--sbg, #0c1222);
+  --sidebar-foreground: var(--ink);
+  --sidebar-accent: var(--accS);
+  --sidebar-muted: var(--faint);
+  --destructive: var(--bad);
   --destructive-foreground: #ffffff;
-  --success: #059669;
-  --warning: #d97706;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --border: #e2e8f0;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --background: #f8fafc;
-  --foreground: #0f172a;
-}
-
-.dark {
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
-  --sidebar: #030712;
-  --sidebar-foreground: #f1f5f9;
-  --sidebar-accent: #111827;
-  --sidebar-muted: #9ca3af;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --border: #1e293b;
-  --card: #0f172a;
-  --card-foreground: #f8fafc;
-  --background: #020617;
-  --foreground: #f8fafc;
+  --success: var(--good);
+  --warning: var(--amber);
+  --muted: var(--bg2);
+  --muted-foreground: var(--faint);
+  --border: var(--line);
+  --card-foreground: var(--ink);
+  --background: var(--bg);
+  --foreground: var(--ink);
 }
 
 body {
@@ -81,10 +63,16 @@ body {
   background: transparent;
 }
 
+/* Only reaches surfaces outside `.cr` (the portalled icon picker). Light keeps
+   its literal so the `--muted-foreground` bridge can't drift a light pixel. */
 ::-webkit-scrollbar-thumb {
-  background: var(--muted-foreground);
+  background: #64748b;
   border-radius: 999px;
   opacity: 0.3;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
 }
 
 ::-webkit-scrollbar-thumb:hover {

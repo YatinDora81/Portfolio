@@ -113,10 +113,12 @@
 
 /* ---------- main / topbar ---------- */
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; z-index: 1 }
+/* `backdrop-filter` makes .tb a stacking context, so a dropdown inside it can
+   never out-paint `.content` on its own — the topbar itself has to be raised. */
 .tb {
   height: 56px; flex: none; border-bottom: 1px solid var(--line2); display: flex; align-items: center;
   gap: 10px; padding: 0 22px; background: var(--glass); backdrop-filter: blur(16px) saturate(1.6);
-  -webkit-backdrop-filter: blur(16px) saturate(1.6); transition: border-color .3s; position: relative
+  -webkit-backdrop-filter: blur(16px) saturate(1.6); transition: border-color .3s; position: relative; z-index: 10
 }
 .cr.hot .tb { border-bottom-color: color-mix(in srgb, var(--amber) 55%, transparent) }
 .tb-burger { display: none; padding: 7px; border-radius: 8px; color: var(--dim) }
@@ -152,7 +154,9 @@
   box-shadow: 0 1px 2px rgba(17, 17, 22, .15), 0 8px 20px -10px rgba(106, 90, 224, .5)
 }
 .pub.dirty:hover { filter: brightness(1.07) }
-.pub-dot { width: 6px; height: 6px; border-radius: 99px; background: #fff }
+/* the dot only ever sits inside `.pub.dirty`, so it tracks that button's own
+   foreground — a fixed light knob would vanish on Dark2's teal `--pri`. */
+.pub-dot { width: 6px; height: 6px; border-radius: 99px; background: currentColor }
 .spin { animation: spin 1s linear infinite }
 @keyframes spin { to { transform: rotate(360deg) } }
 .pubbar { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; overflow: hidden; background: var(--accS); z-index: 5 }
@@ -241,7 +245,7 @@
 }
 .tog::after {
   content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 99px;
-  background: #fff; box-shadow: 0 1px 3px rgba(23, 30, 48, .3); transition: .18s
+  background: var(--knob, #fff); box-shadow: 0 1px 3px rgba(23, 30, 48, .3); transition: .18s
 }
 .tog.on { background: var(--c1) }
 .tog.on::after { left: 17px }
@@ -522,38 +526,76 @@ select.sel option { background: var(--card); color: var(--ink) }
 .sb-mark, .lg-mark, .ava { box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--c1) 45%, transparent) }
 .cr, .login { font-feature-settings: 'cv11' }
 
-/* ---------- dark mode ---------- */
-.dark {
-  --bg: #101014; --bg1: rgba(255, 255, 255, .045); --bg2: rgba(255, 255, 255, .07); --bg3: rgba(255, 255, 255, .1); --bg4: rgba(255, 255, 255, .16);
-  --card: #17171C; --panel: rgba(23, 23, 28, .96); --chipG: rgba(10, 10, 14, .62); --glass: rgba(16, 16, 20, .82);
-  --veil: rgba(0, 0, 0, .55);
-  --line: rgba(255, 255, 255, .1); --line2: rgba(255, 255, 255, .065);
-  --ink: #EDEDF2; --dim: #A3A3AF; --faint: #6E6E7A;
-  --c1: #8B7CF0; --c2: #8B7CF0; --amber: #F5B14E; --amber2: #F8C979; --amber-soft: rgba(245, 177, 78, .13);
-  --accS: rgba(139, 124, 240, .16); --ambT: #F5C878;
-  --accT: #B9AFFF;
-  --good: #3FCF77; --good-soft: rgba(63, 207, 119, .13); --goodT: #7CE3A6;
-  --bad: #F26D6D; --bad-soft: rgba(242, 109, 109, .14);
-  --blue: #94A3B8; --vioT: #B6C2D4; --vioS: rgba(148, 163, 184, .15);
-  --grad: linear-gradient(135deg, #9A8CF5, #6A5AE0);
-  --gridc: rgba(255, 255, 255, .05); --tickc: rgba(255, 255, 255, .3);
-  --pri: #7C6CF0; --priFg: #FFFFFF;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 20px 50px -22px rgba(0, 0, 0, .65);
+/* ---------- dark mode: two themes on a shared quality layer ----------
+   html carries `dark` plus exactly one of `theme-gh` (Dark1) or
+   `theme-zinc` (Dark2). Tokens live on the theme class; the `.dark`
+   rules below are the shared engineering: elevation instead of shadow
+   deletion, a zoned (darker) sidebar, input wells, brand-colored glows. */
+
+/* ── Dark1 · GitHub Dark ── */
+.theme-gh {
+  --sbg: #010409; --bg: #0D1117; --card: #161B22; --panel: rgba(28, 33, 41, .98); --well: #0D1117;
+  --glass: rgba(13, 17, 23, .9); --chipG: rgba(1, 4, 9, .7);
+  --bg1: rgba(177, 186, 196, .06); --bg2: rgba(177, 186, 196, .09); --bg3: rgba(177, 186, 196, .13); --bg4: rgba(177, 186, 196, .2);
+  --line: #30363D; --line2: #21262D;
+  --ink: #E6EDF3; --dim: #A8B0BA; --faint: #8B949E; --knob: #E6EDF3;
+  --veil: rgba(1, 4, 9, .66);
+  --c1: #58A6FF; --c2: #58A6FF; --accS: rgba(56, 139, 253, .15); --accT: #79C0FF;
+  --amber: #D29922; --amber2: #E3B341; --amber-soft: rgba(210, 153, 34, .15); --ambT: #E3B341;
+  --good: #3FB950; --good-soft: rgba(63, 185, 80, .14); --goodT: #56D364;
+  --bad: #F85149; --bad-soft: rgba(248, 81, 73, .14);
+  --blue: #9AA5B1; --vioT: #AFBAC8; --vioS: rgba(139, 148, 158, .15);
+  --grad: linear-gradient(135deg, #58A6FF, #316DCA);
+  --gridc: rgba(177, 186, 196, .07); --tickc: rgba(177, 186, 196, .35);
+  --pri: #238636; --priFg: #FFFFFF;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .6), 0 24px 56px -24px rgba(0, 2, 6, .8);
 }
-.dark .cr ::selection, .dark .login ::selection { background: rgba(139, 124, 240, .32) }
-.dark .cr ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .16); background-clip: padding-box }
-.dark .cr ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26); background-clip: padding-box }
+
+/* ── Dark2 · shadcn zinc + teal ── */
+.theme-zinc {
+  --sbg: #09090B; --bg: #18181B; --card: #1F1F23; --panel: rgba(39, 39, 42, .97); --well: #141417;
+  --glass: rgba(24, 24, 27, .88); --chipG: rgba(9, 9, 11, .66);
+  --bg1: rgba(228, 228, 231, .05); --bg2: rgba(228, 228, 231, .08); --bg3: rgba(228, 228, 231, .12); --bg4: rgba(228, 228, 231, .19);
+  --line: #3F3F46; --line2: #27272A;
+  --ink: #FAFAFA; --dim: #ADADB6; --faint: #8A8A93; --knob: #E4E4E7;
+  --veil: rgba(9, 9, 11, .66);
+  --c1: #2DD4BF; --c2: #2DD4BF; --accS: rgba(45, 212, 191, .13); --accT: #5EEAD4;
+  --amber: #FBBF24; --amber2: #FCD34D; --amber-soft: rgba(251, 191, 36, .13); --ambT: #FCD34D;
+  --good: #4ADE80; --good-soft: rgba(74, 222, 128, .13); --goodT: #86EFAC;
+  --bad: #F87171; --bad-soft: rgba(248, 113, 113, .14);
+  --blue: #A1A1AA; --vioT: #B9BDC7; --vioS: rgba(161, 161, 170, .16);
+  --grad: linear-gradient(135deg, #2DD4BF, #0D9488);
+  --gridc: rgba(228, 228, 231, .06); --tickc: rgba(228, 228, 231, .35);
+  --pri: #2DD4BF; --priFg: #09090B;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .55), 0 24px 56px -24px rgba(0, 0, 0, .75);
+}
+
+/* ── shared dark quality layer ── */
+.dark .cr ::selection, .dark .login ::selection { background: color-mix(in srgb, var(--c1) 30%, transparent) }
+.dark .cr ::-webkit-scrollbar-thumb { background: var(--bg4); background-clip: padding-box }
+.dark .cr ::-webkit-scrollbar-thumb:hover { background: var(--faint); background-clip: padding-box }
 .dark .pcover { filter: brightness(.8) contrast(1.06) saturate(1.05) }
 .dark .pcard:hover .pcover { filter: brightness(.8) contrast(1.06) saturate(1.3) }
-/* `select.sel` again, not `.sel` — this rule sits after `.msg-it.sel` at equal
-   specificity, so an unqualified match would strip the selected row's accent bar. */
-.dark .tb-live, .dark .tb-search, .dark .pub, .dark .btn, .dark .in, .dark .ta, .dark select.sel,
-.dark .stat, .dark .qa-btn, .dark .skill, .dark .live-card { box-shadow: none }
-.dark .btn.pri { box-shadow: 0 6px 16px -10px rgba(0, 0, 0, .5) }
-.dark .pub.dirty { box-shadow: 0 8px 20px -10px rgba(0, 0, 0, .5) }
-.dark .card, .dark .stat, .dark .qa-btn, .dark .pcard, .dark .skill, .dark .live-card { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05) }
 .dark .mava { filter: saturate(.85) brightness(.9) }
-.dark .sb-mark, .dark .lg-mark, .dark .ava { box-shadow: 0 4px 12px -4px rgba(0, 0, 0, .5) }
+/* `select.sel` again, not `.sel` — these rules sit after `.msg-it.sel` at equal
+   specificity, so an unqualified match would strip the selected row's accent bar. */
+/* light-mode paper shadows off; elevation comes from the ladder + ambients */
+.dark .tb-live, .dark .tb-search, .dark .pub, .dark .btn, .dark .in, .dark .ta, .dark select.sel,
+.dark .qa-btn, .dark .skill { box-shadow: none }
+/* elevation, not deletion: resting surfaces keep a whisper of depth */
+.dark .card, .dark .stat, .dark .qa-btn, .dark .pcard, .dark .skill, .dark .live-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 1px 2px rgba(0, 0, 0, .35) }
+.dark .stat:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 10px 26px -14px rgba(0, 0, 0, .6) }
+/* the sidebar is its own (lowest) zone */
+.dark .sb { background: var(--sbg) }
+/* inputs read as wells sunk below the card — `background-color`, not the
+   shorthand: the shorthand would reset `select.sel`'s gradient chevron away */
+.dark .in, .dark .ta, .dark .tb-search, .dark select.sel { background-color: var(--well) }
+/* glows are brand-colored, never dead black */
+.dark .pub { box-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 20px -10px color-mix(in srgb, var(--pri) 60%, transparent) }
+.dark .pub.dirty { box-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 20px -10px color-mix(in srgb, var(--pri) 60%, transparent) }
+.dark .btn.pri { box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--pri) 55%, transparent) }
+.dark .sb-mark, .dark .lg-mark, .dark .ava { box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--c1) 50%, transparent) }
 
 /* ---------- icon library — reference grid + picker ----------
    Sits after the dark block on purpose: the swatch rules below need to win
@@ -742,7 +784,40 @@ select.sel option { background: var(--card); color: var(--ink) }
   .content { padding: 16px 14px 72px }
   .vh h1 { font-size: 23px }
   .f-row { grid-template-columns: 1fr }
+  /* The theme pill is ~95px wide and would push the topbar past a 390px viewport,
+     so it collapses to an icon sized like `.ibtn` (the button keeps its aria-label).
+     Scoped through `.thm` because the base `.thm-btn` rule sits later in this file. */
+  .thm-lbl, .thm-chev { display: none }
+  .thm .thm-btn { padding: 6px }
+  /* The menu is right-anchored to a trigger that sits at the LEFT end of `.tb-right`,
+     so at this width it opens ~80px off the left edge and `.cr`'s overflow clip eats
+     the swatches and labels. Dropping the positioning context re-anchors it to `.tb`
+     (already `position: relative`), which puts it fully on screen under the bar. */
+  .tb .thm { position: static }
+  .tb .thm-menu { right: 14px }
 }
 @media (prefers-reduced-motion: reduce) {
   .cr *, .login * { animation: none !important; transition: none !important }
 }
+
+/* ---------- theme dropdown ---------- */
+.thm { position: relative }
+.thm-btn { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--dim);
+  background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 7px 12px; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(23, 30, 48, .05) }
+.dark .thm-btn { box-shadow: none }
+.thm-btn:hover { color: var(--ink) }
+.thm-chev { transition: transform .2s; flex: none }
+.thm.open .thm-chev { transform: rotate(180deg) }
+.thm-menu { position: absolute; right: 0; top: calc(100% + 6px); min-width: 172px; background: var(--panel);
+  backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid var(--line2); border-radius: 12px; padding: 5px; box-shadow: var(--shadow); z-index: 80;
+  animation: pop .18s cubic-bezier(.3, .7, .3, 1.1) both }
+.thm-it { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 10px; border-radius: 8px;
+  font-size: 12.5px; font-weight: 500; color: var(--dim); text-align: left }
+.thm-it:hover { background: var(--bg2); color: var(--ink) }
+.thm-it.on { background: var(--accS); color: var(--accT); font-weight: 600 }
+.thm-sw { width: 15px; height: 15px; border-radius: 5px; border: 1px solid var(--line); display: grid; place-items: center; flex: none }
+.thm-sw i { width: 5px; height: 5px; border-radius: 99px; display: block }
+.thm-it .ck { margin-left: auto; opacity: 0; flex: none }
+.thm-it.on .ck { opacity: 1 }

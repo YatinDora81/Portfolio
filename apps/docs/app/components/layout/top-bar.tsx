@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { usePathname } from "next/navigation";
 import {
-  IconLogout, IconLock, IconSun, IconMoon, IconMenu2, IconWorld, IconSearch,
+  IconLogout, IconLock, IconMenu2, IconWorld, IconSearch,
   IconRefresh, IconCheck,
 } from "@tabler/icons-react";
 import { logout, changePassword } from "@/lib/actions/auth";
@@ -11,7 +11,7 @@ import { publishSite } from "@/lib/actions/publish";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useTheme } from "@/components/theme-provider";
+import ThemeMenu from "@/components/theme-menu";
 import { matchNav } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +23,6 @@ export function TopBar({ user, onBurger, onPalette, toast }: {
   onPalette: () => void;
   toast: (msg: string, tone?: "good" | "bad") => void;
 }) {
-  const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
   const nav = matchNav(pathname);
 
@@ -78,14 +77,7 @@ export function TopBar({ user, onBurger, onPalette, toast }: {
         </div>
 
         <div className="tb-right">
-          <button
-            className="ibtn"
-            onClick={toggleTheme}
-            title={theme === "light" ? "Switch to dark" : "Switch to light"}
-            aria-label="Toggle theme"
-          >
-            {theme === "light" ? <IconMoon size={15} /> : <IconSun size={15} />}
-          </button>
+          <ThemeMenu />
 
           <button className="ibtn" onClick={openDialog} title="Change password" aria-label="Change password">
             <IconLock size={15} />
