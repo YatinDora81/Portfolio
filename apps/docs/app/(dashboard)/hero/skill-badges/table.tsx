@@ -15,6 +15,7 @@ import {
 } from "@tabler/icons-react";
 import { findSkillIcon } from "@repo/ui/icons/registry";
 import { IconPicker } from "@/components/shared/icon-picker";
+import { useSortable } from "@/lib/use-sortable";
 import { cn } from "@/lib/utils";
 
 interface Badge { id: string; name: string; iconKey: string; sortOrder: number }
@@ -26,13 +27,25 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
   const [editing, setEditing] = useState<Badge | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const commit = (ids: string[]) =>
+    startTransition(async () => { await reorderHeroSkillBadges(ids); });
+
+  const { order, handleProps, itemProps } = useSortable(
+    badges.map((b) => b.id),
+    commit,
+    { disabled: pending }
+  );
+
+  const byId = new Map(badges.map((b) => [b.id, b]));
+  const rows = order.map((id) => byId.get(id)).filter(Boolean) as Badge[];
+
   const openNew = () => { setEditing(null); setDialogOpen(true); };
 
   /** Swap a badge with its neighbour and persist the whole order. */
   const move = (from: number, to: number) => {
-    const ids = badges.map((b) => b.id);
+    const ids = [...order];
     [ids[from], ids[to]] = [ids[to]!, ids[from]!];
-    startTransition(async () => { await reorderHeroSkillBadges(ids); });
+    commit(ids);
   };
 
   return (
@@ -56,11 +69,13 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
         </div>
       ) : (
         <div className="rows">
-          {badges.map((b, i) => {
+          {rows.map((b, i) => {
             const icon = findSkillIcon(b.iconKey);
             return (
-            <div key={b.id} className="row">
-              <IconGripVertical size={14} className="row-grip" />
+            <div key={b.id} className="row sortable" {...itemProps(b.id)}>
+              <span className="row-grip" title="Drag to reorder" {...handleProps(b.id)}>
+                <IconGripVertical size={14} />
+              </span>
               <div className="row-i">{String(i + 1).padStart(2, "0")}</div>
               <span className={cn("ico-sw sm", !icon && "ink")} style={!icon ? { color: "var(--bad)" } : undefined}>
                 {icon ? <icon.Icon /> : <IconAlertTriangle size={12} stroke={1.8} />}
@@ -81,7 +96,7 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
                 <IconButton
                   className="move"
                   aria-label={`Move ${b.name} later`}
-                  disabled={i === badges.length - 1 || pending}
+                  disabled={i === rows.length - 1 || pending}
                   onClick={() => move(i, i + 1)}
                 >
                   <IconChevronDown size={13} stroke={1.6} />

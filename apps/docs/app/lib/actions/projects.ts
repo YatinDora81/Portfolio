@@ -78,3 +78,17 @@ export async function deleteProject(id: string) {
   revalidatePath("/projects");
   revalidatePortfolio();
 }
+
+/**
+ * Rewrites every project's sortOrder from the order of `ids`. The portfolio
+ * shows the first three as highlights and folds the rest, so position one is
+ * the slot that actually gets read. One transaction, so a half-applied order
+ * can't reach the site.
+ */
+export async function reorderProjects(ids: string[]) {
+  await prisma.$transaction(
+    ids.map((id, sortOrder) => prisma.project.update({ where: { id }, data: { sortOrder } }))
+  );
+  revalidatePath("/projects");
+  revalidatePortfolio();
+}

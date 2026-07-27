@@ -660,6 +660,40 @@ select.sel option { background: var(--card); color: var(--ink) }
 .ipick-clear { font-family: var(--mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint) }
 .ipick-clear:hover { color: var(--bad) }
 
+/* ---------- drag-to-reorder ----------
+   Pointer-driven (see lib/use-sortable.ts), so the handle must opt out of
+   touch scrolling or a drag on mobile just scrolls the page instead. */
+.sortable { transition: opacity .15s, transform .15s, box-shadow .15s }
+.sortable[data-dragging] {
+  opacity: .55; transform: scale(.985);
+  box-shadow: 0 12px 28px -14px rgba(17, 17, 22, .35); cursor: grabbing
+}
+.dark .sortable[data-dragging] { box-shadow: 0 12px 28px -14px rgba(0, 0, 0, .6) }
+
+/* The row grip was decorative until now — make it look grabbable. */
+.row-grip {
+  color: var(--faint); flex: none; display: inline-flex; align-items: center;
+  touch-action: none; border-radius: 5px; padding: 1px
+}
+.row-grip:hover { color: var(--ink); background: var(--bg2) }
+
+/* Project cards drag from a grip on the cover; the rest of the cover is links. */
+.pgrip {
+  position: absolute; top: 9px; left: 10px; z-index: 2; touch-action: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 8px; color: var(--ink);
+  background: var(--chipG); border: 1px solid var(--line2); backdrop-filter: blur(6px);
+  opacity: 0; transition: opacity .15s
+}
+.pcard:hover .pgrip, .pcard[data-dragging] .pgrip { opacity: 1 }
+/* Coarse pointers get no hover, so the grip has to stay visible there. */
+@media (hover: none) { .pgrip { opacity: 1 } }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0
+}
+
 /* ---------- responsive ---------- */
 .sb-veil { display: none }
 @media (max-width: 1080px) {
