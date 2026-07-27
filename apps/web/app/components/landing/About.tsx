@@ -252,11 +252,14 @@ function Terminal({
   };
 
   /**
-   * Runs a command. Returns true when it *succeeded* — the caller uses that to
-   * release focus, so you aren't left typing into an off-screen prompt after a
-   * command has moved you somewhere else. Anything that errors (unknown
-   * command, `sudo`, a missing section) keeps focus so you can retype, and so
-   * does `clear`, since you're obviously still working in the terminal.
+   * Runs a command. Returns true only when the command TOOK YOU SOMEWHERE —
+   * a section jump or the resume tab — because that's the one case where
+   * holding focus would leave you typing into an off-screen prompt (and, on
+   * mobile, keep the keyboard covering the thing you just scrolled to).
+   *
+   * Everything that answers inside the terminal — `ls`, `help`, `whoami`,
+   * `cat`, `clear`, and every error — returns false and keeps the caret, since
+   * you're plainly still working here and the next thing you do is type again.
    */
   const run = (raw: string): boolean => {
     const trimmed = raw.trim();
@@ -282,15 +285,15 @@ function Terminal({
         { t: 'out', v: `  ${'clear'.padEnd(12)}→ clean this mess` },
         { t: 'hint', v: '# tip: Tab autocompletes (or indents), ↑ replays history, Esc exits' }
       );
-      return true;
+      return false;
     }
     if (name === 'ls') {
       push({ t: 'out', v: navCmds.map((c) => c.cmd).join('  ') });
-      return true;
+      return false;
     }
     if (name === 'whoami') {
       push(...paragraphs.map((p) => ({ t: 'about' as const, v: p })));
-      return true;
+      return false;
     }
     if (name === 'resume' || name === 'cv') {
       push({ t: 'out', v: '→ opening resume…' });
@@ -303,7 +306,7 @@ function Terminal({
     }
     if (name === 'cat') {
       push({ t: 'out', v: '🐾 the cat is in the navbar, not in the terminal' });
-      return true;
+      return false;
     }
 
     const nav = navCmds.find((c) => c.cmd === name);
@@ -327,11 +330,12 @@ function Terminal({
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      const ok = run(value);
+      const navigated = run(value);
       setBuffer('');
-      // Successful command → let go of the prompt (also closes the mobile
-      // keyboard). Errors and `clear` keep focus so you can just keep typing.
-      if (ok) inputRef.current?.blur();
+      // Only let go of the prompt when the command actually moved you (also
+      // closes the mobile keyboard). Anything that answered in-place keeps the
+      // caret, so `ls` → `skills` is one uninterrupted flow.
+      if (navigated) inputRef.current?.blur();
       return;
     }
     if (e.key === 'Escape') {
