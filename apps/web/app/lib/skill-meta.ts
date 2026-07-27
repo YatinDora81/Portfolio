@@ -53,6 +53,8 @@ const META: Record<string, SkillMeta> = {
   WebSocket: { symbol: 'Ws', color: '#EC4899', category: 'backend' },
   Kafka: { symbol: 'Kf', color: '#D1D5DB', category: 'backend' },
   Java: { symbol: 'Jv', color: '#E76F00', category: 'backend' },
+  Python: { symbol: 'Py', color: '#3776AB', category: 'backend' },
+  FastAPI: { symbol: 'Fa', color: '#009688', category: 'backend' },
 
   // ── Databases ─────────────────────────────────────────────
   PostgreSQL: { symbol: 'Pg', color: '#4F9DDE', category: 'database' },
@@ -74,6 +76,7 @@ const META: Record<string, SkillMeta> = {
   Jenkins: { symbol: 'Je', color: '#D24939', category: 'devops' },
   Nginx: { symbol: 'Ng', color: '#009639', category: 'devops' },
   Cloudflare: { symbol: 'Cf', color: '#F38020', category: 'devops' },
+  'Cloudflare R2': { symbol: 'R2', color: '#F38020', category: 'devops' },
   Vercel: { symbol: 'Vc', color: '#E5E5E5', category: 'devops' },
   Linux: { symbol: 'Lx', color: '#FCC624', category: 'devops' },
   Monitoring: { symbol: 'Mn', color: '#F59E0B', category: 'devops' },
@@ -93,6 +96,8 @@ const META: Record<string, SkillMeta> = {
   'npm/yarn': { symbol: 'Np', color: '#CB3837', category: 'core' },
   Bash: { symbol: 'Bs', color: '#4EAA25', category: 'core' },
   Agile: { symbol: 'Ag', color: '#22C55E', category: 'core' },
+  Gemini: { symbol: 'Ge', color: '#4796E3', category: 'core' },
+  Bun: { symbol: 'Bn', color: '#FBF0DF', category: 'core' },
 };
 
 const CATEGORY_COLOR: Record<SkillCategoryId, string> = Object.fromEntries(

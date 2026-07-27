@@ -25,7 +25,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 const DESCRIPTION =
-  "Yatin Dora - Software Developer. Building scalable web applications with React, Next.js, Node.js, TypeScript, and Go.";
+  "Yatin Dora - Software Developer. Building scalable web applications with React, Next.js, TypeScript, Python, Go, and AI/LLM integrations.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
