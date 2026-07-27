@@ -614,7 +614,11 @@ select.sel option { background: var(--card); color: var(--ink) }
   display: grid; place-items: center; background: #FFFFFF; border: 1px solid var(--line2)
 }
 .ico-sw svg { width: 100%; height: 100%; display: block }
-.dark .ico-sw { background: #F1F1F4; border-color: rgba(255, 255, 255, .09) }
+/* Pin ink too, not just the swatch: a glyph drawn in currentColor would
+   otherwise inherit the theme's near-white --ink and vanish into the light
+   swatch this rule just forced. `.ico-sw.ink` below re-darkens the field and
+   wins on specificity, so line art keeps following --ink. */
+.dark .ico-sw { background: #F1F1F4; border-color: rgba(255, 255, 255, .09); color: #121217 }
 /* Social marks are currentColor line art — they want ink, not a light swatch. */
 .ico-sw.ink { background: var(--bg1); border-color: var(--line2); color: var(--ink) }
 .dark .ico-sw.ink { background: rgba(255, 255, 255, .06); color: var(--ink) }
