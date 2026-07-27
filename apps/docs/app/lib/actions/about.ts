@@ -2,7 +2,6 @@
 
 import { prisma, ScoreType } from "db";
 import { revalidatePath } from "next/cache";
-import { revalidatePortfolio } from "@/lib/revalidate";
 
 export async function createAboutParagraph(formData: FormData) {
   const content = formData.get("content") as string;
@@ -10,20 +9,17 @@ export async function createAboutParagraph(formData: FormData) {
   const count = (_max.sortOrder ?? -1) + 1;
   await prisma.aboutParagraph.create({ data: { content, sortOrder: count } });
   revalidatePath("/about/paragraphs");
-  revalidatePortfolio();
 }
 
 export async function updateAboutParagraph(id: string, formData: FormData) {
   const content = formData.get("content") as string;
   await prisma.aboutParagraph.update({ where: { id }, data: { content } });
   revalidatePath("/about/paragraphs");
-  revalidatePortfolio();
 }
 
 export async function deleteAboutParagraph(id: string) {
   await prisma.aboutParagraph.delete({ where: { id } });
   revalidatePath("/about/paragraphs");
-  revalidatePortfolio();
 }
 
 export async function createEducation(formData: FormData) {
@@ -43,7 +39,6 @@ export async function createEducation(formData: FormData) {
     },
   });
   revalidatePath("/about/education");
-  revalidatePortfolio();
 }
 
 export async function updateEducation(id: string, formData: FormData) {
@@ -61,11 +56,9 @@ export async function updateEducation(id: string, formData: FormData) {
     },
   });
   revalidatePath("/about/education");
-  revalidatePortfolio();
 }
 
 export async function deleteEducation(id: string) {
   await prisma.education.delete({ where: { id } });
   revalidatePath("/about/education");
-  revalidatePortfolio();
 }

@@ -2,7 +2,6 @@
 
 import { prisma } from "db";
 import { revalidatePath } from "next/cache";
-import { revalidatePortfolio } from "@/lib/revalidate";
 
 export async function createBlog(formData: FormData) {
   const { _max } = await prisma.blog.aggregate({ _max: { sortOrder: true } });
@@ -21,7 +20,6 @@ export async function createBlog(formData: FormData) {
     },
   });
   revalidatePath("/blogs");
-  revalidatePortfolio();
 }
 
 export async function updateBlog(id: string, formData: FormData) {
@@ -39,17 +37,14 @@ export async function updateBlog(id: string, formData: FormData) {
     },
   });
   revalidatePath("/blogs");
-  revalidatePortfolio();
 }
 
 export async function toggleBlogVisibility(id: string, show: boolean) {
   await prisma.blog.update({ where: { id }, data: { show } });
   revalidatePath("/blogs");
-  revalidatePortfolio();
 }
 
 export async function deleteBlog(id: string) {
   await prisma.blog.delete({ where: { id } });
   revalidatePath("/blogs");
-  revalidatePortfolio();
 }

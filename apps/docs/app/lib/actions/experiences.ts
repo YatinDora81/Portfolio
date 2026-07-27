@@ -2,7 +2,6 @@
 
 import { prisma } from "db";
 import { revalidatePath } from "next/cache";
-import { revalidatePortfolio } from "@/lib/revalidate";
 
 interface ExperienceData {
   company: string;
@@ -40,7 +39,6 @@ export async function createExperience(data: ExperienceData) {
     },
   });
   revalidatePath("/experiences");
-  revalidatePortfolio();
 }
 
 export async function updateExperience(id: string, data: ExperienceData) {
@@ -80,11 +78,9 @@ export async function updateExperience(id: string, data: ExperienceData) {
     }
   });
   revalidatePath("/experiences");
-  revalidatePortfolio();
 }
 
 export async function deleteExperience(id: string) {
   await prisma.experience.delete({ where: { id } });
   revalidatePath("/experiences");
-  revalidatePortfolio();
 }

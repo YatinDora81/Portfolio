@@ -2,7 +2,6 @@
 
 import { prisma } from "db";
 import { revalidatePath } from "next/cache";
-import { revalidatePortfolio } from "@/lib/revalidate";
 
 export async function createSkill(formData: FormData) {
   const { _max } = await prisma.skill.aggregate({ _max: { sortOrder: true } });
@@ -16,7 +15,6 @@ export async function createSkill(formData: FormData) {
     },
   });
   revalidatePath("/skills");
-  revalidatePortfolio();
 }
 
 export async function updateSkill(id: string, formData: FormData) {
@@ -29,17 +27,14 @@ export async function updateSkill(id: string, formData: FormData) {
     },
   });
   revalidatePath("/skills");
-  revalidatePortfolio();
 }
 
 export async function toggleSkillVisibility(id: string, show: boolean) {
   await prisma.skill.update({ where: { id }, data: { show } });
   revalidatePath("/skills");
-  revalidatePortfolio();
 }
 
 export async function deleteSkill(id: string) {
   await prisma.skill.delete({ where: { id } });
   revalidatePath("/skills");
-  revalidatePortfolio();
 }

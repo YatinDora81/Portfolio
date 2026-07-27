@@ -2,7 +2,6 @@
 
 import { prisma } from "db";
 import { revalidatePath } from "next/cache";
-import { revalidatePortfolio } from "@/lib/revalidate";
 
 export async function updateResumeUrl(url: string) {
   await prisma.siteConfig.upsert({
@@ -12,5 +11,4 @@ export async function updateResumeUrl(url: string) {
   });
   revalidatePath("/links");
   revalidatePath("/site-config");
-  revalidatePortfolio();
 }

@@ -2,7 +2,6 @@
 
 import { prisma } from "db";
 import { revalidatePath } from "next/cache";
-import { revalidatePortfolio } from "@/lib/revalidate";
 
 export async function createQuote(formData: FormData) {
   await prisma.quote.create({
@@ -12,7 +11,6 @@ export async function createQuote(formData: FormData) {
     },
   });
   revalidatePath("/quotes");
-  revalidatePortfolio();
 }
 
 export async function updateQuote(id: string, formData: FormData) {
@@ -24,11 +22,9 @@ export async function updateQuote(id: string, formData: FormData) {
     },
   });
   revalidatePath("/quotes");
-  revalidatePortfolio();
 }
 
 export async function deleteQuote(id: string) {
   await prisma.quote.delete({ where: { id } });
   revalidatePath("/quotes");
-  revalidatePortfolio();
 }

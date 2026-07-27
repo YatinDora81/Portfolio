@@ -2,7 +2,6 @@
 
 import { prisma } from "db";
 import { revalidatePath } from "next/cache";
-import { revalidatePortfolio } from "@/lib/revalidate";
 
 export async function createContactPurpose(formData: FormData) {
   const { _max } = await prisma.contactPurpose.aggregate({ _max: { sortOrder: true } });
@@ -15,7 +14,6 @@ export async function createContactPurpose(formData: FormData) {
     },
   });
   revalidatePath("/contact-purposes");
-  revalidatePortfolio();
 }
 
 export async function updateContactPurpose(id: string, formData: FormData) {
@@ -27,11 +25,9 @@ export async function updateContactPurpose(id: string, formData: FormData) {
     },
   });
   revalidatePath("/contact-purposes");
-  revalidatePortfolio();
 }
 
 export async function deleteContactPurpose(id: string) {
   await prisma.contactPurpose.delete({ where: { id } });
   revalidatePath("/contact-purposes");
-  revalidatePortfolio();
 }

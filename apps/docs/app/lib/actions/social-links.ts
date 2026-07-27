@@ -2,7 +2,6 @@
 
 import { prisma } from "db";
 import { revalidatePath } from "next/cache";
-import { revalidatePortfolio } from "@/lib/revalidate";
 
 export async function createSocialLink(formData: FormData) {
   const name = formData.get("name") as string;
@@ -14,7 +13,6 @@ export async function createSocialLink(formData: FormData) {
   await prisma.socialLink.create({ data: { name, href, iconKey, detail, sortOrder: count } });
   revalidatePath("/social-links");
   revalidatePath("/links");
-  revalidatePortfolio();
 }
 
 export async function updateSocialLink(id: string, formData: FormData) {
@@ -25,12 +23,10 @@ export async function updateSocialLink(id: string, formData: FormData) {
   await prisma.socialLink.update({ where: { id }, data: { name, href, iconKey, detail } });
   revalidatePath("/social-links");
   revalidatePath("/links");
-  revalidatePortfolio();
 }
 
 export async function deleteSocialLink(id: string) {
   await prisma.socialLink.delete({ where: { id } });
   revalidatePath("/social-links");
   revalidatePath("/links");
-  revalidatePortfolio();
 }

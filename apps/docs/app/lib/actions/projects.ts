@@ -2,7 +2,6 @@
 
 import { prisma } from "db";
 import { revalidatePath } from "next/cache";
-import { revalidatePortfolio } from "@/lib/revalidate";
 
 interface ProjectData {
   title: string;
@@ -34,7 +33,6 @@ export async function createProject(data: ProjectData) {
     },
   });
   revalidatePath("/projects");
-  revalidatePortfolio();
 }
 
 export async function updateProject(id: string, data: ProjectData) {
@@ -71,13 +69,11 @@ export async function updateProject(id: string, data: ProjectData) {
     }
   });
   revalidatePath("/projects");
-  revalidatePortfolio();
 }
 
 export async function deleteProject(id: string) {
   await prisma.project.delete({ where: { id } });
   revalidatePath("/projects");
-  revalidatePortfolio();
 }
 
 /**
@@ -91,5 +87,4 @@ export async function reorderProjects(ids: string[]) {
     ids.map((id, sortOrder) => prisma.project.update({ where: { id }, data: { sortOrder } }))
   );
   revalidatePath("/projects");
-  revalidatePortfolio();
 }

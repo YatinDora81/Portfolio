@@ -2,7 +2,6 @@
 
 import { prisma } from "db";
 import { revalidatePath } from "next/cache";
-import { revalidatePortfolio } from "@/lib/revalidate";
 
 export async function updateSiteConfig(entries: { key: string; value: string }[]) {
   await prisma.$transaction(
@@ -11,5 +10,4 @@ export async function updateSiteConfig(entries: { key: string; value: string }[]
     )
   );
   revalidatePath("/site-config");
-  revalidatePortfolio();
 }

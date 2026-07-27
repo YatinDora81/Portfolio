@@ -1,3 +1,5 @@
+// Unused by the mutation actions since publishing became explicit — the site is
+// only pushed live by `publishSite()` (the topbar Publish / Save & Publish).
 if (!process.env.PORTFOLIO_URL) throw new Error("PORTFOLIO_URL environment variable is required");
 if (!process.env.REVALIDATE_SECRET) throw new Error("REVALIDATE_SECRET environment variable is required");
 const PORTFOLIO_URL = process.env.PORTFOLIO_URL;
