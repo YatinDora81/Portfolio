@@ -49,7 +49,8 @@ export function ExperienceForm({ experience, allSkills }: {
   const [selectedSkills, setSelectedSkills] = useState<string[]>(experience?.skillIds || []);
   const [bullets, setBullets] = useState<Bullet[]>(experience?.bullets || [{ content: "", sortOrder: 0 }]);
 
-  const handleSubmit = () => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     const data = {
       company, position, location, startDate, endDate, isCurrent,
       website: website || null,
@@ -77,7 +78,9 @@ export function ExperienceForm({ experience, allSkills }: {
         description="One entry on the work timeline — the header line, the period, and the bullets underneath."
       />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* A real <form>: the inputs already carry `required`, but with a plain
+          div and a type="button" submit the browser never validated anything. */}
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <Card flush>
           <CardHead title="Role" />
           <div className="card-b">
@@ -144,8 +147,9 @@ export function ExperienceForm({ experience, allSkills }: {
               type="number"
               min={1}
               max={30}
+              step={1}
               value={visibleBullets}
-              onChange={(e) => setVisibleBullets(Math.max(1, Number(e.target.value) || 1))}
+              onChange={(e) => setVisibleBullets(Math.min(30, Math.max(1, Math.round(Number(e.target.value)) || 1)))}
               style={{ width: 62, padding: "5px 8px", fontSize: 12.5 }}
             />
             <span style={{ fontSize: 12, color: "var(--faint)" }}>
@@ -253,11 +257,11 @@ export function ExperienceForm({ experience, allSkills }: {
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <Button variant="ghost" type="button" onClick={() => router.push("/experiences")}>Cancel</Button>
-          <Button type="button" onClick={handleSubmit} disabled={pending}>
+          <Button type="submit" disabled={pending}>
             {pending ? "Saving…" : isEditing ? "Update role" : "Create role"}
           </Button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

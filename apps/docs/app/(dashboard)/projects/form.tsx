@@ -34,7 +34,8 @@ export function ProjectForm({ project, allSkills }: {
   const [selectedSkills, setSelectedSkills] = useState<string[]>(project?.skillIds || []);
   const [bullets, setBullets] = useState<Bullet[]>(project?.bullets || [{ content: "", sortOrder: 0 }]);
 
-  const handleSubmit = () => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     const data = {
       title, summary,
       github: github || null,
@@ -63,6 +64,9 @@ export function ProjectForm({ project, allSkills }: {
         description="Title and summary are what the card shows; bullets open up underneath it."
       />
 
+      {/* A real <form>: without one, the `required` attributes below were inert
+          and a blank title reached the server action. */}
+      <form onSubmit={handleSubmit}>
       <Card>
         <Input label="Title" value={title} onChange={e => setTitle(e.target.value)} required />
         <Textarea
@@ -257,11 +261,12 @@ export function ProjectForm({ project, allSkills }: {
           }}
         >
           <Button type="button" variant="outline" onClick={() => router.push("/projects")}>Cancel</Button>
-          <Button type="button" onClick={handleSubmit} disabled={pending}>
+          <Button type="submit" disabled={pending}>
             {pending ? "Saving…" : isEditing ? "Update project" : "Create project"}
           </Button>
         </div>
       </Card>
+      </form>
     </div>
   );
 }
