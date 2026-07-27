@@ -455,6 +455,7 @@ function Terminal({
           {CMD.split('').map((ch, i) => (
             <motion.span
               key={i}
+              className="js-reveal"
               variants={{
                 hidden: { opacity: 0 },
                 show: { opacity: 1, transition: { duration: 0, delay: TYPE_START + i * TYPE_SPEED } },
@@ -470,7 +471,7 @@ function Terminal({
           {paragraphs.map((p, i) => (
             <motion.p
               key={i}
-              className="m-0"
+              className="m-0 js-reveal"
               variants={{
                 hidden: { opacity: 0, y: 6, filter: 'blur(4px)' },
                 show: {

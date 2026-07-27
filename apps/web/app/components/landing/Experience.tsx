@@ -248,7 +248,10 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
       {overflows && (
         <>
           {/* bullets 4..n never leave the DOM — SSR & crawlers see everything */}
-          <div className="xp-fold" id={foldId}>
+          {/* `inert` keeps the bullets in the DOM for SSR and crawlers while
+              taking them out of the accessibility tree, so the collapsed state
+              matches what aria-expanded on the toggle claims. */}
+          <div className="xp-fold" id={foldId} inert={!open} aria-hidden={!open}>
             <div>
               <ul className="xp-log">
                 {rest.map((bullet, i) => (

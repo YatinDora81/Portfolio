@@ -849,6 +849,15 @@ body.cat-on .cw .dot { display: none; }
    without JS every bullet would stay at opacity 0. Show them outright, and
    unfold the overflow too — the toggle can't run either. */
 @media (scripting: none) {
+  /* Motion renders the About intro at inline opacity:0 and only animates it
+     to visible on mount, so with scripting off the whole bio stays blank even
+     though it IS in the HTML. !important is required to beat the inline style. */
+  .js-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
   .xp-card .xp-log li,
   .xp-fold .xp-log li {
     opacity: 1 !important;
