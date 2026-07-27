@@ -2,16 +2,20 @@
 
 import { useState } from "react";
 import { Card, CardHead } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Dialog } from "@/components/ui/dialog";
 import { DeleteButton } from "@/components/shared/delete-button";
-import { createAdminUser, updateAdminUser, deleteAdminUser } from "@/lib/actions/admin-users";
-import { changePassword } from "@/lib/actions/auth";
-import { IconPlus, IconEdit, IconLock, IconShieldCheck, IconUserPlus } from "@tabler/icons-react";
+import { useStaging } from "@/components/staging/staging-provider";
+import type { Entity } from "@/lib/actions/staging";
+import {
+  IconPlus, IconEdit, IconLock, IconShieldCheck, IconUserPlus, IconArrowBackUp,
+} from "@tabler/icons-react";
 
 interface User { id: string; email: string; username: string; name: string; role: string; createdAt: string }
+
+const ENTITY: Entity = "adminUser";
 
 const ROLE_LEVEL: Record<string, number> = { OWNER: 3, ADMIN: 2, SUB_ADMIN: 1 };
 
@@ -45,9 +49,17 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordTarget, setPasswordTarget] = useState<User | null>(null);
   const [passwordError, setPasswordError] = useState("");
-  const [passwordLoading, setPasswordLoading] = useState(false);
   const [pwNewPassword, setPwNewPassword] = useState("");
   const [pwConfirmPassword, setPwConfirmPassword] = useState("");
+  const {
+    overlay, stageCreate, stageUpdate, stageDelete, unstageDelete,
+    isDeleted, isNew, isEdited,
+  } = useStaging();
+
+  // Nothing here writes: every dialog lands in the staging store and the save
+  // bar commits the lot. `overlay` folds the pending batch back over the server
+  // rows so a staged change is visible immediately.
+  const rows = overlay(ENTITY, users, (u) => u.id);
 
   const myRole = currentUser.role;
   const roleOptions = getRoleOptions(myRole);
@@ -61,31 +73,30 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
     setPasswordDialogOpen(true);
   }
 
-  async function handleChangePassword(e: React.FormEvent) {
+  // The match and length rules used to come back from `changePassword`; staged,
+  // they have to be checked here. The rank check still happens server-side when
+  // the batch is applied — this dialog is only offered for accounts you outrank.
+  function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
     if (!passwordTarget) return;
-    setPasswordError("");
-    setPasswordLoading(true);
-    const formData = new FormData();
-    formData.set("targetUserId", passwordTarget.id);
-    formData.set("newPassword", pwNewPassword);
-    formData.set("confirmPassword", pwConfirmPassword);
-    formData.set("adminOverride", "true");
-    const result = await changePassword(formData);
-    setPasswordLoading(false);
-    if (result?.error) {
-      setPasswordError(result.error);
-    } else {
-      setPasswordDialogOpen(false);
-      setPasswordTarget(null);
+    if (pwNewPassword.length < 6) {
+      setPasswordError("New password must be at least 6 characters");
+      return;
     }
+    if (pwNewPassword !== pwConfirmPassword) {
+      setPasswordError("New passwords do not match");
+      return;
+    }
+    stageUpdate(ENTITY, passwordTarget.id, { password: pwNewPassword });
+    setPasswordDialogOpen(false);
+    setPasswordTarget(null);
   }
 
   return (
     <Card flush>
       <CardHead
         title="Accounts"
-        count={users.length}
+        count={rows.filter((u) => !isDeleted(ENTITY, u.id)).length}
         right={
           canCreateUsers ? (
             <Button size="sm" onClick={() => { setEditing(null); setDialogOpen(true); }}>
@@ -105,13 +116,16 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => {
+            {rows.map((u) => {
               const isSelf = u.id === currentUser.userId;
               const canManageUser = !isSelf && canManage(myRole, u.role);
               const isOwner = u.role === "OWNER";
+              const del = isDeleted(ENTITY, u.id);
+              const pending = isNew(ENTITY, u.id);
+              const mark = del ? "staged-del" : pending ? "staged-new" : isEdited(ENTITY, u.id) ? "staged-edit" : null;
 
               return (
-                <tr key={u.id}>
+                <tr key={u.id} className={mark ?? undefined}>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                       <div className="ava">{initials(u.name, u.email)}</div>
@@ -135,32 +149,45 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
                   </td>
                   <td>
                     <div className="row-acts" style={{ justifyContent: "flex-end" }}>
-                      {isOwner ? (
+                      {del ? (
+                        // The row stays put until the save; this is the undo.
+                        <IconButton
+                          aria-label={`Keep ${u.name}`}
+                          title="Undo delete"
+                          onClick={() => unstageDelete(ENTITY, u.id)}
+                        >
+                          <IconArrowBackUp size={13} stroke={1.5} />
+                        </IconButton>
+                      ) : isOwner ? (
                         <span className="chip">
                           <IconShieldCheck size={11} stroke={1.7} /> protected
                         </span>
                       ) : canManageUser ? (
                         <>
-                          <button
-                            className="ibtn"
-                            onClick={() => openPasswordDialog(u)}
-                            title="Change password"
-                            aria-label={`Change password for ${u.name}`}
-                          >
-                            <IconLock size={13} stroke={1.5} />
-                          </button>
-                          <button
-                            className="ibtn"
+                          {/* A staged account has no row to reset a password on
+                              yet — its password comes from the create dialog. */}
+                          {!pending && (
+                            <IconButton
+                              onClick={() => openPasswordDialog(u)}
+                              title="Change password"
+                              aria-label={`Change password for ${u.name}`}
+                            >
+                              <IconLock size={13} stroke={1.5} />
+                            </IconButton>
+                          )}
+                          <IconButton
                             onClick={() => { setEditing(u); setDialogOpen(true); }}
                             title="Edit user"
                             aria-label={`Edit ${u.name}`}
                           >
                             <IconEdit size={13} stroke={1.5} />
-                          </button>
+                          </IconButton>
                           <DeleteButton
+                            staged
+                            newRow={pending}
                             label={`"${u.name}"`}
-                            sub="This revokes their access to the control room immediately. There's no undo here."
-                            onDelete={async () => { await deleteAdminUser(u.id); }}
+                            sub="This revokes their access to the control room."
+                            onDelete={() => stageDelete(ENTITY, u.id)}
                           />
                         </>
                       ) : null}
@@ -194,16 +221,33 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
       >
         <form
           id="admin-user-form"
-          action={async (formData) => {
-            if (editing) await updateAdminUser(editing.id, formData);
-            else await createAdminUser(formData);
+          onSubmit={(e) => {
+            // `onSubmit` rather than `action`: the dialog stages and closes, so
+            // there is no server round trip to await. Native validation still
+            // runs first, so `required` below is unaffected.
+            e.preventDefault();
+            const data = new FormData(e.currentTarget);
+            const fields = {
+              name: String(data.get("name") ?? ""),
+              username: String(data.get("username") ?? ""),
+              email: String(data.get("email") ?? ""),
+              role: String(data.get("role") ?? ""),
+            };
+            if (editing) stageUpdate(ENTITY, editing.id, fields);
+            else stageCreate(ENTITY, {
+              ...fields,
+              password: String(data.get("password") ?? ""),
+              // Display only — the row renders a joined date, and the server
+              // ignores every key outside the entity's own list.
+              createdAt: new Date().toISOString(),
+            });
             setDialogOpen(false);
           }}
         >
           <Input name="name" label="Name" defaultValue={editing?.name || ""} required />
           <Input name="username" label="Username" defaultValue={editing?.username || ""} required mono placeholder="Unique login username" />
           <Input name="email" label="Email" type="email" defaultValue={editing?.email || ""} required mono />
-          {!editing && <Input name="password" label="Password" type="password" required />}
+          {!editing && <Input name="password" label="Password" type="password" required minLength={6} />}
           <Select
             name="role"
             label="Role"
@@ -222,9 +266,7 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
         footer={
           <>
             <Button type="button" variant="ghost" onClick={() => setPasswordDialogOpen(false)}>Cancel</Button>
-            <Button type="submit" form="admin-password-form" disabled={passwordLoading}>
-              {passwordLoading ? "Updating…" : "Update password"}
-            </Button>
+            <Button type="submit" form="admin-password-form">Update password</Button>
           </>
         }
       >
@@ -249,6 +291,7 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
             value={pwConfirmPassword}
             onChange={(e) => setPwConfirmPassword(e.target.value)}
             error={passwordError || undefined}
+            hint="Takes effect when you save — the account keeps its old password until then."
           />
         </form>
       </Dialog>

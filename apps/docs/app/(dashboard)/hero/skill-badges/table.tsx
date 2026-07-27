@@ -1,20 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Card, CardHead } from "@/components/ui/card";
 import { Button, IconButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
 import { DeleteButton } from "@/components/shared/delete-button";
 import {
-  createHeroSkillBadge, updateHeroSkillBadge, deleteHeroSkillBadge, reorderHeroSkillBadges,
-} from "@/lib/actions/hero";
-import {
   IconPlus, IconPencil, IconGripVertical, IconTag, IconAlertTriangle,
-  IconChevronUp, IconChevronDown,
+  IconChevronUp, IconChevronDown, IconArrowBackUp,
 } from "@tabler/icons-react";
 import { findSkillIcon } from "@repo/ui/icons/registry";
 import { IconPicker } from "@/components/shared/icon-picker";
+import { useStaging } from "@/components/staging/staging-provider";
 import { useSortable } from "@/lib/use-sortable";
 import { cn } from "@/lib/utils";
 
@@ -25,39 +23,53 @@ const FORM_ID = "hero-badge-form";
 export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Badge | null>(null);
-  const [pending, startTransition] = useTransition();
+  const {
+    overlay, stageCreate, stageUpdate, stageDelete, unstageDelete, stageReorder,
+    isDeleted, isNew, isEdited, saving,
+  } = useStaging();
 
-  const commit = (ids: string[]) =>
-    startTransition(async () => { await reorderHeroSkillBadges(ids); });
+  // Nothing here writes to the database — every action stages, and the page
+  // renders the staged view so the change is on screen before it is saved.
+  const staged = overlay("heroSkillBadge", badges, (b) => b.id);
 
   const { order, handleProps, itemProps } = useSortable(
-    badges.map((b) => b.id),
-    commit,
-    { disabled: pending }
+    staged.map((b) => b.id),
+    (ids) => stageReorder("heroSkillBadge", ids),
+    { disabled: saving }
   );
 
-  const byId = new Map(badges.map((b) => [b.id, b]));
-  const rows = order.map((id) => byId.get(id)).filter(Boolean) as Badge[];
+  const byId = new Map(staged.map((b) => [b.id, b] as const));
+  const seen = new Set(order);
+  // `order` is the drag preview and only re-seeds after a render, so a row
+  // staged this tick is appended rather than dropped for a frame.
+  const rows = [...order.flatMap((id) => byId.get(id) ?? []), ...staged.filter((b) => !seen.has(b.id))];
+
+  /** One mark per row: on its way out, brand new, or edited. */
+  const mark = (id: string) =>
+    isDeleted("heroSkillBadge", id) ? "staged-del"
+      : isNew("heroSkillBadge", id) ? "staged-new"
+        : isEdited("heroSkillBadge", id) ? "staged-edit"
+          : null;
 
   const openNew = () => { setEditing(null); setDialogOpen(true); };
 
   /**
-   * Swap a badge with its neighbour and persist the whole order. Indices are
+   * Swap a badge with its neighbour and stage the whole order. Indices are
    * `rows` indices, and `rows` drops ids that no longer exist in `badges` — so
    * it is NOT positionally aligned with `order`. Building the payload from
-   * `rows` keeps one index space and can't commit a stale id.
+   * `rows` keeps one index space and can't stage a stale id.
    */
   const move = (from: number, to: number) => {
     const ids = rows.map((b) => b.id);
     [ids[from], ids[to]] = [ids[to]!, ids[from]!];
-    commit(ids);
+    stageReorder("heroSkillBadge", ids);
   };
 
   return (
     <Card flush>
       <CardHead
         title="Skill badges"
-        count={badges.length}
+        count={rows.length}
         right={
           <Button size="sm" onClick={openNew}>
             <IconPlus size={14} stroke={1.8} /> Add badge
@@ -65,7 +77,7 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
         }
       />
 
-      {badges.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="empty">
           <div className="empty-ic"><IconTag size={18} stroke={1.5} /></div>
           <b>No badges yet</b>
@@ -76,8 +88,9 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
         <div className="rows">
           {rows.map((b, i) => {
             const icon = findSkillIcon(b.iconKey);
+            const del = isDeleted("heroSkillBadge", b.id);
             return (
-            <div key={b.id} className="row sortable" {...itemProps(b.id)}>
+            <div key={b.id} className={cn("row sortable", mark(b.id))} {...itemProps(b.id)}>
               <span className="row-grip" title="Drag to reorder" {...handleProps(b.id)}>
                 <IconGripVertical size={14} />
               </span>
@@ -93,7 +106,7 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
                 <IconButton
                   className="move"
                   aria-label={`Move ${b.name} earlier`}
-                  disabled={i === 0 || pending}
+                  disabled={i === 0 || del || saving}
                   onClick={() => move(i, i - 1)}
                 >
                   <IconChevronUp size={13} stroke={1.6} />
@@ -101,18 +114,35 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
                 <IconButton
                   className="move"
                   aria-label={`Move ${b.name} later`}
-                  disabled={i === rows.length - 1 || pending}
+                  disabled={i === rows.length - 1 || del || saving}
                   onClick={() => move(i, i + 1)}
                 >
                   <IconChevronDown size={13} stroke={1.6} />
                 </IconButton>
-                <IconButton
-                  aria-label={`Edit ${b.name}`}
-                  onClick={() => { setEditing(b); setDialogOpen(true); }}
-                >
-                  <IconPencil size={13} stroke={1.5} />
-                </IconButton>
-                <DeleteButton label={`"${b.name}"`} onDelete={async () => { await deleteHeroSkillBadge(b.id); }} />
+                {del ? (
+                  <IconButton
+                    aria-label={`Keep ${b.name}`}
+                    title="Undo delete"
+                    onClick={() => unstageDelete("heroSkillBadge", b.id)}
+                  >
+                    <IconArrowBackUp size={13} stroke={1.6} />
+                  </IconButton>
+                ) : (
+                  <>
+                    <IconButton
+                      aria-label={`Edit ${b.name}`}
+                      onClick={() => { setEditing(b); setDialogOpen(true); }}
+                    >
+                      <IconPencil size={13} stroke={1.5} />
+                    </IconButton>
+                    <DeleteButton
+                      staged
+                      newRow={isNew("heroSkillBadge", b.id)}
+                      label={`"${b.name}"`}
+                      onDelete={() => stageDelete("heroSkillBadge", b.id)}
+                    />
+                  </>
+                )}
               </div>
             </div>
             );
@@ -134,9 +164,14 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
       >
         <form
           id={FORM_ID}
-          action={async (formData) => {
-            if (editing) await updateHeroSkillBadge(editing.id, formData);
-            else await createHeroSkillBadge(formData);
+          action={(formData) => {
+            const name = String(formData.get("name") ?? "").trim();
+            const iconKey = String(formData.get("iconKey") ?? "").trim();
+            // The server trims too; trimming here keeps the staged preview and
+            // the saved row identical. A blank name would fail the whole batch.
+            if (!name) return;
+            if (editing) stageUpdate("heroSkillBadge", editing.id, { name, iconKey });
+            else stageCreate("heroSkillBadge", { name, iconKey });
             setDialogOpen(false);
           }}
         >

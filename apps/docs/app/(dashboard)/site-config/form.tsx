@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { updateSiteConfig } from "@/lib/actions/site-config";
-import { IconArrowBackUp, IconCheck, IconDeviceFloppy } from "@tabler/icons-react";
+import { publishSite } from "@/lib/actions/publish";
+import {
+  IconAlertTriangle, IconArrowBackUp, IconCheck, IconDeviceFloppy, IconWorldUpload,
+} from "@tabler/icons-react";
 
 interface ConfigEntry { key: string; label: string; description: string; value: string }
 
@@ -32,17 +35,35 @@ export function SiteConfigForm({ configs }: { configs: ConfigEntry[] }) {
   const [values, setValues] = useState<Record<string, string>>(initial);
   const [base, setBase] = useState<Record<string, string>>(initial);
   const [pending, startTransition] = useTransition();
+  const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [saved, setSaved] = useState(false);
+  const [pubError, setPubError] = useState<string | null>(null);
 
   const dirty = Object.keys(values).some(k => (values[k] ?? "") !== (base[k] ?? ""));
 
-  const handleSave = () => {
+  // Saving stopped publishing when `revalidatePortfolio()` left the actions, and
+  // the public page holds its render for a day (`revalidate = 86400`). Without
+  // this button a renamed site looks saved here and stays stale out there, with
+  // nothing on the page saying a second, separate action is needed.
+  const handleSave = (publish: boolean) => {
+    setBusy(publish ? "publish" : "save");
+    setPubError(null);
     startTransition(async () => {
-      const snapshot = values;
-      await updateSiteConfig(Object.entries(snapshot).map(([key, value]) => ({ key, value })));
-      setBase(snapshot);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      try {
+        const snapshot = values;
+        await updateSiteConfig(Object.entries(snapshot).map(([key, value]) => ({ key, value })));
+        setBase(snapshot);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+        if (publish) {
+          // Decision 5: the config is saved. A publish that fails is a separate,
+          // retryable failure — it never undoes the write.
+          const res = await publishSite();
+          if (!res.ok) setPubError(res.error ?? "Could not reach the site.");
+        }
+      } finally {
+        setBusy(null);
+      }
     });
   };
 
@@ -111,8 +132,15 @@ export function SiteConfigForm({ configs }: { configs: ConfigEntry[] }) {
         </Card>
       ))}
 
-      <div className="row-acts" style={{ justifyContent: "flex-end", gap: 8 }}>
-        {saved && (
+      {pubError && (
+        <div className="hint" style={{ color: "var(--bad)", lineHeight: 1.5 }}>
+          <IconAlertTriangle size={14} stroke={1.6} style={{ flexShrink: 0 }} />
+          <span>The changes are saved. Publishing failed ({pubError}) — retry with Publish, top right.</span>
+        </div>
+      )}
+
+      <div className="row-acts" style={{ justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+        {saved && !pubError && (
           <span className="hint" style={{ color: "var(--good)" }}>
             <IconCheck size={13} /> Saved
           </span>
@@ -121,8 +149,11 @@ export function SiteConfigForm({ configs }: { configs: ConfigEntry[] }) {
         <Button variant="ghost" onClick={() => setValues(base)} disabled={!dirty || pending}>
           <IconArrowBackUp size={13} /> Reset
         </Button>
-        <Button onClick={handleSave} disabled={pending || !dirty}>
-          <IconDeviceFloppy size={13} /> {pending ? "Saving…" : "Save changes"}
+        <Button variant="outline" onClick={() => handleSave(false)} disabled={pending || !dirty}>
+          <IconDeviceFloppy size={13} /> {pending && busy === "save" ? "Saving…" : "Save changes"}
+        </Button>
+        <Button onClick={() => handleSave(true)} disabled={pending || !dirty}>
+          <IconWorldUpload size={13} /> {pending && busy === "publish" ? "Saving…" : "Save & Publish"}
         </Button>
       </div>
     </div>

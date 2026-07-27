@@ -850,3 +850,66 @@ select.sel option { background: var(--card); color: var(--ink) }
   font-family: var(--mono); font-size: 10.5px; color: var(--dim); line-height: 1.7 }
 .utm-tip .r b { color: var(--ink); font-weight: 600 }
 .utm-empty { padding: 34px 16px; text-align: center; font-size: 12.5px; color: var(--faint) }
+
+/* ---------- staged changes: save bar ----------
+   Mount it INSIDE the scroller (last child of `.content`, or of the page column)
+   — it is sticky *in flow*, never an overlay, so the last row can always be
+   scrolled clear of it; `.content.with-savebar` widens the trailing band while
+   it is shown. z-index 8 paints it over page content (`.tbl` sticky th 2,
+   `.pubbar` 5) and under `.tb` (10) and its theme menu — so also under the
+   sidebar (40/60), `.sb-veil` (55), the dialog veil (90), the palette (100) and
+   the toasts (120). Dropped in a flex column instead (a sibling of `.content`),
+   sticky degrades to a plain bottom bar, which is also correct. */
+.savebar {
+  position: sticky; bottom: 12px; z-index: 8; flex: none; margin: 16px auto 0; max-width: 1060px;
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px 9px 12px;
+  border: 1px solid var(--line); border-radius: var(--r3); background: var(--panel);
+  backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: var(--shadow); animation: up .24s cubic-bezier(.3, .7, .3, 1) both
+}
+/* count chip — holds the `.dot` + the number; `.dot` is currentColor, so it
+   inherits the accent here rather than needing a knob of its own. */
+.savebar-chip {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; font-family: var(--mono); font-size: 10px;
+  font-weight: 700; color: var(--accT); background: var(--accS); border-radius: 99px; padding: 3px 9px;
+  border: 1px solid color-mix(in srgb, var(--c1) 30%, transparent)
+}
+.savebar-txt { flex: 1; min-width: 0; font-size: 12.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.savebar-txt b { color: var(--ink); font-weight: 600 }
+.savebar-acts { display: flex; align-items: center; gap: 8px; flex: none; margin-left: auto }
+.savebar .btn { white-space: nowrap }
+.content.with-savebar { padding-bottom: 96px }
+/* 390px: chip + label keep line one, the three buttons share line two. The
+   `> .btn` fallback keeps it from overflowing if the actions aren't wrapped. */
+@media (max-width: 560px) {
+  .savebar { flex-wrap: wrap; row-gap: 8px; bottom: 8px; margin-top: 14px }
+  .savebar-acts { flex: 1 1 100%; margin-left: 0; justify-content: flex-end }
+  /* `auto` basis, not 0: the buttons share the leftover width but never shrink
+     below "Save & Publish"'s own nowrap width, which is what would overflow. */
+  .savebar-acts .btn, .savebar > .btn { flex: 1 1 auto; justify-content: center; padding: 8px 10px }
+  .content.with-savebar { padding-bottom: 88px }
+}
+
+/* ---------- staged rows ----------
+   Diff colours so the bar's count is explainable at a glance: added / edited /
+   deleted. Listed per surface because the row shape differs by page (`.row` on
+   the list pages, `.qcard` on quotes, `.skill` on skills, `.tbl tr` on admin
+   users), and a `tr` can't carry the rail under `border-collapse`, so its first
+   cell does. These sit after `.row:hover` / `.tbl tr:hover td` deliberately —
+   equal specificity, later wins. */
+.row.staged-new, .qcard.staged-new, .skill.staged-new { --stg: var(--good); background: var(--good-soft); box-shadow: inset 2px 0 0 var(--stg) }
+.row.staged-edit, .qcard.staged-edit, .skill.staged-edit { --stg: var(--amber); background: var(--amber-soft); box-shadow: inset 2px 0 0 var(--stg) }
+.row.staged-del, .qcard.staged-del, .skill.staged-del { --stg: var(--bad); background: var(--bad-soft); box-shadow: inset 2px 0 0 var(--stg) }
+/* the quote card paints its own rail over that inset shadow — recolour it too. */
+.qcard.staged-new::before, .qcard.staged-edit::before, .qcard.staged-del::before { background: var(--stg) }
+.tbl tr.staged-new td { background: var(--good-soft) }
+.tbl tr.staged-edit td { background: var(--amber-soft) }
+.tbl tr.staged-del td { background: var(--bad-soft) }
+.tbl tr.staged-new td:first-child { box-shadow: inset 2px 0 0 var(--good) }
+.tbl tr.staged-edit td:first-child { box-shadow: inset 2px 0 0 var(--amber) }
+.tbl tr.staged-del td:first-child { box-shadow: inset 2px 0 0 var(--bad) }
+/* struck through but still readable — `--dim`, not `.dimmed`'s opacity, and the
+   strike stays off the row's controls so the undo affordance reads normally. */
+.staged-del .row-t, .staged-del .row-m, .staged-del .qtext, .staged-del .qauth, .staged-del .skill-n {
+  text-decoration: line-through; text-decoration-thickness: 1px; color: var(--dim)
+}

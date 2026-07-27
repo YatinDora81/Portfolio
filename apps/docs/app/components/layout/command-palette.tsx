@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconSearch, IconWorld } from "@tabler/icons-react";
 import { ALL_NAV } from "@/lib/nav";
@@ -19,6 +19,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [hot, setHot] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const items: PalItem[] = [
     ...ALL_NAV.map((x) => ({
@@ -44,7 +45,15 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       if (e.key === "Escape") onClose();
       else if (e.key === "ArrowDown") { e.preventDefault(); setHot((i) => Math.min(i + 1, list.length - 1)); }
       else if (e.key === "ArrowUp") { e.preventDefault(); setHot((i) => Math.max(i - 1, 0)); }
-      else if (e.key === "Enter" && list[hot]) { e.preventDefault(); list[hot].run(); }
+      else if (e.key === "Enter" && list[hot]) {
+        e.preventDefault();
+        // Click the highlighted row rather than calling `run()` straight. The
+        // unsaved-changes guard intercepts navigation by listening for clicks,
+        // so calling `run()` here would push the route with no confirm — and
+        // Enter is how a command palette is actually used. Going through the
+        // DOM keeps both paths identical and needs no knowledge of the guard.
+        listRef.current?.querySelectorAll<HTMLButtonElement>(".pal-it")[hot]?.click();
+      }
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
@@ -63,7 +72,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           />
           <span className="kbd">esc</span>
         </div>
-        <div className="pal-list">
+        <div className="pal-list" ref={listRef}>
           {list.length ? list.map((x, i) => {
             const Icon = x.icon;
             return (

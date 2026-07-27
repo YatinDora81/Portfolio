@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/shared/page-header";
 import { createProject, updateProject } from "@/lib/actions/projects";
-import { IconPlus, IconTrash, IconChevronUp, IconChevronDown, IconCheck } from "@tabler/icons-react";
+import { publishSite } from "@/lib/actions/publish";
+import {
+  IconPlus, IconTrash, IconChevronUp, IconChevronDown, IconCheck, IconAlertTriangle,
+} from "@tabler/icons-react";
 
 interface Bullet { id?: string; content: string; sortOrder: number }
 interface ProjectData {
@@ -33,9 +36,17 @@ export function ProjectForm({ project, allSkills }: {
   const [images, setImages] = useState<string[]>(project?.images?.length ? project.images : [""]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>(project?.skillIds || []);
   const [bullets, setBullets] = useState<Bullet[]>(project?.bullets || [{ content: "", sortOrder: 0 }]);
+  const [busy, setBusy] = useState<"save" | "publish" | null>(null);
+  const [pubError, setPubError] = useState<string | null>(null);
+
+  // Which submit button was pressed. A ref, not state: the click lands in the
+  // same event as the submit, so state set here would still be stale by the
+  // time the handler reads it.
+  const wantPublish = useRef(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const publish = wantPublish.current;
     const data = {
       title, summary,
       github: github || null,
@@ -48,6 +59,17 @@ export function ProjectForm({ project, allSkills }: {
     startTransition(async () => {
       if (isEditing) await updateProject(project.id, data);
       else await createProject(data);
+      if (publish) {
+        const res = await publishSite();
+        if (!res.ok) {
+          // Decision 5: the project is saved. A publish that fails is a separate,
+          // retryable failure — it never undoes the write, so hold the page and
+          // name the reason rather than navigating away in silence.
+          setPubError(res.error ?? "Could not reach the site.");
+          setBusy(null);
+          return;
+        }
+      }
       router.push("/projects");
     });
   };
@@ -253,17 +275,50 @@ export function ProjectForm({ project, allSkills }: {
         <div
           style={{
             display: "flex",
+            alignItems: "center",
             justifyContent: "flex-end",
             gap: 8,
+            flexWrap: "wrap",
             marginTop: 4,
             paddingTop: 14,
             borderTop: "1px solid var(--line2)",
           }}
         >
-          <Button type="button" variant="outline" onClick={() => router.push("/projects")}>Cancel</Button>
-          <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : isEditing ? "Update project" : "Create project"}
-          </Button>
+          {pubError ? (
+            <>
+              <span
+                className="hint"
+                style={{ flex: 1, minWidth: 200, color: "var(--bad)", lineHeight: 1.5 }}
+              >
+                <IconAlertTriangle size={14} stroke={1.6} style={{ flexShrink: 0 }} />
+                <span>
+                  The project is saved. Publishing failed ({pubError}) — retry with Publish, top right.
+                </span>
+              </span>
+              <Button type="button" variant="ghost" onClick={() => router.push("/projects")}>
+                Back to projects
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button type="button" variant="ghost" onClick={() => router.push("/projects")}>Cancel</Button>
+              <Button
+                variant="outline"
+                type="submit"
+                disabled={pending}
+                onClick={() => { wantPublish.current = false; setBusy("save"); }}
+              >
+                {pending && busy === "save" ? "Saving…" : isEditing ? "Update project" : "Create project"}
+              </Button>
+              <Button
+                type="submit"
+                disabled={pending}
+                onClick={() => { wantPublish.current = true; setBusy("publish"); }}
+              >
+                {pending && busy === "publish" ? "Saving…" : "Save & Publish"}
+              </Button>
+            </>
+          )}
         </div>
       </Card>
       </form>
