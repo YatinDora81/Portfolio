@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
@@ -66,13 +67,11 @@ function ProjectRow({
 
       {thumb && link ? (
         <a className="pj-thumb" href={link} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={thumb} alt="" width={176} height={110} loading="lazy" />
+          <Image src={thumb} alt="" width={176} height={110} sizes="(max-width: 600px) 230px, 176px" loading="lazy" />
         </a>
       ) : thumb ? (
         <span className="pj-thumb">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={thumb} alt="" width={176} height={110} loading="lazy" />
+          <Image src={thumb} alt="" width={176} height={110} sizes="(max-width: 600px) 230px, 176px" loading="lazy" />
         </span>
       ) : (
         <span className="pj-thumb" />
@@ -81,8 +80,7 @@ function ProjectRow({
       <div>
         <div className="pj-title">
           {project.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img className="pl" src={project.logoUrl} alt="" aria-hidden="true" height={20} loading="lazy" />
+            <Image className="pl" src={project.logoUrl} alt="" aria-hidden width={20} height={20} loading="lazy" />
           )}
           {link ? (
             <a href={link} target="_blank" rel="noopener noreferrer">
