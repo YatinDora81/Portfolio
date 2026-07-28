@@ -127,7 +127,11 @@ export default async function ExperiencesPage() {
       )}
 
       <PreviewFrame label="Experience Preview">
-        <ExperiencePreview experiences={experiences.map(exp => ({ company: exp.company, position: exp.position, location: exp.location, startDate: exp.startDate, endDate: exp.endDate, isCurrent: exp.isCurrent, bullets: exp.bullets.map(b => b.content), technologies: exp.skills.map(s => s.name) }))} />
+        {/* `visibleBullets` and `logoUrl` are already on every row `findMany`
+            returns — dropping them here made the preview fold at the default 4
+            and draw no company mark, contradicting the site for any role that
+            set its own fold size. */}
+        <ExperiencePreview experiences={experiences.map(exp => ({ company: exp.company, position: exp.position, location: exp.location, startDate: exp.startDate, endDate: exp.endDate, isCurrent: exp.isCurrent, bullets: exp.bullets.map(b => b.content), technologies: exp.skills.map(s => s.name), visibleBullets: exp.visibleBullets, logoUrl: exp.logoUrl }))} />
       </PreviewFrame>
     </div>
   );

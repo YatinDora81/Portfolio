@@ -64,7 +64,10 @@ export default async function ProjectsPage() {
       )}
 
       <PreviewFrame label="Projects Preview">
-        <ProjectsPreview projects={projects.map(p => ({ title: p.title, summary: p.summary, github: p.github, live: p.live, bullets: p.bullets.map(b => b.content), technologies: p.skills.map(s => s.name) }))} />
+        {/* `images` / `logoUrl` are already loaded above for `ProjectGrid` —
+            without them the preview's 16:10 cover slot drew an empty grey box
+            on every row, reading as "these projects have no cover art". */}
+        <ProjectsPreview projects={projects.map(p => ({ title: p.title, summary: p.summary, github: p.github, live: p.live, bullets: p.bullets.map(b => b.content), technologies: p.skills.map(s => s.name), images: p.images, logoUrl: p.logoUrl }))} />
       </PreviewFrame>
     </div>
   );
