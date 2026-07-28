@@ -77,12 +77,12 @@ async function seed() {
     data: [
       {
         content:
-          "I'm a **Software Developer** with experience building production-grade web applications. Currently working at **Wiingy** as an SDE, where I architect scheduling platforms, modernize databases, and implement AI-powered search.",
+          "I'm a **Software Engineer** who builds production-grade web applications end to end. These days at **Wiingy** — architecting scheduling platforms, modernizing databases, and building the pipelines that ship it all.",
         sortOrder: 0,
       },
       {
         content:
-          "Previously interned at **Nykaa** on the My Orders team, building user-facing features and payment flows for web and mWeb platforms.",
+          "I got my start at **Nykaa** on the My Orders team, building features and payment flows used by millions of users.",
         sortOrder: 1,
       },
     ],
