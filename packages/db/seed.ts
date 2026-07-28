@@ -21,28 +21,23 @@ async function seed() {
   await prisma.adminUser.deleteMany();
 
   // ── Hero Titles ──
+  // One title only — the hero role line is static, and RotatingRole holds
+  // still on its own once there is nothing to rotate between.
   await prisma.heroTitle.createMany({
-    data: [
-      { title: "Software Developer", sortOrder: 0 },
-      { title: "Frontend Engineer", sortOrder: 1 },
-      { title: "Backend Engineer", sortOrder: 2 },
-      { title: "DevOps Enthusiast", sortOrder: 3 },
-      { title: "Problem Solver", sortOrder: 4 },
-      { title: "AI Engineer", sortOrder: 5 },
-    ],
+    data: [{ title: "Software Engineer", sortOrder: 0 }],
   });
   console.log("Hero titles seeded");
 
   // ── Hero Skill Badges ──
   await prisma.heroSkillBadge.createMany({
     data: [
-      { name: "React", iconKey: "React", sortOrder: 0 },
-      { name: "Next.js", iconKey: "Next.js", sortOrder: 1 },
-      { name: "Node.js", iconKey: "Node.js", sortOrder: 2 },
-      { name: "TypeScript", iconKey: "TypeScript", sortOrder: 3 },
-      { name: "Golang", iconKey: "Go", sortOrder: 4 },
-      { name: "Prisma", iconKey: "Prisma", sortOrder: 5 },
-      { name: "Python", iconKey: "Python", sortOrder: 6 },
+      { name: "Next.js", iconKey: "Next.js", sortOrder: 0 },
+      { name: "React", iconKey: "React", sortOrder: 1 },
+      { name: "TypeScript", iconKey: "TypeScript", sortOrder: 2 },
+      { name: "Go", iconKey: "Go", sortOrder: 3 },
+      { name: "Node.js", iconKey: "Node.js", sortOrder: 4 },
+      { name: "PostgreSQL", iconKey: "PostgreSQL", sortOrder: 5 },
+      { name: "Docker", iconKey: "Docker", sortOrder: 6 },
     ],
   });
   console.log("Hero skill badges seeded");
@@ -53,7 +48,6 @@ async function seed() {
       { name: "LinkedIn", href: "https://www.linkedin.com/in/yatin-dora/", iconKey: "linkedin", detail: "/in/yatin-dora", sortOrder: 0 },
       { name: "GitHub", href: "https://github.com/YatinDora81", iconKey: "github", detail: "@YatinDora81", sortOrder: 1 },
       { name: "LeetCode", href: "https://leetcode.com/yatindora/", iconKey: "leetcode", detail: "@yatindora", sortOrder: 2 },
-      { name: "LeetCode 2", href: "https://leetcode.com/u/Yatin_dora_sde/", iconKey: "leetcode", detail: "@Yatin_dora_sde", sortOrder: 3 },
       { name: "X", href: "https://x.com/YatinDora", iconKey: "x", detail: "@YatinDora", sortOrder: 4 },
       { name: "Email", href: "mailto:yatin.dora81@gmail.com", iconKey: "email", detail: "yatin.dora81@gmail.com", sortOrder: 5 },
     ],
@@ -748,8 +742,12 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
   await prisma.siteConfig.createMany({
     data: [
       { key: "name", value: "Yatin Dora" },
-      { key: "tagline", value: "Ship it, scale it, make it smarter, keep learning — that's the loop I live in." },
-      { key: "intro", value: "I build scalable web apps using" },
+      { key: "tagline", value: "Ship it, scale it, make it smarter — that's the loop I live in." },
+      {
+        key: "intro",
+        value:
+          "Hand me an idea, I'll hand you back a product. Fast backends, clean frontends, and pipelines that do their job so quietly you forget they exist.",
+      },
       { key: "avatarUrl", value: "/mine/avatar.png" },
       { key: "heroPhotos", value: "/mine/avatar.png,/mine/avatar2.jpeg" },
       { key: "resumeUrl", value: "https://drive.google.com/file/d/1eljvOFwiltQbn6EvSiTv1fwjDipTSVI1/view?usp=sharing" },

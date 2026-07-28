@@ -477,7 +477,7 @@ html.no-peek .peek-stack { display: block; }
   transform: translateY(-0.5rem);
 }
 
-/* intro sentence with inline skill chips */
+/* intro sentence, the voice line under it, and the hero pill row's chips */
 .intro {
   margin: 1.75rem 0 0;
   max-width: 42rem;
@@ -507,6 +507,38 @@ html.no-peek .peek-stack { display: block; }
 }
 .chip .ci { width: 16px; height: 16px; flex-shrink: 0; display: inline-flex; }
 .chip .ci svg { width: 100%; height: 100%; }
+
+/* voice line — the personal tagline under the intro, quieter and in italics */
+.voice {
+  margin: 0.9rem 0 0;
+  max-width: 42rem;
+  font-size: 0.95rem;
+  font-style: italic;
+  color: #909092;
+}
+
+/* hero pill row — the curated stack + the "+30 more" doorway to #skills.
+   Sits after the .chip base on purpose: .chip-more has the same specificity,
+   so only source order lets it win the background/border/colour it overrides. */
+.heropills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 1.5rem;
+}
+.heropills .chip {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+.chip-more {
+  background: transparent;
+  border-style: solid;
+  color: #909092;
+  cursor: pointer;
+}
+.chip-more:hover {
+  color: var(--foreground);
+}
 
 /* actions */
 .actions {
