@@ -4,9 +4,11 @@ import { AboutParagraphsTable } from "./table";
 import { StagedAboutPreview } from "@/components/preview/staged";
 
 export default async function AboutParagraphsPage() {
-  const [paragraphs, education] = await Promise.all([
+  const [paragraphs, education, experiences] = await Promise.all([
     prisma.aboutParagraph.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
     prisma.education.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    // Only for the paragraphs' company marks — the site reuses the same logos.
+    prisma.experience.findMany({ select: { company: true, logoUrl: true } }),
   ]);
   return (
     <div className="view">
@@ -18,6 +20,7 @@ export default async function AboutParagraphsPage() {
       <AboutParagraphsTable paragraphs={paragraphs.map(p => ({ id: p.id, content: p.content, sortOrder: p.sortOrder }))} />
       <StagedAboutPreview
         paragraphs={paragraphs.map(p => ({ id: p.id, content: p.content }))}
+        experiences={experiences}
         education={education.map(e => ({
           id: e.id,
           institution: e.institution,

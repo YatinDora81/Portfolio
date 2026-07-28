@@ -36,6 +36,8 @@ interface EducationEntry {
 interface AboutPreviewProps {
   paragraphs: string[];
   education: EducationEntry[];
+  /** company name (lower-cased) -> logo url, sourced from the Experience rows */
+  companyLogos?: Record<string, string>;
 }
 
 /**
@@ -99,7 +101,7 @@ function ScoreRing({ score, scoreTotal, scoreType }: {
   );
 }
 
-export function AboutPreview({ paragraphs, education }: AboutPreviewProps) {
+export function AboutPreview({ paragraphs, education, companyLogos }: AboutPreviewProps) {
   return (
     <div>
       <SectionLabel sub="About" main="Who I am" />
@@ -139,7 +141,7 @@ export function AboutPreview({ paragraphs, education }: AboutPreviewProps) {
           {/* its output: the CMS paragraphs, **bold** runs promoted */}
           <div className="mt-2 space-y-2" style={{ color: DIM }}>
             {paragraphs.map((p, i) => (
-              <p key={i} className="m-0 break-words">{renderBold(p)}</p>
+              <p key={i} className="m-0 break-words">{renderBold(p, companyLogos)}</p>
             ))}
             {paragraphs.length === 0 && (
               <p className="m-0 italic" style={{ color: FAINT }}>

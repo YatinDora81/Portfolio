@@ -1,6 +1,7 @@
 "use client";
 
 import type { Entity } from "@/lib/actions/staging";
+import { cdnUrl } from "@/lib/utils";
 import { useStaging } from "@/components/staging/staging-provider";
 import { useLiveVersion, type HeroContentRow } from "@/components/staging/hero-live";
 import {
@@ -161,7 +162,7 @@ export function StagedHeroPreview({
 
 // ─── About ───────────────────────────────────────────────────────
 
-export function StagedAboutPreview({ paragraphs, education, label = "About Preview" }: {
+export function StagedAboutPreview({ paragraphs, education, experiences, label = "About Preview" }: {
   paragraphs: { id: string; content: string }[];
   education: {
     id: string;
@@ -174,16 +175,27 @@ export function StagedAboutPreview({ paragraphs, education, label = "About Previ
     startYear: string;
     endYear: string;
   }[];
+  /** Company marks for the paragraphs, keyed the way apps/web keys them. Plain
+      server rows and no `useLive`: Experience is not a staged `Entity`, so
+      there is no pending edit for an overlay to fold in. */
+  experiences?: { company: string; logoUrl: string | null }[];
   label?: string;
 }) {
   const p = useLive("aboutParagraph", paragraphs);
   const e = useLive("education", education);
   const pending = usePendingCount(ABOUT_ENTITIES);
 
+  const companyLogos = Object.fromEntries(
+    (experiences ?? [])
+      .filter((x) => x.logoUrl)
+      .map((x) => [x.company.trim().toLowerCase(), cdnUrl(x.logoUrl) as string])
+  );
+
   return (
     <PreviewFrame label={label} pendingCount={pending}>
       <AboutPreview
         paragraphs={p.map((x) => str(x.content))}
+        companyLogos={companyLogos}
         education={e.map((x) => ({
           institution: str(x.institution),
           degree: str(x.degree),

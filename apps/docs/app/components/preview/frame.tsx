@@ -177,11 +177,35 @@ export function SectionLabel({ sub, main }: { sub: string; main: string }) {
   );
 }
 
-export function renderBold(text: string) {
+/**
+ * Renders `**bold**` CMS markup. `logos` keys a company mark by the lower-cased
+ * company name, exactly as `BoldText` does in apps/web — a bolded run that
+ * names a company we have a logo for gets its mark inline just before the name.
+ * Sized for the 11px terminal type rather than the site's 14px.
+ */
+export function renderBold(text: string, logos?: Record<string, string>) {
   const parts = text.split(/\*\*(.*?)\*\*/g);
-  return parts.map((part, i) =>
-    i % 2 === 1 ? <b key={i} className="text-[#fafafa]">{part}</b> : <span key={i}>{part}</span>
-  );
+  return parts.map((part, i) => {
+    if (i % 2 === 0) return <span key={i}>{part}</span>;
+    const key = part.trim().toLowerCase();
+    // `hasOwn`, not a bare read: a bolded `**constructor**` would otherwise
+    // resolve up the prototype chain and render its source as an image src.
+    const logo = logos && Object.hasOwn(logos, key) ? logos[key] : undefined;
+    return (
+      <b key={i} className="text-[#fafafa]">
+        {logo && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logo}
+            alt=""
+            aria-hidden="true"
+            className="mr-1 inline-block size-3 rounded-[2px] object-contain align-[-0.15em]"
+          />
+        )}
+        {part}
+      </b>
+    );
+  });
 }
 
 // Same cadence as `RotatingRole` in apps/web: 2500ms hold, 400ms fade.

@@ -58,7 +58,10 @@ function BoldText({ text, logos }: { text: string; logos?: Record<string, string
     <>
       {text.split(/\*\*(.*?)\*\*/g).map((part, i) => {
         if (i % 2 === 0) return <span key={i}>{part}</span>;
-        const logo = logos?.[part.trim().toLowerCase()];
+        const key = part.trim().toLowerCase();
+        // `hasOwn`, not a bare read: a bolded `**constructor**` would otherwise
+        // resolve up the prototype chain and render its source as an image src.
+        const logo = logos && Object.hasOwn(logos, key) ? logos[key] : undefined;
         return (
           <span key={i} className="font-semibold text-foreground">
             {logo && (
