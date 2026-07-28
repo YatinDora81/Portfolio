@@ -6,31 +6,13 @@ import { IconCircleCheck, IconAlertTriangle } from "@tabler/icons-react";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 import { CommandPalette } from "./command-palette";
-import { StagingProvider, useStaging } from "@/components/staging/staging-provider";
+import { StagingProvider } from "@/components/staging/staging-provider";
 import { SaveBar } from "@/components/staging/save-bar";
 import { cn } from "@/lib/utils";
 
 interface Toast { id: number; msg: string; tone: "good" | "bad"; out?: boolean }
 
 let toastId = 0;
-
-/**
- * The scroller, plus the save bar that sticks to the bottom of it.
- *
- * Its own component only because the bar has to live *inside* `.content` to be
- * sticky in flow, and `.content` has to know whether the bar is up so it can
- * widen its trailing band — and the Shell, being the thing that renders the
- * provider, cannot read the store itself.
- */
-function ContentArea({ pathname, children }: { pathname: string; children: React.ReactNode }) {
-  const { count } = useStaging();
-  return (
-    <div className={cn("content", count > 0 && "with-savebar")} key={pathname}>
-      {children}
-      <SaveBar />
-    </div>
-  );
-}
 
 export function Shell({ user, unread, children }: {
   user: { userId: string; email: string; role: string };
@@ -77,7 +59,10 @@ export function Shell({ user, unread, children }: {
             onPalette={() => setPal(true)}
             toast={toast}
           />
-          <ContentArea pathname={pathname}>{children}</ContentArea>
+          {/* Outside the keyed scroller: the batch outlives the route, so
+              navigating must not remount the bar mid-save. */}
+          <div className="content" key={pathname}>{children}</div>
+          <SaveBar />
         </main>
 
         {pal ? <CommandPalette onClose={() => setPal(false)} /> : null}

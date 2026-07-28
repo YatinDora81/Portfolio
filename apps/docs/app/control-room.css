@@ -35,10 +35,14 @@
   --mono: 'Geist Mono', ui-monospace, monospace;
   --r1: 8px; --r2: 10px; --r3: 12px;
   --shadow: 0 1px 2px rgba(17, 17, 22, .06), 0 12px 32px -16px rgba(17, 17, 22, .16);
+  /* `--shadow` is downward-only, so it is a no-op on the viewport floor. */
+  --shadow-up: 0 -1px 2px rgba(17, 17, 22, .05), 0 -12px 32px -16px rgba(17, 17, 22, .14);
 }
 
 .cr {
-  font-family: var(--ui); background: var(--bg); color: var(--ink); height: 100vh; width: 100%;
+  /* `dvh`: the save band is this box's bottom edge now, and `100vh` on mobile
+     Safari is the large viewport — its buttons would sit behind the toolbar. */
+  font-family: var(--ui); background: var(--bg); color: var(--ink); height: 100vh; height: 100dvh; width: 100%;
   display: flex; overflow: hidden; font-size: 14px; line-height: 1.5; position: relative; isolation: isolate;
 }
 
@@ -172,7 +176,11 @@
 @keyframes slidebar { from { left: -38% } to { left: 104% } }
 
 /* ---------- content / views ---------- */
-.content { flex: 1; overflow-y: auto; padding: 24px 28px 84px; position: relative }
+/* The gutter is reserved on both edges so the reading column stays centred on
+   `.main` whether or not the page overflows — that is what lets the save band
+   mirror it with plain symmetric padding. The old 84px bottom padding was the
+   sticky bar's travel reserve, and was itself the bug. */
+.content { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable both-edges; padding: 24px 28px 32px; position: relative }
 .view { max-width: 1060px; margin: 0 auto; animation: up .32s cubic-bezier(.3, .7, .3, 1) both }
 /* Data consoles (tracker, refer emails) carry tables far wider than the reading
    column, so they opt out of the 1060px cap and use the full viewport instead. */
@@ -373,7 +381,9 @@ select.sel option { background: var(--card); color: var(--ink) }
 
 /* inbox */
 .inbox { display: grid; grid-template-columns: 330px 1fr; gap: 14px; align-items: start; min-height: 480px }
-.msg-list { display: flex; flex-direction: column; max-height: calc(100vh - 250px); overflow-y: auto }
+/* Sized off the viewport rather than off `.content`, so it has to allow for the
+   save band (~56px) whether or not the band is up. */
+.msg-list { display: flex; flex-direction: column; max-height: calc(100dvh - 306px); overflow-y: auto }
 .msg-it { display: flex; gap: 10px; padding: 12px 13px; border-bottom: 1px solid var(--line2); text-align: left; transition: background .13s; width: 100% }
 .msg-it:hover { background: var(--bg1) }
 .msg-it.sel { background: var(--accS); box-shadow: inset 2px 0 0 var(--c1) }
@@ -554,6 +564,7 @@ select.sel option { background: var(--card); color: var(--ink) }
   --gridc: rgba(177, 186, 196, .07); --tickc: rgba(177, 186, 196, .35);
   --pri: #238636; --priFg: #FFFFFF;
   --shadow: 0 1px 2px rgba(0, 0, 0, .6), 0 24px 56px -24px rgba(0, 2, 6, .8);
+  --shadow-up: 0 -1px 2px rgba(0, 0, 0, .5), 0 -20px 48px -24px rgba(0, 2, 6, .75);
 }
 
 /* ── Dark2 · shadcn zinc + teal ── */
@@ -573,6 +584,7 @@ select.sel option { background: var(--card); color: var(--ink) }
   --gridc: rgba(228, 228, 231, .06); --tickc: rgba(228, 228, 231, .35);
   --pri: #2DD4BF; --priFg: #09090B;
   --shadow: 0 1px 2px rgba(0, 0, 0, .55), 0 24px 56px -24px rgba(0, 0, 0, .75);
+  --shadow-up: 0 -1px 2px rgba(0, 0, 0, .45), 0 -20px 48px -24px rgba(0, 0, 0, .7);
 }
 
 /* ── shared dark quality layer ── */
@@ -790,7 +802,9 @@ select.sel option { background: var(--card); color: var(--ink) }
   .tb-live span { display: none }
   .tb-search { min-width: 0 }
   .tb-search .lbl { display: none }
-  .content { padding: 16px 14px 72px }
+  .content { padding: 16px 14px 24px }
+  /* 14px content padding + the 10px reserved gutter. */
+  .savebar { padding-left: 24px; padding-right: 24px }
   .vh h1 { font-size: 23px }
   .f-row { grid-template-columns: 1fr }
   /* The theme pill is ~95px wide and would push the topbar past a 390px viewport,
@@ -856,21 +870,28 @@ select.sel option { background: var(--card); color: var(--ink) }
 .utm-empty { padding: 34px 16px; text-align: center; font-size: 12.5px; color: var(--faint) }
 
 /* ---------- staged changes: save bar ----------
-   Mount it INSIDE the scroller (last child of `.content`, or of the page column)
-   — it is sticky *in flow*, never an overlay, so the last row can always be
-   scrolled clear of it; `.content.with-savebar` widens the trailing band while
-   it is shown. z-index 8 paints it over page content (`.tbl` sticky th 2,
-   `.pubbar` 5) and under `.tb` (10) and its theme menu — so also under the
-   sidebar (40/60), `.sb-veil` (55), the dialog veil (90), the palette (100) and
-   the toasts (120). Dropped in a flex column instead (a sibling of `.content`),
-   sticky degrades to a plain bottom bar, which is also correct. */
+   The third and last child of `.main`'s column, below the scroller — not a
+   sticky child of `.content`. Sticky only travels inside the content box, so on
+   a page shorter than the viewport the bar exhausted its range and parked ~108px
+   above the bottom edge, over whatever the page ended with. As a band the
+   scroller physically ends where the bar begins, so clearance is structural
+   rather than a trailing strip measured to the bar's height per breakpoint.
+
+   Nothing passes behind it, so no `backdrop-filter` — `--glass` over `.cr`'s
+   flat `--bg` is the surface `.tb` already reads as. `z-index: 8` is vestigial
+   (band and scroller cannot overlap) and kept only so the ladder stays legible:
+   over `.tbl` sticky th (2) and `.pubbar` (5), under `.tb` (10) and — since
+   `.main` is a stacking context at 1 — under the sidebar (40/60), `.sb-veil`
+   (55), the dialog veil (90), the palette (100) and the toasts (120). */
 .savebar {
-  position: sticky; bottom: 12px; z-index: 8; flex: none; margin: 16px auto 0; max-width: 1060px;
-  display: flex; align-items: center; gap: 10px; padding: 9px 10px 9px 12px;
-  border: 1px solid var(--line); border-radius: var(--r3); background: var(--panel);
-  backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  box-shadow: var(--shadow); animation: up .24s cubic-bezier(.3, .7, .3, 1) both
+  flex: none; position: relative; z-index: 8;
+  padding: 9px 38px; padding-bottom: calc(9px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line2); background: var(--glass);
+  box-shadow: var(--shadow-up); animation: up .24s cubic-bezier(.3, .7, .3, 1) both
 }
+/* 28px of `.content` padding + its 10px reserved gutter, so this column and
+   `.view` resolve to the same rectangle whether or not the cap binds. */
+.savebar-inner { max-width: 1060px; margin: 0 auto; display: flex; align-items: center; gap: 10px }
 /* count chip — holds the `.dot` + the number; `.dot` is currentColor, so it
    inherits the accent here rather than needing a knob of its own. */
 .savebar-chip {
@@ -882,16 +903,14 @@ select.sel option { background: var(--card); color: var(--ink) }
 .savebar-txt b { color: var(--ink); font-weight: 600 }
 .savebar-acts { display: flex; align-items: center; gap: 8px; flex: none; margin-left: auto }
 .savebar .btn { white-space: nowrap }
-.content.with-savebar { padding-bottom: 96px }
 /* 390px: chip + label keep line one, the three buttons share line two. The
    `> .btn` fallback keeps it from overflowing if the actions aren't wrapped. */
 @media (max-width: 560px) {
-  .savebar { flex-wrap: wrap; row-gap: 8px; bottom: 8px; margin-top: 14px }
+  .savebar-inner { flex-wrap: wrap; row-gap: 8px }
   .savebar-acts { flex: 1 1 100%; margin-left: 0; justify-content: flex-end }
   /* `auto` basis, not 0: the buttons share the leftover width but never shrink
      below "Save & Publish"'s own nowrap width, which is what would overflow. */
-  .savebar-acts .btn, .savebar > .btn { flex: 1 1 auto; justify-content: center; padding: 8px 10px }
-  .content.with-savebar { padding-bottom: 88px }
+  .savebar-acts .btn, .savebar-inner > .btn { flex: 1 1 auto; justify-content: center; padding: 8px 10px }
 }
 
 /* ---------- staged rows ----------

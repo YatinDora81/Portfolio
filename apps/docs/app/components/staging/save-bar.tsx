@@ -11,11 +11,14 @@ import { useStaging } from "./staging-provider";
 /**
  * The page-level Cancel / Save / Save & Publish bar.
  *
- * It mounts as the last child of `.content`, i.e. inside the scroller, so it is
- * sticky *in flow*: the last row of a list can always be scrolled clear of it
- * (`.content.with-savebar` widens the trailing band while it is up), and it
- * never needs to win a fight on the z-index ladder. Styling is `.savebar` in
- * `control-room.css`.
+ * A band under the scroller — the last child of `.main`'s column — rather than
+ * a sticky child of `.content`. Sticky only travels inside the content box, so
+ * on a page shorter than the viewport it ran out of range and came to rest a
+ * content-length-dependent distance above the bottom edge. As a sibling the
+ * scroller ends where the bar begins, so the last row clears it for free.
+ *
+ * Styling is `.savebar` in `control-room.css`; `.savebar-inner` holds its
+ * contents on the `.view` reading column.
  */
 
 export function SaveBar() {
@@ -49,32 +52,35 @@ export function SaveBar() {
   return (
     <>
       <div className="savebar" role="region" aria-label="Unsaved changes">
-        <span className="savebar-chip">
-          <span className="dot" aria-hidden="true" />
-          {count}
-        </span>
-        <span className="savebar-txt" aria-live="polite">
-          <b>unsaved change{count === 1 ? "" : "s"}</b> — nothing is written until you save
-        </span>
+        <div className="savebar-inner">
+          <span className="savebar-chip">
+            <span className="dot" aria-hidden="true" />
+            {count}
+          </span>
+          <span className="savebar-txt" aria-live="polite">
+            <b>unsaved change{count === 1 ? "" : "s"}</b> — nothing is written until you save
+          </span>
 
-        <div className="savebar-acts">
-          <Button variant="ghost" onClick={() => setAsking(true)} disabled={disabled}>Cancel</Button>
-          <Button variant="outline" onClick={() => void run(false)} disabled={disabled}>
-            {busy === "save" ? <IconRefresh size={13} className="spin" /> : null}
-            {busy === "save" ? "Saving…" : "Save"}
-          </Button>
-          <Button variant="primary" onClick={() => void run(true)} disabled={disabled}>
-            {busy === "publish" ? <IconRefresh size={13} className="spin" /> : null}
-            {busy === "publish" ? "Saving…" : "Save & Publish"}
-          </Button>
+          <div className="savebar-acts">
+            <Button variant="ghost" onClick={() => setAsking(true)} disabled={disabled}>Cancel</Button>
+            <Button variant="outline" onClick={() => void run(false)} disabled={disabled}>
+              {busy === "save" ? <IconRefresh size={13} className="spin" /> : null}
+              {busy === "save" ? "Saving…" : "Save"}
+            </Button>
+            <Button variant="primary" onClick={() => void run(true)} disabled={disabled}>
+              {busy === "publish" ? <IconRefresh size={13} className="spin" /> : null}
+              {busy === "publish" ? "Saving…" : "Save & Publish"}
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Deliberately a SIBLING of `.savebar`, not a child: the bar carries a
-          `backdrop-filter`, which makes it the containing block for any fixed
-          descendant — the dialog's full-viewport veil would collapse into the
-          bar's own 40px-tall box. Out here it behaves like every other dialog
-          in `.content`.
+      {/* Deliberately a SIBLING of `.savebar`, not a child. The bar animates in
+          with a transform, and for as long as that runs it is the containing
+          block for any fixed descendant — the dialog's full-viewport veil would
+          collapse into the bar's own ~53px-tall box. Out here the veil resolves
+          against the viewport like every other dialog in the app (`.main` is a
+          stacking context, but it sets no containing block).
 
           Cancel throws away the whole batch, and the batch spans pages — on
           /quotes it can be holding three hero titles no card here is marked
