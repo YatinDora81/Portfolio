@@ -13,7 +13,7 @@ import { IconPlus, IconPencil, IconQuote, IconArrowBackUp } from "@tabler/icons-
 
 interface Quote { id: string; quote: string; author: string }
 
-export function QuotesTable({ quotes, todayIndex }: { quotes: Quote[]; todayIndex: number }) {
+export function QuotesTable({ quotes, dayOfYear }: { quotes: Quote[]; dayOfYear: number }) {
   const {
     overlay, stageCreate, stageUpdate, stageDelete, unstageDelete,
     isDeleted, isNew, isEdited,
@@ -22,9 +22,17 @@ export function QuotesTable({ quotes, todayIndex }: { quotes: Quote[]; todayInde
   const [editing, setEditing] = useState<Quote | null>(null);
 
   // Quotes are the one staged entity with no sortOrder, so there is no reorder
-  // op to fold in: the overlay only patches edits and appends pending creates,
-  // which is what keeps `todayIndex` pointing at the row the server picked.
+  // op to fold in: the overlay only patches edits and appends pending creates.
   const rows = overlay("quote", quotes, (q) => q.id);
+
+  // Which quote visitors get once this batch lands — `dayOfYear % count`, the
+  // same pick apps/web makes, run over the list the site will actually have.
+  // A staged delete shortens that list and moves the pick, so a server-computed
+  // index would badge a row here while the preview below named another one and
+  // the published site a third. Deleted rows stay visible for their undo but
+  // are out of the rotation, so they can never carry the badge.
+  const live = rows.filter((q) => !isDeleted("quote", q.id));
+  const todayId = live.length > 0 ? live[dayOfYear % live.length]?.id ?? null : null;
 
   const openNew = () => { setEditing(null); setDialogOpen(true); };
 
@@ -59,7 +67,7 @@ export function QuotesTable({ quotes, todayIndex }: { quotes: Quote[]; todayInde
           {rows.map((q, i) => {
             const gone = isDeleted("quote", q.id);
             return (
-              <div key={q.id} className={cn("qcard", i === todayIndex && "today", mark(q.id))}>
+              <div key={q.id} className={cn("qcard", q.id === todayId && "today", mark(q.id))}>
                 <span className="row-i" style={{ marginTop: 4 }}>
                   {String(i + 1).padStart(2, "0")}
                 </span>
@@ -67,7 +75,7 @@ export function QuotesTable({ quotes, todayIndex }: { quotes: Quote[]; todayInde
                   <div className="qtext">&ldquo;{q.quote}&rdquo;</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 5, flexWrap: "wrap" }}>
                     <span className="qauth" style={{ marginTop: 0 }}>— {q.author}</span>
-                    {i === todayIndex && (
+                    {q.id === todayId && (
                       <span className="chip amb"><span className="dot" /> showing today</span>
                     )}
                   </div>

@@ -1,7 +1,7 @@
 import { prisma } from "db";
 import { PageHeader } from "@/components/shared/page-header";
 import { ContactPurposesTable } from "./table";
-import { PreviewFrame, ContactPreview } from "@/components/preview";
+import { StagedContactPreview } from "@/components/preview/staged";
 
 export default async function ContactPurposesPage() {
   const [purposes, socialLinks, siteConfigs] = await Promise.all([
@@ -20,14 +20,12 @@ export default async function ContactPurposesPage() {
         description="The chips a visitor picks from before writing you a message."
       />
       <ContactPurposesTable purposes={purposes.map(p => ({ id: p.id, label: p.label, emoji: p.emoji, sortOrder: p.sortOrder }))} />
-      <PreviewFrame label="Contact Preview">
-        <ContactPreview
-          purposes={purposes.map(p => ({ label: p.label, emoji: p.emoji }))}
-          socialLinks={socialLinks.map(l => ({ name: l.name }))}
-          availabilityStatus={cfg.get("availabilityStatus") || ""}
-          availabilityDetail={cfg.get("availabilityDetail") || ""}
-        />
-      </PreviewFrame>
+      <StagedContactPreview
+        purposes={purposes.map(p => ({ id: p.id, label: p.label, emoji: p.emoji }))}
+        socialLinks={socialLinks.map(l => ({ id: l.id, name: l.name, iconKey: l.iconKey, detail: l.detail }))}
+        availabilityStatus={cfg.get("availabilityStatus") || ""}
+        availabilityDetail={cfg.get("availabilityDetail") || ""}
+      />
     </div>
   );
 }

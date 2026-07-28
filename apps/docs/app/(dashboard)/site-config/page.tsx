@@ -24,6 +24,9 @@ export default async function SiteConfigPage() {
   ]);
 
   const configMap = Object.fromEntries(configs.map(c => [c.key, c.value]));
+  // Same parse as apps/web/app/lib/data.ts — one comma-separated SiteConfig row.
+  // `cdnUrl` is applied inside the preview, so the raw paths go through.
+  const heroPhotos = (configMap["heroPhotos"] ?? "").split(",").map(p => p.trim()).filter(Boolean);
 
   return (
     <div className="view">
@@ -34,14 +37,21 @@ export default async function SiteConfigPage() {
       />
       <SiteConfigForm configs={CONFIG_KEYS.map(k => ({ ...k, value: configMap[k.key] || "" }))} />
       <PreviewFrame label="Hero Preview (affected by config changes)">
+        {/* `availabilityStatus` is CONFIG_KEY #7, edited in the form directly
+            above — not passing it left the pill reading "Availability not set"
+            next to the field that sets it. `iconKey` and `heroPhotos` are the
+            same story: already loaded here, and the hero keys its glyphs and
+            its photo deck on them. */}
         <HeroPreview
           titles={titles.map(t => t.title)}
           name={configMap["name"] || "Yatin"}
           tagline={configMap["tagline"] || ""}
           intro={configMap["intro"] || ""}
           skills={skillBadges.map(s => ({ name: s.name }))}
-          socialLinks={socialLinks.map(l => ({ name: l.name }))}
+          socialLinks={socialLinks.map(l => ({ name: l.name, iconKey: l.iconKey }))}
           avatarUrl={configMap["avatarUrl"] || ""}
+          photos={heroPhotos}
+          availabilityStatus={configMap["availabilityStatus"] || ""}
         />
       </PreviewFrame>
     </div>

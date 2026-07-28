@@ -1,7 +1,6 @@
 import { prisma } from "db";
 import { PageHeader } from "@/components/shared/page-header";
-import { PreviewFrame } from "@/components/preview";
-import { HeroPreview } from "@/components/preview";
+import { StagedHeroPreview } from "@/components/preview/staged";
 import { HeroTitlesTable } from "./table";
 
 export default async function HeroTitlesPage() {
@@ -17,6 +16,9 @@ export default async function HeroTitlesPage() {
   const tagline = config.get("tagline") ?? "";
   const intro = config.get("intro") ?? "";
   const avatarUrl = config.get("avatarUrl") ?? "";
+  const availabilityStatus = config.get("availabilityStatus") ?? "";
+  // Same comma-split as apps/web/app/lib/data.ts; `cdnUrl` runs inside the preview.
+  const heroPhotos = (config.get("heroPhotos") ?? "").split(",").map(p => p.trim()).filter(Boolean);
 
   return (
     <div className="view">
@@ -26,17 +28,17 @@ export default async function HeroTitlesPage() {
         description="The line that cycles under your name in the hero. Order here is the order visitors see."
       />
       <HeroTitlesTable titles={titles.map(t => ({ id: t.id, title: t.title, sortOrder: t.sortOrder }))} />
-      <PreviewFrame label="Hero Preview">
-        <HeroPreview
-          titles={titles.map(t => t.title)}
-          name={name}
-          tagline={tagline}
-          intro={intro}
-          skills={skillBadges.map(b => ({ name: b.name }))}
-          socialLinks={socialLinks.map(l => ({ name: l.name }))}
-          avatarUrl={avatarUrl || undefined}
-        />
-      </PreviewFrame>
+      <StagedHeroPreview
+        titles={titles.map(t => ({ id: t.id, title: t.title }))}
+        badges={skillBadges.map(b => ({ id: b.id, name: b.name }))}
+        socialLinks={socialLinks.map(l => ({ id: l.id, name: l.name, iconKey: l.iconKey }))}
+        name={name}
+        tagline={tagline}
+        intro={intro}
+        avatarUrl={avatarUrl || undefined}
+        photos={heroPhotos}
+        availabilityStatus={availabilityStatus}
+      />
     </div>
   );
 }

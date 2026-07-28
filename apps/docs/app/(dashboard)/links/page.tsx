@@ -1,7 +1,7 @@
 import { prisma } from "db";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardHead } from "@/components/ui/card";
-import { PreviewFrame, LinksPreview } from "@/components/preview";
+import { StagedLinksPreview } from "@/components/preview/staged";
 import { SocialLinksList } from "./social-links-list";
 import { ResumeForm } from "./resume-form";
 import { IconArrowUpRight } from "@tabler/icons-react";
@@ -15,6 +15,7 @@ export default async function LinksPage() {
   const config = new Map(siteConfigRows.map((c) => [c.key, c.value]));
   const resumeUrl = config.get("resumeUrl") ?? "";
   const contactEmail = config.get("contactEmail") ?? "";
+  const copyrightName = config.get("copyrightName") ?? "";
 
   return (
     <div className="view">
@@ -55,14 +56,16 @@ export default async function LinksPage() {
         />
       </div>
 
-      {/* Preview */}
-      <PreviewFrame label="Links Preview — How they appear across your portfolio">
-        <LinksPreview
-          socialLinks={links.map((l) => ({ name: l.name, href: l.href, iconKey: l.iconKey, detail: l.detail }))}
-          resumeUrl={resumeUrl}
-          contactEmail={contactEmail}
-        />
-      </PreviewFrame>
+      {/* Preview — `copyrightName` feeds the footer wordmark and copyright
+          line; without it the pane drew the PORTFOLIO placeholder over a name
+          the config already holds. */}
+      <StagedLinksPreview
+        label="Links Preview — How they appear across your portfolio"
+        socialLinks={links.map((l) => ({ id: l.id, name: l.name, href: l.href, iconKey: l.iconKey, detail: l.detail }))}
+        resumeUrl={resumeUrl}
+        contactEmail={contactEmail}
+        copyrightName={copyrightName}
+      />
     </div>
   );
 }

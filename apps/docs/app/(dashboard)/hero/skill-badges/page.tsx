@@ -1,7 +1,6 @@
 import { prisma } from "db";
 import { PageHeader } from "@/components/shared/page-header";
-import { PreviewFrame } from "@/components/preview";
-import { HeroPreview } from "@/components/preview";
+import { StagedHeroPreview } from "@/components/preview/staged";
 import { HeroSkillBadgesTable } from "./table";
 
 export default async function HeroSkillBadgesPage() {
@@ -17,6 +16,9 @@ export default async function HeroSkillBadgesPage() {
   const tagline = config.get("tagline") ?? "";
   const intro = config.get("intro") ?? "";
   const avatarUrl = config.get("avatarUrl") ?? "";
+  const availabilityStatus = config.get("availabilityStatus") ?? "";
+  // Same comma-split as apps/web/app/lib/data.ts; `cdnUrl` runs inside the preview.
+  const heroPhotos = (config.get("heroPhotos") ?? "").split(",").map(p => p.trim()).filter(Boolean);
 
   return (
     <div className="view">
@@ -26,17 +28,17 @@ export default async function HeroSkillBadgesPage() {
         description="The small skill badges that sit inline in the hero bio, in this order."
       />
       <HeroSkillBadgesTable badges={badges.map(b => ({ id: b.id, name: b.name, iconKey: b.iconKey, sortOrder: b.sortOrder }))} />
-      <PreviewFrame label="Hero Preview">
-        <HeroPreview
-          titles={titles.map(t => t.title)}
-          name={name}
-          tagline={tagline}
-          intro={intro}
-          skills={badges.map(b => ({ name: b.name }))}
-          socialLinks={socialLinks.map(l => ({ name: l.name }))}
-          avatarUrl={avatarUrl || undefined}
-        />
-      </PreviewFrame>
+      <StagedHeroPreview
+        titles={titles.map(t => ({ id: t.id, title: t.title }))}
+        badges={badges.map(b => ({ id: b.id, name: b.name }))}
+        socialLinks={socialLinks.map(l => ({ id: l.id, name: l.name, iconKey: l.iconKey }))}
+        name={name}
+        tagline={tagline}
+        intro={intro}
+        avatarUrl={avatarUrl || undefined}
+        photos={heroPhotos}
+        availabilityStatus={availabilityStatus}
+      />
     </div>
   );
 }

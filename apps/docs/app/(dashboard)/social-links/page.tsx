@@ -1,7 +1,6 @@
 import { prisma } from "db";
 import { PageHeader } from "@/components/shared/page-header";
-import { PreviewFrame } from "@/components/preview";
-import { HeroPreview } from "@/components/preview";
+import { StagedHeroPreview } from "@/components/preview/staged";
 import { SocialLinksTable } from "./table";
 
 export default async function SocialLinksPage() {
@@ -17,6 +16,9 @@ export default async function SocialLinksPage() {
   const tagline = config.get("tagline") ?? "";
   const intro = config.get("intro") ?? "";
   const avatarUrl = config.get("avatarUrl") ?? "";
+  const availabilityStatus = config.get("availabilityStatus") ?? "";
+  // Same comma-split as apps/web/app/lib/data.ts; `cdnUrl` runs inside the preview.
+  const heroPhotos = (config.get("heroPhotos") ?? "").split(",").map(p => p.trim()).filter(Boolean);
 
   return (
     <div className="view">
@@ -26,17 +28,21 @@ export default async function SocialLinksPage() {
         description="Profiles rendered in the hero, contact block and footer. Order here is the order on site."
       />
       <SocialLinksTable links={links.map(l => ({ id: l.id, name: l.name, href: l.href, iconKey: l.iconKey, detail: l.detail, sortOrder: l.sortOrder }))} />
-      <PreviewFrame label="Hero Preview">
-        <HeroPreview
-          titles={titles.map(t => t.title)}
-          name={name}
-          tagline={tagline}
-          intro={intro}
-          skills={skillBadges.map(b => ({ name: b.name }))}
-          socialLinks={links.map(l => ({ name: l.name }))}
-          avatarUrl={avatarUrl || undefined}
-        />
-      </PreviewFrame>
+      {/* `iconKey` is the whole point of this page — the table above edits it,
+          so the preview has to key its glyphs on it and not on the display
+          name, or "LeetCode 2" draws a two-letter stand-in where the site
+          draws the LeetCode mark. */}
+      <StagedHeroPreview
+        titles={titles.map(t => ({ id: t.id, title: t.title }))}
+        badges={skillBadges.map(b => ({ id: b.id, name: b.name }))}
+        socialLinks={links.map(l => ({ id: l.id, name: l.name, iconKey: l.iconKey }))}
+        name={name}
+        tagline={tagline}
+        intro={intro}
+        avatarUrl={avatarUrl || undefined}
+        photos={heroPhotos}
+        availabilityStatus={availabilityStatus}
+      />
     </div>
   );
 }
