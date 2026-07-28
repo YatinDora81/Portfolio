@@ -790,6 +790,9 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
       { key: "contactEmail", value: "yatin.dora81@gmail.com" },
       { key: "availabilityStatus", value: "Available for opportunities" },
       { key: "availabilityDetail", value: "Open to freelance, full-time & collaborations" },
+      // The hero's status dot. "" = follow --foreground, the look it shipped with.
+      { key: "heroDotColor", value: "" },
+      { key: "heroDotPulse", value: "on" },
       { key: "copyrightName", value: "Yatin Dora" },
     ],
   });

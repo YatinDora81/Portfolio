@@ -112,6 +112,8 @@ export default async function Home() {
               photos={siteConfig.heroPhotos}
               resumeUrl={siteConfig.resumeUrl}
               availabilityStatus={siteConfig.availabilityStatus}
+              dotColor={siteConfig.heroDotColor}
+              dotPulse={siteConfig.heroDotPulse}
             />
             <Bridge />
             <About

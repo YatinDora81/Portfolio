@@ -299,9 +299,13 @@
   width: 7px;
   height: 7px;
   border-radius: 9999px;
-  background: var(--foreground);
+  /* `--avail-dot` is set inline from siteConfig `heroDotColor`; unset keeps the
+     monochrome dot that follows the theme. */
+  background: var(--avail-dot, var(--foreground));
   flex: none;
 }
+/* siteConfig `heroDotPulse` off — the dot stays, the ripple goes. */
+.avail.still i::after { display: none; }
 .avail i::after {
   content: "";
   position: absolute;

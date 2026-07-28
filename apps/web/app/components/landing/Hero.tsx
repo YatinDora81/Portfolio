@@ -17,6 +17,10 @@ interface HeroProps {
   avatarUrl: string;
   resumeUrl: string;
   availabilityStatus: string;
+  /** Hex colour for the status dot. Empty follows `--foreground`, as it always did. */
+  dotColor?: string;
+  /** Whether that dot keeps its ping ripple. Defaults to on. */
+  dotPulse?: boolean;
   /** Total skills shown in the Skills section — drives v2's "+N more" chip. */
   totalSkills?: number;
   /** Optional extra photos for the name-hover peek deck. Defaults to [avatarUrl]. */
@@ -216,6 +220,8 @@ export default function Hero({
   avatarUrl,
   resumeUrl,
   availabilityStatus,
+  dotColor,
+  dotPulse = true,
   totalSkills,
   photos,
 }: HeroProps) {
@@ -314,7 +320,13 @@ export default function Hero({
     <section className="hero" id="hero" ref={heroRef}>
       <div className="hcontainer">
         <div className="toprow animate-fade-in-blur">
-          <span className="avail mono">
+          {/* The dot is CMS-driven twice over: an unset colour leaves the
+              custom property off entirely so the CSS fallback (`--foreground`)
+              keeps its theme-following monochrome. */}
+          <span
+            className={`avail mono${dotPulse ? '' : ' still'}`}
+            style={dotColor ? ({ '--avail-dot': dotColor } as React.CSSProperties) : undefined}
+          >
             <i aria-hidden="true" />
             <span>{availabilityStatus}</span>
           </span>

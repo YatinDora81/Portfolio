@@ -16,8 +16,20 @@ export interface SiteConfig {
   contactEmail: string;
   availabilityStatus: string;
   availabilityDetail: string;
+  /** Hero status dot. "" means "follow --foreground", the monochrome default. */
+  heroDotColor: string;
+  /** Whether the hero status dot keeps its ping ripple. */
+  heroDotPulse: boolean;
   copyrightName: string;
 }
+
+/**
+ * The dot's colour is painted through an inline custom property, so a stored
+ * value reaches the browser as CSS. Only hex literals are let through — the
+ * admin writes them with a colour picker, and anything else (a `url()`, a
+ * second declaration) falls back to the default rather than being trusted.
+ */
+const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
 export async function getSiteConfig(): Promise<SiteConfig> {
   const [rows, content] = await Promise.all([
@@ -51,6 +63,12 @@ export async function getSiteConfig(): Promise<SiteConfig> {
     contactEmail: map.get("contactEmail") ?? "",
     availabilityStatus: map.get("availabilityStatus") ?? "",
     availabilityDetail: map.get("availabilityDetail") ?? "",
+    heroDotColor: HEX.test((map.get("heroDotColor") ?? "").trim())
+      ? map.get("heroDotColor")!.trim()
+      : "",
+    // Absent row = the pulse the hero has always had, so an untouched database
+    // renders exactly as before.
+    heroDotPulse: (map.get("heroDotPulse") ?? "on") !== "off",
     copyrightName: map.get("copyrightName") ?? "",
   };
 }
