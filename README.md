@@ -57,7 +57,7 @@ The public-facing portfolio at [yatindora.in](https://yatindora.in).
 Admin dashboard CMS for managing all portfolio content.
 
 **Manages:**
-- Hero titles & skill badges
+- Hero copy, titles & skill badges, and which hero version is live
 - About paragraphs & education
 - Social links & resume
 - Skills (with visibility toggle)
@@ -67,7 +67,7 @@ Admin dashboard CMS for managing all portfolio content.
 - Quotes / Thought of the Day
 - Contact form purposes
 - Incoming messages (inbox)
-- Site configuration (name, tagline, avatar, etc.)
+- Site configuration (name, avatar, contact, footer, etc.)
 - Admin users & roles
 
 **Auth Features:**
@@ -163,7 +163,7 @@ bun run build
 
 ## Database Models
 
-**Content:** HeroTitle, HeroSkillBadge, SocialLink, AboutParagraph, Education, Skill, Experience, ExperienceBullet, Project, ProjectBullet, Blog, Quote, ContactPurpose, ContactMessage, SiteConfig
+**Content:** HeroContent, HeroTitle, HeroSkillBadge, SocialLink, AboutParagraph, Education, Skill, Experience, ExperienceBullet, Project, ProjectBullet, Blog, Quote, ContactPurpose, ContactMessage, SiteConfig
 
 **Admin:** AdminUser (with roles: Owner, Admin, Sub-Admin)
 

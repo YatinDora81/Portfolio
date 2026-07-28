@@ -37,6 +37,7 @@ import { getSession } from "@/lib/session";
 export type Entity =
   | "heroTitle"
   | "heroSkillBadge"
+  | "heroContent"
   | "aboutParagraph"
   | "education"
   | "skill"
@@ -164,12 +165,15 @@ type TxClient = Omit<
 >;
 
 /** Entities whose rows carry a `sortOrder`, i.e. the reorderable ones. */
-type SortableEntity = Exclude<Entity, "quote" | "adminUser">;
+type SortableEntity = Exclude<Entity, "quote" | "adminUser" | "heroContent">;
 
 /** Admin routes to re-render after a write. Doubles as the entity allow-list. */
 const ENTITY_PATHS: Record<Entity, readonly string[]> = {
   heroTitle: ["/hero"],
   heroSkillBadge: ["/hero"],
+  // Every admin route that renders the live version or the hero's copy. This is
+  // what the site-config form's `revalidatePath("/", "layout")` used to cover.
+  heroContent: ["/hero", "/site-config", "/social-links", "/dashboard"],
   aboutParagraph: ["/about/paragraphs"],
   education: ["/about/education"],
   skill: ["/skills"],
@@ -193,6 +197,7 @@ const SORTABLE: Record<SortableEntity, true> = {
 const LABEL: Record<Entity, string> = {
   heroTitle: "hero title",
   heroSkillBadge: "hero skill badge",
+  heroContent: "hero copy",
   aboutParagraph: "about paragraph",
   education: "education entry",
   skill: "skill",
@@ -537,6 +542,13 @@ async function createRow(
       });
       return row.id;
     }
+    // There are exactly two hero versions and the migration created both rows.
+    // Nothing in the admin offers a third, so a create here is a malformed
+    // payload rather than a user action.
+    // `return fail(…)`, not a bare call: `fail` is typed `never`, but ESLint's
+    // no-fallthrough only recognises a return or a throw.
+    case "heroContent":
+      return fail("There are only two hero versions — you can't add another.");
     case "aboutParagraph": {
       const row = await tx.aboutParagraph.create({
         data: { content: req(f, "content", entity), sortOrder: await nextSortOrder(tx, entity, cursors) },
@@ -656,6 +668,27 @@ async function updateRow(
       await tx.heroSkillBadge.update({ where: { id }, data });
       return;
     }
+    case "heroContent": {
+      // `text` and not `req`: blanking the tagline is a legitimate edit, and v2
+      // no longer inherits v1's copy when its own row is empty — the migration
+      // resolved that fallback once, so blank now means blank.
+      const data: { intro?: string; tagline?: string; live?: string | null } = {};
+      if (present(f, "intro")) data.intro = text(f, "intro", entity);
+      if (present(f, "tagline")) data.tagline = text(f, "tagline", entity);
+      if (present(f, "live")) {
+        // Only ever "make this one live". There is no way to spell "nothing is
+        // live" — the site always serves a hero, so the way to retire a version
+        // is to make the other one live.
+        if (!bool(f, "live", entity)) fail("Make the other version live instead — one of them always is.");
+        // Clear before writing: `live` carries a unique index, so setting the
+        // sentinel while the other row still holds it collides mid-transaction.
+        await tx.heroContent.updateMany({ where: { NOT: { id } }, data: { live: null } });
+        data.live = "live";
+      }
+      nonEmpty(data, entity);
+      await tx.heroContent.update({ where: { id }, data });
+      return;
+    }
     case "aboutParagraph": {
       const data: { content?: string } = {};
       if (present(f, "content")) data.content = req(f, "content", entity);
@@ -764,6 +797,9 @@ async function deleteRow(tx: TxClient, entity: Entity, id: string, actor: Actor)
     case "heroSkillBadge":
       await tx.heroSkillBadge.deleteMany({ where: { id } });
       return;
+    // Deleting one would leave a version with no copy and possibly no live row.
+    case "heroContent":
+      return fail("Hero copy can't be deleted — edit it or make the other version live.");
     case "aboutParagraph":
       await tx.aboutParagraph.deleteMany({ where: { id } });
       return;

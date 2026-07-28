@@ -20,19 +20,20 @@ export interface SiteConfig {
 }
 
 export async function getSiteConfig(): Promise<SiteConfig> {
-  const rows = await prisma.siteConfig.findMany();
+  const [rows, content] = await Promise.all([
+    prisma.siteConfig.findMany(),
+    prisma.heroContent.findMany(),
+  ]);
   const map = new Map(rows.map((r) => [r.key, r.value]));
-  const heroVersion: HeroVersion = map.get("heroVersion") === "v1" ? "v1" : "v2";
-  // `||` not `??`: the site-config form posts every key on every save, so blank
-  // rows are inevitable and `??` would let "" through and empty the hero.
-  const intro =
-    heroVersion === "v2"
-      ? map.get("introV2") || map.get("intro") || ""
-      : map.get("intro") || "";
-  const tagline =
-    heroVersion === "v2"
-      ? map.get("taglineV2") || map.get("tagline") || ""
-      : map.get("tagline") || "";
+  // The hero the admin marked live. No row live is not an error state worth
+  // throwing over — the site still has to render, so it falls back to v2, the
+  // same coercion every other read of this used to make.
+  const live = content.find((c) => c.live) ?? content.find((c) => c.version === "v2") ?? null;
+  const heroVersion: HeroVersion = live?.version === "v1" ? "v1" : "v2";
+  // No `||` chain any more: the migration resolved "v2 borrows v1's copy while
+  // its own row is blank" once, into the rows themselves. Blank now means blank.
+  const intro = live?.intro ?? "";
+  const tagline = live?.tagline ?? "";
   return {
     name: map.get("name") ?? "",
     heroVersion,

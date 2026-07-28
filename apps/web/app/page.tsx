@@ -37,7 +37,8 @@ function quoteOfDay(quotes: { quote: string; author: string }[]) {
 }
 
 export default async function Home() {
-  // First and alone: it holds `heroVersion`, which every hero query is scoped to.
+  // First and alone: it resolves the live hero row, and `heroVersion` scopes
+  // every hero query below it.
   const siteConfig = await getSiteConfig();
   const [heroData, aboutData, skills, experiences, projects, blogs, quotes, contactData] =
     await Promise.all([

@@ -4,8 +4,8 @@ import { prisma } from "../src/index";
  * Installs the v2 hero content alongside v1. Additive and idempotent: it never
  * deletes a v1 row, and re-running it replaces only what it wrote last time.
  *
- * It deliberately does NOT set `heroVersion` — flipping the site over is a
- * separate, deliberate act in the admin portal.
+ * It deliberately does NOT make v2 live — flipping the site over is a separate,
+ * deliberate act on the admin's Hero page.
  *
  * Run from `packages/db`, after the migration is applied and the code deployed:
  *   bun run hero:v2
@@ -19,15 +19,12 @@ async function main() {
   // Idempotent re-assertion of the migration's backfill.
   await prisma.socialLink.updateMany({ where: { name: "LeetCode 2" }, data: { version: "v1" } });
 
-  await prisma.siteConfig.upsert({
-    where: { key: "introV2" },
-    update: { value: INTRO_V2 },
-    create: { key: "introV2", value: INTRO_V2 },
-  });
-  await prisma.siteConfig.upsert({
-    where: { key: "taglineV2" },
-    update: { value: TAGLINE_V2 },
-    create: { key: "taglineV2", value: TAGLINE_V2 },
+  // Upserted by version, and `live` is left alone on both paths — installing the
+  // copy must never move the site onto it.
+  await prisma.heroContent.upsert({
+    where: { version: "v2" },
+    update: { intro: INTRO_V2, tagline: TAGLINE_V2 },
+    create: { version: "v2", intro: INTRO_V2, tagline: TAGLINE_V2 },
   });
 
   // Scoped to v2, so a re-run can't duplicate rows and can't touch v1.
@@ -50,7 +47,7 @@ async function main() {
     ],
   });
 
-  console.log("v2 hero content installed — flip `heroVersion` in the admin to serve it");
+  console.log("v2 hero content installed — open /hero in the admin and serve v2 to publish it");
 }
 
 main()

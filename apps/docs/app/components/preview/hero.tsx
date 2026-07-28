@@ -43,7 +43,8 @@ const PAW_TILT = [
 type HeroVersion = "v1" | "v2";
 
 interface HeroPreviewProps {
-  /** Which body the site is currently publishing — siteConfig `heroVersion`. */
+  /** Which body to draw — the HeroContent row holding `live`, or the tab being
+      edited when the caller is showing one version at a time. */
   version: HeroVersion;
   titles: string[];
   name: string;

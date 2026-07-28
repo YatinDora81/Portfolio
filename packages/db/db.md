@@ -2,16 +2,28 @@
 
 ## Hero Section
 
-Two hero layouts exist side by side and the `heroVersion` SiteConfig row (`"v1"` or `"v2"`) picks the one the site serves:
+Two hero layouts exist side by side and the `HeroContent` row holding `live` picks the one the site serves:
 
 - **v1** — one bio paragraph carries the skill badges inline and ends with the tagline; ghost "Resume / CV" comes before solid "Get in touch".
 - **v2** — a plain intro paragraph, then the tagline on its own italic line; the skill badges sit in a wrapped pill row that ends in a `+N more ↓` chip linking to `#skills`; solid "Get in touch" comes before ghost "View Resume".
 
 The role line itself is shared: it cycles whenever the live version has more than one title, in either version.
 
-The three models below carry a `version` column so both sets of rows can live in the table at once.
+HeroTitle, HeroSkillBadge and SocialLink each carry a `version` column so both sets of rows can live in one table; HeroContent carries one row *per* version instead.
 
-**Invariant:** `sortOrder` is dense *within* a version, never across the table — v1 and v2 each start at 0 and number independently. Every read that feeds the hero must therefore carry a version filter. The one deliberate exception is the admin's icon-usage lookup, which asks "is this icon used anywhere at all".
+**Invariant:** `sortOrder` is dense *within* a version, never across the table — v1 and v2 each start at 0 and number independently, in HeroTitle, HeroSkillBadge and SocialLink. Every read that feeds the hero must therefore carry a version filter. The one deliberate exception is the admin's icon-usage lookup, which asks "is this icon used anywhere at all".
+
+### HeroContent
+Exactly two rows, one per hero version, holding that version's copy and whether it is the one visitors see. Replaces the `heroVersion`, `intro`, `tagline`, `introV2` and `taglineV2` SiteConfig rows.
+
+- `version` — `"v1"` or `"v2"`, unique, with a `HeroContent_version_check` CHECK constraint
+- `intro` / `tagline` — NOT NULL, default `""`. **Blank means blank:** v2 no longer inherits v1's copy when its own field is empty. The migration resolved that fallback once, into the rows.
+- `live` — the sentinel `"live"` on the served row, NULL on the other. Unique, so "at most one row is live" is a database constraint rather than a convention. A boolean would have needed a partial index Prisma cannot express; `@unique` on a boolean would have allowed only one *non*-live row.
+
+Edited on the admin's `/hero` page, through the same save bar as the titles and badges — which is the point: flipping the live version commits in the same transaction as the rows that version depends on.
+```
+e.g. { version: "v2", intro: "Hand me an idea…", tagline: "Ship it, scale it…", live: "live" }
+```
 
 ### HeroTitle
 Role titles shown under the name in the hero heading with a blur transition. Two or more rows in the live version cycle; a single row holds still. v1 ships several, v2 ships one.
@@ -154,23 +166,20 @@ e.g. { label: "Job Opportunity", emoji: "🚀", sortOrder: 2 }
 ## Site Config
 
 ### SiteConfig
-Key-value store for site-wide configuration that was previously hardcoded in frontend components. Fetched in a single query by `getSiteConfig()` in `data.ts`, with fallback defaults if keys are missing.
+Key-value store for site-wide configuration that was previously hardcoded in frontend components. Read by `getSiteConfig()` in `data.ts`, alongside the HeroContent rows, with fallback defaults if keys are missing.
+
+The hero's own copy and the version it serves are **not** here — they are columns on [HeroContent](#herocontent), so that flipping the live version commits atomically with the titles and badges it depends on.
 
 **Keys:**
 | Key | Used In | Description |
 |-----|---------|-------------|
-| `name` | Hero | Full name shown on the hero nameplate (split on whitespace, trailing dot appended) and used as avatar alt text |
-| `heroVersion` | Hero | Which hero to serve — `"v1"` or `"v2"`. Also scopes every HeroTitle / HeroSkillBadge / SocialLink read. Anything other than `"v1"` is treated as `"v2"` |
-| `tagline` | Hero (v1) | Sentence closing the hero bio, appended after the inline skill badges |
-| `intro` | Hero (v1) | Text before the inline skill badges ("I build scalable web apps using") |
-| `taglineV2` | Hero (v2) | The italic voice line under the intro paragraph. Falls back to `tagline` when unset |
-| `introV2` | Hero (v2) | The standalone intro paragraph, above the skill pills. Falls back to `intro` when unset |
-| `avatarUrl` | Hero | Path to avatar image (e.g. "/mine/avatar.png") |
+| `name` | Hero, JSON-LD | Full name on the hero nameplate (split on whitespace, trailing dot appended), and `Person.name` in the structured data |
+| `avatarUrl` | Hero, JSON-LD | Path to avatar image (e.g. "/mine/avatar.png"). Also `Person.image` |
 | `heroPhotos` | Hero | Comma-separated photo paths for the name-hover peek deck (e.g. "/mine/avatar.png,/mine/avatar-2.png"). Gliding across the nameplate flips through them; one entry means no flipping. Falls back to `avatarUrl` when unset |
-| `resumeUrl` | Hero | Path to resume PDF (e.g. "/Yatin-SDE-1.pdf") |
+| `resumeUrl` | Hero, About | Path to resume PDF (e.g. "/Yatin-SDE-1.pdf"). The About terminal's `resume`/`cv` command opens the same URL |
 | `navbarLogo` | Navbar | Logo text in the navbar (e.g. "Yatin.Dora") |
 | `contactEmail` | Contact | Email address used in the mailto link of the contact form |
-| `availabilityStatus` | Contact | Status text (e.g. "Available for opportunities") |
+| `availabilityStatus` | Hero, Contact | Status text (e.g. "Available for opportunities") — the hero pill and the contact availability card render the same string |
 | `availabilityDetail` | Contact | Detail text below status (e.g. "Open to freelance, full-time & collaborations") |
 | `copyrightName` | Footer | Name in the copyright line (e.g. "Yatin Dora") |
 

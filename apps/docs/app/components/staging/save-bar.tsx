@@ -25,6 +25,7 @@ import { useStaging } from "./staging-provider";
 const WHERE: Record<Entity, string> = {
   heroTitle: "Hero · titles",
   heroSkillBadge: "Hero · skill badges",
+  heroContent: "Hero · copy and live version",
   aboutParagraph: "About · paragraphs",
   education: "About · education",
   skill: "Skills",

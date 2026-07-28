@@ -11,6 +11,7 @@ async function seed() {
   await prisma.skill.deleteMany();
   await prisma.heroTitle.deleteMany();
   await prisma.heroSkillBadge.deleteMany();
+  await prisma.heroContent.deleteMany();
   await prisma.socialLink.deleteMany();
   await prisma.aboutParagraph.deleteMany();
   await prisma.education.deleteMany();
@@ -755,21 +756,33 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
   });
   console.log("Contact purposes seeded");
 
+  // ── Hero Content ──
+  // One row per version, each holding that version's copy. `live` is set
+  // explicitly rather than left to a fallback: every code path coerces an absent
+  // value to v2, while this seed has always shipped v1 as the served hero.
+  await prisma.heroContent.createMany({
+    data: [
+      {
+        version: "v1",
+        intro: "I build scalable web apps using",
+        tagline: "Ship it, scale it, make it smarter, keep learning — that's the loop I live in.",
+        live: "live",
+      },
+      {
+        version: "v2",
+        intro:
+          "Hand me an idea, I'll hand you back a product. Fast backends, clean frontends, and pipelines that do their job so quietly you forget they exist.",
+        tagline: "Ship it, scale it, make it smarter — that's the loop I live in.",
+        live: null,
+      },
+    ],
+  });
+  console.log("Hero content seeded");
+
   // ── Site Config ──
   await prisma.siteConfig.createMany({
     data: [
       { key: "name", value: "Yatin Dora" },
-      // `intro`/`tagline` are v1's copy; v2's lives under its own keys so neither
-      // version can overwrite the other.
-      { key: "heroVersion", value: "v1" },
-      { key: "tagline", value: "Ship it, scale it, make it smarter, keep learning — that's the loop I live in." },
-      { key: "intro", value: "I build scalable web apps using" },
-      { key: "taglineV2", value: "Ship it, scale it, make it smarter — that's the loop I live in." },
-      {
-        key: "introV2",
-        value:
-          "Hand me an idea, I'll hand you back a product. Fast backends, clean frontends, and pipelines that do their job so quietly you forget they exist.",
-      },
       { key: "avatarUrl", value: "/mine/avatar.png" },
       { key: "heroPhotos", value: "/mine/avatar.png,/mine/avatar2.jpeg" },
       { key: "resumeUrl", value: "https://drive.google.com/file/d/1eljvOFwiltQbn6EvSiTv1fwjDipTSVI1/view?usp=sharing" },

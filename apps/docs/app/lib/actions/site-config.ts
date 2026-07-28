@@ -8,16 +8,14 @@ import { getSession } from "@/lib/session";
  * `"use server"` exports compile to public POST endpoints addressable by action
  * id, so this runs for anyone who can reach the origin whether or not they ever
  * loaded the admin UI. Everything below the session check exists because of
- * that: an allow-list, so an arbitrary key cannot be minted, and a per-key
- * validator, because `heroVersion` decides what the whole public hero renders.
+ * that: an allow-list, so an arbitrary key cannot be minted.
+ *
+ * The hero's copy and the version it serves are NOT here any more — they are
+ * columns on HeroContent, written through `applyStagedChanges`, so the one key
+ * on this page that could reshape the public hero no longer passes through it.
  */
 const ALLOWED_KEYS = new Set([
   "name",
-  "tagline",
-  "intro",
-  "taglineV2",
-  "introV2",
-  "heroVersion",
   "avatarUrl",
   "navbarLogo",
   "contactEmail",
@@ -31,9 +29,7 @@ const ALLOWED_KEYS = new Set([
 
 /** Returns the value to persist, or null to drop the entry entirely. */
 function validate(key: string, value: string): string | null {
-  if (!ALLOWED_KEYS.has(key)) return null;
-  if (key === "heroVersion") return value === "v1" || value === "v2" ? value : null;
-  return value;
+  return ALLOWED_KEYS.has(key) ? value : null;
 }
 
 export async function updateSiteConfig(entries: { key: string; value: string }[]) {
@@ -50,7 +46,11 @@ export async function updateSiteConfig(entries: { key: string; value: string }[]
       prisma.siteConfig.upsert({ where: { key }, create: { key, value }, update: { value } })
     )
   );
-  revalidatePath("/site-config");
-  // The hero version reshapes every page that previews it.
-  if (clean.some((e) => e.key === "heroVersion")) revalidatePath("/", "layout");
+  // Unconditional, and not just "/site-config". These keys are baked into the
+  // preview panes on several other admin pages, and the layout-wide revalidate
+  // that used to cover them only fired because the form happened to post
+  // `heroVersion` on every save — which it no longer holds.
+  for (const path of ["/site-config", "/hero", "/social-links", "/links", "/contact-purposes"]) {
+    revalidatePath(path);
+  }
 }

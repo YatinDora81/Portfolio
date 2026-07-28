@@ -2,6 +2,7 @@
 
 import type { Entity } from "@/lib/actions/staging";
 import { useStaging } from "@/components/staging/staging-provider";
+import { useLiveVersion, type HeroContentRow } from "@/components/staging/hero-live";
 import {
   PreviewFrame,
   AboutPreview,
@@ -70,7 +71,7 @@ function usePendingCount(entities: readonly Entity[]): number {
 }
 
 /** What each preview draws — the scope of its pending count. */
-const HERO_ENTITIES = ["heroTitle", "heroSkillBadge", "socialLink"] as const;
+const HERO_ENTITIES = ["heroTitle", "heroSkillBadge", "heroContent", "socialLink"] as const;
 const ABOUT_ENTITIES = ["aboutParagraph", "education"] as const;
 const SKILL_ENTITIES = ["skill"] as const;
 const QUOTE_ENTITIES = ["quote"] as const;
@@ -82,12 +83,15 @@ const LINK_ENTITIES = ["socialLink"] as const;
 // of the three entities the hero draws, so all three get the same wrapper.
 
 export function StagedHeroPreview({
-  version, titles, badges, socialLinks, name, tagline, intro, avatarUrl, photos,
+  version, titles, badges, socialLinks, content, name, avatarUrl, photos,
   availabilityStatus, totalSkills, label = "Hero Preview",
 }: {
-  /** Which hero this pane is showing — the tab being edited, not necessarily
-      siteConfig `heroVersion`. Also the scope of every list below. */
-  version: "v1" | "v2";
+  /** Which hero this pane is showing, and the scope of every list below. Pass
+      it when the caller owns a version tab (/hero). OMIT it when the caller has
+      no tab (/social-links): the pane then follows the staged flip, so it can
+      never draw one version while its own pending-change chip counts the flip
+      to the other. */
+  version?: "v1" | "v2";
   titles: { id: string; title: string; version: string }[];
   badges: { id: string; name: string; version: string }[];
   /** `iconKey` is optional so a caller that only has names still compiles, but
@@ -95,9 +99,11 @@ export function StagedHeroPreview({
       display name. `version` is nullable on this table alone, where NULL means
       the row shows in every hero. */
   socialLinks: { id: string; name: string; iconKey?: string; version: string | null }[];
+  /** Both HeroContent rows. The pane picks its own version's copy and overlays
+      any staged edit, so typing in the copy card moves the preview immediately —
+      the same guarantee the titles and badges already had. */
+  content: HeroContentRow[];
   name: string;
-  tagline: string;
-  intro: string;
   avatarUrl?: string;
   /** siteConfig `heroPhotos`, already split — the site fans these; without them
       the deck falls back to the single avatar card. */
@@ -114,20 +120,28 @@ export function StagedHeroPreview({
   // that ignores it renders the other tab's pending drag. It filters AFTER,
   // never on the server rows, because a staged create carries its version in
   // the field bag — filtering first would hide it until save.
-  const t = useLive("heroTitle", titles, version).filter((x) => x.version === version);
-  const b = useLive("heroSkillBadge", badges, version).filter((x) => x.version === version);
+  // Resolved before any list is scoped, and unconditionally so the hook order
+  // never depends on whether the caller passed a version.
+  const live = useLiveVersion(content);
+  const v = version ?? live;
+
+  const t = useLive("heroTitle", titles, v).filter((x) => x.version === v);
+  const b = useLive("heroSkillBadge", badges, v).filter((x) => x.version === v);
   // Social links are one unscoped list with one drag, so this one stays global.
-  const s = useLive("socialLink", socialLinks).filter((x) => x.version === version || x.version == null);
+  const s = useLive("socialLink", socialLinks).filter((x) => x.version === v || x.version == null);
+  // No version argument: HeroContent has no reorder op, so there is no
+  // per-tab pending drag for the lookup to pick the wrong one of.
+  const c = useLive("heroContent", content).find((x) => x.version === v);
   const pending = usePendingCount(HERO_ENTITIES);
 
   return (
     <PreviewFrame label={label} pendingCount={pending}>
       <HeroPreview
-        version={version}
+        version={v}
         titles={t.map((x) => str(x.title))}
         name={name}
-        tagline={tagline}
-        intro={intro}
+        tagline={str(c?.tagline)}
+        intro={str(c?.intro)}
         skills={b.map((x) => ({ name: str(x.name) }))}
         // `iconKey` rides along: the site draws `socialIconMap[link.iconKey]`,
         // so a row whose display name differs from its slug ("LeetCode 2") only

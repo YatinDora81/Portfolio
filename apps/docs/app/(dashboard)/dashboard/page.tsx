@@ -18,8 +18,8 @@ const SITE_HOST = SITE.replace(/^https?:\/\//, "");
  * what the site shows. Only the live version's rows are the health number.
  */
 async function liveHeroTitleCount() {
-  const row = await prisma.siteConfig.findUnique({ where: { key: "heroVersion" } });
-  return prisma.heroTitle.count({ where: { version: row?.value === "v1" ? "v1" : "v2" } });
+  const row = await prisma.heroContent.findFirst({ where: { live: "live" }, select: { version: true } });
+  return prisma.heroTitle.count({ where: { version: row?.version === "v1" ? "v1" : "v2" } });
 }
 
 async function getDashboardData() {

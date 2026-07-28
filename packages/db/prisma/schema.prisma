@@ -7,10 +7,29 @@ datasource db {
   provider = "postgresql"
 }
 
-/// Two hero layouts live side by side, chosen by the `heroVersion` SiteConfig row.
-/// sortOrder is dense *within a version*, so every read of the three models below
-/// must carry a version filter — the one exception is the admin's icon-usage
-/// lookup, which asks "is this icon used anywhere at all".
+/// One row per hero layout, holding that version's copy and whether it is the
+/// one the site serves. Replaces the `heroVersion`, `intro`, `tagline`,
+/// `introV2` and `taglineV2` SiteConfig rows: the version a visitor sees is now
+/// a column on a real row, so flipping it is an ordinary staged update that
+/// commits in the same transaction as the titles and badges it depends on.
+///
+/// `live` is a nullable string holding the sentinel "live", not a boolean, so
+/// "at most one row is live" is a unique index Prisma itself declares — NULLs
+/// don't collide in Postgres. A boolean would need a partial index Prisma
+/// cannot express, and `@unique` on a boolean would permit only one *non*-live
+/// row. Reads stay boolean-shaped: `content.find((c) => c.live)`.
+model HeroContent {
+  id      String  @id @default(uuid())
+  version String  @unique
+  intro   String  @default("")
+  tagline String  @default("")
+  live    String? @unique
+}
+
+/// Two hero layouts live side by side, chosen by the HeroContent row that holds
+/// `live`. sortOrder is dense *within a version*, so every read of the three
+/// models below must carry a version filter — the one exception is the admin's
+/// icon-usage lookup, which asks "is this icon used anywhere at all".
 model HeroTitle {
   id        String @id @default(uuid())
   title     String

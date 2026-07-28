@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
+  createContext, startTransition, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from "react";
 import { useRouter } from "next/navigation";
 import { IconAlertTriangle } from "@tabler/icons-react";
@@ -50,6 +50,17 @@ export interface StagingApi {
   /** Partial: only the keys passed are written. Coalesces onto any pending op for `id`. */
   stageUpdate(entity: Entity, id: string, fields: StagedFields): void;
   stageDelete(entity: Entity, id: string): void;
+  /**
+   * Removes a pending update — the counterpart `stageUpdate` never had, since it
+   * only ever appends or merges. Without it, an always-mounted field (the hero
+   * copy textareas) that is typed into and then typed back leaves the bar
+   * reading "1 unsaved change" over a change that no longer exists.
+   *
+   * With no `keys` the whole op goes; with `keys`, only those fields, and the op
+   * goes when the bag empties. Deliberately blind to creates — a create's bag is
+   * the row itself, so removing a key from it is not an undo.
+   */
+  clearUpdate(entity: Entity, id: string, keys?: string[]): void;
   /** The row-level undo. */
   unstageDelete(entity: Entity, id: string): void;
   /** `ids` is the full post-drag order, tempIds included. `version` scopes the
@@ -146,6 +157,28 @@ export function StagingProvider({ toast, children }: {
     });
   }, []);
 
+  const clearUpdate = useCallback((entity: Entity, id: string, keys?: string[]) => {
+    setOps((prev) => {
+      const i = prev.findIndex(
+        (op) => op.kind === "update" && op.entity === entity && op.id === id
+      );
+      const target = prev[i];
+      if (!target || target.kind !== "update") return prev;
+      if (!keys) return prev.filter((op) => op !== target);
+
+      const fields = { ...target.fields };
+      for (const key of keys) delete fields[key];
+      if (Object.keys(fields).length === 0) return prev.filter((op) => op !== target);
+
+      // Rebuilt rather than mutated, like every other path here: `settle` retires
+      // the batch by object identity, so an op edited in place would be retired
+      // along with the version that was actually sent.
+      const next = [...prev];
+      next[i] = { kind: "update", entity, id, fields };
+      return next;
+    });
+  }, []);
+
   const stageDelete = useCallback((entity: Entity, id: string) => {
     setOps((prev) => {
       const isStagedCreate = prev.some(
@@ -186,6 +219,13 @@ export function StagingProvider({ toast, children }: {
   }, []);
 
   const unstageDelete = useCallback((entity: Entity, id: string) => {
+    // The batch is already on the wire and this row is very likely gone by the
+    // time the click lands. Undoing would re-stage the edit the delete folded
+    // away as a fresh update op — one `settle` will not retire, because it was
+    // never in the batch — and `updateRow` uses a strict `update`, so every
+    // later save dies on P2025 with no row on screen to cancel it from. The
+    // move buttons beside it are already gated on `saving`; this was the gap.
+    if (savingRef.current) return;
     setOps((prev) => {
       const gone = prev.find(
         (op) => op.kind === "delete" && op.entity === entity && op.id === id
@@ -335,8 +375,18 @@ export function StagingProvider({ toast, children }: {
           return;
         }
         saved = true;
-        settle(batch, res.idMap);
-        router.refresh();
+        // Both inside a transition, and this is load-bearing. Next holds the
+        // whole RSC tree on a transition lane for the duration of a server
+        // action, so a default-priority `setOps` renders on its own: the store
+        // empties while the tree still carries the PRE-save props. Every other
+        // surface hides that — its edits live in a dialog that is already
+        // closed — but the hero copy textareas render straight off `overlay()`,
+        // so they would flip back to the old copy for a whole refresh round
+        // trip and a successful save would look like it had failed.
+        startTransition(() => {
+          settle(batch, res.idMap);
+          router.refresh();
+        });
 
         if (!publish) {
           toast(`Saved ${plural(n)}.`);
@@ -365,7 +415,9 @@ export function StagingProvider({ toast, children }: {
         );
       } finally {
         savingRef.current = false;
-        setSaving(false);
+        // Same lane as the retirement above, or the inputs re-enable a beat
+        // before the content behind them is real.
+        startTransition(() => setSaving(false));
       }
     },
     [router, settle, toast]
@@ -379,6 +431,7 @@ export function StagingProvider({ toast, children }: {
       stageCreate,
       stageUpdate,
       stageDelete,
+      clearUpdate,
       unstageDelete,
       stageReorder,
       discardAll,
@@ -389,8 +442,8 @@ export function StagingProvider({ toast, children }: {
       overlay,
     }),
     [
-      ops, saving, stageCreate, stageUpdate, stageDelete, unstageDelete, stageReorder,
-      discardAll, commit, isDeleted, isNew, isEdited, overlay,
+      ops, saving, stageCreate, stageUpdate, stageDelete, clearUpdate, unstageDelete,
+      stageReorder, discardAll, commit, isDeleted, isNew, isEdited, overlay,
     ]
   );
 
