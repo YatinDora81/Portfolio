@@ -10,6 +10,9 @@ export async function createSocialLink(formData: FormData) {
   const detail = (formData.get("detail") as string) || null;
   const { _max } = await prisma.socialLink.aggregate({ _max: { sortOrder: true } });
   const count = (_max.sortOrder ?? -1) + 1;
+  // No `version`: the column is nullable and NULL means shown in every hero
+  // version, which is what a link added here should be. Scoping one to v1 or v2
+  // is deliberate and happens on /social-links.
   await prisma.socialLink.create({ data: { name, href, iconKey, detail, sortOrder: count } });
   revalidatePath("/social-links");
   revalidatePath("/links");

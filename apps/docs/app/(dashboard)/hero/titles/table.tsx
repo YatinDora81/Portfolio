@@ -14,13 +14,22 @@ import {
   IconChevronUp, IconChevronDown,
 } from "@tabler/icons-react";
 
-interface Title { id: string; title: string; sortOrder: number }
+type Version = "v1" | "v2";
+
+interface Title { id: string; title: string; sortOrder: number; version: string }
 
 const FORM_ID = "hero-title-form";
 
-export function HeroTitlesTable({ titles }: { titles: Title[] }) {
+export function HeroTitlesTable({ titles, liveVersion, preview }: {
+  titles: Title[];
+  liveVersion: Version;
+  /** Both panes are rendered on the server; the tab picks which one is shown,
+      so the preview under the table is always the hero being edited. */
+  preview: Record<Version, React.ReactNode>;
+}) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Title | null>(null);
+  const [version, setVersion] = useState<Version>(liveVersion);
   const {
     overlay, stageCreate, stageUpdate, stageDelete, unstageDelete, stageReorder,
     isDeleted, isNew, isEdited, saving,
@@ -28,19 +37,31 @@ export function HeroTitlesTable({ titles }: { titles: Title[] }) {
 
   // Nothing here writes to the database — every action stages, and the page
   // renders the staged view so the change is on screen before it is saved.
-  const staged = overlay("heroTitle", titles, (t) => t.id);
+  // The version scopes the reorder lookup as well: `stageReorder` keeps one
+  // pending drag per tab, so an unscoped overlay would apply the other tab's.
+  const staged = overlay("heroTitle", titles, (t) => t.id, version);
+
+  // After the overlay, never before: a staged create only carries a version
+  // once `overlay` has materialised it, so filtering first strands new rows.
+  const mine = staged.filter((t) => t.version === version);
 
   const { order, handleProps, itemProps } = useSortable(
-    staged.map((t) => t.id),
-    (ids) => stageReorder("heroTitle", ids),
+    mine.map((t) => t.id),
+    // sortOrder is dense within a version, so the drag belongs to this tab alone.
+    (ids) => stageReorder("heroTitle", ids, version),
     { disabled: saving }
   );
 
-  const byId = new Map(staged.map((t) => [t.id, t] as const));
+  const byId = new Map(mine.map((t) => [t.id, t] as const));
   const seen = new Set(order);
   // `order` is the drag preview and only re-seeds after a render, so a row
   // staged this tick is appended rather than dropped for a frame.
-  const rows = [...order.flatMap((id) => byId.get(id) ?? []), ...staged.filter((t) => !seen.has(t.id))];
+  const rows = [...order.flatMap((id) => byId.get(id) ?? []), ...mine.filter((t) => !seen.has(t.id))];
+
+  const tabs: { key: Version; label: string; n: number }[] = [
+    { key: "v1", label: liveVersion === "v1" ? "v1 · live" : "v1", n: staged.filter((t) => t.version === "v1").length },
+    { key: "v2", label: liveVersion === "v2" ? "v2 · live" : "v2", n: staged.filter((t) => t.version === "v2").length },
+  ];
 
   /** One mark per row: on its way out, brand new, or edited. */
   const mark = (id: string) =>
@@ -58,15 +79,16 @@ export function HeroTitlesTable({ titles }: { titles: Title[] }) {
   const move = (from: number, to: number) => {
     const ids = rows.map((t) => t.id);
     [ids[from], ids[to]] = [ids[to]!, ids[from]!];
-    stageReorder("heroTitle", ids);
+    stageReorder("heroTitle", ids, version);
   };
 
   const openNew = () => { setEditing(null); setDialogOpen(true); };
 
   return (
+    <>
     <Card flush>
       <CardHead
-        title="Rotating titles"
+        title="Role titles"
         count={rows.length}
         right={
           <Button size="sm" onClick={openNew}>
@@ -75,11 +97,24 @@ export function HeroTitlesTable({ titles }: { titles: Title[] }) {
         }
       />
 
+      <div className="filters">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            className={cn("filt", version === t.key && "on")}
+            onClick={() => setVersion(t.key)}
+          >
+            {t.label} {t.n}
+          </button>
+        ))}
+      </div>
+
       {rows.length === 0 ? (
         <div className="empty">
           <div className="empty-ic"><IconSparkles size={18} stroke={1.5} /></div>
-          <b>No titles yet</b>
-          <span>The hero cycles through these one after another, right under your name.</span>
+          <b>No {version} titles yet</b>
+          <span>The role line right under your name reads from here. Add two or more and it cycles through them.</span>
           <Button size="sm" onClick={openNew}><IconPlus size={14} stroke={1.8} /> Add the first title</Button>
         </div>
       ) : (
@@ -163,7 +198,8 @@ export function HeroTitlesTable({ titles }: { titles: Title[] }) {
             // the saved row identical. A blank one would fail the whole batch.
             if (!title) return;
             if (editing) stageUpdate("heroTitle", editing.id, { title });
-            else stageCreate("heroTitle", { title });
+            // The column is NOT NULL and the server rejects a create without it.
+            else stageCreate("heroTitle", { title, version });
             setDialogOpen(false);
           }}
         >
@@ -172,10 +208,12 @@ export function HeroTitlesTable({ titles }: { titles: Title[] }) {
             label="Title"
             defaultValue={editing?.title || ""}
             required
-            hint="Shown one at a time in the hero rotator — a few words reads best."
+            hint="Shown one at a time under your name — a few words reads best."
           />
         </form>
       </Dialog>
     </Card>
+    {preview[version]}
+    </>
   );
 }

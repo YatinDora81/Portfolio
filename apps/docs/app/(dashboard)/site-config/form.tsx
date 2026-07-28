@@ -4,7 +4,9 @@ import { useMemo, useState, useTransition } from "react";
 import { Card, CardHead } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { PreviewFrame, HeroPreview } from "@/components/preview";
 import { updateSiteConfig } from "@/lib/actions/site-config";
 import { publishSite } from "@/lib/actions/publish";
 import {
@@ -13,24 +15,54 @@ import {
 
 interface ConfigEntry { key: string; label: string; description: string; value: string }
 
+type HeroVersion = "v1" | "v2";
+
+/** One version's slice of the three tables the hero draws. */
+interface HeroRows {
+  titles: string[];
+  skills: { name: string }[];
+  socialLinks: { name: string; iconKey?: string }[];
+}
+
+const VERSION_OPTIONS = [
+  { value: "v1", label: "v1 — chips inside the sentence, Resume first" },
+  { value: "v2", label: "v2 — voice line and pill row, Get in touch first" },
+];
+
 /**
  * Presentation only — which card a key lands in and how wide it renders.
  * Keys missing from here still render (in a trailing "Other" card), so the
  * form can never silently drop a SiteConfig row.
  */
 const GROUPS: { title: string; keys: string[] }[] = [
-  { title: "Identity", keys: ["name", "navbarLogo", "avatarUrl", "copyrightName", "intro", "tagline"] },
+  { title: "Identity", keys: ["name", "navbarLogo", "avatarUrl", "copyrightName"] },
+  { title: "Hero copy", keys: ["intro", "tagline", "introV2", "taglineV2"] },
   { title: "Contact & availability", keys: ["contactEmail", "availabilityStatus", "availabilityDetail"] },
 ];
 /** Sentence-length copy — gets a full-width textarea. */
-const LONG = new Set(["intro", "tagline", "availabilityDetail"]);
+const LONG = new Set(["intro", "tagline", "introV2", "taglineV2", "availabilityDetail"]);
 /** URLs / addresses — mono face. */
 const MONO = new Set(["avatarUrl", "contactEmail"]);
 
-export function SiteConfigForm({ configs }: { configs: ConfigEntry[] }) {
+export function SiteConfigForm({
+  configs,
+  heroVersion,
+  hero,
+  photos,
+  totalSkills,
+}: {
+  configs: ConfigEntry[];
+  heroVersion: string;
+  hero: Record<HeroVersion, HeroRows>;
+  photos: string[];
+  /** Drives v2's "+N more" chip — the Skills section's visible row count. */
+  totalSkills?: number;
+}) {
+  // `heroVersion` is not a CONFIG_KEYS entry — it rides in the same state so the
+  // dirty flag, Reset and both save buttons cover it without a second code path.
   const initial = useMemo(
-    () => Object.fromEntries(configs.map(c => [c.key, c.value])),
-    [configs]
+    () => ({ ...Object.fromEntries(configs.map(c => [c.key, c.value])), heroVersion }),
+    [configs, heroVersion]
   );
   const [values, setValues] = useState<Record<string, string>>(initial);
   const [base, setBase] = useState<Record<string, string>>(initial);
@@ -121,41 +153,94 @@ export function SiteConfigForm({ configs }: { configs: ConfigEntry[] }) {
   const leftovers = configs.filter(c => !grouped.has(c.key));
   if (leftovers.length) cards.push({ title: "Other", entries: leftovers });
 
+  const version: HeroVersion = values.heroVersion === "v1" ? "v1" : "v2";
+  // Same fallback chain as apps/web/app/lib/data.ts: v2 borrows v1's copy while
+  // its own row is blank, so the preview shows what would actually ship.
+  const intro = version === "v2" ? values.introV2 || values.intro || "" : values.intro || "";
+  const tagline = version === "v2" ? values.taglineV2 || values.tagline || "" : values.tagline || "";
+  const rows = hero[version];
+
   return (
-    <div className="grid gap-3">
-      {cards.map(g => (
-        <Card flush key={g.title}>
-          <CardHead title={g.title} count={g.entries.length} />
+    <>
+      <div className="grid gap-3">
+        {/* Its own card rather than a CONFIG_KEYS entry: the generic renderer only
+            knows textarea-or-input and pairs short fields up, so this would read as
+            a half-width string field beside an unrelated one. */}
+        <Card flush>
+          <CardHead title="Hero version" />
           <div className="card-b" style={{ paddingBottom: 2 }}>
-            {fields(g.entries)}
+            <div className="ico-warn">
+              <IconAlertTriangle size={16} stroke={1.8} style={{ flex: "none", marginTop: 1 }} />
+              <div>
+                <b>This switch saves on its own, and only from here</b>
+                Hero titles, skill badges and social links stage in the save bar at the top of the
+                screen; this page saves through the buttons at the bottom. Publishing a flip while
+                those are still staged serves the new hero against the old rows — commit the save bar
+                first. Save before leaving this page, too: unsaved changes here are not kept.
+              </div>
+            </div>
+            <Select
+              label="Version on the live site"
+              hint="Which hero layout the public page renders."
+              value={version}
+              onChange={e => set("heroVersion", e.target.value)}
+              options={VERSION_OPTIONS}
+            />
           </div>
         </Card>
-      ))}
 
-      {pubError && (
-        <div className="hint" style={{ color: "var(--bad)", lineHeight: 1.5 }}>
-          <IconAlertTriangle size={14} stroke={1.6} style={{ flexShrink: 0 }} />
-          <span>The changes are saved. Publishing failed ({pubError}) — retry with Publish, top right.</span>
-        </div>
-      )}
+        {cards.map(g => (
+          <Card flush key={g.title}>
+            <CardHead title={g.title} count={g.entries.length} />
+            <div className="card-b" style={{ paddingBottom: 2 }}>
+              {fields(g.entries)}
+            </div>
+          </Card>
+        ))}
 
-      <div className="row-acts" style={{ justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
-        {saved && !pubError && (
-          <span className="hint" style={{ color: "var(--good)" }}>
-            <IconCheck size={13} /> Saved
-          </span>
+        {pubError && (
+          <div className="hint" style={{ color: "var(--bad)", lineHeight: 1.5 }}>
+            <IconAlertTriangle size={14} stroke={1.6} style={{ flexShrink: 0 }} />
+            <span>The changes are saved. Publishing failed ({pubError}) — retry with Publish, top right.</span>
+          </div>
         )}
-        {!saved && dirty && <span className="hint">Unsaved changes</span>}
-        <Button variant="ghost" onClick={() => setValues(base)} disabled={!dirty || pending}>
-          <IconArrowBackUp size={13} /> Reset
-        </Button>
-        <Button variant="outline" onClick={() => handleSave(false)} disabled={pending || !dirty}>
-          <IconDeviceFloppy size={13} /> {pending && busy === "save" ? "Saving…" : "Save changes"}
-        </Button>
-        <Button onClick={() => handleSave(true)} disabled={pending || !dirty}>
-          <IconWorldUpload size={13} /> {pending && busy === "publish" ? "Saving…" : "Save & Publish"}
-        </Button>
+
+        <div className="row-acts" style={{ justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+          {saved && !pubError && (
+            <span className="hint" style={{ color: "var(--good)" }}>
+              <IconCheck size={13} /> Saved
+            </span>
+          )}
+          {!saved && dirty && <span className="hint">Unsaved changes</span>}
+          <Button variant="ghost" onClick={() => setValues(base)} disabled={!dirty || pending}>
+            <IconArrowBackUp size={13} /> Reset
+          </Button>
+          <Button variant="outline" onClick={() => handleSave(false)} disabled={pending || !dirty}>
+            <IconDeviceFloppy size={13} /> {pending && busy === "save" ? "Saving…" : "Save changes"}
+          </Button>
+          <Button onClick={() => handleSave(true)} disabled={pending || !dirty}>
+            <IconWorldUpload size={13} /> {pending && busy === "publish" ? "Saving…" : "Save & Publish"}
+          </Button>
+        </div>
       </div>
-    </div>
+
+      {/* Draws the version currently SELECTED, not the saved one — the question this
+          pane answers is what the switch is about to publish. */}
+      <PreviewFrame label={`Hero Preview — ${version} (affected by config changes)`}>
+        <HeroPreview
+          version={version}
+          titles={rows.titles}
+          name={values["name"] || "Yatin"}
+          tagline={tagline}
+          intro={intro}
+          skills={rows.skills}
+          socialLinks={rows.socialLinks}
+          avatarUrl={values["avatarUrl"] || ""}
+          photos={photos}
+          availabilityStatus={values["availabilityStatus"] || ""}
+          totalSkills={totalSkills}
+        />
+      </PreviewFrame>
+    </>
   );
 }

@@ -52,8 +52,9 @@ export interface StagingApi {
   stageDelete(entity: Entity, id: string): void;
   /** The row-level undo. */
   unstageDelete(entity: Entity, id: string): void;
-  /** `ids` is the full post-drag order, tempIds included. */
-  stageReorder(entity: Entity, ids: string[]): void;
+  /** `ids` is the full post-drag order, tempIds included. `version` scopes the
+      op so a drag on one version's tab doesn't discard the other's. */
+  stageReorder(entity: Entity, ids: string[], version?: string | null): void;
   discardAll(): void;
   commit(opts: { publish: boolean }): Promise<void>;
   isDeleted(entity: Entity, id: string): boolean;
@@ -66,8 +67,11 @@ export interface StagingApi {
    * deletes stay in the list — flag them with `isDeleted` and render the row
    * struck through with its undo; dropping them here would take the undo with
    * them and punch holes in the ids a later reorder has to name.
+   *
+   * `version` must match the one the tab passes to `stageReorder`, or a
+   * version-scoped list picks up the other tab's pending drag instead of its own.
    */
-  overlay<T>(entity: Entity, rows: T[], getId: (r: T) => string): T[];
+  overlay<T>(entity: Entity, rows: T[], getId: (r: T) => string, version?: string | null): T[];
 }
 
 const StagingContext = createContext<StagingApi | null>(null);
@@ -196,14 +200,20 @@ export function StagingProvider({ toast, children }: {
     });
   }, []);
 
-  const stageReorder = useCallback((entity: Entity, ids: string[]) => {
-    // Only the final order matters, so a second drag replaces the first rather
-    // than stacking a second op onto the count.
-    setOps((prev) => [
-      ...prev.filter((op) => !(op.kind === "reorder" && op.entity === entity)),
-      { kind: "reorder", entity, ids: [...ids] },
-    ]);
-  }, []);
+  const stageReorder = useCallback(
+    (entity: Entity, ids: string[], version?: string | null) => {
+      // Only the final order matters, so a second drag replaces the first rather
+      // than stacking a second op onto the count. Compared by version too, or
+      // dragging on the v2 tab would silently discard a pending v1 drag.
+      setOps((prev) => [
+        ...prev.filter(
+          (op) => !(op.kind === "reorder" && op.entity === entity && op.version === version)
+        ),
+        { kind: "reorder", entity, ids: [...ids], version },
+      ]);
+    },
+    []
+  );
 
   const discardAll = useCallback(() => setOps([]), []);
 
@@ -226,7 +236,7 @@ export function StagingProvider({ toast, children }: {
   );
 
   const overlay = useCallback(
-    <T,>(entity: Entity, rows: T[], getId: (r: T) => string): T[] => {
+    <T,>(entity: Entity, rows: T[], getId: (r: T) => string, version?: string | null): T[] => {
       const mine = ops.filter((op) => op.entity === entity);
       if (mine.length === 0) return rows;
 
@@ -249,7 +259,9 @@ export function StagingProvider({ toast, children }: {
         if (op.kind === "create") out.push(materialise<T>(op.tempId, op.fields, out.length));
       }
 
-      const ro = mine.find((op) => op.kind === "reorder");
+      // Matched on version, not just entity: with a drag pending on both tabs
+      // the unmatched one would otherwise win and render the wrong order here.
+      const ro = mine.find((op) => op.kind === "reorder" && op.version === version);
       if (ro?.kind === "reorder") {
         const pos = new Map(ro.ids.map((id, i) => [id, i] as const));
         // Rows the drag never saw (created since) keep their relative order at

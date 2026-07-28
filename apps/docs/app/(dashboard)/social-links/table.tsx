@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardHead } from "@/components/ui/card";
 import { Button, IconButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Dialog } from "@/components/ui/dialog";
 import { DeleteButton } from "@/components/shared/delete-button";
 import { IconPicker } from "@/components/shared/icon-picker";
@@ -17,7 +18,11 @@ import {
 } from "@tabler/icons-react";
 import { findSocialIcon } from "@repo/ui/icons/registry";
 
-interface Link { id: string; name: string; href: string; iconKey: string; detail: string | null; sortOrder: number }
+interface Link {
+  id: string; name: string; href: string; iconKey: string; detail: string | null; sortOrder: number;
+  /** Which hero version lists this link. NULL = every version. */
+  version: string | null;
+}
 
 const ENTITY: Entity = "socialLink";
 
@@ -95,6 +100,8 @@ export function SocialLinksTable({ links }: { links: Link[] }) {
                     {l.detail ? ` · ${l.detail}` : ""}
                   </div>
                 </div>
+                {/* Only a scoped row is worth a chip — most links are in both. */}
+                {l.version ? <span className="chip off">{l.version} hero only</span> : null}
                 <div className="row-acts">
                   {del ? (
                     // The row stays put until the save; this is the undo.
@@ -160,6 +167,8 @@ export function SocialLinksTable({ links }: { links: Link[] }) {
               iconKey: String(data.get("iconKey") ?? ""),
               // Blank clears it, exactly as the old action's `|| null` did.
               detail: String(data.get("detail") ?? ""),
+              // Blank means NULL, which is "every version" — not "no version".
+              version: String(data.get("version") ?? ""),
             };
             if (editing) stageUpdate(ENTITY, editing.id, fields);
             else stageCreate(ENTITY, fields);
@@ -177,6 +186,17 @@ export function SocialLinksTable({ links }: { links: Link[] }) {
             required
           />
           <Input name="detail" label="Detail (optional)" placeholder="@handle" defaultValue={editing?.detail || ""} />
+          <Select
+            name="version"
+            label="Show in hero"
+            defaultValue={editing?.version || ""}
+            options={[
+              { value: "", label: "Both versions" },
+              { value: "v1", label: "v1 only" },
+              { value: "v2", label: "v2 only" },
+            ]}
+            hint="Only the hero honours this. The contact section, the footer and the structured data list every link whichever version is live."
+          />
           <div className="row-acts" style={{ justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
             <Button variant="ghost" type="button" onClick={() => setDialogOpen(false)}>Cancel</Button>
             {/* Not "Save": the save bar owns that word now, and this only stages. */}

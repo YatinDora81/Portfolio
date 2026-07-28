@@ -16,13 +16,22 @@ import { useStaging } from "@/components/staging/staging-provider";
 import { useSortable } from "@/lib/use-sortable";
 import { cn } from "@/lib/utils";
 
-interface Badge { id: string; name: string; iconKey: string; sortOrder: number }
+type Version = "v1" | "v2";
+
+interface Badge { id: string; name: string; iconKey: string; sortOrder: number; version: string }
 
 const FORM_ID = "hero-badge-form";
 
-export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
+export function HeroSkillBadgesTable({ badges, liveVersion, preview }: {
+  badges: Badge[];
+  liveVersion: Version;
+  /** Both panes are rendered on the server; the tab picks which one is shown,
+      so the preview under the table is always the hero being edited. */
+  preview: Record<Version, React.ReactNode>;
+}) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Badge | null>(null);
+  const [version, setVersion] = useState<Version>(liveVersion);
   const {
     overlay, stageCreate, stageUpdate, stageDelete, unstageDelete, stageReorder,
     isDeleted, isNew, isEdited, saving,
@@ -30,19 +39,31 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
 
   // Nothing here writes to the database — every action stages, and the page
   // renders the staged view so the change is on screen before it is saved.
-  const staged = overlay("heroSkillBadge", badges, (b) => b.id);
+  // The version scopes the reorder lookup as well: `stageReorder` keeps one
+  // pending drag per tab, so an unscoped overlay would apply the other tab's.
+  const staged = overlay("heroSkillBadge", badges, (b) => b.id, version);
+
+  // After the overlay, never before: a staged create only carries a version
+  // once `overlay` has materialised it, so filtering first strands new rows.
+  const mine = staged.filter((b) => b.version === version);
 
   const { order, handleProps, itemProps } = useSortable(
-    staged.map((b) => b.id),
-    (ids) => stageReorder("heroSkillBadge", ids),
+    mine.map((b) => b.id),
+    // sortOrder is dense within a version, so the drag belongs to this tab alone.
+    (ids) => stageReorder("heroSkillBadge", ids, version),
     { disabled: saving }
   );
 
-  const byId = new Map(staged.map((b) => [b.id, b] as const));
+  const byId = new Map(mine.map((b) => [b.id, b] as const));
   const seen = new Set(order);
   // `order` is the drag preview and only re-seeds after a render, so a row
   // staged this tick is appended rather than dropped for a frame.
-  const rows = [...order.flatMap((id) => byId.get(id) ?? []), ...staged.filter((b) => !seen.has(b.id))];
+  const rows = [...order.flatMap((id) => byId.get(id) ?? []), ...mine.filter((b) => !seen.has(b.id))];
+
+  const tabs: { key: Version; label: string; n: number }[] = [
+    { key: "v1", label: liveVersion === "v1" ? "v1 · live" : "v1", n: staged.filter((b) => b.version === "v1").length },
+    { key: "v2", label: liveVersion === "v2" ? "v2 · live" : "v2", n: staged.filter((b) => b.version === "v2").length },
+  ];
 
   /** One mark per row: on its way out, brand new, or edited. */
   const mark = (id: string) =>
@@ -62,10 +83,11 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
   const move = (from: number, to: number) => {
     const ids = rows.map((b) => b.id);
     [ids[from], ids[to]] = [ids[to]!, ids[from]!];
-    stageReorder("heroSkillBadge", ids);
+    stageReorder("heroSkillBadge", ids, version);
   };
 
   return (
+    <>
     <Card flush>
       <CardHead
         title="Skill badges"
@@ -77,11 +99,24 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
         }
       />
 
+      <div className="filters">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            className={cn("filt", version === t.key && "on")}
+            onClick={() => setVersion(t.key)}
+          >
+            {t.label} {t.n}
+          </button>
+        ))}
+      </div>
+
       {rows.length === 0 ? (
         <div className="empty">
           <div className="empty-ic"><IconTag size={18} stroke={1.5} /></div>
-          <b>No badges yet</b>
-          <span>Badges sit inline in the hero bio. Each one needs a name and an icon key.</span>
+          <b>No {version} badges yet</b>
+          <span>v1 sets these inline in the hero paragraph, v2 lists them as pills under it. Each one needs a name and an icon.</span>
           <Button size="sm" onClick={openNew}><IconPlus size={14} stroke={1.8} /> Add the first badge</Button>
         </div>
       ) : (
@@ -171,7 +206,8 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
             // the saved row identical. A blank name would fail the whole batch.
             if (!name) return;
             if (editing) stageUpdate("heroSkillBadge", editing.id, { name, iconKey });
-            else stageCreate("heroSkillBadge", { name, iconKey });
+            // The column is NOT NULL and the server rejects a create without it.
+            else stageCreate("heroSkillBadge", { name, iconKey, version });
             setDialogOpen(false);
           }}
         >
@@ -184,10 +220,12 @@ export function HeroSkillBadgesTable({ badges }: { badges: Badge[] }) {
             label="Icon"
             defaultValue={editing?.iconKey || ""}
             required
-            hint="The hero bio draws this inline next to the name."
+            hint="Drawn beside the badge name — inline in v1's paragraph, in v2's pill row."
           />
         </form>
       </Dialog>
     </Card>
+    {preview[version]}
+    </>
   );
 }

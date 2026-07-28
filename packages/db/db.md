@@ -2,22 +2,39 @@
 
 ## Hero Section
 
+Two hero layouts exist side by side and the `heroVersion` SiteConfig row (`"v1"` or `"v2"`) picks the one the site serves:
+
+- **v1** — one bio paragraph carries the skill badges inline and ends with the tagline; ghost "Resume / CV" comes before solid "Get in touch".
+- **v2** — a plain intro paragraph, then the tagline on its own italic line; the skill badges sit in a wrapped pill row that ends in a `+N more ↓` chip linking to `#skills`; solid "Get in touch" comes before ghost "View Resume".
+
+The role line itself is shared: it cycles whenever the live version has more than one title, in either version.
+
+The three models below carry a `version` column so both sets of rows can live in the table at once.
+
+**Invariant:** `sortOrder` is dense *within* a version, never across the table — v1 and v2 each start at 0 and number independently. Every read that feeds the hero must therefore carry a version filter. The one deliberate exception is the admin's icon-usage lookup, which asks "is this icon used anywhere at all".
+
 ### HeroTitle
-Rotating titles that cycle in the hero heading with a blur transition.
+Role titles shown under the name in the hero heading with a blur transition. Two or more rows in the live version cycle; a single row holds still. v1 ships several, v2 ships one.
+
+- `version` — `"v1"` or `"v2"`, required (defaults to `"v2"`)
 ```
-e.g. { title: "Full-Stack Developer", sortOrder: 1 }
+e.g. { title: "Full-Stack Developer", sortOrder: 1, version: "v1" }
 ```
 
 ### HeroSkillBadge
-Inline skill badges displayed in the hero bio text ("I build scalable web apps using [React] [Next.js] ...").
+Skill badges shown in the hero. v1 draws them inline inside the bio sentence (`intro` + badges + `tagline`); v2 draws them as a separate pill row below the intro, followed by a `+N more ↓` chip counting the skills that only appear in the skills grid.
+
+- `version` — `"v1"` or `"v2"`, required (defaults to `"v2"`)
 ```
-e.g. { name: "React", iconKey: "react", sortOrder: 1 }
+e.g. { name: "React", iconKey: "react", sortOrder: 1, version: "v2" }
 ```
 
 ### SocialLink
 Social links displayed in hero, footer, and contact sections (GitHub, LinkedIn, LeetCode, Email). `detail` is optional and shown in the contact section.
+
+- `version` — nullable, and NULL means "shown in every version". It is nullable here and not above because the footer and contact section read this table too and stay version-agnostic; scope a row only when one hero version needs a link the other does not.
 ```
-e.g. { name: "GitHub", href: "https://github.com/yatindora", iconKey: "github", detail: "@yatindora", sortOrder: 2 }
+e.g. { name: "GitHub", href: "https://github.com/yatindora", iconKey: "github", detail: "@yatindora", sortOrder: 2, version: null }
 ```
 
 ---
@@ -143,8 +160,11 @@ Key-value store for site-wide configuration that was previously hardcoded in fro
 | Key | Used In | Description |
 |-----|---------|-------------|
 | `name` | Hero | Full name shown on the hero nameplate (split on whitespace, trailing dot appended) and used as avatar alt text |
-| `tagline` | Hero | Sentence after the skill badges in hero bio |
-| `intro` | Hero | Text before inline skill badges ("I build scalable web apps using") |
+| `heroVersion` | Hero | Which hero to serve — `"v1"` or `"v2"`. Also scopes every HeroTitle / HeroSkillBadge / SocialLink read. Anything other than `"v1"` is treated as `"v2"` |
+| `tagline` | Hero (v1) | Sentence closing the hero bio, appended after the inline skill badges |
+| `intro` | Hero (v1) | Text before the inline skill badges ("I build scalable web apps using") |
+| `taglineV2` | Hero (v2) | The italic voice line under the intro paragraph. Falls back to `tagline` when unset |
+| `introV2` | Hero (v2) | The standalone intro paragraph, above the skill pills. Falls back to `intro` when unset |
 | `avatarUrl` | Hero | Path to avatar image (e.g. "/mine/avatar.png") |
 | `heroPhotos` | Hero | Comma-separated photo paths for the name-hover peek deck (e.g. "/mine/avatar.png,/mine/avatar-2.png"). Gliding across the nameplate flips through them; one entry means no flipping. Falls back to `avatarUrl` when unset |
 | `resumeUrl` | Hero | Path to resume PDF (e.g. "/Yatin-SDE-1.pdf") |

@@ -48,7 +48,7 @@ export function ResumeForm({ resumeUrl }: { resumeUrl: string }) {
         placeholder="https://drive.google.com/..."
         label="Resume URL"
         mono
-        hint="Drives the “Resume / CV” button in the hero. Paste a public share link."
+        hint="Drives the resume button in the hero. Paste a public share link."
       />
       {pubError && (
         <div

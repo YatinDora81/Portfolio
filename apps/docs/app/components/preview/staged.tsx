@@ -54,9 +54,9 @@ function str(v: unknown): string {
  * and staged deletes actually dropped, which is the one place a preview must
  * diverge from what the tables render.
  */
-function useLive<T extends { id: string }>(entity: Entity, rows: T[]): T[] {
+function useLive<T extends { id: string }>(entity: Entity, rows: T[], version?: string | null): T[] {
   const { overlay, isDeleted } = useStaging();
-  return overlay(entity, rows, (r) => r.id).filter((r) => !isDeleted(entity, r.id));
+  return overlay(entity, rows, (r) => r.id, version).filter((r) => !isDeleted(entity, r.id));
 }
 
 /**
@@ -82,15 +82,19 @@ const LINK_ENTITIES = ["socialLink"] as const;
 // of the three entities the hero draws, so all three get the same wrapper.
 
 export function StagedHeroPreview({
-  titles, badges, socialLinks, name, tagline, intro, avatarUrl, photos, availabilityStatus,
-  label = "Hero Preview",
+  version, titles, badges, socialLinks, name, tagline, intro, avatarUrl, photos,
+  availabilityStatus, totalSkills, label = "Hero Preview",
 }: {
-  titles: { id: string; title: string }[];
-  badges: { id: string; name: string }[];
+  /** Which hero this pane is showing — the tab being edited, not necessarily
+      siteConfig `heroVersion`. Also the scope of every list below. */
+  version: "v1" | "v2";
+  titles: { id: string; title: string; version: string }[];
+  badges: { id: string; name: string; version: string }[];
   /** `iconKey` is optional so a caller that only has names still compiles, but
       pass it where you have it — the hero's glyph is keyed on it, not on the
-      display name. */
-  socialLinks: { id: string; name: string; iconKey?: string }[];
+      display name. `version` is nullable on this table alone, where NULL means
+      the row shows in every hero. */
+  socialLinks: { id: string; name: string; iconKey?: string; version: string | null }[];
   name: string;
   tagline: string;
   intro: string;
@@ -101,16 +105,25 @@ export function StagedHeroPreview({
   /** siteConfig `availabilityStatus` — the hero pill is verbatim CMS copy, so
       leaving it out renders "not set" rather than a stand-in sentence. */
   availabilityStatus?: string;
+  /** The Skills section's row count, for v2's "+N more" chip. Omitted = no chip. */
+  totalSkills?: number;
   label?: string;
 }) {
-  const t = useLive("heroTitle", titles);
-  const b = useLive("heroSkillBadge", badges);
-  const s = useLive("socialLink", socialLinks);
+  // Two separate reasons the version appears twice here. It goes INTO `useLive`
+  // because the hero tables scope their reorder ops by version, and a lookup
+  // that ignores it renders the other tab's pending drag. It filters AFTER,
+  // never on the server rows, because a staged create carries its version in
+  // the field bag — filtering first would hide it until save.
+  const t = useLive("heroTitle", titles, version).filter((x) => x.version === version);
+  const b = useLive("heroSkillBadge", badges, version).filter((x) => x.version === version);
+  // Social links are one unscoped list with one drag, so this one stays global.
+  const s = useLive("socialLink", socialLinks).filter((x) => x.version === version || x.version == null);
   const pending = usePendingCount(HERO_ENTITIES);
 
   return (
     <PreviewFrame label={label} pendingCount={pending}>
       <HeroPreview
+        version={version}
         titles={t.map((x) => str(x.title))}
         name={name}
         tagline={tagline}
@@ -126,6 +139,7 @@ export function StagedHeroPreview({
         avatarUrl={avatarUrl}
         photos={photos}
         availabilityStatus={availabilityStatus}
+        totalSkills={totalSkills}
       />
     </PreviewFrame>
   );

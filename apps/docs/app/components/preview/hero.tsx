@@ -7,8 +7,18 @@ import { DIM, FAINT, FADE_MS, MONO, useRotatingTitle } from "./frame";
 // ─── Hero Preview ────────────────────────────────────────────────
 // Mirrors apps/web/app/components/landing/Hero.tsx at card scale: the
 // availability + socials top row, the fanned photo deck, the uppercase
-// nameplate, the `// role ▮` line, the intro sentence with inline skill chips,
-// the two actions, and the paw-print scroll cue.
+// nameplate, the `// role ▮` line, the body, and the paw-print scroll cue.
+//
+// Everything above the body is shared, exactly as it is on the site. The body
+// is the whole of the version split, so it lives in `BodyV1` / `BodyV2` here
+// the same way it lives in `HeroBodyV1` / `HeroBodyV2` there:
+//
+//   v1 — one paragraph carrying the intro, the chips inline with an " and "
+//        before the last, and `. ${tagline}` tacked on; ghost Resume / CV then
+//        solid Get in touch; five strokes on the document icon.
+//   v2 — a plain intro paragraph, an italic voice line for the tagline, a
+//        wrapped pill row ending in the "+N more ↓" doorway to #skills; solid
+//        Get in touch then ghost View Resume; four strokes on the icon.
 //
 // The hero is interactive on the real site — the photo trails the cursor across
 // the letters and each social pill unfurls its label on hover. A preview can't
@@ -30,7 +40,11 @@ const PAW_TILT = [
   "translateX(-3px) rotate(-8deg)",
 ];
 
+type HeroVersion = "v1" | "v2";
+
 interface HeroPreviewProps {
+  /** Which body the site is currently publishing — siteConfig `heroVersion`. */
+  version: HeroVersion;
   titles: string[];
   name: string;
   tagline: string;
@@ -48,6 +62,10 @@ interface HeroPreviewProps {
       because this pill is verbatim CMS copy and a plausible-looking default
       would read as the line that ships. */
   availabilityStatus?: string;
+  /** Mirrors Hero's `totalSkills` — the Skills section's row count, which drives
+      v2's "+N more" chip. Absent means unknown, and the chip is left out
+      entirely rather than shown against a number this pane guessed. */
+  totalSkills?: number;
 }
 
 /** Filled paw print — the same glyph the real scroll cue repeats three times. */
@@ -63,9 +81,139 @@ function Paw() {
   );
 }
 
+/** `.chip`, scaled. The pill row asks for `mono`, matching `.heropills .chip`. */
+function SkillChip({ name, mono }: { name: string; mono?: boolean }) {
+  const Icon = findSkillIcon(name)?.Icon;
+  return (
+    <span
+      className="inline-flex items-center gap-[5px] align-middle"
+      style={{
+        height: 20, padding: "0 7px", borderRadius: 6,
+        border: `1px dashed ${LINE}`, background: "#262626", color: "#fafafa",
+        fontSize: mono ? 10 : 11, fontWeight: 500,
+        fontFamily: mono ? MONO : undefined,
+      }}
+    >
+      {Icon && <span className="inline-flex size-[11px] flex-none"><Icon /></span>}
+      {name}
+    </span>
+  );
+}
+
+/** v1 draws a fifth stroke that v2 drops. */
+function ResumeIcon({ fifthLine }: { fifthLine: boolean }) {
+  return (
+    <svg
+      className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      {fifthLine && <polyline points="10 9 9 9 8 9" />}
+    </svg>
+  );
+}
+
+const BTN = { borderRadius: 7, padding: "7px 13px", fontSize: 11.5, fontWeight: 500 } as const;
+
+function ResumeButton({ version }: { version: HeroVersion }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5"
+      style={{ ...BTN, border: `1px solid ${LINE}`, background: "#0a0a0a", color: "#fafafa" }}
+    >
+      <ResumeIcon fifthLine={version === "v1"} />
+      {version === "v1" ? "Resume / CV" : "View Resume"}
+    </span>
+  );
+}
+
+function ContactButton() {
+  return (
+    <span className="inline-flex items-center gap-1.5" style={{ ...BTN, background: "#fafafa", color: "#0a0a0a" }}>
+      Get in touch
+      <svg
+        className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+      >
+        <line x1="5" y1="12" x2="19" y2="12" />
+        <polyline points="12 5 19 12 12 19" />
+      </svg>
+    </span>
+  );
+}
+
+const PARAGRAPH = { fontSize: 12.5, lineHeight: 2, color: DIM, maxWidth: "42rem" } as const;
+
+function BodyV1({ intro, tagline, skills }: { intro: string; tagline: string; skills: { name: string }[] }) {
+  return (
+    <>
+      <p className="mt-4 break-words" style={PARAGRAPH}>
+        {intro || "Your intro text"}{" "}
+        {skills.map((skill, i) => (
+          <span key={`${skill.name}-${i}`}>
+            <SkillChip name={skill.name} />
+            {i < skills.length - 2 && " "}
+            {i === skills.length - 2 && " and "}
+          </span>
+        ))}
+        {tagline ? `. ${tagline}` : skills.length > 0 ? "." : ""}
+      </p>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <ResumeButton version="v1" />
+        <ContactButton />
+      </div>
+    </>
+  );
+}
+
+function BodyV2({ intro, tagline, skills, totalSkills }: {
+  intro: string;
+  tagline: string;
+  skills: { name: string }[];
+  totalSkills?: number;
+}) {
+  const remaining = (totalSkills ?? 0) - skills.length;
+
+  return (
+    <>
+      <p className="mt-4 break-words" style={PARAGRAPH}>{intro || "Your intro text"}</p>
+      {/* `.voice` — same ink as the intro, a step smaller and in italics */}
+      {tagline && (
+        <p className="mt-2 break-words italic" style={{ fontSize: 11.5, color: DIM, maxWidth: "42rem" }}>
+          {tagline}
+        </p>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        {skills.map((skill, i) => <SkillChip key={`${skill.name}-${i}`} name={skill.name} mono />)}
+        {remaining > 0 && (
+          <span
+            className="inline-flex items-center"
+            style={{
+              height: 20, padding: "0 7px", borderRadius: 6, border: `1px solid ${LINE}`,
+              color: DIM, fontFamily: MONO, fontSize: 10, fontWeight: 500,
+            }}
+          >
+            +{remaining} more ↓
+          </span>
+        )}
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <ContactButton />
+        <ResumeButton version="v2" />
+      </div>
+    </>
+  );
+}
+
 export function HeroPreview({
-  titles, name, tagline, intro, skills, socialLinks, avatarUrl,
-  photos, availabilityStatus,
+  version, titles, name, tagline, intro, skills, socialLinks, avatarUrl,
+  photos, availabilityStatus, totalSkills,
 }: HeroPreviewProps) {
   // The hook owns the 2500ms hold / 400ms fade AND the guard that stops an
   // interrupted fade stranding the word at opacity 0 — never re-implement it here.
@@ -223,66 +371,11 @@ export function HeroPreview({
       {/* the rotation is decorative — screen readers get the full list, once */}
       {titles.length > 0 && <span className="sr-only">{titles.join(", ")}</span>}
 
-      {/* intro sentence with inline skill chips */}
-      <p className="mt-4 break-words" style={{ fontSize: 12.5, lineHeight: 2, color: DIM, maxWidth: "42rem" }}>
-        {intro || "Your intro text"}{" "}
-        {skills.map((skill, i) => {
-          const Icon = findSkillIcon(skill.name)?.Icon;
-          return (
-            <span key={`${skill.name}-${i}`}>
-              <span
-                className="inline-flex items-center gap-[5px] align-middle"
-                style={{
-                  height: 20, padding: "0 7px", borderRadius: 6,
-                  border: `1px dashed ${LINE}`, background: "#262626", color: "#fafafa",
-                  fontSize: 11, fontWeight: 500,
-                }}
-              >
-                {Icon && <span className="inline-flex size-[11px] flex-none"><Icon /></span>}
-                {skill.name}
-              </span>
-              {i < skills.length - 2 && " "}
-              {i === skills.length - 2 && " and "}
-            </span>
-          );
-        })}
-        {tagline ? `. ${tagline}` : skills.length > 0 ? "." : ""}
-      </p>
-
-      {/* actions */}
-      <div className="mt-5 flex flex-wrap gap-2">
-        <span
-          className="inline-flex items-center gap-1.5"
-          style={{
-            borderRadius: 7, padding: "7px 13px", fontSize: 11.5, fontWeight: 500,
-            border: `1px solid ${LINE}`, background: "#0a0a0a", color: "#fafafa",
-          }}
-        >
-          <svg
-            className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-          >
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="16" y1="13" x2="8" y2="13" />
-            <line x1="16" y1="17" x2="8" y2="17" />
-          </svg>
-          Resume / CV
-        </span>
-        <span
-          className="inline-flex items-center gap-1.5"
-          style={{ borderRadius: 7, padding: "7px 13px", fontSize: 11.5, fontWeight: 500, background: "#fafafa", color: "#0a0a0a" }}
-        >
-          Get in touch
-          <svg
-            className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-          >
-            <line x1="5" y1="12" x2="19" y2="12" />
-            <polyline points="12 5 19 12 12 19" />
-          </svg>
-        </span>
-      </div>
+      {version === "v1" ? (
+        <BodyV1 intro={intro} tagline={tagline} skills={skills} />
+      ) : (
+        <BodyV2 intro={intro} tagline={tagline} skills={skills} totalSkills={totalSkills} />
+      )}
 
       {/* scroll cue — paw prints leading down to the cat on the wire */}
       <div className="mt-6 flex flex-col items-center gap-[5px]" style={{ color: DIM }} aria-hidden="true">

@@ -57,7 +57,13 @@ export type StagedOp =
    * drops it — the server never reads it.
    */
   | { kind: "delete"; entity: Entity; id: string; restore?: StagedFields }
-  | { kind: "reorder"; entity: Entity; ids: string[] };
+  /**
+   * `version` scopes the drag to one tab so two versions of the same entity can
+   * each hold a pending reorder. `normalizeOps` drops it — the server doesn't
+   * need it, because `reorderRows` renumbers only the ids it is handed and every
+   * op's ids come from a single tab.
+   */
+  | { kind: "reorder"; entity: Entity; ids: string[]; version?: string | null };
 
 export type ApplyStagedResult =
   | { ok: true; idMap: Record<string, string> }
@@ -344,6 +350,21 @@ function scoreType(f: StagedFields): ScoreType | null {
   return v === "CGPA" || v === "PERCENTAGE" ? v : null;
 }
 
+/** Never reuse `nullable()` for this — it would let any string into the column. */
+function versionReq(f: StagedFields, entity: Entity): "v1" | "v2" {
+  const v = f.version;
+  if (v !== "v1" && v !== "v2") fail(`${LABEL[entity]}: "version" must be v1 or v2.`);
+  return v;
+}
+
+/** Blank means null: shown in every version. */
+function versionOpt(f: StagedFields, entity: Entity): "v1" | "v2" | null {
+  const v = f.version;
+  if (v === undefined || v === null || v === "") return null;
+  if (v !== "v1" && v !== "v2") fail(`${LABEL[entity]}: "version" must be v1, v2 or blank.`);
+  return v;
+}
+
 /** An update that recognised none of its fields is a bug worth surfacing. */
 function nonEmpty(data: object, entity: Entity): void {
   if (Object.keys(data).length === 0) fail(`${LABEL[entity]}: nothing recognisable to update.`);
@@ -495,7 +516,11 @@ async function createRow(
   switch (entity) {
     case "heroTitle": {
       const row = await tx.heroTitle.create({
-        data: { title: req(f, "title", entity), sortOrder: await nextSortOrder(tx, entity, cursors) },
+        data: {
+          title: req(f, "title", entity),
+          sortOrder: await nextSortOrder(tx, entity, cursors),
+          version: versionReq(f, entity),
+        },
         select: { id: true },
       });
       return row.id;
@@ -506,6 +531,7 @@ async function createRow(
           name: req(f, "name", entity),
           iconKey: text(f, "iconKey", entity),
           sortOrder: await nextSortOrder(tx, entity, cursors),
+          version: versionReq(f, entity),
         },
         select: { id: true },
       });
@@ -573,6 +599,7 @@ async function createRow(
           iconKey: text(f, "iconKey", entity),
           detail: nullable(f, "detail", entity),
           sortOrder: await nextSortOrder(tx, entity, cursors),
+          version: versionOpt(f, entity),
         },
         select: { id: true },
       });
@@ -685,11 +712,15 @@ async function updateRow(
       return;
     }
     case "socialLink": {
-      const data: { name?: string; href?: string; iconKey?: string; detail?: string | null } = {};
+      const data: {
+        name?: string; href?: string; iconKey?: string; detail?: string | null;
+        version?: "v1" | "v2" | null;
+      } = {};
       if (present(f, "name")) data.name = req(f, "name", entity);
       if (present(f, "href")) data.href = req(f, "href", entity);
       if (present(f, "iconKey")) data.iconKey = text(f, "iconKey", entity);
       if (present(f, "detail")) data.detail = nullable(f, "detail", entity);
+      if (present(f, "version")) data.version = versionOpt(f, entity);
       nonEmpty(data, entity);
       await tx.socialLink.update({ where: { id }, data });
       return;

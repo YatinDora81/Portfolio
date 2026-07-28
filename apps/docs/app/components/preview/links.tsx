@@ -9,7 +9,13 @@ import { DIM, FAINT, MONO } from "./frame";
 // link actually lands on, in the order a visitor meets them:
 //
 //   Hero      — the `.socs` icon pills in the top-right rail, and the
-//               Resume / CV + Get in touch buttons (`.btn-ghost` / `.btn-solid`).
+//               Get in touch + View Resume buttons (`.btn-solid` / `.btn-ghost`).
+//               The hero has two versions and this page has none: it is the
+//               site-wide link list, it shows every row including the ones
+//               scoped to one hero, and its job here is "this is where a link
+//               lands", not a faithful hero. So the buttons are drawn as v2,
+//               the default both the schema column and `data.ts` fall back to.
+//               HeroPreview is the pane that actually branches.
 //   Contact   — the sidebar rows under the availability pulse.
 //   Footer    — nothing. Footer.tsx still ACCEPTS `socialLinks` but renders the
 //               wordmark and the mono copyright only; the socials moved into
@@ -146,19 +152,6 @@ export function LinksPreview({ socialLinks, resumeUrl, contactEmail, copyrightNa
         <div className="mt-3 flex flex-wrap gap-2">
           <span
             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-medium"
-            style={{ border: "1px solid rgba(255,255,255,0.1)", background: "#0a0a0a", color: "#fafafa" }}
-          >
-            <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
-            </svg>
-            Resume / CV
-          </span>
-          <span
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-medium"
             style={{ background: "#fafafa", color: "#0a0a0a" }}
           >
             Get in touch
@@ -166,6 +159,18 @@ export function LinksPreview({ socialLinks, resumeUrl, contactEmail, copyrightNa
               <line x1="5" y1="12" x2="19" y2="12" />
               <polyline points="12 5 19 12 12 19" />
             </svg>
+          </span>
+          <span
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-medium"
+            style={{ border: "1px solid rgba(255,255,255,0.1)", background: "#0a0a0a", color: "#fafafa" }}
+          >
+            <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
+            View Resume
           </span>
         </div>
 
