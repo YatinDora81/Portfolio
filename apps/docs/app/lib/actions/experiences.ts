@@ -2,6 +2,22 @@
 
 import { prisma } from "db";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/session";
+
+/**
+ * `"use server"` exports compile to public POST endpoints addressable by action
+ * id, so each writer below has to prove the session itself: middleware only
+ * checks that the cookie holds a valid JWT, and it never runs for a direct
+ * action POST at all.
+ *
+ * `redirect` rather than a returned `{ ok: false }` so an expired session can
+ * never look like a successful write to a caller that ignores the return value.
+ */
+async function requireSession() {
+  if (!(await getSession())) redirect("/login");
+}
+
 
 interface ExperienceData {
   company: string;
@@ -18,6 +34,7 @@ interface ExperienceData {
 }
 
 export async function createExperience(data: ExperienceData) {
+  await requireSession();
   const { _max } = await prisma.experience.aggregate({ _max: { sortOrder: true } });
   const count = (_max.sortOrder ?? -1) + 1;
   await prisma.experience.create({
@@ -42,6 +59,7 @@ export async function createExperience(data: ExperienceData) {
 }
 
 export async function updateExperience(id: string, data: ExperienceData) {
+  await requireSession();
   await prisma.$transaction(async (tx) => {
     await tx.experience.update({
       where: { id },
@@ -81,6 +99,7 @@ export async function updateExperience(id: string, data: ExperienceData) {
 }
 
 export async function deleteExperience(id: string) {
+  await requireSession();
   await prisma.experience.delete({ where: { id } });
   revalidatePath("/experiences");
 }

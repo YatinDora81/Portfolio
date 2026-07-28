@@ -2,8 +2,24 @@
 
 import { prisma } from "db";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/session";
+
+/**
+ * `"use server"` exports compile to public POST endpoints addressable by action
+ * id, so each writer below has to prove the session itself: middleware only
+ * checks that the cookie holds a valid JWT, and it never runs for a direct
+ * action POST at all.
+ *
+ * `redirect` rather than a returned `{ ok: false }` so an expired session can
+ * never look like a successful write to a caller that ignores the return value.
+ */
+async function requireSession() {
+  if (!(await getSession())) redirect("/login");
+}
 
 export async function createSocialLink(formData: FormData) {
+  await requireSession();
   const name = formData.get("name") as string;
   const href = formData.get("href") as string;
   const iconKey = formData.get("iconKey") as string;
@@ -19,6 +35,7 @@ export async function createSocialLink(formData: FormData) {
 }
 
 export async function updateSocialLink(id: string, formData: FormData) {
+  await requireSession();
   const name = formData.get("name") as string;
   const href = formData.get("href") as string;
   const iconKey = formData.get("iconKey") as string;
@@ -29,6 +46,7 @@ export async function updateSocialLink(id: string, formData: FormData) {
 }
 
 export async function deleteSocialLink(id: string) {
+  await requireSession();
   await prisma.socialLink.delete({ where: { id } });
   revalidatePath("/social-links");
   revalidatePath("/links");

@@ -2,6 +2,22 @@
 
 import { prisma } from "db";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/session";
+
+/**
+ * `"use server"` exports compile to public POST endpoints addressable by action
+ * id, so each writer below has to prove the session itself: middleware only
+ * checks that the cookie holds a valid JWT, and it never runs for a direct
+ * action POST at all.
+ *
+ * `redirect` rather than a returned `{ ok: false }` so an expired session can
+ * never look like a successful write to a caller that ignores the return value.
+ */
+async function requireSession() {
+  if (!(await getSession())) redirect("/login");
+}
+
 
 interface ProjectData {
   title: string;
@@ -15,6 +31,7 @@ interface ProjectData {
 }
 
 export async function createProject(data: ProjectData) {
+  await requireSession();
   const { _max } = await prisma.project.aggregate({ _max: { sortOrder: true } });
   const count = (_max.sortOrder ?? -1) + 1;
   await prisma.project.create({
@@ -36,6 +53,7 @@ export async function createProject(data: ProjectData) {
 }
 
 export async function updateProject(id: string, data: ProjectData) {
+  await requireSession();
   await prisma.$transaction(async (tx) => {
     await tx.project.update({
       where: { id },
@@ -72,6 +90,7 @@ export async function updateProject(id: string, data: ProjectData) {
 }
 
 export async function deleteProject(id: string) {
+  await requireSession();
   await prisma.project.delete({ where: { id } });
   revalidatePath("/projects");
 }
@@ -83,6 +102,7 @@ export async function deleteProject(id: string) {
  * can't reach the site.
  */
 export async function reorderProjects(ids: string[]) {
+  await requireSession();
   await prisma.$transaction(
     ids.map((id, sortOrder) => prisma.project.update({ where: { id }, data: { sortOrder } }))
   );

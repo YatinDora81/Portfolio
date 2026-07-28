@@ -13,6 +13,8 @@ export function ResumeForm({ resumeUrl }: { resumeUrl: string }) {
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [saved, setSaved] = useState(false);
   const [pubError, setPubError] = useState<string | null>(null);
+  /** Distinct from `pubError`: nothing was written at all. */
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Saving stopped publishing when `revalidatePortfolio()` left the actions, so
   // without this button the hero's Resume button keeps the old link until
@@ -21,9 +23,14 @@ export function ResumeForm({ resumeUrl }: { resumeUrl: string }) {
   const handleSave = (publish: boolean) => {
     setBusy(publish ? "publish" : "save");
     setPubError(null);
+    setSaveError(null);
     startTransition(async () => {
       try {
-        await updateResumeUrl(url);
+        const res = await updateResumeUrl(url);
+        if (!res.ok) {
+          setSaveError("Your session has expired — sign in again, then save.");
+          return;
+        }
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
         if (publish) {
@@ -50,17 +57,21 @@ export function ResumeForm({ resumeUrl }: { resumeUrl: string }) {
         mono
         hint="Drives the resume button in the hero. Paste a public share link."
       />
-      {pubError && (
+      {(pubError || saveError) && (
         <div
           className="hint"
           style={{ color: "var(--bad)", marginBottom: 8, lineHeight: 1.5 }}
         >
           <IconAlertTriangle size={14} stroke={1.6} style={{ flexShrink: 0 }} />
-          <span>The URL is saved. Publishing failed ({pubError}) — retry with Publish, top right.</span>
+          <span>
+            {saveError
+              ? `Nothing was saved — ${saveError}`
+              : `The URL is saved. Publishing failed (${pubError}) — retry with Publish, top right.`}
+          </span>
         </div>
       )}
       <div className="row-acts" style={{ justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
-        {saved && !pubError && (
+        {saved && !pubError && !saveError && (
           <span className="hint" style={{ color: "var(--good)" }}>
             <IconCheck size={13} /> Saved
           </span>

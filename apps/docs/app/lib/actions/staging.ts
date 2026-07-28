@@ -378,8 +378,17 @@ function nonEmpty(data: object, entity: Entity): void {
 /* --------------------------------------------------------------- the roles */
 
 /**
- * Mirrors `lib/actions/admin-users.ts`. Duplicated rather than imported because
- * a `"use server"` module may only export async functions.
+ * The role model, enforced HERE and nowhere else now that the standalone
+ * admin-user actions are gone.
+ *
+ * `"use server"` exports compile to public POST endpoints addressable by action
+ * id, so a signed-in browser can invoke this directly and never touch the UI
+ * that hides the buttons. Middleware only proves the session cookie is a valid
+ * JWT — it never inspects the role it carries. Without the checks below, the
+ * lowest role could promote itself to OWNER, mint a new OWNER, or delete anyone.
+ *
+ * Declared inline rather than imported because a `"use server"` module may only
+ * export async functions.
  */
 type Role = "OWNER" | "ADMIN" | "SUB_ADMIN";
 

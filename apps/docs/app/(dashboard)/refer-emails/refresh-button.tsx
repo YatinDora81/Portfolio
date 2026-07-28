@@ -16,6 +16,10 @@ export function ReferEmailsRefreshButton() {
     startTransition(async () => {
       try {
         const result = await syncReferEmails();
+        if (result.error) {
+          setMessage(result.error);
+          return;
+        }
         if (!result.trackingEnabled) {
           setMessage("Sheet reloaded (Supabase tracking not configured)");
         } else if (result.updated > 0) {
