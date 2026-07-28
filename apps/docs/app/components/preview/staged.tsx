@@ -78,7 +78,7 @@ const CONTACT_ENTITIES = ["contactPurpose", "socialLink"] as const;
 const LINK_ENTITIES = ["socialLink"] as const;
 
 // ─── Hero ────────────────────────────────────────────────────────
-// Used by hero/titles, hero/skill-badges and social-links — all three edit one
+// Used by the hero page and social-links — both edit one
 // of the three entities the hero draws, so all three get the same wrapper.
 
 export function StagedHeroPreview({

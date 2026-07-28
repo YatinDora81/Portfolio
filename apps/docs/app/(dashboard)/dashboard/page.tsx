@@ -71,7 +71,7 @@ function ago(date: Date) {
 }
 
 const HEALTH: { label: string; href: string; icon: typeof IconSparkles }[] = [
-  { label: "Hero titles", href: "/hero/titles", icon: IconSparkles },
+  { label: "Hero titles", href: "/hero", icon: IconSparkles },
   { label: "About paragraphs", href: "/about/paragraphs", icon: IconUser },
   { label: "Quotes in rotation", href: "/quotes", icon: IconQuote },
   { label: "Contact purposes", href: "/contact-purposes", icon: IconTag },
@@ -200,7 +200,7 @@ export default async function DashboardPage() {
               <div className="qa">
                 <Link href="/blogs/new" className="qa-btn"><IconPlus size={15} /> New blog post</Link>
                 <Link href="/projects/new" className="qa-btn"><IconFolderCode size={15} /> Add project</Link>
-                <Link href="/hero/titles" className="qa-btn"><IconSparkles size={15} /> Edit hero</Link>
+                <Link href="/hero" className="qa-btn"><IconSparkles size={15} /> Edit hero</Link>
                 <Link href="/site-config" className="qa-btn"><IconSettings2 size={15} /> Site config</Link>
               </div>
             </div>

@@ -1,9 +1,9 @@
 import { prisma } from "db";
 import { PageHeader } from "@/components/shared/page-header";
 import { StagedHeroPreview } from "@/components/preview/staged";
-import { HeroSkillBadgesTable } from "./table";
+import { HeroSections } from "./sections";
 
-export default async function HeroSkillBadgesPage() {
+export default async function HeroPage() {
   // Both hero versions have rows in these tables, and the query stays unfiltered
   // so the tabs below can be populated without a second round trip.
   const [titles, badges, socialLinks, siteConfigRows, totalSkills] = await Promise.all([
@@ -20,12 +20,12 @@ export default async function HeroSkillBadgesPage() {
   const availabilityStatus = config.get("availabilityStatus") ?? "";
   const heroVersion = config.get("heroVersion") === "v1" ? "v1" : "v2";
   // Same comma-split as apps/web/app/lib/data.ts; `cdnUrl` runs inside the preview.
-  const heroPhotos = (config.get("heroPhotos") ?? "").split(",").map(p => p.trim()).filter(Boolean);
+  const heroPhotos = (config.get("heroPhotos") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
 
   const previewRows = {
-    titles: titles.map(t => ({ id: t.id, title: t.title, version: t.version })),
-    badges: badges.map(b => ({ id: b.id, name: b.name, version: b.version })),
-    socialLinks: socialLinks.map(l => ({ id: l.id, name: l.name, iconKey: l.iconKey, version: l.version })),
+    titles: titles.map((t) => ({ id: t.id, title: t.title, version: t.version })),
+    badges: badges.map((b) => ({ id: b.id, name: b.name, version: b.version })),
+    socialLinks: socialLinks.map((l) => ({ id: l.id, name: l.name, iconKey: l.iconKey, version: l.version })),
   };
 
   // The copy is per version too, with v2 falling back to v1's row — the same
@@ -48,11 +48,12 @@ export default async function HeroSkillBadgesPage() {
     <div className="view">
       <PageHeader
         eyebrow="section 01 · top of the page"
-        title="Hero badges"
-        description="The small skill badges under your name, in this order — set inline in v1's paragraph, listed as pills in v2."
+        title="Hero"
+        description="Everything at the top of the page: the role line under your name and the skill badges beside it. Pick a version to edit — the switch deciding which one visitors see lives in Site config."
       />
-      <HeroSkillBadgesTable
-        badges={badges.map(b => ({ id: b.id, name: b.name, iconKey: b.iconKey, sortOrder: b.sortOrder, version: b.version }))}
+      <HeroSections
+        titles={titles.map((t) => ({ id: t.id, title: t.title, sortOrder: t.sortOrder, version: t.version }))}
+        badges={badges.map((b) => ({ id: b.id, name: b.name, iconKey: b.iconKey, sortOrder: b.sortOrder, version: b.version }))}
         liveVersion={heroVersion}
         preview={{ v1: pane("v1"), v2: pane("v2") }}
       />

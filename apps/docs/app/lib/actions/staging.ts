@@ -168,8 +168,8 @@ type SortableEntity = Exclude<Entity, "quote" | "adminUser">;
 
 /** Admin routes to re-render after a write. Doubles as the entity allow-list. */
 const ENTITY_PATHS: Record<Entity, readonly string[]> = {
-  heroTitle: ["/hero/titles"],
-  heroSkillBadge: ["/hero/skill-badges"],
+  heroTitle: ["/hero"],
+  heroSkillBadge: ["/hero"],
   aboutParagraph: ["/about/paragraphs"],
   education: ["/about/education"],
   skill: ["/skills"],

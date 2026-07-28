@@ -31,14 +31,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: "Portfolio",
     items: [
-      {
-        label: "Hero",
-        icon: IconSparkles,
-        children: [
-          { label: "Titles", href: "/hero/titles" },
-          { label: "Skill Badges", href: "/hero/skill-badges" },
-        ],
-      },
+      { label: "Hero", icon: IconSparkles, href: "/hero" },
       {
         label: "About",
         icon: IconInfoCircle,

@@ -8,18 +8,18 @@ export async function createHeroTitle(formData: FormData) {
   const { _max } = await prisma.heroTitle.aggregate({ _max: { sortOrder: true } });
   const count = (_max.sortOrder ?? -1) + 1;
   await prisma.heroTitle.create({ data: { title, sortOrder: count } });
-  revalidatePath("/hero/titles");
+  revalidatePath("/hero");
 }
 
 export async function updateHeroTitle(id: string, formData: FormData) {
   const title = formData.get("title") as string;
   await prisma.heroTitle.update({ where: { id }, data: { title } });
-  revalidatePath("/hero/titles");
+  revalidatePath("/hero");
 }
 
 export async function deleteHeroTitle(id: string) {
   await prisma.heroTitle.delete({ where: { id } });
-  revalidatePath("/hero/titles");
+  revalidatePath("/hero");
 }
 
 export async function createHeroSkillBadge(formData: FormData) {
@@ -28,19 +28,19 @@ export async function createHeroSkillBadge(formData: FormData) {
   const { _max } = await prisma.heroSkillBadge.aggregate({ _max: { sortOrder: true } });
   const count = (_max.sortOrder ?? -1) + 1;
   await prisma.heroSkillBadge.create({ data: { name, iconKey, sortOrder: count } });
-  revalidatePath("/hero/skill-badges");
+  revalidatePath("/hero");
 }
 
 export async function updateHeroSkillBadge(id: string, formData: FormData) {
   const name = formData.get("name") as string;
   const iconKey = formData.get("iconKey") as string;
   await prisma.heroSkillBadge.update({ where: { id }, data: { name, iconKey } });
-  revalidatePath("/hero/skill-badges");
+  revalidatePath("/hero");
 }
 
 export async function deleteHeroSkillBadge(id: string) {
   await prisma.heroSkillBadge.delete({ where: { id } });
-  revalidatePath("/hero/skill-badges");
+  revalidatePath("/hero");
 }
 
 /**
@@ -55,5 +55,5 @@ export async function reorderHeroSkillBadges(ids: string[]) {
       prisma.heroSkillBadge.update({ where: { id }, data: { sortOrder } })
     )
   );
-  revalidatePath("/hero/skill-badges");
+  revalidatePath("/hero");
 }

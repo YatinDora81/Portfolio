@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import {
   IconLayoutGrid, IconInbox, IconSparkles, IconUser, IconCpu, IconBriefcase,
   IconFolderCode, IconPencil, IconQuote, IconTag, IconSettings2, IconShieldCheck,
-  IconLink, IconSend, IconChartBar, IconSchool, IconBadge, IconPalette, IconTerminal2,
+  IconLink, IconSend, IconChartBar, IconSchool, IconPalette, IconTerminal2,
 } from "@tabler/icons-react";
 
 export type NavIcon = ComponentType<{ size?: number; className?: string; stroke?: number }>;
@@ -31,8 +31,7 @@ export const NAV_TOP: NavLink[] = [
 ];
 
 export const NAV_CONTENT: NavLink[] = [
-  { href: "/hero/titles", n: "01", label: "Hero titles", icon: IconSparkles, eyebrow: "section 01 · top of the page" },
-  { href: "/hero/skill-badges", n: "01", label: "Hero badges", icon: IconBadge, eyebrow: "section 01 · top of the page" },
+  { href: "/hero", n: "01", label: "Hero", icon: IconSparkles, eyebrow: "section 01 · top of the page" },
   { href: "/about/paragraphs", n: "02", label: "About", icon: IconUser, eyebrow: "section 02" },
   { href: "/about/education", n: "02", label: "Education", icon: IconSchool, eyebrow: "section 02" },
   { href: "/skills", n: "03", label: "Skills", icon: IconCpu, eyebrow: "section 03" },

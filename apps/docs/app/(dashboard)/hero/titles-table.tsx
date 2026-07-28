@@ -20,16 +20,13 @@ interface Title { id: string; title: string; sortOrder: number; version: string 
 
 const FORM_ID = "hero-title-form";
 
-export function HeroTitlesTable({ titles, liveVersion, preview }: {
+export function HeroTitlesTable({ titles, version }: {
   titles: Title[];
-  liveVersion: Version;
-  /** Both panes are rendered on the server; the tab picks which one is shown,
-      so the preview under the table is always the hero being edited. */
-  preview: Record<Version, React.ReactNode>;
+  /** Owned by HeroSections — titles and badges always edit the same hero. */
+  version: Version;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Title | null>(null);
-  const [version, setVersion] = useState<Version>(liveVersion);
   const {
     overlay, stageCreate, stageUpdate, stageDelete, unstageDelete, stageReorder,
     isDeleted, isNew, isEdited, saving,
@@ -58,11 +55,6 @@ export function HeroTitlesTable({ titles, liveVersion, preview }: {
   // staged this tick is appended rather than dropped for a frame.
   const rows = [...order.flatMap((id) => byId.get(id) ?? []), ...mine.filter((t) => !seen.has(t.id))];
 
-  const tabs: { key: Version; label: string; n: number }[] = [
-    { key: "v1", label: liveVersion === "v1" ? "v1 · live" : "v1", n: staged.filter((t) => t.version === "v1").length },
-    { key: "v2", label: liveVersion === "v2" ? "v2 · live" : "v2", n: staged.filter((t) => t.version === "v2").length },
-  ];
-
   /** One mark per row: on its way out, brand new, or edited. */
   const mark = (id: string) =>
     isDeleted("heroTitle", id) ? "staged-del"
@@ -85,7 +77,6 @@ export function HeroTitlesTable({ titles, liveVersion, preview }: {
   const openNew = () => { setEditing(null); setDialogOpen(true); };
 
   return (
-    <>
     <Card flush>
       <CardHead
         title="Role titles"
@@ -96,19 +87,6 @@ export function HeroTitlesTable({ titles, liveVersion, preview }: {
           </Button>
         }
       />
-
-      <div className="filters">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            className={cn("filt", version === t.key && "on")}
-            onClick={() => setVersion(t.key)}
-          >
-            {t.label} {t.n}
-          </button>
-        ))}
-      </div>
 
       {rows.length === 0 ? (
         <div className="empty">
@@ -213,7 +191,5 @@ export function HeroTitlesTable({ titles, liveVersion, preview }: {
         </form>
       </Dialog>
     </Card>
-    {preview[version]}
-    </>
   );
 }
