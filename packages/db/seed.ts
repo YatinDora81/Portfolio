@@ -29,7 +29,7 @@ async function seed() {
       { title: "Backend Engineer", sortOrder: 2, version: "v1" },
       { title: "DevOps Enthusiast", sortOrder: 3, version: "v1" },
       { title: "Problem Solver", sortOrder: 4, version: "v1" },
-      { title: "Software Engineer", sortOrder: 100, version: "v2" },
+      { title: "Software Developer", sortOrder: 100, version: "v2" },
     ],
   });
   console.log("Hero titles seeded");
@@ -45,13 +45,14 @@ async function seed() {
       { name: "Prisma", iconKey: "Prisma", sortOrder: 5, version: "v1" },
       { name: "Python", iconKey: "Python", sortOrder: 6, version: "v1" },
 
+      // Same seven as v1 — the pill row is a different layout, not a different stack.
       { name: "Next.js", iconKey: "Next.js", sortOrder: 100, version: "v2" },
-      { name: "React", iconKey: "React", sortOrder: 101, version: "v2" },
+      { name: "Golang", iconKey: "Go", sortOrder: 101, version: "v2" },
       { name: "TypeScript", iconKey: "TypeScript", sortOrder: 102, version: "v2" },
-      { name: "Go", iconKey: "Go", sortOrder: 103, version: "v2" },
-      { name: "Node.js", iconKey: "Node.js", sortOrder: 104, version: "v2" },
-      { name: "PostgreSQL", iconKey: "PostgreSQL", sortOrder: 105, version: "v2" },
-      { name: "Docker", iconKey: "Docker", sortOrder: 106, version: "v2" },
+      { name: "Node.js", iconKey: "Node.js", sortOrder: 103, version: "v2" },
+      { name: "React", iconKey: "React", sortOrder: 104, version: "v2" },
+      { name: "Prisma", iconKey: "Prisma", sortOrder: 105, version: "v2" },
+      { name: "Python", iconKey: "Python", sortOrder: 106, version: "v2" },
     ],
   });
   console.log("Hero skill badges seeded");

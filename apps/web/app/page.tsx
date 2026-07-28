@@ -80,7 +80,7 @@ export default async function Home() {
     ...(siteConfig.avatarUrl ? { image: absoluteUrl(siteConfig.avatarUrl) } : {}),
     // Hardcoded, not `heroData.titles[0]` — structured data shouldn't flip with
     // a presentational toggle.
-    jobTitle: "Software Engineer",
+    jobTitle: "Software Developer",
     ...(sameAs.length ? { sameAs } : {}),
   };
 
