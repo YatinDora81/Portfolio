@@ -37,9 +37,11 @@ function quoteOfDay(quotes: { quote: string; author: string }[]) {
 }
 
 export default async function Home() {
-  const [heroData, aboutData, skills, experiences, projects, blogs, quotes, contactData, siteConfig] =
+  // First and alone: it holds `heroVersion`, which every hero query is scoped to.
+  const siteConfig = await getSiteConfig();
+  const [heroData, aboutData, skills, experiences, projects, blogs, quotes, contactData] =
     await Promise.all([
-      getHeroData(),
+      getHeroData(siteConfig.heroVersion),
       getAboutData(),
       getSkills(),
       getExperiences(),
@@ -47,7 +49,6 @@ export default async function Home() {
       getBlogs(),
       getQuotes(),
       getContactData(),
-      getSiteConfig(),
     ]);
 
   // Company marks for the About terminal, reusing the logos already set on the
@@ -77,7 +78,9 @@ export default async function Home() {
     name: siteConfig.name || SITE_NAME,
     url: SITE_URL,
     ...(siteConfig.avatarUrl ? { image: absoluteUrl(siteConfig.avatarUrl) } : {}),
-    jobTitle: heroData.titles[0] ?? "Software Developer",
+    // Hardcoded, not `heroData.titles[0]` — structured data shouldn't flip with
+    // a presentational toggle.
+    jobTitle: "Software Engineer",
     ...(sameAs.length ? { sameAs } : {}),
   };
 
@@ -96,9 +99,11 @@ export default async function Home() {
           <Navbar logo={siteConfig.navbarLogo} hasBlogs={blogs.length > 0} />
           <main>
             <Hero
+              version={siteConfig.heroVersion}
               titles={heroData.titles}
               skills={heroData.skills}
               socialLinks={heroData.socialLinks}
+              totalSkills={skills.length}
               name={siteConfig.name}
               tagline={siteConfig.tagline}
               intro={siteConfig.intro}

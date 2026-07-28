@@ -7,6 +7,10 @@
   },
   "type": "module",
   "private": true,
+  "scripts": {
+    "seed": "bun seed.ts",
+    "hero:v2": "bun scripts/install-hero-v2.ts"
+  },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.8.0",

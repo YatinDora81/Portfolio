@@ -7,10 +7,17 @@ datasource db {
   provider = "postgresql"
 }
 
+/// Two hero layouts live side by side, chosen by the `heroVersion` SiteConfig row.
+/// sortOrder is dense *within a version*, so every read of the three models below
+/// must carry a version filter — the one exception is the admin's icon-usage
+/// lookup, which asks "is this icon used anywhere at all".
 model HeroTitle {
   id        String @id @default(uuid())
   title     String
   sortOrder Int
+  version   String @default("v2")
+
+  @@index([version, sortOrder])
 }
 
 model HeroSkillBadge {
@@ -18,6 +25,9 @@ model HeroSkillBadge {
   name      String
   iconKey   String
   sortOrder Int
+  version   String @default("v2")
+
+  @@index([version, sortOrder])
 }
 
 model SocialLink {
@@ -27,6 +37,11 @@ model SocialLink {
   iconKey   String
   detail    String?
   sortOrder Int
+  /// NULL = shown in every version. Nullable here and not above because the
+  /// contact section and footer read this table too and stay version-agnostic.
+  version   String?
+
+  @@index([version, sortOrder])
 }
 
 model AboutParagraph {

@@ -1,8 +1,11 @@
 import { prisma } from "db";
 import { cdnUrl } from "./site";
 
+export type HeroVersion = "v1" | "v2";
+
 export interface SiteConfig {
   name: string;
+  heroVersion: HeroVersion;
   tagline: string;
   intro: string;
   avatarUrl: string;
@@ -19,10 +22,22 @@ export interface SiteConfig {
 export async function getSiteConfig(): Promise<SiteConfig> {
   const rows = await prisma.siteConfig.findMany();
   const map = new Map(rows.map((r) => [r.key, r.value]));
+  const heroVersion: HeroVersion = map.get("heroVersion") === "v1" ? "v1" : "v2";
+  // `||` not `??`: the site-config form posts every key on every save, so blank
+  // rows are inevitable and `??` would let "" through and empty the hero.
+  const intro =
+    heroVersion === "v2"
+      ? map.get("introV2") || map.get("intro") || ""
+      : map.get("intro") || "";
+  const tagline =
+    heroVersion === "v2"
+      ? map.get("taglineV2") || map.get("tagline") || ""
+      : map.get("tagline") || "";
   return {
     name: map.get("name") ?? "",
-    tagline: map.get("tagline") ?? "",
-    intro: map.get("intro") ?? "",
+    heroVersion,
+    tagline,
+    intro,
     avatarUrl: cdnUrl(map.get("avatarUrl") ?? ""),
     // Stored as one comma-separated string so it stays a plain SiteConfig row.
     heroPhotos: (map.get("heroPhotos") ?? "")
@@ -39,11 +54,21 @@ export async function getSiteConfig(): Promise<SiteConfig> {
   };
 }
 
-export async function getHeroData() {
+/** sortOrder is only meaningful within a version, so every query here is scoped. */
+export async function getHeroData(version: HeroVersion) {
   const [titles, skills, socialLinks] = await Promise.all([
-    prisma.heroTitle.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
-    prisma.heroSkillBadge.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
-    prisma.socialLink.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.heroTitle.findMany({
+      where: { version },
+      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    }),
+    prisma.heroSkillBadge.findMany({
+      where: { version },
+      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    }),
+    prisma.socialLink.findMany({
+      where: { OR: [{ version }, { version: null }] },
+      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    }),
   ]);
   return {
     titles: titles.map((t) => t.title),
@@ -178,6 +203,8 @@ export async function getQuotes() {
   return quotes.map((q) => ({ quote: q.quote, author: q.author }));
 }
 
+/** Deliberately unscoped: flipping the hero must not edit the contact list, and
+    keeping this whole is what holds the JSON-LD `sameAs` union stable. */
 export async function getContactData() {
   const [purposes, socialLinks] = await Promise.all([
     prisma.contactPurpose.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),

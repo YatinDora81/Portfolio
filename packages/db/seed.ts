@@ -21,23 +21,37 @@ async function seed() {
   await prisma.adminUser.deleteMany();
 
   // ── Hero Titles ──
-  // One title only — the hero role line is static, and RotatingRole holds
-  // still on its own once there is nothing to rotate between.
+  // v2 starts at sortOrder 100 so the two versions' ranges don't overlap.
   await prisma.heroTitle.createMany({
-    data: [{ title: "Software Engineer", sortOrder: 0 }],
+    data: [
+      { title: "Full-Stack Developer", sortOrder: 0, version: "v1" },
+      { title: "Frontend Engineer", sortOrder: 1, version: "v1" },
+      { title: "Backend Engineer", sortOrder: 2, version: "v1" },
+      { title: "DevOps Enthusiast", sortOrder: 3, version: "v1" },
+      { title: "Problem Solver", sortOrder: 4, version: "v1" },
+      { title: "Software Engineer", sortOrder: 100, version: "v2" },
+    ],
   });
   console.log("Hero titles seeded");
 
   // ── Hero Skill Badges ──
   await prisma.heroSkillBadge.createMany({
     data: [
-      { name: "Next.js", iconKey: "Next.js", sortOrder: 0 },
-      { name: "React", iconKey: "React", sortOrder: 1 },
-      { name: "TypeScript", iconKey: "TypeScript", sortOrder: 2 },
-      { name: "Go", iconKey: "Go", sortOrder: 3 },
-      { name: "Node.js", iconKey: "Node.js", sortOrder: 4 },
-      { name: "PostgreSQL", iconKey: "PostgreSQL", sortOrder: 5 },
-      { name: "Docker", iconKey: "Docker", sortOrder: 6 },
+      { name: "Next.js", iconKey: "Next.js", sortOrder: 0, version: "v1" },
+      { name: "Golang", iconKey: "Go", sortOrder: 1, version: "v1" },
+      { name: "TypeScript", iconKey: "TypeScript", sortOrder: 2, version: "v1" },
+      { name: "Node.js", iconKey: "Node.js", sortOrder: 3, version: "v1" },
+      { name: "React", iconKey: "React", sortOrder: 4, version: "v1" },
+      { name: "Prisma", iconKey: "Prisma", sortOrder: 5, version: "v1" },
+      { name: "Python", iconKey: "Python", sortOrder: 6, version: "v1" },
+
+      { name: "Next.js", iconKey: "Next.js", sortOrder: 100, version: "v2" },
+      { name: "React", iconKey: "React", sortOrder: 101, version: "v2" },
+      { name: "TypeScript", iconKey: "TypeScript", sortOrder: 102, version: "v2" },
+      { name: "Go", iconKey: "Go", sortOrder: 103, version: "v2" },
+      { name: "Node.js", iconKey: "Node.js", sortOrder: 104, version: "v2" },
+      { name: "PostgreSQL", iconKey: "PostgreSQL", sortOrder: 105, version: "v2" },
+      { name: "Docker", iconKey: "Docker", sortOrder: 106, version: "v2" },
     ],
   });
   console.log("Hero skill badges seeded");
@@ -48,6 +62,8 @@ async function seed() {
       { name: "LinkedIn", href: "https://www.linkedin.com/in/yatin-dora/", iconKey: "linkedin", detail: "/in/yatin-dora", sortOrder: 0 },
       { name: "GitHub", href: "https://github.com/YatinDora81", iconKey: "github", detail: "@YatinDora81", sortOrder: 1 },
       { name: "LeetCode", href: "https://leetcode.com/yatindora/", iconKey: "leetcode", detail: "@yatindora", sortOrder: 2 },
+      // The only version-scoped link; the rest leave `version` null = shown in both.
+      { name: "LeetCode 2", href: "https://leetcode.com/u/Yatin_dora_sde/", iconKey: "leetcode", detail: "@Yatin_dora_sde", sortOrder: 3, version: "v1" },
       { name: "X", href: "https://x.com/YatinDora", iconKey: "x", detail: "@YatinDora", sortOrder: 4 },
       { name: "Email", href: "mailto:yatin.dora81@gmail.com", iconKey: "email", detail: "yatin.dora81@gmail.com", sortOrder: 5 },
     ],
@@ -742,9 +758,14 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
   await prisma.siteConfig.createMany({
     data: [
       { key: "name", value: "Yatin Dora" },
-      { key: "tagline", value: "Ship it, scale it, make it smarter — that's the loop I live in." },
+      // `intro`/`tagline` are v1's copy; v2's lives under its own keys so neither
+      // version can overwrite the other.
+      { key: "heroVersion", value: "v1" },
+      { key: "tagline", value: "Ship it, scale it, make it smarter, keep learning — that's the loop I live in." },
+      { key: "intro", value: "I build scalable web apps using" },
+      { key: "taglineV2", value: "Ship it, scale it, make it smarter — that's the loop I live in." },
       {
-        key: "intro",
+        key: "introV2",
         value:
           "Hand me an idea, I'll hand you back a product. Fast backends, clean frontends, and pipelines that do their job so quietly you forget they exist.",
       },

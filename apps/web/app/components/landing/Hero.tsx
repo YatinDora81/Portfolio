@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { skillIconMap, socialIconMap } from '@repo/ui/icons/registry';
 
+type HeroVersion = 'v1' | 'v2';
+
 interface HeroProps {
+  version: HeroVersion;
+  /** v1 rotates through these; v2 ships a single row and holds still. */
   titles: string[];
   skills: { name: string; iconKey: string }[];
   socialLinks: { name: string; href: string; iconKey: string }[];
@@ -13,8 +17,134 @@ interface HeroProps {
   avatarUrl: string;
   resumeUrl: string;
   availabilityStatus: string;
+  /** Total skills shown in the Skills section — drives v2's "+N more" chip. */
+  totalSkills?: number;
   /** Optional extra photos for the name-hover peek deck. Defaults to [avatarUrl]. */
   photos?: string[];
+}
+
+/** v1 draws a fifth stroke that v2 drops. */
+function ResumeIcon({ fifthLine }: { fifthLine: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      {fifthLine && <polyline points="10 9 9 9 8 9" />}
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
+    </svg>
+  );
+}
+
+interface BodyProps {
+  intro: string;
+  tagline: string;
+  skills: { name: string; iconKey: string }[];
+  resumeUrl: string;
+  totalSkills?: number;
+}
+
+function HeroBodyV1({ intro, tagline, skills, resumeUrl }: BodyProps) {
+  return (
+    <>
+      <p className="intro animate-fade-in-blur animate-delay-3">
+        {intro}{' '}
+        {skills.map((skill, i) => (
+          <span key={skill.name}>
+            <span className="chip">
+              <span className="ci">{skillIconMap[skill.iconKey]}</span>
+              {skill.name}
+            </span>
+            {i < skills.length - 2 && ' '}
+            {i === skills.length - 2 && ' and '}
+          </span>
+        ))}
+        {`. ${tagline}`}
+      </p>
+
+      <div className="actions animate-fade-in-blur animate-delay-4">
+        <a
+          className="btn btn-ghost"
+          href={resumeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <ResumeIcon fifthLine />
+          Resume / CV
+        </a>
+        <a className="btn btn-solid" href="#contact">
+          Get in touch
+          <ArrowIcon />
+        </a>
+      </div>
+    </>
+  );
+}
+
+function HeroBodyV2({ intro, tagline, skills, resumeUrl, totalSkills }: BodyProps) {
+  const remaining = (totalSkills ?? 0) - skills.length;
+
+  return (
+    <>
+      <p className="intro animate-fade-in-blur animate-delay-3">{intro}</p>
+      <p className="voice animate-fade-in-blur animate-delay-3">{tagline}</p>
+
+      <div className="heropills animate-fade-in-blur animate-delay-4">
+        {skills.map((skill) => (
+          <span key={skill.name} className="chip">
+            <span className="ci">{skillIconMap[skill.iconKey]}</span>
+            {skill.name}
+          </span>
+        ))}
+        {remaining > 0 && (
+          <a className="chip chip-more mono" href="#skills" aria-label={`+${remaining} more — see all skills`}>
+            +{remaining} more ↓
+          </a>
+        )}
+      </div>
+
+      <div className="actions animate-fade-in-blur animate-delay-5">
+        <a className="btn btn-solid" href="#contact">
+          Get in touch
+          <ArrowIcon />
+        </a>
+        <a
+          className="btn btn-ghost"
+          href={resumeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <ResumeIcon fifthLine={false} />
+          View Resume
+        </a>
+      </div>
+    </>
+  );
 }
 
 /** Filled paw print — 13x13 via CSS, three of them make the scroll cue. */
@@ -76,6 +206,7 @@ function RotatingRole({ titles }: { titles: string[] }) {
 }
 
 export default function Hero({
+  version,
   titles,
   skills,
   socialLinks,
@@ -85,6 +216,7 @@ export default function Hero({
   avatarUrl,
   resumeUrl,
   availabilityStatus,
+  totalSkills,
   photos,
 }: HeroProps) {
   const heroRef = useRef<HTMLElement>(null);
@@ -257,60 +389,17 @@ export default function Hero({
           {titles.join(', ')}
         </span>
 
-        <p className="intro animate-fade-in-blur animate-delay-3">{intro}</p>
-        <p className="voice animate-fade-in-blur animate-delay-3">{tagline}</p>
-
-        <div className="heropills animate-fade-in-blur animate-delay-4">
-          {skills.map((skill) => (
-            <span key={skill.name} className="chip">
-              <span className="ci">{skillIconMap[skill.iconKey]}</span>
-              {skill.name}
-            </span>
-          ))}
-          <a className="chip chip-more mono" href="#skills" aria-label="See all skills">
-            +30 more ↓
-          </a>
-        </div>
-
-        <div className="actions animate-fade-in-blur animate-delay-5">
-          <a className="btn btn-solid" href="#contact">
-            Get in touch
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <line x1="5" y1="12" x2="19" y2="12" />
-              <polyline points="12 5 19 12 12 19" />
-            </svg>
-          </a>
-          <a
-            className="btn btn-ghost"
-            href={resumeUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-            </svg>
-            View Resume
-          </a>
-        </div>
+        {version === 'v1' ? (
+          <HeroBodyV1 intro={intro} tagline={tagline} skills={skills} resumeUrl={resumeUrl} />
+        ) : (
+          <HeroBodyV2
+            intro={intro}
+            tagline={tagline}
+            skills={skills}
+            resumeUrl={resumeUrl}
+            totalSkills={totalSkills}
+          />
+        )}
       </div>
 
       {/* absolutely positioned, so it takes no part in the hero's flex column */}
