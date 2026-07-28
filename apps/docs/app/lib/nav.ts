@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import {
   IconLayoutGrid, IconInbox, IconSparkles, IconUser, IconCpu, IconBriefcase,
   IconFolderCode, IconPencil, IconQuote, IconTag, IconSettings2, IconShieldCheck,
-  IconLink, IconSend, IconChartBar, IconSchool, IconPalette, IconTerminal2,
+  IconLink, IconSend, IconChartBar, IconSchool, IconPalette, IconTerminal2, IconHistory,
 } from "@tabler/icons-react";
 
 export type NavIcon = ComponentType<{ size?: number; className?: string; stroke?: number }>;
@@ -46,6 +46,9 @@ export const NAV_SITE: NavLink[] = [
   { href: "/links", label: "Social & resume", icon: IconLink, eyebrow: "site-wide · hero + footer" },
   { href: "/site-config", label: "Site config", icon: IconSettings2, eyebrow: "site-wide" },
   { href: "/admin-users", label: "Admins & roles", icon: IconShieldCheck, eyebrow: "access control" },
+  // Not role-filtered: hiding a link is not access control, and the page and
+  // its detail action each check the session themselves.
+  { href: "/history", label: "Change history", icon: IconHistory, eyebrow: "access control · audit" },
   { href: "/icons", label: "Icon library", icon: IconPalette, eyebrow: "reference · icon keys" },
   { href: "/terminal", label: "Terminal (whoami)", icon: IconTerminal2, eyebrow: "reference · about terminal" },
 ];

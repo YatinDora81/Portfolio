@@ -1,6 +1,7 @@
 "use server";
 
 import { getSession } from "@/lib/session";
+import { recordPublish } from "@/lib/audit-writer";
 
 /**
  * Publish = ISR revalidation on the public site, and the ONLY thing that pushes
@@ -11,13 +12,18 @@ import { getSession } from "@/lib/session";
  *
  * Open to every signed-in admin, sub-admins included.
  */
-export async function publishSite(): Promise<{ ok: boolean; error?: string }> {
+export async function publishSite(opts?: { eventId?: string }): Promise<{ ok: boolean; error?: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
 
   const secret = process.env.REVALIDATE_SECRET;
   if (!secret) {
-    return { ok: false, error: "REVALIDATE_SECRET isn't set on the admin app." };
+    // Recorded, unlike the missing-session branch above: the session is valid,
+    // the publish was genuinely attempted, and it definitely failed. Leaving it
+    // out would show a Save & Publish stuck at "publish pending" forever.
+    const miss = { ok: false, error: "REVALIDATE_SECRET isn't set on the admin app." };
+    await recordPublish(session, opts?.eventId, miss);
+    return miss;
   }
 
   const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/$/, "");
@@ -29,11 +35,16 @@ export async function publishSite(): Promise<{ ok: boolean; error?: string }> {
       body: JSON.stringify({ secret }),
       cache: "no-store",
     });
-    if (!res.ok) {
-      return { ok: false, error: `Revalidate returned ${res.status}.` };
-    }
-    return { ok: true };
+    const result = res.ok
+      ? { ok: true }
+      : { ok: false, error: `Revalidate returned ${res.status}.` };
+    await recordPublish(session, opts?.eventId, result);
+    return result;
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Could not reach the site." };
+    const result = { ok: false, error: e instanceof Error ? e.message : "Could not reach the site." };
+    // Transport failures are recorded too — "we never reached the site" is the
+    // outcome someone reading the history most needs to see.
+    await recordPublish(session, opts?.eventId, result);
+    return result;
   }
 }

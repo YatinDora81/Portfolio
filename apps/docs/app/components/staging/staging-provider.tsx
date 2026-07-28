@@ -369,7 +369,7 @@ export function StagingProvider({ toast, children }: {
       const n = batch.length;
       let saved = false;
       try {
-        const res = await applyStagedChanges(batch);
+        const res = await applyStagedChanges(batch, publish ? "SAVE_AND_PUBLISH" : "SAVE");
         if (!res.ok) {
           toast(res.error, "bad");
           return;
@@ -395,7 +395,7 @@ export function StagingProvider({ toast, children }: {
 
         // Decision 5: the save has already landed. A publish that fails is a
         // separate, retryable failure — it never rolls the save back.
-        const pub = await publishSite();
+        const pub = await publishSite({ eventId: res.eventId });
         if (pub.ok) toast(`Saved and published ${plural(n)}.`);
         else toast(`Saved ${plural(n)}, but publishing failed: ${pub.error ?? "unknown error"}`, "bad");
       } catch (e) {

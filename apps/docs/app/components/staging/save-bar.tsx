@@ -5,6 +5,7 @@ import { IconAlertTriangle, IconRefresh } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import type { Entity } from "@/lib/actions/staging";
+import { WHERE } from "@/lib/audit";
 import { useStaging } from "./staging-provider";
 
 /**
@@ -16,24 +17,6 @@ import { useStaging } from "./staging-provider";
  * never needs to win a fight on the z-index ladder. Styling is `.savebar` in
  * `control-room.css`.
  */
-
-/**
- * Where each entity is edited. The store deliberately outlives a route change —
- * the leave dialog promises as much — so the batch can name rows that are not on
- * screen, and Cancel has to be able to say where they live.
- */
-const WHERE: Record<Entity, string> = {
-  heroTitle: "Hero · titles",
-  heroSkillBadge: "Hero · skill badges",
-  heroContent: "Hero · copy and live version",
-  aboutParagraph: "About · paragraphs",
-  education: "About · education",
-  skill: "Skills",
-  quote: "Quotes",
-  contactPurpose: "Contact purposes",
-  socialLink: "Social links",
-  adminUser: "Admin users",
-};
 
 export function SaveBar() {
   const { ops, count, saving, discardAll, commit } = useStaging();

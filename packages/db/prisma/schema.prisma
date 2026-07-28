@@ -217,6 +217,85 @@ model AdminUser {
   otpExpiresAt   DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+
+  auditEvents AuditEvent[]
+}
+
+/// One row per user gesture in the admin: a Save, a Save & Publish, or a bare
+/// Publish. The publish outcome lives on this row rather than a separate one
+/// because a Save & Publish is a single gesture whose publish half is allowed
+/// to fail without rolling the save back. One entry that can read "saved,
+/// publish failed" is the only shape that matches what actually happens.
+model AuditEvent {
+  id        String   @id @default(uuid())
+  /// SAVE | SAVE_AND_PUBLISH | PUBLISH. TEXT with a CHECK rather than a Prisma
+  /// enum, the same call the hero-version migration made: a fourth kind later
+  /// is one ALTER, with no CREATE TYPE fighting the migration's transaction.
+  action    String
+  /// Which door the write came through: "staging", "messages", …
+  surface   String
+  createdAt DateTime @default(now())
+
+  /// Nullable and denormalised: admin accounts are hard-deleted, and the
+  /// history has to outlive the account that made it. A required FK would
+  /// either block the delete or cascade away exactly what the log exists for.
+  actorId    String?
+  actor      AdminUser? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName  String
+  actorEmail String
+  /// The role that AUTHORIZED the action, read from the JWT. It can be up to
+  /// seven days stale against AdminUser.role, which is why it is stored.
+  actorRole  String
+
+  /// NONE | OK | FAILED. NONE on a plain SAVE, and on a SAVE_AND_PUBLISH whose
+  /// second round trip never came back.
+  publishState String    @default("NONE")
+  publishedAt  DateTime?
+  publishError String?
+
+  /// Denormalised so the list page never loads children — one reorder can
+  /// legitimately carry hundreds of them.
+  changeCount Int    @default(0)
+  summary     String
+
+  changes AuditChange[]
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@index([publishState, publishedAt])
+}
+
+/// One row per changed FIELD. Creates carry before = null, deletes after =
+/// null, and a reorder collapses to a single row holding the two orders.
+model AuditChange {
+  id      String     @id @default(uuid())
+  eventId String
+  event   AuditEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  /// Render order within the event — the order the ops were applied in.
+  seq  Int
+  /// CREATE | UPDATE | DELETE | REORDER
+  kind String
+
+  entity      String
+  /// "Hero · titles" — the save bar's own label, so the history names a change
+  /// the same way the bar named it when it was made.
+  entityLabel String
+  rowId       String?
+  /// What the row IS in human terms, so a deleted row stays legible.
+  rowLabel    String?
+
+  field  String
+  before String?
+  after  String?
+  /// A credential changed; the values are deliberately absent.
+  redacted  Boolean @default(false)
+  /// The stored value is a window around the first divergence, not the whole
+  /// field.
+  truncated Boolean @default(false)
+
+  @@index([eventId, seq])
+  @@index([entity, rowId])
 }
 
 enum ScoreType {

@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import { prisma, type ScoreType } from "db";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
+import { draft, labelOf, WHERE } from "@/lib/audit";
+import { commitAudit, resolveActor } from "@/lib/audit-writer";
 
 /**
  * The commit endpoint behind the admin's Cancel / Save / Save & Publish bar.
@@ -67,21 +69,29 @@ export type StagedOp =
   | { kind: "reorder"; entity: Entity; ids: string[]; version?: string | null };
 
 export type ApplyStagedResult =
-  | { ok: true; idMap: Record<string, string> }
+  | { ok: true; idMap: Record<string, string>; eventId?: string }
   | { ok: false; error: string };
 
 /**
  * Applies a whole batch of staged changes in one transaction.
  *
  * Returns `idMap`, the client's `tempId` → real database id, so the store can
- * reconcile the rows it optimistically rendered.
+ * reconcile the rows it optimistically rendered, and `eventId`, the audit entry
+ * this batch wrote, so a publish that follows attaches to the same gesture
+ * instead of appearing as a second one.
+ *
+ * `intent` is a LABEL, never an authorization input — it only decides whether
+ * the entry reads SAVE or SAVE_AND_PUBLISH. A client that lies about it changes
+ * a word in the history and nothing else; the publish outcome is recorded by
+ * the server from the actual result.
  */
-export async function applyStagedChanges(ops: StagedOp[]): Promise<ApplyStagedResult> {
+export async function applyStagedChanges(ops: StagedOp[], intent?: unknown): Promise<ApplyStagedResult> {
   // Middleware only proves the session cookie is a valid JWT and never runs for
   // a direct action POST at all, so the check has to happen here.
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
   const actor = { userId: session.userId, role: session.role };
+  const action = intent === "SAVE_AND_PUBLISH" ? "SAVE_AND_PUBLISH" : "SAVE";
 
   try {
     const plan = normalizeOps(ops);
@@ -99,17 +109,27 @@ export async function applyStagedChanges(ops: StagedOp[]): Promise<ApplyStagedRe
     const idMap: Record<string, string> = {};
     /** Real ids this batch removes — reorders must not try to renumber them. */
     const deleted = new Set<string>();
+    let eventId: string | null = null;
 
     await prisma.$transaction(
       async (tx) => {
         // A new row's sortOrder is max+1, per entity. The cursor keeps several
         // creates in one batch from all landing on the same slot.
         const cursors = new Map<Entity, number>();
+        const d = draft(action, "staging", await resolveActor(tx, session));
 
         for (const [i, op] of plan.entries()) {
           if (op.kind !== "create") continue;
           idMap[op.tempId] = await createRow(tx, op.entity, op.fields, actor, hashes.get(i), cursors);
         }
+
+        // Read every row this batch is about to touch, BEFORE it touches it —
+        // and after the creates, so a row created and then edited in the same
+        // batch is already visible. This is where the log's before/after comes
+        // from: `updateRow` builds the coerced values and discards them, and
+        // re-reading is what makes creates, updates and deletes all diffable
+        // without rewriting ten entity branches.
+        const before = await snapshotPlan(tx, plan, idMap, ["update", "delete", "reorder"]);
 
         for (const [i, op] of plan.entries()) {
           if (op.kind !== "update") continue;
@@ -139,6 +159,13 @@ export async function applyStagedChanges(ops: StagedOp[]): Promise<ApplyStagedRe
           }
           await reorderRows(tx, entity, ids);
         }
+
+        // Read back what the writes actually produced, rather than trusting the
+        // payload: a column default, a trim or a coercion means the stored value
+        // and the submitted one are not always the same thing.
+        const after = await snapshotPlan(tx, plan, idMap, ["create", "update"]);
+        recordBatch(d, plan, idMap, before, after, deleted);
+        eventId = await commitAudit(tx, d);
       },
       // Generous next to the 5s default: a batch can be dozens of round trips
       // and the database is remote.
@@ -146,9 +173,120 @@ export async function applyStagedChanges(ops: StagedOp[]): Promise<ApplyStagedRe
     );
 
     for (const path of affectedPaths(plan)) revalidatePath(path);
-    return { ok: true, idMap };
+    return { ok: true, idMap, eventId: eventId ?? undefined };
   } catch (e) {
     return { ok: false, error: toMessage(e) };
+  }
+}
+
+/* ------------------------------------------------------------------- audit */
+
+type Row = Record<string, unknown>;
+/** entity → (id → row), as of one moment inside the transaction. */
+type Shadow = Map<Entity, Map<string, Row>>;
+
+/**
+ * Reads the rows named by the given op kinds. A closed switch, never a dynamic
+ * model accessor — the same rule the writes follow, so a hostile `entity` can
+ * never reach a table this endpoint does not mean to expose.
+ *
+ * `adminUser` selects its columns explicitly so the password hash and the OTP
+ * never enter process memory, let alone the log. `heroContent` ignores the id
+ * list and reads both rows, because setting one version live clears the other —
+ * a write no op names, and one that a snapshot-what-you-were-given scheme
+ * would silently miss.
+ */
+async function snapshotPlan(
+  tx: TxClient,
+  plan: StagedOp[],
+  idMap: Record<string, string>,
+  kinds: StagedOp["kind"][]
+): Promise<Shadow> {
+  const wanted = new Map<Entity, Set<string>>();
+  for (const op of plan) {
+    if (!kinds.includes(op.kind)) continue;
+    const set = wanted.get(op.entity) ?? new Set<string>();
+    if (op.kind === "create") set.add(resolve(idMap, op.tempId));
+    else if (op.kind === "reorder") for (const raw of op.ids) set.add(resolve(idMap, raw));
+    else set.add(resolve(idMap, op.id));
+    wanted.set(op.entity, set);
+  }
+
+  const shadow: Shadow = new Map();
+  for (const [entity, set] of wanted) {
+    const ids = [...set];
+    const rows = await readRows(tx, entity, ids);
+    shadow.set(entity, new Map(rows.map((r) => [String(r.id), r])));
+  }
+  return shadow;
+}
+
+async function readRows(tx: TxClient, entity: Entity, ids: string[]): Promise<Row[]> {
+  const where = { id: { in: ids } };
+  switch (entity) {
+    case "heroTitle": return tx.heroTitle.findMany({ where });
+    case "heroSkillBadge": return tx.heroSkillBadge.findMany({ where });
+    // Both rows, always: the sibling's `live` is cleared by a write no op names.
+    case "heroContent": return tx.heroContent.findMany();
+    case "aboutParagraph": return tx.aboutParagraph.findMany({ where });
+    case "education": return tx.education.findMany({ where });
+    case "skill": return tx.skill.findMany({ where });
+    case "quote": return tx.quote.findMany({ where });
+    case "contactPurpose": return tx.contactPurpose.findMany({ where });
+    case "socialLink": return tx.socialLink.findMany({ where });
+    case "adminUser":
+      return tx.adminUser.findMany({
+        where,
+        select: { id: true, email: true, username: true, name: true, role: true },
+      });
+  }
+}
+
+/** Turns the applied plan plus its two snapshots into the draft's change rows. */
+function recordBatch(
+  d: ReturnType<typeof draft>,
+  plan: StagedOp[],
+  idMap: Record<string, string>,
+  before: Shadow,
+  after: Shadow,
+  deleted: Set<string>
+): void {
+  const row = (s: Shadow, e: Entity, id: string) => s.get(e)?.get(id) ?? null;
+
+  for (const op of plan) {
+    const entity = op.entity;
+    const entityLabel = WHERE[entity];
+
+    if (op.kind === "create") {
+      const id = resolve(idMap, op.tempId);
+      const now = row(after, entity, id);
+      d.row({ entity, entityLabel, rowId: id, rowLabel: labelOf(entity, now),
+        kind: "CREATE", before: null, after: now });
+    } else if (op.kind === "update") {
+      const id = resolve(idMap, op.id);
+      const was = row(before, entity, id);
+      const now = row(after, entity, id);
+      d.row({ entity, entityLabel, rowId: id, rowLabel: labelOf(entity, now ?? was),
+        kind: "UPDATE", before: was, after: now });
+    } else if (op.kind === "delete") {
+      const id = resolve(idMap, op.id);
+      const was = row(before, entity, id);
+      d.row({ entity, entityLabel, rowId: id, rowLabel: labelOf(entity, was),
+        kind: "DELETE", before: was, after: null });
+    } else {
+      // The order as it stood, from the pre-write snapshot, against the order
+      // the batch actually wrote — with this batch's deletions removed, or the
+      // diff would report rows leaving the list as a reshuffle.
+      const mine = before.get(entity);
+      if (!mine) continue;
+      const live = [...mine.values()].filter((r) => !deleted.has(String(r.id)));
+      const wasOrder = live
+        .sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0))
+        .map((r) => String(r.id));
+      const nowOrder = op.ids.map((raw) => resolve(idMap, raw)).filter((id) => !deleted.has(id));
+      const labels = new Map(live.map((r) => [String(r.id), labelOf(entity, r)] as const));
+      d.reorder({ entity, entityLabel, before: wasOrder, after: nowOrder, labels });
+    }
   }
 }
 

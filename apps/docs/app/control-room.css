@@ -917,3 +917,46 @@ select.sel option { background: var(--card); color: var(--ink) }
 .staged-del .row-t, .staged-del .row-m, .staged-del .qtext, .staged-del .qauth, .staged-del .skill-n {
   text-decoration: line-through; text-decoration-thickness: 1px; color: var(--dim)
 }
+
+/* ── Change history ─────────────────────────────────────────────────────────
+   A timeline rather than a table: the question this page answers is "what
+   happened, in what order, and by whom", and a rail with dated groups reads
+   that far faster than five columns of equal weight. */
+.hist-pub { display: flex; align-items: center; gap: 11px; padding: 12px 15px; border: 1px solid var(--line2); border-radius: 10px; background: var(--card); font-size: 13.5px; margin-bottom: 4px }
+.hist-pub i { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--good-soft); color: var(--good); flex: none }
+.hist-pub .sub { color: var(--dim) }
+
+.hist-day { display: flex; align-items: center; gap: 10px; margin: 20px 0 2px; font-family: var(--mono); font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--faint) }
+.hist-day::after { content: ""; flex: 1; height: 1px; background: var(--line2) }
+
+.hist-ev { display: grid; grid-template-columns: 50px 18px minmax(0, 1fr) auto; align-items: start; width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; font: inherit; color: inherit }
+.hist-time { font-family: var(--mono); font-size: 10.5px; color: var(--faint); padding-top: 15px; white-space: nowrap }
+/* The rail is drawn by the row so it joins up automatically however many
+   events a day holds; the first and last stubs stop it dangling. */
+.hist-rail { position: relative; align-self: stretch; display: flex; justify-content: center }
+.hist-rail::before { content: ""; position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line2) }
+.hist-ev:first-child .hist-rail::before { top: 15px }
+.hist-ev:last-child .hist-rail::before { bottom: auto; height: 15px }
+.hist-dot { position: relative; width: 7px; height: 7px; border-radius: 50%; margin-top: 12px; background: var(--faint); box-shadow: 0 0 0 3px var(--bg) }
+.hist-dot.good { background: var(--good) }
+.hist-dot.bad { background: var(--bad) }
+
+.hist-body { padding: 9px 12px 11px; min-width: 0; border-radius: 8px; transition: background .13s }
+.hist-ev:hover .hist-body { background: var(--bg1) }
+.hist-sum { font-size: 13.5px; font-weight: 550; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.hist-meta { display: flex; align-items: center; gap: 7px; margin-top: 5px; font-size: 11.5px; color: var(--dim) }
+.hist-av { display: grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; background: var(--vioS); color: var(--vioT); font-size: 9px; font-weight: 650; flex: none }
+
+.hist-badge { align-self: center; margin-top: 11px; padding: 3px 9px; border-radius: 999px; font-family: var(--mono); font-size: 10px; white-space: nowrap; background: var(--bg2); color: var(--dim) }
+.hist-badge.good { background: var(--good-soft); color: var(--goodT) }
+.hist-badge.bad { background: var(--bad-soft); color: var(--bad) }
+
+.hist-diff { display: grid; gap: 7px }
+.hist-field { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11.5px; color: var(--faint) }
+.hist-field b { font-family: var(--mono); font-weight: 500; font-size: 11px; color: var(--dim) }
+/* Stacked, not side by side: the values are sentences, and two narrow columns
+   wrap them into unreadable ribbons. */
+.hist-val { padding: 8px 10px; border-radius: 7px; font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; border-left: 2px solid }
+.hist-val.was { background: var(--bad-soft); border-color: var(--bad) }
+.hist-val.now { background: var(--good-soft); border-color: var(--good) }
+.hist-val em { color: var(--faint) }
