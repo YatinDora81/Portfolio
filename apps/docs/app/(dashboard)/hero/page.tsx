@@ -19,6 +19,9 @@ export default async function HeroPage() {
   const name = config.get("name") ?? "Yatin";
   const avatarUrl = config.get("avatarUrl") ?? "";
   const availabilityStatus = config.get("availabilityStatus") ?? "";
+  // Edited on /site-config, read-only here — same rule as the name and avatar.
+  const dotColor = config.get("heroDotColor") ?? "";
+  const dotPulse = (config.get("heroDotPulse") ?? "on") !== "off";
   // Same comma-split as apps/web/app/lib/data.ts; `cdnUrl` runs inside the preview.
   const heroPhotos = (config.get("heroPhotos") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
 
@@ -37,6 +40,8 @@ export default async function HeroPage() {
       avatarUrl={avatarUrl || undefined}
       photos={heroPhotos}
       availabilityStatus={availabilityStatus}
+      dotColor={dotColor}
+      dotPulse={dotPulse}
       totalSkills={totalSkills}
     />
   );

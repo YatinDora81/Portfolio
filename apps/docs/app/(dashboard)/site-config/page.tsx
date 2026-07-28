@@ -9,6 +9,8 @@ const CONFIG_KEYS = [
   { key: "contactEmail", label: "Contact Email", description: "Email in contact form mailto" },
   { key: "availabilityStatus", label: "Availability Status", description: "Status text in contact" },
   { key: "availabilityDetail", label: "Availability Detail", description: "Detail below status" },
+  { key: "heroDotColor", label: "Dot Colour", description: "The pulsing dot beside the hero's status line" },
+  { key: "heroDotPulse", label: "Pulse", description: "The ripple around the dot" },
   { key: "copyrightName", label: "Copyright Name", description: "Name in footer copyright" },
 ];
 

@@ -28,6 +28,10 @@ import { DIM, FAINT, FADE_MS, MONO, useRotatingTitle } from "./frame";
 
 const LINE = "rgba(255,255,255,0.1)";
 
+/** The site's `--foreground` on this pane's dark surface — what an unset
+    `heroDotColor` renders as, so "no colour chosen" previews honestly. */
+const DOT_DEFAULT = "#fafafa";
+
 /** How `.peek-stack` fans its three cards, scaled down from 86×104 to 52×62. */
 const DECK_TILT = ["rotate(-6deg)", "rotate(3deg) translateY(-4px)", "rotate(-2deg)"];
 const DECK_Z = [1, 3, 2];
@@ -63,6 +67,11 @@ interface HeroPreviewProps {
       because this pill is verbatim CMS copy and a plausible-looking default
       would read as the line that ships. */
   availabilityStatus?: string;
+  /** Mirrors Hero's `dotColor` (siteConfig `heroDotColor`). Empty follows the
+      site's `--foreground`, which on this pane's dark surface is `DOT_DEFAULT`. */
+  dotColor?: string;
+  /** Mirrors Hero's `dotPulse` (siteConfig `heroDotPulse`). */
+  dotPulse?: boolean;
   /** Mirrors Hero's `totalSkills` — the Skills section's row count, which drives
       v2's "+N more" chip. Absent means unknown, and the chip is left out
       entirely rather than shown against a number this pane guessed. */
@@ -214,7 +223,7 @@ function BodyV2({ intro, tagline, skills, totalSkills }: {
 
 export function HeroPreview({
   version, titles, name, tagline, intro, skills, socialLinks, avatarUrl,
-  photos, availabilityStatus, totalSkills,
+  photos, availabilityStatus, dotColor, dotPulse = true, totalSkills,
 }: HeroPreviewProps) {
   // The hook owns the 2500ms hold / 400ms fade AND the guard that stops an
   // interrupted fade stranding the word at opacity 0 — never re-implement it here.
@@ -223,6 +232,7 @@ export function HeroPreview({
 
   const displayName = name.trim().split(/\s+/).filter(Boolean).join(" ");
   const status = availabilityStatus?.trim() ?? "";
+  const dot = dotColor?.trim() || DOT_DEFAULT;
   // Same deck rule as Hero: explicit photos win, else the avatar, else nothing.
   const deck = (photos && photos.length > 0 ? photos : avatarUrl ? [avatarUrl] : [])
     .filter(Boolean)
@@ -239,8 +249,15 @@ export function HeroPreview({
           style={{ fontFamily: MONO, fontSize: 8, letterSpacing: "0.2em", color: DIM }}
         >
           <span className="relative flex size-[6px] flex-none" aria-hidden="true">
-            <span className="absolute inset-0 rounded-full bg-[#fafafa] opacity-60 animate-ping motion-reduce:hidden" />
-            <span className="relative size-[6px] rounded-full bg-[#fafafa]" />
+            {/* `.avail.still i::after` on the site drops the ripple outright,
+                so the pane drops the element rather than freezing it. */}
+            {dotPulse && (
+              <span
+                className="absolute inset-0 rounded-full opacity-60 animate-ping motion-reduce:hidden"
+                style={{ background: dot }}
+              />
+            )}
+            <span className="relative size-[6px] rounded-full" style={{ background: dot }} />
           </span>
           {/* Same honesty as ContactPreview, which previews this identical
               field: an unset status shows as unset rather than as copy. */}

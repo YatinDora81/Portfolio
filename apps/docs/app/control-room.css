@@ -288,6 +288,14 @@ select.sel option { background: var(--card); color: var(--ink) }
 .f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px }
 .f-hint { font-size: 11px; color: var(--faint); margin-top: -2px }
 
+/* Colour swatch. `.in`'s padding would letterbox the colour, so the native
+   picker is stripped to nothing and fills this well instead. The ring belongs
+   on the well for the same reason: `.cr :focus-visible` would paint its outline
+   on a transparent input, which is to say nowhere. */
+.swatch { position: relative; flex: none; width: 38px; height: 36px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden }
+.swatch:has(:focus-visible) { outline: 2px solid var(--c1); outline-offset: 2px }
+.swatch input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer }
+
 /* modal */
 .veil {
   position: fixed; inset: 0; background: var(--veil); backdrop-filter: blur(3px); z-index: 90;

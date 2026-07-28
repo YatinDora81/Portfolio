@@ -5,6 +5,8 @@ import { Card, CardHead } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ColorField } from "@/components/ui/color-field";
+import { Switch } from "@/components/ui/switch";
 import { PreviewFrame, HeroPreview } from "@/components/preview";
 import { updateSiteConfig } from "@/lib/actions/site-config";
 import { publishSite } from "@/lib/actions/publish";
@@ -31,11 +33,29 @@ interface HeroRows {
 const GROUPS: { title: string; keys: string[] }[] = [
   { title: "Identity", keys: ["name", "navbarLogo", "avatarUrl", "copyrightName"] },
   { title: "Contact & availability", keys: ["contactEmail", "availabilityStatus", "availabilityDetail"] },
+  { title: "Hero status dot", keys: ["heroDotColor", "heroDotPulse"] },
 ];
 /** Sentence-length copy — gets a full-width textarea. */
 const LONG = new Set(["availabilityDetail"]);
 /** URLs / addresses — mono face. */
 const MONO = new Set(["avatarUrl", "contactEmail"]);
+/** Hex-valued — swatch, typed hex and presets instead of a text box. */
+const COLOR = new Set(["heroDotColor"]);
+/** "on" / "off" rows — a switch, so the stored strings never have to be typed. */
+const TOGGLE = new Set(["heroDotPulse"]);
+
+/**
+ * Offered next to the picker. Status greens first (what a live availability dot
+ * usually wants), then the accents the site already uses elsewhere.
+ */
+const DOT_PRESETS = [
+  { value: "#22C55E", label: "Green" },
+  { value: "#10B981", label: "Emerald" },
+  { value: "#F59E0B", label: "Amber" },
+  { value: "#3B82F6", label: "Blue" },
+  { value: "#A855F7", label: "Violet" },
+  { value: "#F43F5E", label: "Rose" },
+];
 
 export function SiteConfigForm({
   configs,
@@ -95,8 +115,34 @@ export function SiteConfigForm({
 
   const set = (key: string, value: string) => setValues(prev => ({ ...prev, [key]: value }));
 
-  const field = (c: ConfigEntry) =>
-    LONG.has(c.key) ? (
+  const field = (c: ConfigEntry): React.ReactNode =>
+    COLOR.has(c.key) ? (
+      <ColorField
+        key={c.key}
+        label={c.label}
+        hint={c.description}
+        value={values[c.key] ?? ""}
+        onChange={v => set(c.key, v)}
+        presets={DOT_PRESETS}
+        // What the site renders with no colour set: `--foreground`, which is
+        // near-black on the light theme and near-white on the dark one.
+        fallback="#FAFAFA"
+        defaultLabel="Theme default"
+        defaultHint="Follow the site's text colour — black in light mode, white in dark"
+      />
+    ) : TOGGLE.has(c.key) ? (
+      <div className="f" key={c.key}>
+        <label>{c.label}</label>
+        <div style={{ height: 36, display: "flex", alignItems: "center" }}>
+          <Switch
+            checked={(values[c.key] ?? "on") !== "off"}
+            onChange={on => set(c.key, on ? "on" : "off")}
+            label={(values[c.key] ?? "on") !== "off" ? "Pulsing" : "Still"}
+          />
+        </div>
+        <div className="f-hint">{c.description}</div>
+      </div>
+    ) : LONG.has(c.key) ? (
       <Textarea
         key={c.key}
         label={c.label}
@@ -200,6 +246,8 @@ export function SiteConfigForm({
           avatarUrl={values["avatarUrl"] || ""}
           photos={photos}
           availabilityStatus={values["availabilityStatus"] || ""}
+          dotColor={values["heroDotColor"] || ""}
+          dotPulse={(values["heroDotPulse"] ?? "on") !== "off"}
           totalSkills={totalSkills}
         />
       </PreviewFrame>

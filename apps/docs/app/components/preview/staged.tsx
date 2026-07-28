@@ -85,7 +85,7 @@ const LINK_ENTITIES = ["socialLink"] as const;
 
 export function StagedHeroPreview({
   version, titles, badges, socialLinks, content, name, avatarUrl, photos,
-  availabilityStatus, totalSkills, label = "Hero Preview",
+  availabilityStatus, dotColor, dotPulse, totalSkills, label = "Hero Preview",
 }: {
   /** Which hero this pane is showing, and the scope of every list below. Pass
       it when the caller owns a version tab (/hero). OMIT it when the caller has
@@ -112,6 +112,11 @@ export function StagedHeroPreview({
   /** siteConfig `availabilityStatus` — the hero pill is verbatim CMS copy, so
       leaving it out renders "not set" rather than a stand-in sentence. */
   availabilityStatus?: string;
+  /** siteConfig `heroDotColor` / `heroDotPulse` — the pill's dot. Both are edited
+      on /site-config; they ride along here so a pane on any other page draws the
+      dot the site is actually serving instead of the monochrome default. */
+  dotColor?: string;
+  dotPulse?: boolean;
   /** The Skills section's row count, for v2's "+N more" chip. Omitted = no chip. */
   totalSkills?: number;
   label?: string;
@@ -154,6 +159,8 @@ export function StagedHeroPreview({
         avatarUrl={avatarUrl}
         photos={photos}
         availabilityStatus={availabilityStatus}
+        dotColor={dotColor}
+        dotPulse={dotPulse}
         totalSkills={totalSkills}
       />
     </PreviewFrame>
