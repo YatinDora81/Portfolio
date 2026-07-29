@@ -9,6 +9,7 @@ import { ColorField } from "@/components/ui/color-field";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { PreviewFrame, HeroPreview } from "@/components/preview";
+import { NapStylePicker } from "./nap-style-picker";
 import { updateSiteConfig } from "@/lib/actions/site-config";
 import { publishSite } from "@/lib/actions/publish";
 import {
@@ -39,6 +40,8 @@ const GROUPS: { title: string; keys: string[] }[] = [
 ];
 /** Sentence-length copy — gets a full-width textarea. */
 const LONG = new Set(["availabilityDetail"]);
+/** Rows whose control is a grid of its own — they break the two-up row. */
+const FULL = new Set(["catNapStyle"]);
 /** URLs / addresses — mono face. */
 const MONO = new Set(["avatarUrl", "contactEmail"]);
 /** Hex-valued — swatch, typed hex and presets instead of a text box. */
@@ -173,6 +176,23 @@ export function SiteConfigForm({
         defaultLabel="Theme default"
         defaultHint="Follow the site's text colour — black in light mode, white in dark"
       />
+    ) : c.key === "catNapStyle" ? (
+      // Six of the eight choices are a *picture*; a dropdown of their names is
+      // unreadable, so each one draws itself. Same fallback rule as the Select
+      // below: a stored value outside the list shows the style the site serves.
+      <NapStylePicker
+        key={c.key}
+        label={c.label}
+        hint={c.description}
+        options={SELECT[c.key]!}
+        value={
+          SELECT[c.key]!.some(o => o.value === values[c.key])
+            ? values[c.key]!
+            : SELECT[c.key]![0]!.value
+        }
+        onChange={v => set(c.key, v)}
+        napSeconds={clampNumber("catNapSeconds", values["catNapSeconds"] ?? "")}
+      />
     ) : SELECT[c.key] ? (
       <Select
         key={c.key}
@@ -253,7 +273,7 @@ export function SiteConfigForm({
       }
     };
     for (const c of entries) {
-      if (LONG.has(c.key)) { flush(); out.push(field(c)); }
+      if (LONG.has(c.key) || FULL.has(c.key)) { flush(); out.push(field(c)); }
       else buf.push(c);
     }
     flush();
