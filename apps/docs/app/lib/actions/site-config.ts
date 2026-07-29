@@ -23,6 +23,8 @@ const ALLOWED_KEYS = new Set([
   "availabilityDetail",
   "heroDotColor",
   "heroDotPulse",
+  "catNapStyle",
+  "catNapSeconds",
   "copyrightName",
   // Not in the form's registry, but real rows written by the links page.
   "heroPhotos",
@@ -31,6 +33,11 @@ const ALLOWED_KEYS = new Set([
 
 /** The only shape `heroDotColor` may take — see below. */
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+/** Nap indicators the cat's script knows, plus "random" and "off". */
+const CAT_NAP_STYLES = new Set([
+  "tooltip", "ring", "halo", "pixel", "moon", "ticks", "random", "off",
+]);
 
 /** Returns the value to persist, or null to drop the entry entirely. */
 function validate(key: string, value: string): string | null {
@@ -45,6 +52,16 @@ function validate(key: string, value: string): string | null {
     return hex === "" || HEX.test(hex) ? hex : "";
   }
   if (key === "heroDotPulse") return value === "off" ? "off" : "on";
+  // The cat reads these from data attributes and re-defaults anything it does
+  // not recognise, so this is about what the admin can save, not about safety.
+  if (key === "catNapStyle") {
+    const style = value.trim().toLowerCase();
+    return CAT_NAP_STYLES.has(style) ? style : "ticks";
+  }
+  if (key === "catNapSeconds") {
+    const secs = parseInt(value, 10);
+    return String(Number.isFinite(secs) ? Math.min(300, Math.max(3, secs)) : 30);
+  }
   return value;
 }
 

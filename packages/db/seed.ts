@@ -793,6 +793,9 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
       // The hero's status dot. "" = follow --foreground, the look it shipped with.
       { key: "heroDotColor", value: "" },
       { key: "heroDotPulse", value: "on" },
+      // The cat's corner nap. "off" here would leave it draggable but sleepless.
+      { key: "catNapStyle", value: "ticks" },
+      { key: "catNapSeconds", value: "30" },
       { key: "copyrightName", value: "Yatin Dora" },
     ],
   });

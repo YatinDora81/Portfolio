@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ColorField } from "@/components/ui/color-field";
+import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { PreviewFrame, HeroPreview } from "@/components/preview";
 import { updateSiteConfig } from "@/lib/actions/site-config";
@@ -34,6 +35,7 @@ const GROUPS: { title: string; keys: string[] }[] = [
   { title: "Identity", keys: ["name", "navbarLogo", "avatarUrl", "copyrightName"] },
   { title: "Contact & availability", keys: ["contactEmail", "availabilityStatus", "availabilityDetail"] },
   { title: "Hero status dot", keys: ["heroDotColor", "heroDotPulse"] },
+  { title: "Corner-nap cat", keys: ["catNapStyle", "catNapSeconds"] },
 ];
 /** Sentence-length copy — gets a full-width textarea. */
 const LONG = new Set(["availabilityDetail"]);
@@ -43,6 +45,35 @@ const MONO = new Set(["avatarUrl", "contactEmail"]);
 const COLOR = new Set(["heroDotColor"]);
 /** "on" / "off" rows — a switch, so the stored strings never have to be typed. */
 const TOGGLE = new Set(["heroDotPulse"]);
+/**
+ * Fixed-vocabulary rows — a dropdown, so a typo can't reach a row the cat's
+ * script would silently reject. The label carries the description because the
+ * six styles are impossible to tell apart by name alone.
+ */
+const SELECT: Record<string, { value: string; label: string }[]> = {
+  catNapStyle: [
+    { value: "ticks", label: "Ticks — watch-face dial around the cat" },
+    { value: "moon", label: "Moon — crescent crosses a starry arc overhead" },
+    { value: "pixel", label: "Pixel — 8-bit speech bubble with a block bar" },
+    { value: "halo", label: "Halo — breathing emerald glow, no numbers" },
+    { value: "ring", label: "Ring — thin progress ring, seconds on hover" },
+    { value: "tooltip", label: "Tooltip — micro pill, seconds and a draining border" },
+    { value: "random", label: "Random — a different one every nap" },
+    { value: "off", label: "Never sleeps — still draggable, just never naps" },
+  ],
+};
+/** Whole-number rows, with the range the site clamps to anyway. */
+const NUMBER: Record<string, { min: number; max: number }> = {
+  catNapSeconds: { min: 3, max: 300 },
+};
+/** The value the row would hold after `updateSiteConfig` has had it. */
+const NUMBER_FALLBACK: Record<string, number> = { catNapSeconds: 30 };
+function clampNumber(key: string, raw: string) {
+  const range = NUMBER[key]!;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return NUMBER_FALLBACK[key] ?? range.min;
+  return Math.min(range.max, Math.max(range.min, n));
+}
 
 /**
  * Offered next to the picker. Status greens first (what a live availability dot
@@ -96,7 +127,15 @@ export function SiteConfigForm({
     setPubError(null);
     startTransition(async () => {
       try {
-        const snapshot = values;
+        // Clamped here as well as on blur, because clicking Save is what blurs
+        // the field — and the action rewrites out-of-range numbers without
+        // reporting back, so anything it would change has to be settled before
+        // it goes, or the box sits there showing 600 under a green "Saved".
+        const snapshot = { ...values };
+        for (const key of Object.keys(NUMBER)) {
+          if (key in snapshot) snapshot[key] = String(clampNumber(key, snapshot[key] ?? ""));
+        }
+        setValues(snapshot);
         await updateSiteConfig(Object.entries(snapshot).map(([key, value]) => ({ key, value })));
         setBase(snapshot);
         setSaved(true);
@@ -115,6 +154,10 @@ export function SiteConfigForm({
 
   const set = (key: string, value: string) => setValues(prev => ({ ...prev, [key]: value }));
 
+  // Nap length is dead config once the cat never sleeps — leaving it live next
+  // to the switch that disabled it invites tuning a number nothing reads.
+  const napsOff = values["catNapStyle"] === "off";
+
   const field = (c: ConfigEntry): React.ReactNode =>
     COLOR.has(c.key) ? (
       <ColorField
@@ -129,6 +172,38 @@ export function SiteConfigForm({
         fallback="#FAFAFA"
         defaultLabel="Theme default"
         defaultHint="Follow the site's text colour — black in light mode, white in dark"
+      />
+    ) : SELECT[c.key] ? (
+      <Select
+        key={c.key}
+        label={c.label}
+        hint={c.description}
+        options={SELECT[c.key]!}
+        // A stored value outside the list would leave the control blank with no
+        // way to tell what the site is doing — show the fallback it serves.
+        value={
+          SELECT[c.key]!.some(o => o.value === values[c.key])
+            ? values[c.key]!
+            : SELECT[c.key]![0]!.value
+        }
+        onChange={e => set(c.key, e.target.value)}
+      />
+    ) : NUMBER[c.key] ? (
+      <Input
+        key={c.key}
+        label={c.label}
+        hint={c.description}
+        type="number"
+        min={NUMBER[c.key]!.min}
+        max={NUMBER[c.key]!.max}
+        step={1}
+        disabled={napsOff}
+        value={values[c.key] ?? ""}
+        onChange={e => set(c.key, e.target.value)}
+        // The action clamps on the way in, and it does not report back — so
+        // without this the box keeps showing 500 next to a green "Saved" while
+        // the row holds 300, and an emptied box silently becomes the default.
+        onBlur={e => set(c.key, String(clampNumber(c.key, e.target.value)))}
       />
     ) : TOGGLE.has(c.key) ? (
       <div className="f" key={c.key}>

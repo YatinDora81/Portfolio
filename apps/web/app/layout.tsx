@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { SITE_URL, SITE_NAME } from "./lib/site";
+import { getSiteConfig } from "./lib/data";
 import OnekoCat from "./components/OnekoCat";
 import ClarityAnalytics from "./components/ClarityAnalytics";
 import UtmTrackerBeacon from "./components/UtmTrackerBeacon";
@@ -58,11 +59,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The cat rides in the layout, so its nap settings have to be read here too.
+  // `getSiteConfig` is memoised per request, so the home page reading it again
+  // for everything else costs nothing.
+  const { catNapStyle, catNapSeconds } = await getSiteConfig();
   return (
     <html
       lang="en"
@@ -91,7 +96,7 @@ export default function RootLayout({
       </head>
       <body>
         {children}
-        <OnekoCat />
+        <OnekoCat napStyle={catNapStyle} napSeconds={catNapSeconds} />
         <VercelAnalytics />
         <ClarityAnalytics />
         <UtmTrackerBeacon />

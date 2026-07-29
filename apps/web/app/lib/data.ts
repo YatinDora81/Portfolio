@@ -1,7 +1,16 @@
+import { cache } from "react";
 import { prisma } from "db";
 import { cdnUrl } from "./site";
 
 export type HeroVersion = "v1" | "v2";
+
+/** Nap indicator the oneko cat shows when it sleeps. "off" means it never does. */
+export type CatNapStyle =
+  | "tooltip" | "ring" | "halo" | "pixel" | "moon" | "ticks" | "random" | "off";
+
+const CAT_NAP_STYLES: CatNapStyle[] = [
+  "tooltip", "ring", "halo", "pixel", "moon", "ticks", "random", "off",
+];
 
 export interface SiteConfig {
   name: string;
@@ -20,6 +29,10 @@ export interface SiteConfig {
   heroDotColor: string;
   /** Whether the hero status dot keeps its ping ripple. */
   heroDotPulse: boolean;
+  /** Which indicator the napping cat shows, or "off" to stop it napping at all. */
+  catNapStyle: CatNapStyle;
+  /** How long a nap lasts, in seconds. */
+  catNapSeconds: number;
   copyrightName: string;
 }
 
@@ -31,7 +44,10 @@ export interface SiteConfig {
  */
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
-export async function getSiteConfig(): Promise<SiteConfig> {
+// `cache`: the root layout reads this for the cat's nap settings and the home
+// page reads it again for everything else, so without memoising, one render of
+// `/` would run both queries twice.
+export const getSiteConfig = cache(async (): Promise<SiteConfig> => {
   const [rows, content] = await Promise.all([
     prisma.siteConfig.findMany(),
     prisma.heroContent.findMany(),
@@ -46,6 +62,15 @@ export async function getSiteConfig(): Promise<SiteConfig> {
   // its own row is blank" once, into the rows themselves. Blank now means blank.
   const intro = live?.intro ?? "";
   const tagline = live?.tagline ?? "";
+  // Normalised the way the admin writes it, so a row set by hand — "Off", or a
+  // pasted trailing newline — still means what it says. Falling back silently
+  // would leave the cat napping after someone had switched napping off.
+  const rawNapStyle = (map.get("catNapStyle") ?? "ticks").trim().toLowerCase() as CatNapStyle;
+  const catNapStyle: CatNapStyle = CAT_NAP_STYLES.includes(rawNapStyle) ? rawNapStyle : "ticks";
+  const rawNapSeconds = parseInt(map.get("catNapSeconds") ?? "30", 10);
+  const catNapSeconds = Number.isFinite(rawNapSeconds)
+    ? Math.min(300, Math.max(3, rawNapSeconds))
+    : 30;
   return {
     name: map.get("name") ?? "",
     heroVersion,
@@ -69,9 +94,11 @@ export async function getSiteConfig(): Promise<SiteConfig> {
     // Absent row = the pulse the hero has always had, so an untouched database
     // renders exactly as before.
     heroDotPulse: (map.get("heroDotPulse") ?? "on") !== "off",
+    catNapStyle,
+    catNapSeconds,
     copyrightName: map.get("copyrightName") ?? "",
   };
-}
+});
 
 /** sortOrder is only meaningful within a version, so every query here is scoped. */
 export async function getHeroData(version: HeroVersion) {

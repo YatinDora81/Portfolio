@@ -2,8 +2,15 @@
 
 import Script from 'next/script';
 import { useEffect, useState } from 'react';
+import type { CatNapStyle } from '../lib/data';
 
-export default function OnekoCat() {
+export default function OnekoCat({
+  napStyle = 'ticks',
+  napSeconds = 30,
+}: {
+  napStyle?: CatNapStyle;
+  napSeconds?: number;
+}) {
   const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
@@ -11,5 +18,12 @@ export default function OnekoCat() {
   }, []);
 
   if (!isDesktop) return null;
-  return <Script src="/oneko/oneko.js" data-cat="/oneko/oneko.gif" />;
+  return (
+    <Script
+      src="/oneko/oneko.js"
+      data-cat="/oneko/oneko.gif"
+      data-nap-style={napStyle}
+      data-nap-seconds={String(napSeconds)}
+    />
+  );
 }

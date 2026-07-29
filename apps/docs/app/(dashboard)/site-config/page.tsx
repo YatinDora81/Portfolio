@@ -11,6 +11,8 @@ const CONFIG_KEYS = [
   { key: "availabilityDetail", label: "Availability Detail", description: "Detail below status" },
   { key: "heroDotColor", label: "Dot Colour", description: "The pulsing dot beside the hero's status line" },
   { key: "heroDotPulse", label: "Pulse", description: "The ripple around the dot" },
+  { key: "catNapStyle", label: "Nap Style", description: "What the cat shows while it sleeps, or Never sleeps to switch napping off" },
+  { key: "catNapSeconds", label: "Nap Length", description: "Seconds the cat sleeps before it wakes and starts chasing again (3–300)" },
   { key: "copyrightName", label: "Copyright Name", description: "Name in footer copyright" },
 ];
 
@@ -27,6 +29,10 @@ export default async function SiteConfigPage() {
   ]);
 
   const configMap = Object.fromEntries(configs.map(c => [c.key, c.value]));
+  // Shown when the row is missing, so the form reads what the site is actually
+  // serving — apps/web falls back to exactly these. Everything else defaults to
+  // blank, where blank is a real value.
+  const DEFAULTS: Record<string, string> = { catNapStyle: "ticks", catNapSeconds: "30" };
   // Same parse as apps/web/app/lib/data.ts — one comma-separated SiteConfig row.
   // `cdnUrl` is applied inside the preview, so the raw paths go through.
   const heroPhotos = (configMap["heroPhotos"] ?? "").split(",").map(p => p.trim()).filter(Boolean);
@@ -55,7 +61,7 @@ export default async function SiteConfigPage() {
           preview: the hero keys its glyphs on the icon key and its photo deck on
           those paths, and the pill is verbatim CMS copy edited on this page. */}
       <SiteConfigForm
-        configs={CONFIG_KEYS.map(k => ({ ...k, value: configMap[k.key] || "" }))}
+        configs={CONFIG_KEYS.map(k => ({ ...k, value: configMap[k.key] || DEFAULTS[k.key] || "" }))}
         liveHero={{ version, intro: live?.intro ?? "", tagline: live?.tagline ?? "" }}
         hero={hero}
         photos={heroPhotos}
