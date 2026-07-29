@@ -36,7 +36,11 @@ export function Shell({ user, unread, children }: {
     const h = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPal((p) => !p);
+        // A dialog covers the palette, and the palette's input autofocuses, so
+        // opening one under a dialog would take the keyboard somewhere nobody
+        // can see. Closing an already-open palette is still fine.
+        const dialogOpen = document.querySelector(".veil") !== null;
+        setPal((p) => (p ? false : !dialogOpen));
       }
     };
     window.addEventListener("keydown", h);

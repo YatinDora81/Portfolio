@@ -75,14 +75,7 @@ export function SaveBar() {
         </div>
       </div>
 
-      {/* Deliberately a SIBLING of `.savebar`, not a child. The bar animates in
-          with a transform, and for as long as that runs it is the containing
-          block for any fixed descendant — the dialog's full-viewport veil would
-          collapse into the bar's own ~53px-tall box. Out here the veil resolves
-          against the viewport like every other dialog in the app (`.main` is a
-          stacking context, but it sets no containing block).
-
-          Cancel throws away the whole batch, and the batch spans pages — on
+      {/* Cancel throws away the whole batch, and the batch spans pages — on
           /quotes it can be holding three hero titles no card here is marked
           with. Discarding that on one click, with nothing on screen to explain
           the number, is the one destructive button in the bar. */}

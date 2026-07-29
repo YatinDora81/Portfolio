@@ -530,28 +530,26 @@ function LeaveGuard({ count }: { count: number }) {
 
   if (!asking) return null;
 
-  // `.pal` sits at z-index 100 and this dialog's veil at 90, so without a raised
-  // wrapper the palette would paint straight over the question it just triggered.
+  // Nothing raises this dialog: `.veil` already outranks `.pal`, so the palette
+  // cannot paint over the question that navigating from it just raised.
   return (
-    <div style={{ position: "relative", zIndex: 110 }}>
-      <Dialog
-        open
-        onClose={dismiss}
-        title="Leave with unsaved changes?"
-        icon={IconAlertTriangle}
-        footer={
-          <>
-            <Button variant="ghost" onClick={dismiss}>Stay here</Button>
-            <Button variant="outline" onClick={leave}>Leave anyway</Button>
-          </>
-        }
-      >
-        <p style={{ color: "var(--dim)", fontSize: 13.5 }}>
-          {plural(count)} on this page {count === 1 ? "is" : "are"} still staged. Nothing is thrown away
-          if you leave — the save bar follows you and Save still applies them — but you won&apos;t be able
-          to see which rows they belong to until you come back.
-        </p>
-      </Dialog>
-    </div>
+    <Dialog
+      open
+      onClose={dismiss}
+      title="Leave with unsaved changes?"
+      icon={IconAlertTriangle}
+      footer={
+        <>
+          <Button variant="ghost" onClick={dismiss}>Stay here</Button>
+          <Button variant="outline" onClick={leave}>Leave anyway</Button>
+        </>
+      }
+    >
+      <p style={{ color: "var(--dim)", fontSize: 13.5 }}>
+        {plural(count)} on this page {count === 1 ? "is" : "are"} still staged. Nothing is thrown away
+        if you leave — the save bar follows you and Save still applies them — but you won&apos;t be able
+        to see which rows they belong to until you come back.
+      </p>
+    </Dialog>
   );
 }

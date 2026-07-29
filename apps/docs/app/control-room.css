@@ -298,14 +298,26 @@ select.sel option { background: var(--card); color: var(--ink) }
 
 /* modal */
 .veil {
-  position: fixed; inset: 0; background: var(--veil); backdrop-filter: blur(3px); z-index: 90;
+  /* Dialogs portal onto `.cr`, so this sits beside the sidebar rather than
+     under it. Above the palette (100) on purpose: navigating from the palette
+     is what raises the leave guard, and the asker must not cover the question.
+
+     `dvh` for the reason `.cr` gives: left to `inset` alone the height comes
+     from the fixed containing block, which on mobile is the large viewport, and
+     centring inside a box taller than the screen puts every dialog below the
+     middle of it. No `vh` fallback here — `height` and `bottom` together are
+     over-constrained, so a browser without `dvh` would take 100vh and land back
+     on the large viewport. Dropping the declaration leaves `inset` in charge. */
+  position: fixed; inset: 0; height: 100dvh;
+  background: var(--veil); backdrop-filter: blur(3px); z-index: 110;
   display: grid; place-items: center; padding: 20px; animation: fade .16s both
 }
 @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
 .modal {
   background: var(--panel); backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
   border: 1px solid var(--line2); border-radius: 16px; width: 100%; max-width: 520px;
-  box-shadow: var(--shadow); animation: pop .22s cubic-bezier(.3, .7, .3, 1.1) both; max-height: 88vh; display: flex; flex-direction: column
+  box-shadow: var(--shadow); animation: pop .22s cubic-bezier(.3, .7, .3, 1.1) both;
+  max-height: 88vh; max-height: 88dvh; display: flex; flex-direction: column
 }
 @keyframes pop { from { opacity: 0; transform: scale(.97) translateY(8px) } to { opacity: 1; transform: none } }
 .modal-h { display: flex; align-items: center; gap: 10px; padding: 15px 18px; border-bottom: 1px solid var(--line2) }
@@ -498,7 +510,8 @@ select.sel option { background: var(--card); color: var(--ink) }
 
 /* login */
 .login {
-  min-height: 100vh; width: 100%; display: grid; place-items: center; background: var(--bg); position: relative;
+  min-height: 100vh; min-height: 100dvh;
+  width: 100%; display: grid; place-items: center; background: var(--bg); position: relative;
   font-family: var(--ui); color: var(--ink); overflow: hidden; padding: 20px; isolation: isolate
 }
 .lg-card {
@@ -527,8 +540,10 @@ select.sel option { background: var(--card); color: var(--ink) }
 
 /* command palette */
 .pal {
-  position: fixed; inset: 0; z-index: 100; background: var(--veil); backdrop-filter: blur(3px);
-  display: flex; justify-content: center; padding: 12vh 20px 20px; animation: fade .14s both
+  position: fixed; inset: 0; height: 100dvh;
+  z-index: 100; background: var(--veil); backdrop-filter: blur(3px);
+  display: flex; justify-content: center;
+  padding: 12vh 20px 20px; padding: 12dvh 20px 20px; animation: fade .14s both
 }
 .pal-box {
   width: 100%; max-width: 520px; background: var(--panel); backdrop-filter: blur(22px) saturate(1.6);
@@ -890,7 +905,9 @@ select.sel option { background: var(--card); color: var(--ink) }
    (band and scroller cannot overlap) and kept only so the ladder stays legible:
    over `.tbl` sticky th (2) and `.pubbar` (5), under `.tb` (10) and — since
    `.main` is a stacking context at 1 — under the sidebar (40/60), `.sb-veil`
-   (55), the dialog veil (90), the palette (100) and the toasts (120). */
+   (55), the palette (100), the dialog veil (110) and the toasts (120). The
+   veil outranks the palette deliberately: dialogs portal out to `.cr`, so a
+   dialog raised by navigating from the palette has to cover the palette. */
 .savebar {
   flex: none; position: relative; z-index: 8;
   padding: 9px 38px; padding-bottom: calc(9px + env(safe-area-inset-bottom, 0px));
