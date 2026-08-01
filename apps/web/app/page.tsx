@@ -1,4 +1,6 @@
 
+import { after } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { ThemeProvider } from './components/common/ThemeProvider';
 import { CatProvider } from './components/common/CatProvider';
 import MotionProvider from './components/common/MotionProvider';
@@ -25,15 +27,32 @@ import {
   getContactData,
   getSiteConfig,
 } from './lib/data';
+import { githubHandle, readGithubActivity, refreshGithubActivity } from './lib/github';
 import { SITE_URL, SITE_NAME, absoluteUrl } from './lib/site';
 
-function quoteOfDay(quotes: { quote: string; author: string }[]) {
-  if (quotes.length === 0) return null;
+/** Which quote today lands on, and the date the section prints beside it — both
+    off the same UTC midnight so the label can never name a different day than
+    the pick. */
+function thoughtOfDay(quotes: { quote: string; author: string }[]) {
   const now = new Date();
   const start = Date.UTC(now.getUTCFullYear(), 0, 0);
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const dayOfYear = Math.floor((today - start) / 86_400_000);
-  return quotes[dayOfYear % quotes.length] ?? null;
+  const year = now.getUTCFullYear();
+  return {
+    quote: quotes.length > 0 ? quotes[dayOfYear % quotes.length] ?? null : null,
+    date: new Date(today)
+      .toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+      .toLowerCase(),
+    // The machine-readable half of the same label, off the same UTC midnight —
+    // so the <time> datetime can never name a different day than the printed
+    // one or than the pick.
+    iso: new Date(today).toISOString().slice(0, 10),
+    // The ledger index the section prints beside the date. Leap-aware, or one
+    // year in four the denominator is short by a day the numerator can reach.
+    day: dayOfYear,
+    days: year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 366 : 365,
+  };
 }
 
 export default async function Home() {
@@ -60,10 +79,33 @@ export default async function Home() {
       .map((e) => [e.company.trim().toLowerCase(), e.logoUrl as string])
   );
 
-  // Pick the "thought of the day" on the server (deterministic day-of-year index)
-  // so only ONE quote is serialized into the payload instead of all ~28, and there's
-  // no post-hydration flash. Stable within the 24h revalidation window.
-  const thought = quoteOfDay(quotes);
+  // Picked here so only ONE quote is serialized into the payload instead of all
+  // ~28, and the first paint is already the right one.
+  const thought = thoughtOfDay(quotes);
+
+  // Real commit activity for the contact section's GitHub tile, read from the
+  // archive in Postgres rather than from the upstream mirror. Sequential on
+  // purpose: the handle comes out of the social links above.
+  const github = await readGithubActivity(contactData.socialLinks);
+
+  // The mirror is polled here because there is no cron, and this render already
+  // wakes about once a day on the 24h revalidate below — the cadence wanted. It
+  // runs in `after`, so the fetch happens once the response is already streamed:
+  // no visitor waits on a third-party service, and nothing writes mid-render.
+  // The 20h floor keeps a burst of revalidations to one poll; if two regions do
+  // race, the merge is idempotent.
+  //
+  // The flush at the end is what makes the poll worth anything. This render has
+  // already read the archive, so the HTML now being cached still shows the
+  // PREVIOUS snapshot; without it the tile would serve data a full extra cycle
+  // old. Re-rendering is safe rather than circular: the next render finds a
+  // fresh `fetchedAt`, so `stale` is false and it does not poll again.
+  const handle = githubHandle(contactData.socialLinks.find((l) => l.iconKey === 'github')?.href);
+  if (handle && (!github || github.stale)) {
+    after(async () => {
+      if (await refreshGithubActivity(handle)) revalidatePath('/');
+    });
+  }
 
   // Person structured data for rich results (knowledge panel, sameAs linking).
   const sameAs = Array.from(
@@ -126,13 +168,21 @@ export default async function Home() {
             <Experience experiences={experiences} />
             <Projects projects={projects} />
             {blogs.length > 0 && <Blogs blogs={blogs} />}
-            <ThoughtOfTheDay quote={thought} />
+            <ThoughtOfTheDay
+              quote={thought.quote}
+              date={thought.date}
+              iso={thought.iso}
+              day={thought.day}
+              days={thought.days}
+            />
             <Contact
               purposes={contactData.purposes}
               socialLinks={contactData.socialLinks}
               contactEmail={siteConfig.contactEmail}
               availabilityStatus={siteConfig.availabilityStatus}
               availabilityDetail={siteConfig.availabilityDetail}
+              resumeUrl={siteConfig.resumeUrl}
+              github={github}
             />
           </main>
           <Footer copyrightName={siteConfig.copyrightName} />

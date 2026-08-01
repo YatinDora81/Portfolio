@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* Auto-detection stops at this app's own tree, so utilities that only ever appear
+   inside the shared package — size-5 on every brand icon, size-full on the rest —
+   were never generated and those SVGs collapsed to 0×0. */
+@source '../../../packages/ui/src';
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -31,6 +36,24 @@
   --border: #e5e5e5;
   --accent: #f5f5f5;
   --accent-foreground: #171717;
+
+  /* The keyline ink, shared by THOUGHT OF THE DAY and CONTACT. Two greys
+     declared per theme rather than one alpha-blended into both — no composited
+     value clears 4.5:1 on #fff and on #0a0a0a at once. */
+  --lab-dim: #6e6e70;
+  --lab-2: #5f5f61;
+  /* The channel's one colour, and its text-safe twin. `--ok` is the dot green:
+     it clears 3:1 for a graphic and no more, which the 12.5px ACK receipt and
+     the "copied ✓" label would fail on white. */
+  --ok: #16a34a;
+  --ok-ink: #15803d;
+  --err: #dc2626;
+  --dotgrid: rgba(0, 0, 0, .065);
+  /* The sentence form has no visible labels — the placeholders ARE the field
+     names, so they are content and take the 4.5:1 the keyline greys take. The
+     design's alpha-mixed grey came out at ~2.2:1; weight, not contrast, is what
+     keeps them subordinate to typed text. */
+  --ph: #6e6e70;
 }
 
 .dark {
@@ -45,6 +68,16 @@
   --border: rgba(255, 255, 255, 0.1);
   --accent: #262626;
   --accent-foreground: #fafafa;
+
+  --lab-dim: #8b8b8d;
+  --lab-2: #a5a5a7;
+  /* On #0a0a0a the dot green is already 11.4:1, so there is no second value to
+     declare — the twin exists for white, not for the dark theme. */
+  --ok: #4ade80;
+  --ok-ink: #4ade80;
+  --err: #f87171;
+  --dotgrid: rgba(255, 255, 255, .07);
+  --ph: #8b8b8d;
 }
 
 @layer base {
@@ -60,6 +93,9 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
+    /* Inter is loaded with its optical-size axis (layout.tsx), so display type
+       gets the tighter, higher-contrast letterforms it was drawn with. */
+    font-optical-sizing: auto;
     margin: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -118,6 +154,12 @@
   content-visibility: auto;
   contain-intrinsic-size: auto 600px;
 }
+
+/* The open channel is one tall column rather than a grid of tiles, so it needs
+   its own estimate — 600px would jump the scrollbar by two thirds of a section
+   on first scroll-in. Measured at the 720px content width, resting state, with
+   the year-in-one-line fold shut. */
+#contact { contain-intrinsic-size: auto 1480px; }
 
 .skill-inner-shadow {
   box-shadow:
@@ -222,7 +264,8 @@
 
    Every @keyframes in this file is defined exactly once. Pre-existing:
    fadeInBlur, gradientShift, pawWiggle, pawPounce, pawGlow.
-   Added below: heroPing, heroCaret, pawStep, xpPing, pingPulse.
+   Added below: heroPing, heroCaret, pawStep, xpPing, pingPulse, ctPing, nudge,
+   eq, rot, blink, eqB, rise, ghlnPing, wIn, footIn.
    All reduced-motion overrides live in the single block at the end of the file.
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -903,6 +946,18 @@ body.cat-on .cw .dot { display: none; }
   .xp-fold { grid-template-rows: 1fr; }
   .xp-veil,
   .xp-more { display: none; }
+
+  /* Contact needs no rescue — every block in the channel animates with a
+     `backwards` fill, so none of them ever rests at opacity 0. What it does need
+     is honesty about the parts that genuinely stop working: an oscilloscope
+     that never draws is an empty ruled box, a clock frozen at `--:--:--` beside
+     a live dot is a claim the page cannot make, and the address can be read but
+     not copied. The address itself and every link on the dial are plain HTML
+     and carry the section on their own. */
+  #contact .scope,
+  #contact .car-wave,
+  #contact .ct-now { display: none; }
+  #contact .car-btn { cursor: text; }
 }
 
 .xp-card.in .xp-log li {
@@ -1112,6 +1167,843 @@ body.cat-on .cw .dot { display: none; }
 .show-more:hover{border-color:color-mix(in srgb,var(--foreground) 30%,transparent);color:var(--foreground)}
 .show-more svg{width:16px;height:16px}
 
+/* ───────────────────────────────────────────────────────────────────────────
+   SHARED — the keyline.
+
+   A mono key, then a hairline cutting out to the margin. Both sections below
+   open with one, so it is declared once here instead of twice inside them. The
+   ink arrives through `--lab-*` rather than through a section token because
+   neither section owns the unit any more.
+   ─────────────────────────────────────────────────────────────────────────── */
+.lab {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Every call site writes a bare `class="lab"` — the mono is the unit's, not
+     the caller's. */
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--lab-dim);
+}
+.lab i { flex: 1; border-top: 1px solid var(--border); }
+/* Letter-spacing trails the last glyph: .18em at 11px pushes the hairline ~2px
+   past where `gap: 12px` says it is. Take it back for a true 12px. */
+.lab > span:first-child { margin-right: -.18em; }
+/* subordination is lighter, not tighter — and lowercase takes no tracking */
+.lab .hint {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--lab-2);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   CONTACT — "the open channel".
+
+   The section is an instrument rather than a form. A canvas oscilloscope idles
+   across the top and everything below feeds it: the form is one sentence with
+   the fields cut out of it, the address rides a carrier whose underline is a
+   second live wave, and the dial at the bottom lists everywhere else I am —
+   with the one row that has an archive behind it unfolding into a year of
+   commits drawn as a single stroke.
+
+   THE WHOLE BLOCK IS SCOPED UNDER `#contact`. The names are short and generic
+   by design (`.chip`, `.bars`, `.up`, `.err`, `.caret`) and several of them
+   already mean something else on this page — `.chip` is the hero's pill row and
+   `.caret` is its typing cursor. Scoping the block rather than the four actual
+   collisions keeps the answer to "which one is this?" in a single place, and
+   `#contact` outranks every bare class it lands on top of.
+
+   THE INK. Monochrome except `--ok`, which is spent on the signal dot, the
+   transmit HUD, the ACK and the live end of the year line — the four places the
+   channel says it is open. `--ok-ink` is its text-safe twin: the graphic green
+   clears 3:1 on white and no more, and the ACK receipt is 12.5px type.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+#contact {
+  position: relative;
+  /* 130px above the keyline in the design; 80 of it already arrives as the
+     Container's own `mt-20`, so only the remainder is declared here. */
+  padding: 50px 0 110px;
+  /* The dot grid is inset:0 and the error nudge travels ±3px inside the
+     measure, so nothing should overhang — this is the guarantee, not a fix. */
+  overflow-x: clip;
+}
+/* faint instrument dot-grid, masked so it breathes out at the edges */
+#contact::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(var(--dotgrid) 1px, transparent 1.4px);
+  background-size: 26px 26px;
+  -webkit-mask-image: radial-gradient(78% 62% at 50% 42%, #000 30%, transparent 100%);
+  mask-image: radial-gradient(78% 62% at 50% 42%, #000 30%, transparent 100%);
+}
+#contact .ct { position: relative; }
+
+#contact .ct-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+#contact .ct-title {
+  margin: 14px 0 0;
+  font-size: clamp(30px, 5.6vw, 42px);
+  font-weight: 650;
+  letter-spacing: -.03em;
+  line-height: 1.08;
+  font-variation-settings: 'opsz' 32;
+}
+#contact .ct-now {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: var(--lab-2);
+  white-space: nowrap;
+}
+#contact .ct-clock { font-variant-numeric: tabular-nums; color: var(--foreground); }
+#contact .sig-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--ok);
+  position: relative;
+  flex: none;
+}
+#contact .sig-dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 1px solid var(--ok);
+  animation: ctPing 2.4s cubic-bezier(0, 0, .2, 1) infinite;
+}
+@keyframes ctPing {
+  0% { transform: scale(.6); opacity: .8; }
+  70%, 100% { transform: scale(1.9); opacity: 0; }
+}
+
+/* ── the instrument ──────────────────────────────────────────────────────── */
+
+#contact .scope {
+  position: relative;
+  margin-top: 34px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+#contact .scope canvas { display: block; width: 100%; height: 118px; }
+#contact .scope-hud {
+  position: absolute;
+  inset: 8px 2px auto;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--lab-dim);
+}
+#contact .scope-hud b { font-weight: 500; color: var(--lab-2); letter-spacing: .1em; }
+#contact .scope-hud .tx { color: var(--ok-ink); opacity: 0; transition: opacity .25s ease; }
+#contact .scope.txing .scope-hud .tx { opacity: 1; }
+#contact .scope-cap {
+  position: absolute;
+  inset: auto 2px 8px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--lab-dim);
+}
+
+/* ── the sentence form ───────────────────────────────────────────────────── */
+
+#contact .sent-form { margin-top: 44px; }
+#contact .sentence {
+  font-size: clamp(19px, 3.4vw, 26px);
+  line-height: 2.05;
+  letter-spacing: -.014em;
+  font-weight: 350;
+  font-variation-settings: 'opsz' 26;
+  color: var(--muted-foreground);
+  max-width: 60ch;
+}
+#contact .sentence b { font-weight: 520; color: var(--foreground); }
+#contact .blank {
+  display: inline-block;
+  position: relative;
+  vertical-align: baseline;
+  margin: 0 .12em;
+}
+#contact .blank input {
+  font: inherit;
+  color: var(--foreground);
+  background: none;
+  border: 0;
+  outline: 0;
+  padding: 0 .1em 2px;
+  text-align: center;
+  min-width: 2ch;
+  border-bottom: 2px solid color-mix(in srgb, var(--foreground) 30%, transparent);
+  transition: border-color .25s ease;
+  font-weight: 480;
+  caret-color: var(--foreground);
+}
+#contact .blank input::placeholder {
+  color: var(--ph);
+  font-weight: 350;
+}
+#contact .blank input:focus { border-bottom-color: var(--foreground); }
+#contact .blank.err input { border-bottom-color: var(--err); animation: nudge .3s ease; }
+@keyframes nudge {
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+/* The width oracle: the field is sized from a copy of its own value set in the
+   same metrics, so it grows with the sentence instead of sitting in a box. */
+#contact .blank .mirror {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  visibility: hidden;
+  white-space: pre;
+  font: inherit;
+  font-weight: 480;
+  padding: 0 .1em;
+}
+
+/* purpose — an inline word that opens a chip rail */
+#contact .pk {
+  font: inherit;
+  color: var(--foreground);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0 .1em 2px;
+  font-weight: 480;
+  border-bottom: 2px dashed color-mix(in srgb, var(--foreground) 34%, transparent);
+  transition: border-color .25s ease;
+}
+#contact .pk:hover,
+#contact .pk[aria-expanded="true"] { border-bottom-color: var(--foreground); }
+#contact .pk .car {
+  display: inline-block;
+  font-size: .6em;
+  transform: translateY(-.15em);
+  margin-left: .35em;
+  transition: transform .25s ease;
+  color: var(--lab-dim);
+}
+#contact .pk[aria-expanded="true"] .car { transform: translateY(-.15em) rotate(180deg); }
+#contact .chip-rail {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows .35s cubic-bezier(.22, 1, .36, 1);
+}
+#contact .chip-rail.open { grid-template-rows: 1fr; }
+#contact .chip-rail > div {
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 14px;
+}
+#contact .chip {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: .02em;
+  color: var(--muted-foreground);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  padding: 6px 13px;
+  cursor: pointer;
+  transition: color .2s, border-color .2s, background-color .2s, transform .15s;
+}
+#contact .chip:hover {
+  color: var(--foreground);
+  border-color: color-mix(in srgb, var(--foreground) 28%, transparent);
+}
+#contact .chip:active { transform: scale(.96); }
+#contact .chip[aria-pressed="true"] {
+  color: var(--background);
+  background: var(--foreground);
+  border-color: var(--foreground);
+}
+
+/* message — the long blank gets its own line */
+#contact .msg-line { display: block; margin-top: 6px; }
+#contact .msg-line textarea {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-weight: 480;
+  color: var(--foreground);
+  background: none;
+  border: 0;
+  outline: 0;
+  resize: none;
+  overflow: hidden;
+  padding: 2px 0 8px;
+  min-height: 1.6em;
+  line-height: 1.6;
+  border-bottom: 2px solid color-mix(in srgb, var(--foreground) 30%, transparent);
+  transition: border-color .25s ease;
+  caret-color: var(--foreground);
+}
+#contact .msg-line textarea::placeholder {
+  color: var(--ph);
+  font-weight: 350;
+}
+#contact .msg-line textarea:focus { border-bottom-color: var(--foreground); }
+#contact .msg-line.err textarea { border-bottom-color: var(--err); animation: nudge .3s ease; }
+
+/* transmit row */
+#contact .tx-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 34px;
+}
+#contact .f-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--lab-dim);
+  font-variant-numeric: tabular-nums;
+}
+#contact .f-count.near { color: var(--err); }
+#contact .tx-note { font-size: 12px; color: var(--muted-foreground); }
+#contact .tx-spacer { flex: 1; }
+#contact .tx-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 520;
+  letter-spacing: .02em;
+  color: var(--background);
+  background: var(--foreground);
+  border: 1px solid var(--foreground);
+  border-radius: 9999px;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: transform .2s cubic-bezier(.22, 1, .36, 1), opacity .2s ease;
+}
+#contact .tx-btn:hover { transform: translateY(-2px); }
+#contact .tx-btn:active { transform: translateY(0) scale(.98); }
+/* `aria-disabled`, not `disabled`: the browser blurs an element the moment it
+   becomes disabled, so a keyboard visitor who pressed Transmit would be dropped
+   to <body> and have to tab back through the whole sentence to hear the receipt.
+   The button stays focusable and the submit handler is what refuses the second
+   send. Ordered after :hover so the lift is cancelled while in flight. */
+#contact .tx-btn[aria-disabled='true'] { opacity: .55; cursor: wait; transform: none; }
+#contact .tx-btn .up { display: inline-flex; transition: transform .3s cubic-bezier(.22, 1, .36, 1); }
+#contact .tx-btn:hover .up { transform: translateY(-3px); }
+#contact .tx-btn svg { width: 15px; height: 15px; }
+/* a tiny waveform lives inside the button */
+#contact .tx-btn .btnwave { display: inline-flex; align-items: center; gap: 2.5px; height: 14px; }
+#contact .tx-btn .btnwave i { width: 2px; border-radius: 1px; background: currentColor; height: 4px; opacity: .85; }
+#contact .tx-btn:hover .btnwave i { animation: eq .7s ease-in-out infinite alternate; }
+#contact .tx-btn .btnwave i:nth-child(1) { animation-delay: 0s; }
+#contact .tx-btn .btnwave i:nth-child(2) { animation-delay: .12s; }
+#contact .tx-btn .btnwave i:nth-child(3) { animation-delay: .24s; }
+#contact .tx-btn .btnwave i:nth-child(4) { animation-delay: .36s; }
+@keyframes eq { from { height: 3px; } to { height: 13px; } }
+#contact .spin {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  flex: none;
+  border: 2px solid color-mix(in srgb, var(--background) 35%, transparent);
+  border-top-color: var(--background);
+  animation: rot .7s linear infinite;
+}
+@keyframes rot { to { transform: rotate(360deg); } }
+
+/* the typed ACK receipt */
+#contact .ack {
+  margin-top: 26px;
+  min-height: 22px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: .02em;
+  color: var(--lab-2);
+  white-space: pre-wrap;
+}
+#contact .ack .ok { color: var(--ok-ink); }
+/* `opacity` and `transform` are reset, not inherited-away: the hero's own
+   `.caret` sets both, and a rule that only names the box would leave this one
+   at 85% and a tenth of an em low. */
+#contact .ack .caret {
+  display: inline-block;
+  width: .55em;
+  height: 1.05em;
+  vertical-align: -.18em;
+  opacity: 1;
+  transform: none;
+  background: var(--foreground);
+  animation: blink 1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+#contact .ack .again {
+  font: inherit;
+  color: var(--foreground);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 0;
+}
+
+/* ── carrier line (email): one button, the address riding its wave ───────── */
+
+#contact .carrier { margin-top: 76px; }
+#contact .car-copied {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ok-ink);
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity .3s ease, transform .3s ease;
+}
+#contact .car-copied.on { opacity: 1; transform: none; }
+/* THE RULE IS THE AFFORDANCE — the whole strip is the button, including the run
+   past the end of the address, which is the largest target in the section. */
+#contact .car-btn {
+  display: block;
+  width: 100%;
+  margin-top: 18px;
+  padding: 6px 2px 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+#contact .car-btn:focus-visible { outline: 1px dashed var(--lab-dim); outline-offset: 8px; }
+#contact .car-top { display: flex; align-items: center; gap: 16px; }
+#contact .car-addr {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  font-size: clamp(17px, 4.6vw, 30px);
+  letter-spacing: -.018em;
+  font-variation-settings: 'opsz' 30;
+  line-height: 1.25;
+}
+#contact .car-addr .cc {
+  display: inline-block;
+  white-space: pre;
+  font-variation-settings: 'wght' var(--cw, 480), 'opsz' 30;
+  transform: translateY(calc(var(--cy, 0) * 1px));
+  will-change: font-variation-settings, transform;
+}
+#contact .car-addr .cc.at { font-variation-settings: 'wght' calc(var(--cw, 480) + 220), 'opsz' 30; }
+#contact .car-ic {
+  margin-left: auto;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--muted-foreground);
+  background: var(--background);
+  transition: color .25s ease, border-color .25s ease, background-color .25s ease, transform .25s ease;
+}
+#contact .car-btn:hover .car-ic {
+  color: var(--foreground);
+  background: var(--muted);
+  border-color: color-mix(in srgb, var(--foreground) 30%, transparent);
+  transform: translateY(-2px);
+}
+#contact .car-ic svg { width: 15px; height: 15px; }
+#contact .car-ic .ic-check { display: none; color: var(--ok-ink); }
+#contact .car-btn.copied .car-ic { border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+#contact .car-btn.copied .car-ic .ic-copy { display: none; }
+#contact .car-btn.copied .car-ic .ic-check { display: block; }
+/* the wave IS the underline */
+#contact .car-wave { display: block; width: 100%; height: 30px; margin-top: 2px; }
+#contact .car-sub { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+#contact .car-open {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--lab-dim);
+  text-decoration: none;
+  transition: color .2s;
+}
+#contact .car-open:hover { color: var(--foreground); }
+
+/* ── the dial ────────────────────────────────────────────────────────────── */
+
+#contact .freqs { margin-top: 56px; }
+#contact .fq-list { margin-top: 6px; }
+#contact .fq {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 2px;
+  border-bottom: 1px solid var(--border);
+  color: inherit;
+  text-decoration: none;
+}
+#contact .fq-band {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--lab-dim);
+  width: 44px;
+  flex: none;
+  letter-spacing: .08em;
+}
+#contact .fq-name { font-size: 14px; font-weight: 480; letter-spacing: -.01em; }
+#contact .fq-line { flex: 1; border-top: 1px dashed color-mix(in srgb, var(--border) 92%, transparent); }
+#contact .fq-h { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+#contact .bars { display: inline-flex; align-items: flex-end; gap: 2.5px; height: 13px; flex: none; }
+#contact .bars i {
+  width: 2.5px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--foreground) 40%, transparent);
+  transition: background-color .25s ease;
+}
+#contact .bars i:nth-child(1) { height: 4px; }
+#contact .bars i:nth-child(2) { height: 7px; }
+#contact .bars i:nth-child(3) { height: 10px; }
+#contact .bars i:nth-child(4) { height: 13px; }
+#contact .fq-arr {
+  font-size: 12px;
+  color: var(--lab-dim);
+  flex: none;
+  transition: transform .3s cubic-bezier(.22, 1, .36, 1), color .3s ease;
+}
+@media (hover: hover) {
+  #contact .fq:hover .fq-name { font-weight: 620; }
+  #contact .fq:hover .bars i { background: var(--foreground); animation: eqB .6s ease-in-out infinite alternate; }
+  #contact .fq:hover .bars i:nth-child(2) { animation-delay: .1s; }
+  #contact .fq:hover .bars i:nth-child(3) { animation-delay: .2s; }
+  #contact .fq:hover .bars i:nth-child(4) { animation-delay: .3s; }
+  #contact .fq:hover .fq-arr { transform: translate(3px, -3px); color: var(--foreground); }
+}
+@keyframes eqB { from { transform: scaleY(.45); } to { transform: scaleY(1); } }
+#contact .fq:focus-visible { outline: 1px dashed var(--lab-dim); outline-offset: -1px; }
+
+#contact .ct-close {
+  margin-top: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--lab-dim);
+}
+#contact .ct-close .coord { letter-spacing: .06em; text-transform: none; color: var(--lab-2); }
+
+/* Entrances. `backwards` fill with no resting `opacity: 0` is the whole no-JS
+   story: `.in` is added by an IntersectionObserver, so without scripting it
+   never lands, nothing runs, and every block is simply there. */
+#contact .ct.in .rv { animation: rise .65s cubic-bezier(.22, 1, .36, 1) var(--d, 0s) backwards; }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+
+@media (max-width: 560px) {
+  #contact .ct-now .awk { display: none; }
+  #contact .fq-h { display: none; }
+  #contact .sentence { line-height: 1.95; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   88.1 · GITHUB — THE YEAR IN ONE LINE
+
+   A year of commits as a single smooth stroke — a seven-day trailing mean, with
+   the raw days drawn faintly beneath it as grain. The ink fades where the year
+   is old and sharpens toward now; the stroke ends on the live green dot. No
+   grid, no box, no bars — one line in whitespace, over the year it came from.
+
+   The row hides it and hover (or keyboard focus) unfolds it, on the same
+   contract as the site's own folds: grid 0fr→1fr, `:focus-visible` opens,
+   touch is always open.
+   ─────────────────────────────────────────────────────────────────────────── */
+#contact .fqx { position: relative; }
+#contact .ghv {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--lab-dim);
+  margin: 0 -4px 0 -6px;
+  transition: transform .3s ease, color .2s ease;
+}
+#contact .fqx:hover .ghv,
+#contact .fqx:has(.fq:focus-visible) .ghv { transform: rotate(180deg); color: var(--foreground); }
+#contact .ghln {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows .3s cubic-bezier(.4, 0, .2, 1);
+}
+#contact .ghln-in {
+  overflow: hidden;
+  min-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity .3s ease, transform .3s ease;
+}
+#contact .ghln-body { position: relative; padding: 14px 2px 16px; border-bottom: 1px solid var(--border); }
+#contact .fqx:hover .ghln,
+#contact .fqx:has(.fq:focus-visible) .ghln {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows .5s cubic-bezier(.22, 1, .36, 1);
+}
+#contact .fqx:hover .ghln-in,
+#contact .fqx:has(.fq:focus-visible) .ghln-in { opacity: 1; transform: none; transition-delay: .08s; }
+#contact .ghln-stage { position: relative; cursor: crosshair; touch-action: pan-y; }
+#contact .ghln-stage svg { display: block; width: 100%; height: 60px; overflow: visible; }
+
+/* one ink. the gradient is time: the past at a whisper, now at full. */
+#contact .ghln stop { stop-color: currentColor; }
+#contact .ghln .stroke {
+  fill: none;
+  stroke: url(#ghlnInk);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+#contact .ghln .under { fill: url(#ghlnFade); opacity: 0; }
+
+#contact .ghln .base { stroke: var(--border); stroke-width: 1; stroke-dasharray: 1 5; vector-effect: non-scaling-stroke; }
+#contact .ghln .pkdot { fill: currentColor; }
+#contact .ghln-pk {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--lab-dim);
+  white-space: nowrap;
+  opacity: 0;
+}
+
+/* the live end — the only green on the line */
+#contact .ghln-dot {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 9999px;
+  background: var(--ok);
+  pointer-events: none;
+  opacity: 0;
+}
+#contact .ghln-dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 1px solid var(--ok);
+  animation: ghlnPing 2.4s cubic-bezier(0, 0, .2, 1) infinite;
+}
+@keyframes ghlnPing {
+  0% { transform: scale(.6); opacity: .8; }
+  70%, 100% { transform: scale(1.9); opacity: 0; }
+}
+
+/* scrub: a hairline, a dot on the curve, a whispered readout */
+#contact .ghln .cur {
+  stroke: color-mix(in srgb, var(--foreground) 45%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  transition: opacity .15s;
+}
+#contact .ghln .curdot {
+  fill: var(--background);
+  stroke: var(--foreground);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  transition: opacity .15s;
+}
+#contact .ghln-stage:hover .cur,
+#contact .ghln-stage:hover .curdot,
+#contact .ghln-stage:active .cur,
+#contact .ghln-stage:active .curdot { opacity: 1; }
+#contact .ghln-ro {
+  position: absolute;
+  top: -2px;
+  right: 2px;
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--foreground);
+  opacity: 0;
+  transition: opacity .15s;
+  font-variant-numeric: tabular-nums;
+}
+#contact .ghln-stage:hover .ghln-ro,
+#contact .ghln-stage:active .ghln-ro { opacity: 1; }
+
+/* the line writes itself each time the fold opens */
+/* 1.15, not 1, and the reason is subtle. `pathLength="1"` normalises the dash
+   against the path's USER-space length, but `vector-effect: non-scaling-stroke`
+   makes the browser lay the pattern down in SCREEN space — and this viewBox is
+   stretched, because preserveAspectRatio is `none`. The panel renders 660 units
+   across a column that Container caps at 720px, so the rendered line is ~1.09x
+   longer than the dash that is supposed to cover it and the last ~8% of the
+   year fell permanently inside the gap: the line stopped short of its own live
+   dot. Anything at or above that ratio covers it; 1.15 leaves margin and still
+   completes the reveal at ~95% of the transition, so the draw does not visibly
+   finish early. */
+#contact .ghln .stroke { stroke-dasharray: 1.15; stroke-dashoffset: 1.15; }
+#contact .fqx:hover .stroke,
+#contact .fqx:has(.fq:focus-visible) .stroke {
+  transition: stroke-dashoffset 1.4s cubic-bezier(.4, 0, .2, 1) .25s;
+  stroke-dashoffset: 0;
+}
+#contact .fqx:hover .under,
+#contact .fqx:has(.fq:focus-visible) .under { transition: opacity .7s ease 1.1s; opacity: 1; }
+#contact .fqx:hover .ghln-dot,
+#contact .fqx:has(.fq:focus-visible) .ghln-dot { transition: opacity .3s ease 1.45s; opacity: 1; }
+#contact .fqx:hover .ghln-pk,
+#contact .fqx:has(.fq:focus-visible) .ghln-pk { transition: opacity .5s ease 1.55s; opacity: 1; }
+
+/* no pointer, no dwell to spend: on touch the panel is open from first paint
+   and the line draws when it scrolls into view. */
+@media (hover: none) {
+  #contact .ghv { display: none; }
+  #contact .ghln { grid-template-rows: 1fr; }
+  #contact .ghln-in { opacity: 1; transform: none; }
+  #contact .ghln.in .stroke { transition: stroke-dashoffset 1.5s cubic-bezier(.4, 0, .2, 1) .1s; stroke-dashoffset: 0; }
+  #contact .ghln.in .under { transition: opacity .8s ease 1.2s; opacity: 1; }
+  #contact .ghln.in .ghln-dot { transition: opacity .3s ease 1.55s; opacity: 1; }
+  #contact .ghln.in .ghln-pk { transition: opacity .5s ease 1.7s; opacity: 1; }
+}
+
+/* one caption line — the label and the ledger share it */
+#contact .ghln-cap {
+  margin: 10px 0 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 16px;
+  letter-spacing: .02em;
+  color: var(--lab-dim);
+}
+#contact .ghln-cap b { font-weight: 500; color: var(--lab-2); }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   THOUGHT OF THE DAY — living type.
+
+   The quote is set in variable-weight Inter, split a word to a span, and every
+   word's `wght` axis swells toward the cursor (ThoughtEntry writes `--w`
+   straight to the node, spring-smoothed). On touch there is nothing to chase,
+   so a gaussian pulse walks the line instead. The words assemble on scroll-in
+   as a weight-and-blur ramp, which is the same mechanic played once.
+
+   NO CARD, NO RULE ABOVE. The section opens on the keyline and closes on the
+   attribution's own hairline, so it stays a beat between two sections rather
+   than becoming a third object.
+
+   ONE MEASURE, TWO RUNGS. `ch` scales with the type, so both caps land at
+   roughly the same ~620px of column while holding a different number of
+   characters a line: the pull-quote rung is 19ch of 52px, the reading rung
+   26ch of 38px. Which one a quote lands on is decided server-side from its own
+   length (`rung()` in ThoughtOfTheDay.tsx) — that number and these two caps are
+   the whole tuning surface. Nothing steps UP: a long quote set at the display
+   size is how a short section starts competing with the page it sits inside.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.thought {
+  /* 72px above the keyline in the design, all of which arrives as the
+     Container's own `mt-20` — only the tail is declared here. */
+  padding: 0 0 8px;
+}
+.thought .th-wrap {
+  position: relative;
+  --q-size: clamp(30px, 6.4vw, 52px);
+  --q-cap: 19ch;
+}
+/* Past 90 characters the block has stopped being an aphorism. Same column,
+   smaller type, more of it a line. */
+.thought .th-wrap[data-len='long'] {
+  --q-size: clamp(24px, 4.4vw, 38px);
+  --q-cap: 26ch;
+}
+
+.thought .th-quote {
+  margin: 34px 0 0;
+  max-width: var(--q-cap);
+  font-size: var(--q-size);
+  line-height: 1.14;
+  letter-spacing: -.028em;
+  font-weight: 250; /* the base; each word carries its own through --w */
+  cursor: default;
+}
+.thought .th-quote p { margin: 0; text-wrap: balance; }
+/* The trailing space lives INSIDE each span and `pre` is what keeps it — an
+   inline-block would otherwise collapse it and fuse every word to the next. */
+.thought .th-quote .w {
+  display: inline-block;
+  white-space: pre;
+  font-variation-settings: 'wght' var(--w, 250), 'opsz' 32;
+  will-change: font-variation-settings;
+}
+/* `backwards` fill with no resting `opacity: 0` is the whole no-JS story: `.in`
+   arrives from an IntersectionObserver, so without scripting nothing runs and
+   the quote is simply there, at its resting weight. */
+.thought .th-wrap.in .th-quote .w {
+  animation: wIn .7s cubic-bezier(.22, 1, .36, 1) var(--d, 0s) backwards;
+}
+@keyframes wIn { from { opacity: 0; transform: translateY(.35em); filter: blur(6px); } }
+
+/* The instruction is only true where there is a cursor to move. */
+.thought .th-hintline {
+  margin-top: 8px;
+  font-size: 10.5px;
+  color: var(--lab-dim);
+  letter-spacing: .05em;
+  opacity: 0;
+  transition: opacity .5s ease .2s;
+}
+.thought .th-wrap.in .th-hintline { opacity: .75; }
+@media (hover: none) { .thought .th-hintline { display: none; } }
+
+/* The close: rule first, name flush right on the quote's own measure. The rule
+   running into the name IS the attribution dash. */
+.thought .th-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 30px;
+  max-width: 560px;
+}
+.thought .th-wrap.in .th-foot { animation: footIn .6s ease .55s backwards; }
+@keyframes footIn { from { opacity: 0; transform: translateY(8px); } }
+/* Without a floor a long name squeezes `flex: 1` to nothing and the section's
+   only ornament disappears on exactly the rows where it works hardest. */
+.thought .th-foot i { flex: 1; min-width: 24px; border-top: 1px solid var(--border); }
+.thought .th-author { font-size: 13px; line-height: 20px; color: var(--lab-2); overflow-wrap: anywhere; }
+
 @media (prefers-reduced-motion: reduce) {
   .paw-btn:hover .paw,
   .paw-btn:active .paw,
@@ -1189,4 +2081,52 @@ body.cat-on .cw .dot { display: none; }
     transform: none !important;
     transition: none !important;
   }
+
+  /* Contact and thought both arrive already there. Every entrance in the two
+     sections is `backwards`-filled off a keyframe rather than parked at
+     `opacity: 0`, so dropping the animation leaves the natural state and no
+     `!important` reset is needed to rescue the content. */
+  #contact .ct.in .rv,
+  .thought .th-wrap.in .th-quote .w,
+  .thought .th-wrap.in .th-foot { animation: none !important; }
+
+  /* The loops: the signal dot's ping, the transmit button's equaliser, the
+     dial's bars, and the live end of the year line. The instrument itself goes
+     quiet in Scope.tsx and Carrier.tsx, which draw one static frame instead. */
+  #contact .sig-dot::after,
+  #contact .tx-btn:hover .btnwave i,
+  #contact .fq:hover .bars i { animation: none !important; }
+  #contact .ghln-dot::after { animation: none; opacity: 0; }
+
+  /* The two the prototype only ever caught with its blanket duration override:
+     a ±3px horizontal shake is the canonical vestibular trigger, and the
+     spinner runs unbounded until the fetch resolves. Neither carries meaning on
+     its own — the red rule marks the field, the ACK names it, and the button
+     says "Transmitting" in words. */
+  #contact .blank.err input,
+  #contact .msg-line.err textarea,
+  #contact .spin { animation: none !important; }
+
+  /* Lift and travel go; every state stays reachable — the ACK still types, the
+     copy still confirms, the chip rail and the year still open. */
+  #contact .tx-btn:hover,
+  #contact .tx-btn:hover .up,
+  #contact .car-btn:hover .car-ic,
+  #contact .fq:hover .fq-arr { transform: none; }
+  #contact .chip-rail,
+  #contact .ghln,
+  #contact .ghln-in { transition-duration: .01ms !important; }
+  .thought .th-hintline { transition: none; }
+
+  /* The year in one line is drawn rather than written: without the dash the
+     stroke is simply present the moment the fold opens. */
+  #contact .ghln .stroke {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    transition: none !important;
+  }
+  #contact .ghln .under,
+  #contact .ghln-pk,
+  #contact .ghln-dot { opacity: 1 !important; transition: none !important; }
+  #contact .ghv { transition: none; }
 }

@@ -10,10 +10,16 @@ import VercelAnalytics from "./components/VercelAnalytics";
 
 // Self-hosted, preloaded, font-display: swap. Exposes --font-inter, which
 // globals.css maps onto --font-sans.
+//
+// `axes: ['opsz']` is not decorative: next/font ships only the wght axis unless
+// asked, so every `font-variation-settings: 'opsz' N` in the display type —
+// the thought quote, the channel title, the carrier address — was being parsed
+// and then silently dropped against a font with no such axis.
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-inter",
+  axes: ["opsz"],
 });
 
 // Terminal/metadata voice used by `.mono` (availability chip, role line, tenure
