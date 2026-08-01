@@ -2,6 +2,10 @@
 /* Control-room design system — tokens + component classes for the whole admin. */
 @import './control-room.css';
 
+/* Same reason as the web app: utilities used only inside the shared package are
+   outside this app's auto-detected source tree, so the icons came out 0×0. */
+@source '../../../packages/ui/src';
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

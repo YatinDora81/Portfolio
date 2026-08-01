@@ -25,6 +25,8 @@ export default async function ContactPurposesPage() {
         socialLinks={socialLinks.map(l => ({ id: l.id, name: l.name, iconKey: l.iconKey, detail: l.detail }))}
         availabilityStatus={cfg.get("availabilityStatus") || ""}
         availabilityDetail={cfg.get("availabilityDetail") || ""}
+        contactEmail={cfg.get("contactEmail") || ""}
+        resumeUrl={cfg.get("resumeUrl") || ""}
       />
     </div>
   );

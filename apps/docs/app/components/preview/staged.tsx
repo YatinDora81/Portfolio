@@ -259,7 +259,7 @@ export function StagedQuotesPreview({ quotes, dayOfYear, label = "Quotes Preview
   const live = useLive("quote", quotes);
   const pending = usePendingCount(QUOTE_ENTITIES);
 
-  // Exactly `quoteOfDay` from apps/web/app/page.tsx, run over the staged list,
+  // Exactly `thoughtOfDay` from apps/web/app/page.tsx, run over the staged list,
   // so the preview names the quote the site will show the moment this saves.
   const index = live.length === 0 ? 0 : dayOfYear % live.length;
 
@@ -268,6 +268,10 @@ export function StagedQuotesPreview({ quotes, dayOfYear, label = "Quotes Preview
       <QuotesPreview
         quotes={live.map((q) => ({ quote: str(q.quote), author: str(q.author) }))}
         todayIndex={index}
+        // The same raw day again, this time as the numerator the site prints in
+        // its keyline. It rides along rather than being recomputed in the pane
+        // for the reason above: one formula, three widgets.
+        dayOfYear={dayOfYear}
       />
     </PreviewFrame>
   );
@@ -276,14 +280,23 @@ export function StagedQuotesPreview({ quotes, dayOfYear, label = "Quotes Preview
 // ─── Contact ─────────────────────────────────────────────────────
 
 export function StagedContactPreview({
-  purposes, socialLinks, availabilityStatus, availabilityDetail, label = "Contact Preview",
+  purposes, socialLinks, availabilityStatus, availabilityDetail,
+  contactEmail, resumeUrl, label = "Contact Preview",
 }: {
   purposes: { id: string; label: string; emoji: string }[];
-  /** `iconKey`/`detail` are optional, but pass them: Contact.tsx keys the row's
-      glyph on `iconKey` and prints `detail` under the name. */
+  /** `iconKey`/`detail` are optional, but pass them: Contact.tsx sorts the
+      GitHub row out by `iconKey`, and every return row's handle is `detail`. */
   socialLinks: { id: string; name: string; iconKey?: string; detail?: string | null }[];
+  /** siteConfig `availabilityStatus` / `availabilityDetail` — the caption under
+      the oscilloscope and the note in the transmit row. Each falls back to the
+      section's own line rather than leaving the instrument unlabelled. */
   availabilityStatus?: string;
   availabilityDetail?: string;
+  /** siteConfig `contactEmail` / `resumeUrl` — the address is the carrier line
+      and the résumé is the `tape` row on the dial, so without either the site
+      drops that block outright and so does the pane. */
+  contactEmail?: string;
+  resumeUrl?: string;
   /** The frame's caption — not to be confused with a purpose's own `label`. */
   label?: string;
 }) {
@@ -302,6 +315,8 @@ export function StagedContactPreview({
         }))}
         availabilityStatus={availabilityStatus}
         availabilityDetail={availabilityDetail}
+        contactEmail={contactEmail}
+        resumeUrl={resumeUrl}
       />
     </PreviewFrame>
   );
