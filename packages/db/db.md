@@ -161,6 +161,29 @@ Purpose chips in the contact form. User selects one to categorize their inquiry 
 e.g. { label: "Job Opportunity", emoji: "🚀", sortOrder: 2 }
 ```
 
+### GithubProfile / GithubYear
+The contribution heatmap in the contact section's GitHub tile. Written only by the refresh in `apps/web/app/lib/github.ts`; nothing in the admin edits these rows, the same arrangement as `UtmTracker` and `ContactMessage`.
+
+The upstream source (`github-contributions-api.jogruber.de`, unauthenticated, no SLA) serves only a **trailing 365 days**, so these tables are both the outage fallback and the only place older history will ever exist — a day not captured before it scrolls out of that window is unrecoverable. Rows are therefore a permanent archive, never overwritten wholesale.
+
+**GithubProfile** — one row per account, holding the scalars from the last successful poll.
+- `total` — contributions in the trailing year, taken verbatim from the API. Not summed from `GithubYear`: the API's window starts on a week boundary and runs ~369 days, so a 365-day sum legitimately disagrees by a day or two, and the API's number is the authoritative one.
+- `fetchedAt` — what the tile prints as "as of jul 24". Advanced **only** on a successful, validated poll, so the label can never claim to be newer than the data.
+```
+e.g. { handle: "YatinDora81", total: 456, fetchedAt: 2026-07-30T13:00:00Z }
+```
+
+**GithubYear** — one row per calendar year of history.
+- `days` — one character per day, index 0 = Jan 1 UTC, encoded against `0-9a-zA-Z-_` where the index *is* the count. A year reads as `000310021045000…` and needs no decoder to skim. Length is 365 or 366, held there by `GithubYear_days_length_check` — the length carries the calendar, so a row of any other size could not be indexed by day-of-year at all.
+- `spikes` — `"index:count"` pairs for the rare days above 63, which one character cannot hold. Empty in a normal year; it exists so the archive is lossless rather than lossy in the tail.
+
+Keyed to the **calendar year**, not to the fetch window: a trailing year slides one day daily, so any offset stored against it drifts, whereas Jan 1 never moves. A refresh writes only the days the response actually mentioned, which is what lets an outage heal on the next success and leaves scrolled-out years untouched.
+
+Raw **counts** are stored, never the API's `level` — that level is quantile-derived over the API's own sliding window, so the same day reports 3 one month and 2 the next. Levels, streaks and the layout are all recomputed at read time in `apps/web/app/lib/github-codec.ts`.
+```
+e.g. { handle: "YatinDora81", year: 2026, days: "0003100210450…", spikes: "" }
+```
+
 ---
 
 ## Site Config

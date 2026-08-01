@@ -179,6 +179,50 @@ model ContactMessage {
   createdAt DateTime @default(now())
 }
 
+/// Latest snapshot scalars for one GitHub account, feeding the contact section's
+/// contribution tile. Separate from GithubYear because `total` is a TRAILING
+/// 365-day number from the API, not a calendar-year one — on a year row it would
+/// be a category error, and on an old year row it would be meaningless.
+///
+/// `fetchedAt` is what the tile prints as "as of <date>", and it is the only thing
+/// standing between a months-old graph and a false claim about the present. It is
+/// written on a successful, validated refresh and on nothing else, so the label
+/// can never age past the data it describes.
+model GithubProfile {
+  id     String @id @default(uuid())
+  handle String @unique
+  /// Taken verbatim from the API rather than summed from GithubYear: the API's
+  /// number is authoritative, and a gap in the archive must not quietly
+  /// under-report it.
+  total     Int      @default(0)
+  fetchedAt DateTime
+}
+
+/// One row per calendar year of contribution history — the permanent archive.
+/// The upstream mirror only ever serves a trailing 365 days, so a day not captured
+/// before it scrolls out of that window is unrecoverable; these rows are the only
+/// place the older years will ever exist.
+///
+/// Keyed to the calendar year and not to the fetch window on purpose. A trailing
+/// year slides one day every day, so any offset stored against it drifts and every
+/// merge becomes an alignment problem. Jan 1 never moves.
+model GithubYear {
+  id     String @id @default(uuid())
+  handle String
+  year   Int
+  /// One character per day, index 0 = Jan 1 UTC, counts encoded against the
+  /// 64-character alphabet in apps/web/app/lib/github.ts. Length is 365, or 366 in
+  /// a leap year, so the string's own length carries the calendar — a
+  /// GithubYear_days_length_check CHECK holds it to one of those two.
+  days   String
+  /// The rare days whose count outruns a single character, as "index:count" pairs.
+  /// Empty in almost every year; it exists so the archive is genuinely lossless
+  /// rather than lossy in the tail, which is the whole reason for keeping one.
+  spikes String @default("")
+
+  @@unique([handle, year])
+}
+
 model SiteConfig {
   id    String @id @default(uuid())
   key   String @unique

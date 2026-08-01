@@ -2,6 +2,7 @@ import { prisma } from "db";
 import { PageHeader } from "@/components/shared/page-header";
 import { StagedHeroPreview } from "@/components/preview/staged";
 import { SocialLinksTable } from "./table";
+import { RefreshGithubButton } from "./refresh-github";
 
 export default async function SocialLinksPage() {
   const [titles, skillBadges, links, content, siteConfigRows, totalSkills] = await Promise.all([
@@ -31,6 +32,10 @@ export default async function SocialLinksPage() {
         description="Profiles rendered in the hero, contact block and footer. Order here is the order on site."
       />
       <SocialLinksTable links={links.map(l => ({ id: l.id, name: l.name, href: l.href, iconKey: l.iconKey, detail: l.detail, sortOrder: l.sortOrder, version: l.version }))} />
+      {/* Only with a GitHub row to read a handle from — the site resolves the
+          handle from exactly that row, so without one the button has nothing to
+          refresh. */}
+      {links.some(l => l.iconKey === "github") && <RefreshGithubButton />}
       {/* `iconKey` is the whole point of this page — the table above edits it,
           so the preview has to key its glyphs on it and not on the display
           name, or "LeetCode 2" draws a two-letter stand-in where the site
