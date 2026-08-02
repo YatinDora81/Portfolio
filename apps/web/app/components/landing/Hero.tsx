@@ -1,7 +1,21 @@
 'use client';
 
+// Aliased so the peek effect below can still reach the DOM's own `Image`
+// constructor for its preloads.
+import NextImage from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { skillIconMap, socialIconMap } from '@repo/ui/icons/registry';
+
+/**
+ * The peek photo cannot be a next/image: the pointer handler assigns `img.src`
+ * as the cursor moves, and next/image owns that attribute. It can still be
+ * *served* by the optimiser though — the endpoint is just a URL — which is the
+ * difference between the 2 MB source PNG and ~25 kB of AVIF per photo.
+ * Deliberately no srcset: a srcset would outrank every `src` the handler writes.
+ */
+const PEEK_W = 384; // the widest .peek renders at 164 CSS px; this covers 2x
+const optimized = (src: string, w: number) =>
+  `/_next/image?url=${encodeURIComponent(src)}&w=${w}&q=75`;
 
 type HeroVersion = 'v1' | 'v2';
 
@@ -250,10 +264,12 @@ export default function Hero({
     document.documentElement.classList.toggle('no-peek', !canPeek);
     if (!canPeek) return;
 
-    // Preload the alternates so each flip is instant.
+    // Preload the alternates so each flip is instant. Same optimised URL the
+    // flip will ask for — preloading the original would warm the wrong cache
+    // entry and pull a megabyte per photo to do it.
     list.slice(1).forEach((src) => {
       const pre = new Image();
-      pre.src = src;
+      pre.src = optimized(src, PEEK_W);
     });
 
     const SWAP = 150;
@@ -281,7 +297,7 @@ export default function Hero({
       if (vis && list.length > 1 && trail > SWAP) {
         trail = 0;
         idx = (idx + 1) % list.length;
-        img.src = list[idx] as string;
+        img.src = optimized(list[idx] as string, PEEK_W);
         s = Math.max(0.84, s - 0.12); // tiny pop on each flip
       }
     };
@@ -371,8 +387,7 @@ export default function Hero({
         {/* touch / reduced-motion fallback for the cursor-trailing photo */}
         <div className="peek-stack animate-fade-in-blur animate-delay-1" aria-hidden="true">
           {deck.slice(0, 3).map((src) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={src} src={src} alt="" width={86} height={104} loading="lazy" />
+            <NextImage key={src} src={src} alt="" width={86} height={104} loading="lazy" />
           ))}
         </div>
 
@@ -420,7 +435,7 @@ export default function Hero({
         <img
           ref={peekRef}
           className="peek"
-          src={deck[0]}
+          src={optimized(deck[0] as string, PEEK_W)}
           alt=""
           width={164}
           height={205}
