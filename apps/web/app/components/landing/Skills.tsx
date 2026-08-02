@@ -243,7 +243,10 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
     {
       id: null as SkillCategoryId | null,
       label: 'All',
-      color: '#909092',
+      // `tune()` only darkens above a luminance of 160 and this grey sits at
+      // 144, so it passes through untouched — which left the light theme at
+      // 3.19:1. The two values are the `--secondary-ink` pair.
+      color: isDark ? '#909092' : '#6e6e70',
       count: enriched.length,
     },
     ...skillCategories

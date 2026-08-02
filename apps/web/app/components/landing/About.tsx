@@ -86,11 +86,10 @@ function BoldText({ text, logos }: { text: string; logos?: Record<string, string
 /* ---------- terminal ---------- */
 
 /**
- * Note on colours: `.text-secondary` is a hand-written class in globals.css,
- * not a Tailwind theme colour — so `text-secondary/50` generates no CSS at all
- * and the element silently falls back to `foreground`. Anywhere the muted tone
- * needs an opacity variant (ghost suggestion, hint lines) the value is spelled
- * out as `text-[#909092]/…` so Tailwind can actually emit it.
+ * The muted tone is `text-secondary-ink`, a real theme colour — unlike the
+ * hand-written `.text-secondary`, where `text-secondary/50` emits no CSS at all
+ * and silently falls back to `foreground`. No opacity variant: the ghost and
+ * hint lines used to carry /50 and /70, which composited to 1.67:1 and 2.14:1.
  */
 
 const UNLOCK_HINT = "# type 'help' to explore — try \"skills\" ⏎";
@@ -412,7 +411,7 @@ function Terminal({
       );
     if (l.t === 'hint')
       return (
-        <div key={i} className="whitespace-pre-wrap italic text-[#909092]/70">
+        <div key={i} className="whitespace-pre-wrap italic text-secondary-ink">
           {l.v}
         </div>
       );
@@ -578,7 +577,7 @@ function Terminal({
               </span>
               {/* zsh-style ghost suggestion */}
               {suggestion && (
-                <span className="text-[#909092]/50">
+                <span className="text-secondary-ink">
                   {suggestion.slice(value.length)}
                 </span>
               )}

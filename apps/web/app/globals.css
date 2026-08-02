@@ -19,6 +19,7 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-secondary-ink: var(--secondary-ink);
   --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo,
     Consolas, 'Liberation Mono', monospace;
@@ -54,6 +55,11 @@
      design's alpha-mixed grey came out at ~2.2:1; weight, not contrast, is what
      keeps them subordinate to typed text. */
   --ph: #6e6e70;
+  /* The site's secondary ink — every non-heading string that isn't a keyline.
+     Two values per theme rather than one: #909092 reads correctly on #0a0a0a
+     (6.21:1) and fails on #ffffff (3.19:1), and it is carrying real prose —
+     project summaries, experience bullets, the hero intro. */
+  --secondary-ink: #6e6e70;
 }
 
 .dark {
@@ -78,6 +84,7 @@
   --err: #f87171;
   --dotgrid: rgba(255, 255, 255, .07);
   --ph: #8b8b8d;
+  --secondary-ink: #909092;
 }
 
 @layer base {
@@ -107,7 +114,7 @@
 }
 
 .text-secondary {
-  color: #909092;
+  color: var(--secondary-ink);
 }
 
 /* The "terminal voice" — used by the availability chip, hero role line, socials,
@@ -323,7 +330,7 @@
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #909092;
+  color: var(--secondary-ink);
 }
 .loc-line svg { width: 12px; height: 12px; flex: none; }
 
@@ -335,7 +342,7 @@
   font-size: 11px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: #909092;
+  color: var(--secondary-ink);
 }
 .avail i {
   position: relative;
@@ -377,7 +384,7 @@
   border-radius: 9999px;
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--background) 60%, transparent);
-  color: #909092;
+  color: var(--secondary-ink);
   transition: color 0.45s cubic-bezier(.4,0,.2,1), border-color 0.45s cubic-bezier(.4,0,.2,1);
 }
 .soc:hover {
@@ -424,7 +431,7 @@
   cursor: default;
   user-select: none;
 }
-.hero h1 .dot { color: #909092; }
+.hero h1 .dot { color: var(--secondary-ink); }
 
 /* the photo that trails the cursor across the letters */
 .peek {
@@ -450,11 +457,14 @@
 @media (hover: hover) and (pointer: fine) {
   .peek-hint {
     display: inline;
-    color: #909092;
+    color: var(--secondary-ink);
     font-size: 11px;
     letter-spacing: 0.08em;
     margin-left: 0.75rem;
-    opacity: 0.8;
+    /* No opacity: this is the only thing telling anyone the nameplate has a
+       photo behind it, and fading the secondary ink another 20% put it at
+       2.43:1 — the people most likely to miss the interaction were the ones
+       who could not read the invitation. */
   }
 }
 
@@ -497,7 +507,7 @@ html.no-peek .peek-stack { display: block; }
   font-size: 1.05rem;
   font-weight: 500;
 }
-.roleline .slash { user-select: none; color: #909092; }
+.roleline .slash { user-select: none; color: var(--secondary-ink); }
 @media (max-width: 640px) {
   .roleline { font-size: 1rem; }
 }
@@ -530,7 +540,7 @@ html.no-peek .peek-stack { display: block; }
   max-width: 42rem;
   font-size: 1.06rem;
   line-height: 2;
-  color: #909092;
+  color: var(--secondary-ink);
 }
 .chip {
   display: inline-flex;
@@ -561,7 +571,7 @@ html.no-peek .peek-stack { display: block; }
   max-width: 42rem;
   font-size: 0.95rem;
   font-style: italic;
-  color: #909092;
+  color: var(--secondary-ink);
 }
 
 /* hero pill row — the curated stack + the "+30 more" doorway to #skills.
@@ -580,7 +590,7 @@ html.no-peek .peek-stack { display: block; }
 .chip-more {
   background: transparent;
   border-style: solid;
-  color: #909092;
+  color: var(--secondary-ink);
   cursor: pointer;
 }
 .chip-more:hover {
@@ -625,7 +635,7 @@ html.no-peek .peek-stack { display: block; }
   align-items: center;
   gap: 7px;
   padding: 0 14px 1.35rem;
-  color: #909092;
+  color: var(--secondary-ink);
   transition: color 0.25s;
 }
 .cue:hover { color: var(--foreground); }
@@ -643,17 +653,14 @@ html.no-peek .peek-stack { display: block; }
 .cue i:nth-child(2) { animation-delay: 0.35s; }
 .cue i:nth-child(3) { animation-delay: 0.7s; }
 
-/* ───────────────────────────────────────────────────────────────────────────
-   BRIDGE — the cat-on-a-wire divider between Hero and About.
-   `body.cat-on` is toggled by CatProvider, so shooing the cat with the navbar
-   paw takes it off the wire too and leaves a plain interpunct behind.
-   ─────────────────────────────────────────────────────────────────────────── */
+/* BRIDGE — the cat-on-a-wire divider. `body.cat-on` is toggled by CatProvider,
+   so shooing the cat also takes it off the wire. */
 #bridge { margin-top: 2.5rem; }
 .cw {
   display: flex;
   align-items: center;
   gap: 1rem;
-  color: #909092;
+  color: var(--secondary-ink);
 }
 .cw::before,
 .cw::after {
@@ -821,7 +828,7 @@ body.cat-on .cw .dot { display: none; }
 .xp-pos {
   margin: 2px 0 0;
   font-size: 0.875rem;
-  color: #909092;
+  color: var(--secondary-ink);
 }
 
 .xp-when {
@@ -829,7 +836,7 @@ body.cat-on .cw .dot { display: none; }
   flex-direction: column;
   gap: 4px;
   font-size: 0.875rem;
-  color: #909092;
+  color: var(--secondary-ink);
   flex-shrink: 0;
 }
 
@@ -852,7 +859,7 @@ body.cat-on .cw .dot { display: none; }
   border: 1px dashed var(--border);
   border-radius: 9999px;
   padding: 2px 8px;
-  color: #909092;
+  color: var(--secondary-ink);
   white-space: nowrap;
 }
 
@@ -897,11 +904,11 @@ body.cat-on .cw .dot { display: none; }
   font-family: var(--font-mono);
   font-size: 0.72rem;
   line-height: 1;
-  color: color-mix(in srgb, #909092 62%, transparent);
+  color: color-mix(in srgb, var(--secondary-ink) 62%, transparent);
   transition: color 0.2s;
 }
 
-.xp-log li > span:last-child { color: #909092; transition: transform 0.2s ease; }
+.xp-log li > span:last-child { color: var(--secondary-ink); transition: transform 0.2s ease; }
 .xp-log b { font-weight: 500; color: var(--foreground); }
 
 @media (hover: hover) {
@@ -1018,7 +1025,7 @@ body.cat-on .cw .dot { display: none; }
   font-family: var(--font-mono);
   font-size: 0.7rem;
   letter-spacing: 0.12em;
-  color: #909092;
+  color: var(--secondary-ink);
   background: transparent;
   border: 0;
   padding: 8px 0;
@@ -1077,7 +1084,7 @@ body.cat-on .cw .dot { display: none; }
   background: color-mix(in srgb, var(--foreground) 40%, transparent);
 }
 
-.bullets li span { color: #909092; }
+.bullets li span { color: var(--secondary-ink); }
 .bullets li b { font-weight: 500; color: var(--foreground); }
 
 /* ── Experience: tech badges ──
@@ -1130,14 +1137,14 @@ body.cat-on .cw .dot { display: none; }
 .pj-title .pl{height:20px;width:auto;max-width:40px;border-radius:4px;object-fit:contain;flex-shrink:0}
 /* `.pj-name` is the added no-link fallback — reference assumed live||github always exists */
 .pj-title a,.pj-title .pj-name{font-size:1.05rem;font-weight:700;letter-spacing:-.01em;display:inline-flex;align-items:center;gap:.4rem}
-.pj-title a svg{width:14px;height:14px;flex-shrink:0;color:#909092;transition:transform .22s,color .22s}
+.pj-title a svg{width:14px;height:14px;flex-shrink:0;color:var(--secondary-ink);transition:transform .22s,color .22s}
 .pj-row:hover .pj-title a svg{transform:translate(3px,-3px);color:var(--foreground)}
-.pj-sum{margin:.4rem 0 0;font-size:.875rem;line-height:1.65;color:#909092}
+.pj-sum{margin:.4rem 0 0;font-size:.875rem;line-height:1.65;color:var(--secondary-ink)}
 .pj-row .bullets{margin-top:.8rem;gap:.55rem;font-size:.83rem}
 
 /* hover-expand cards @ 525ms + staggered highlights */
 .pj-row.expand{cursor:pointer}
-.pj-hint{position:absolute;top:1.1rem;right:1rem;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#909092;opacity:0;transition:opacity .25s;pointer-events:none}
+.pj-hint{position:absolute;top:1.1rem;right:1rem;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--secondary-ink);opacity:0;transition:opacity .25s;pointer-events:none}
 @media(hover:hover){.pj-row:hover .pj-hint{opacity:.9}}
 .pj-row.open .pj-hint{opacity:0!important}
 .pj-x{display:grid;grid-template-rows:0fr;transition:grid-template-rows .525s cubic-bezier(.22,1,.36,1)}
@@ -1156,27 +1163,41 @@ body.cat-on .cw .dot { display: none; }
 }
 .pj-chips{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.85rem}
 .pj-links{display:flex;gap:1.1rem;margin-top:.7rem}
-.pj-links a{display:inline-flex;align-items:center;gap:.4rem;font-size:.75rem;letter-spacing:.02em;color:#909092;transition:color .2s}
+.pj-links a{display:inline-flex;align-items:center;gap:.4rem;font-size:.75rem;letter-spacing:.02em;color:var(--secondary-ink);transition:color .2s}
 .pj-links a:hover{color:var(--foreground)}
 .pj-links svg{width:13px;height:13px}
 .pj-chips .badge{font-size:.72rem;padding:2px 9px;gap:5px}
 .pj-chips .badge .bi{width:12px;height:12px}
-.pj-div{display:flex;align-items:center;gap:1rem;color:#909092;font-size:10px;letter-spacing:.25em;text-transform:uppercase;margin:1.5rem 0 .25rem}
+.pj-div{display:flex;align-items:center;gap:1rem;color:var(--secondary-ink);font-size:10px;letter-spacing:.25em;text-transform:uppercase;margin:1.5rem 0 .25rem}
 .pj-div::before,.pj-div::after{content:"";height:1px;background:var(--border);flex:1}
 
+/* Rows 4..n stay in the DOM — they used to mount only on "show more", which
+   kept them out of the served markup. `min-height:0` because a flex item's
+   automatic minimum size would floor the fold at its content height. */
+.pj-fold{display:grid;grid-template-rows:0fr;min-height:0;transition:grid-template-rows .525s cubic-bezier(.22,1,.36,1)}
+/* the clip box is padded back out to the bleed: `.pj-row` sits on a -1rem
+   horizontal margin, so a bare overflow:hidden would shear its hover card and
+   border off at both edges for the whole life of the row, not just mid-fold. */
+.pj-fold>div{overflow:hidden;min-height:0;padding:0 1rem;margin:0 -1rem}
+.pj-fold.open{grid-template-rows:1fr}
+.pj-more svg{transition:transform .3s ease}
+.pj-more.open svg{transform:rotate(180deg)}
+@media(scripting:none){
+  /* Only the dead control goes. The fold is NOT forced open here: `inert` is on
+     the collapsed rows and no CSS lifts it, so serving them visible would paint
+     content that is excluded from the accessibility tree and skipped by
+     find-in-page. They are in the served HTML either way, which is what the
+     crawler needed. */
+  .pj-more{display:none}
+}
+
 /* shared: "Show More" button (Projects + Blogs) */
-.show-more{margin:2rem auto 0;display:flex;align-items:center;gap:.5rem;border-radius:.5rem;border:1px solid var(--border);background:transparent;padding:10px 20px;font-size:.875rem;font-weight:500;color:#909092;cursor:pointer;transition:border-color .2s,color .2s}
+.show-more{margin:2rem auto 0;display:flex;align-items:center;gap:.5rem;border-radius:.5rem;border:1px solid var(--border);background:transparent;padding:10px 20px;font-size:.875rem;font-weight:500;color:var(--secondary-ink);cursor:pointer;transition:border-color .2s,color .2s}
 .show-more:hover{border-color:color-mix(in srgb,var(--foreground) 30%,transparent);color:var(--foreground)}
 .show-more svg{width:16px;height:16px}
 
-/* ───────────────────────────────────────────────────────────────────────────
-   SHARED — the keyline.
-
-   A mono key, then a hairline cutting out to the margin. Both sections below
-   open with one, so it is declared once here instead of twice inside them. The
-   ink arrives through `--lab-*` rather than through a section token because
-   neither section owns the unit any more.
-   ─────────────────────────────────────────────────────────────────────────── */
+/* SHARED — the keyline. Both sections below open with one, so the ink comes
+   through `--lab-*` rather than a token either of them owns. */
 .lab {
   display: flex;
   align-items: center;
