@@ -1106,3 +1106,69 @@ select.sel option { background: var(--card); color: var(--ink) }
   .sec-reach { margin-left: 0 }
 }
 
+/* ── Borrowed values ────────────────────────────────────────────────────────
+   A key or row a section renders but another section owns. Never an input and
+   never disabled-looking: a disabled field says "you can't", this says "not
+   here — there", and points at the page that can. */
+.borrowed {
+  display: flex; align-items: center; gap: 10px; padding: 11px 14px;
+  border-bottom: 1px solid var(--line2); font-size: 13px; min-width: 0
+}
+.borrowed:last-child { border-bottom: 0 }
+.borrowed-k {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--dim); flex: none; min-width: 124px
+}
+.borrowed-v { color: var(--dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.borrowed-v.none { color: var(--faint); font-style: italic }
+.borrowed-lock { color: var(--faint); flex: none; display: inline-flex }
+.borrowed-go {
+  margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .06em; color: var(--accT)
+}
+.borrowed-go:hover { text-decoration: underline }
+
+/* ── Config card ────────────────────────────────────────────────────────────
+   The second of the admin's two save affordances. Staged tables commit through
+   the save bar and show nothing local; a config card writes SiteConfig on its
+   own, so it says so in its own footer and never borrows the bar's language. */
+.card.cfg-dirty { border-color: var(--amber) }
+.cfg-foot {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  padding: 12px 16px; border-top: 1px solid var(--line2); background: var(--bg1)
+}
+.cfg-note { font-size: 11.5px; color: var(--dim); margin-right: auto; max-width: 46ch }
+.cfg-err {
+  display: flex; align-items: flex-start; gap: 8px; padding: 10px 16px; font-size: 12.5px;
+  color: var(--ambT); background: var(--amber-soft); border-top: 1px solid var(--line2)
+}
+.cfg-err svg { flex: none; margin-top: 1px }
+/* A stack of labelled fields inside a card body, at the row rhythm the tables
+   use, so a config page and a table page scan at the same speed. */
+.cfg-rows { display: grid; gap: 14px }
+.cfg-rows > .f { gap: 6px }
+
+/* ---------- 03 · the photo deck ----------
+   `heroPhotos`' first editor anywhere. It is a list, not a text box, because
+   the stored value is one comma-separated row and typing commas by hand is how
+   a path silently becomes two broken ones. */
+.hro-ph { display: grid; gap: 8px }
+.hro-ph-row { display: flex; align-items: center; gap: 10px }
+.hro-ph-row .in { flex: 1; min-width: 0 }
+.hro-ph-n {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--faint); width: 26px; flex: none
+}
+.hro-ph-thumb {
+  width: 34px; height: 34px; flex: none; border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--line2); background: var(--bg2); display: block
+}
+.hro-ph-thumb img { width: 100%; height: 100%; object-fit: cover; display: block }
+.hro-ph-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+  padding: 20px 16px; border: 1px dashed var(--line); border-radius: var(--r2); color: var(--faint)
+}
+.hro-ph-empty b { color: var(--dim); font-weight: 600; font-size: 13.5px }
+.hro-ph-empty span { font-size: 12px; max-width: 34ch }
+.hro-ph-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px }
+
