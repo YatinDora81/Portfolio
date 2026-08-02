@@ -1980,7 +1980,12 @@ body.cat-on .cw .dot { display: none; }
    inline-block would otherwise collapse it and fuse every word to the next. */
 .thought .th-quote .w {
   display: inline-block;
-  white-space: pre;
+  /* `pre-wrap`, not `pre`: each span carries its own trailing space and both
+     values preserve it, but `pre` also forbids breaking inside the span — one
+     unbroken 100-character token in a CMS quote then ran the whole page off the
+     side on a phone. `anywhere` is what actually breaks it. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   font-variation-settings: 'wght' var(--w, 250), 'opsz' 32;
   will-change: font-variation-settings;
 }
