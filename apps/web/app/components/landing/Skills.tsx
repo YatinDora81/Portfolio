@@ -128,7 +128,7 @@ function ElementCard({
           'group/card relative flex aspect-square w-[70px] flex-col justify-between overflow-hidden',
           'rounded-lg border-0 bg-transparent p-1.5 sm:w-[78px]',
           'transition-[transform,background-color,opacity,filter] duration-300 ease-out will-change-transform',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20',
+          'focus-visible:ring-2 focus-visible:ring-foreground/70',
           dimmed
             ? 'pointer-events-none scale-90 opacity-15 grayscale'
             : 'hover:-translate-y-0.5 hover:bg-foreground/[0.03]',
