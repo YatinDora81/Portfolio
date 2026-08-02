@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition } from "react";
+import { Fragment, useTransition } from "react";
 import {
   IconPencil, IconBrandGithub, IconWorld, IconGripVertical,
   IconChevronUp, IconChevronDown,
@@ -10,6 +10,13 @@ import { DeleteButton } from "@/components/shared/delete-button";
 import { deleteProject, reorderProjects } from "@/lib/actions/projects";
 import { cdnUrl } from "@/lib/utils";
 import { useSortable } from "@/lib/use-sortable";
+
+/**
+ * `FEATURED` in apps/web/app/components/landing/Projects.tsx — the first three
+ * cards render open and the rest sit behind the section's own fold. Position is
+ * therefore editorial, not cosmetic, so the grid draws the cut.
+ */
+const FEATURED = 3;
 
 export interface ProjectCard {
   id: string;
@@ -50,7 +57,16 @@ export function ProjectGrid({ projects }: { projects: ProjectCard[] }) {
         const cover = p.images?.[0];
 
         return (
-          <article key={p.id} className="pcard sortable" {...itemProps(p.id)}>
+          <Fragment key={p.id}>
+            {i === FEATURED && (
+              <div className="wk-cut">
+                below the fold
+                <span className="n">
+                  / {String(order.length - FEATURED).padStart(2, "0")} — collapsed until a visitor opens them
+                </span>
+              </div>
+            )}
+          <article className={i < FEATURED ? "pcard sortable prj-feat" : "pcard sortable"} {...itemProps(p.id)}>
             <div
               className="pcover"
               style={
@@ -100,6 +116,12 @@ export function ProjectGrid({ projects }: { projects: ProjectCard[] }) {
                 <span className="chip on"><span className="dot" /> Live</span>
               ) : (
                 <span className="chip off"><span className="dot" /> No demo</span>
+              )}
+
+              {i < FEATURED && (
+                <span className="prj-flag" title="Renders open on the site — the section's first three">
+                  featured
+                </span>
               )}
             </div>
 
@@ -187,6 +209,7 @@ export function ProjectGrid({ projects }: { projects: ProjectCard[] }) {
               </div>
             </div>
           </article>
+          </Fragment>
         );
       })}
       {dragId && <span className="sr-only" role="status">Reordering…</span>}

@@ -24,10 +24,10 @@ const BORDER = "rgba(255,255,255,0.1)";
  *  60-skill table would out-scroll the admin card it lives in. */
 const MAX_CARDS = 40;
 
-type CategoryId = "frontend" | "backend" | "database" | "devops" | "core";
+export type CategoryId = "frontend" | "backend" | "database" | "devops" | "core";
 
 /** Mirrors `skillCategories` in apps/web/app/lib/skill-meta.ts. */
-const CATEGORIES: { id: CategoryId; label: string; color: string }[] = [
+export const CATEGORIES: { id: CategoryId; label: string; color: string }[] = [
   { id: "frontend", label: "Frontend", color: "#38BDF8" },
   { id: "backend", label: "Backend", color: "#34D399" },
   { id: "database", label: "Databases", color: "#FBBF24" },
@@ -79,13 +79,13 @@ const LOOKUP: Record<string, { category: CategoryId; color: string }> = Object.f
 );
 
 /** Same fallback the site uses: unmapped skills land in "CS & Tooling". */
-function metaFor(name: string): { category: CategoryId; color: string } {
+export function metaFor(name: string): { category: CategoryId; color: string } {
   return LOOKUP[name] ?? { category: "core", color: "#F472B6" };
 }
 
 /** `deriveSymbol` from skill-meta — the two-letter element symbol a card falls
  *  back to when the registry has no glyph for it, so no card is ever a hole. */
-function deriveSymbol(name: string): string {
+export function deriveSymbol(name: string): string {
   const letters = name.replace(/[^a-zA-Z0-9]/g, "");
   if (letters.length === 0) return "??";
   return letters.charAt(0).toUpperCase() + letters.charAt(1).toLowerCase();

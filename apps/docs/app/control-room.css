@@ -1340,6 +1340,137 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .abt-foot-l { color: var(--accT); font-weight: 550; text-decoration: underline; text-underline-offset: 2px }
 .abt-foot-l:hover { text-decoration-thickness: 2px }
 
+/* ══ WORK SECTIONS ═══════════════════════════════════════════════════════════
+   Skills · Experience · Projects · Blogs · Thought of the day · Site chrome.
+
+   Own block, own prefixes (.wk- .skl- .xpr- .prj- .blg- .tod- .chr-). The
+   shared families the regroup introduced — .sec-*, .cfg-*, .borrowed — are
+   declared once, further up, and nothing here redefines them. Every colour
+   resolves through a token; the only literals are the site's own category
+   accents, passed in as `--cat` from the component that already mirrors
+   apps/web/app/lib/skill-meta.ts, and they are never used to carry text. */
+
+/* ---------- shared by these six pages ---------- */
+
+/* A figure strip that reads as instrumentation rather than as a stat card:
+   it belongs to the card it heads, so it sits inside `.card` above the list
+   and shares that card's keyline instead of floating as its own surface. */
+.wk-meter { display: flex; align-items: center; gap: 0 18px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--line2) }
+.wk-fig { display: flex; align-items: baseline; gap: 7px; min-width: 0 }
+.wk-fig b { font-family: var(--disp); font-size: 19px; font-weight: 650; letter-spacing: -.025em; line-height: 1 }
+.wk-fig b.q { color: var(--faint); font-weight: 500 }
+.wk-fig span { font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); white-space: nowrap }
+.wk-meter .sp { flex: 1 }
+
+/* Card entrance stagger — four steps, 60ms, on the existing `up` keyframe.
+   Beyond the fourth the delay stops reading as rhythm and starts reading as
+   lag, so the ladder deliberately stops there. */
+.wk-in { animation: up .28s cubic-bezier(.3, .7, .3, 1) both }
+.wk-in.s1 { animation-delay: .06s }
+.wk-in.s2 { animation-delay: .12s }
+.wk-in.s3 { animation-delay: .18s }
+
+/* Rule with a mono cap — the divider these pages use to say "the site cuts
+   here": the projects fold, the experience bullet fold, the blog groups. */
+.wk-cut { display: flex; align-items: center; gap: 10px; margin: 16px 0 10px; font-family: var(--mono); font-size: 9.5px; letter-spacing: .15em; text-transform: uppercase; color: var(--faint) }
+.wk-cut::after { content: ''; flex: 1; height: 1px; background: var(--line2) }
+.wk-cut .n { color: var(--dim) }
+
+/* ---------- 03 · Skills ----------
+   The site renders one continuous grid in sortOrder and treats category as a
+   *filter*, so the admin does the same: one draggable sequence, dimmed by the
+   legend, rather than category folders that would make a drag mean nothing. */
+.skl-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 11px 16px; border-bottom: 1px solid var(--line2) }
+.skl-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px;
+  border: 1px solid var(--line2); background: var(--card); font-family: var(--mono); font-size: 10px;
+  letter-spacing: .05em; color: var(--dim); transition: .14s
+}
+.skl-chip:hover { border-color: var(--line); color: var(--ink) }
+.skl-chip[aria-pressed="true"] { border-color: var(--line); background: var(--bg1); color: var(--ink); font-weight: 600 }
+/* Decorative only: the accent identifies the cluster, the label carries it. */
+.skl-chip i { width: 7px; height: 7px; border-radius: 99px; background: var(--cat, var(--faint)); flex: none }
+.skl-chip[aria-pressed="true"] i { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cat, var(--faint)) 22%, transparent) }
+.skl-chip b { font-weight: 500; color: var(--faint) }
+.skl-chip[aria-pressed="true"] b { color: var(--dim) }
+
+.skill.skl-el { position: relative; padding-top: 9px }
+/* The site's own resting chrome on a periodic-table card: one accent hairline
+   across the top and nothing else. Same device, admin scale. */
+.skl-el::after {
+  content: ''; position: absolute; left: 11px; right: 11px; top: 0; height: 2px;
+  border-radius: 0 0 99px 99px; background: var(--cat, var(--faint)); opacity: .55
+}
+.skl-el.skl-mute { opacity: .26 }
+.skill.hid.skl-mute { opacity: .16 }
+.skl-sym { font-family: var(--mono); font-size: 9px; color: var(--faint); letter-spacing: .04em }
+
+/* ---------- 04 · Experience ---------- */
+.xpr-mark {
+  width: 38px; height: 38px; border-radius: 10px; flex: none; overflow: hidden;
+  border: 1px solid var(--line2); background: var(--bg1); display: grid; place-items: center
+}
+.xpr-mark img { width: 100%; height: 100%; object-fit: contain; padding: 5px }
+.xpr-mark.none { border-style: dashed; color: var(--faint) }
+.xpr-role { font-family: var(--disp); font-weight: 600; font-size: 15.5px; letter-spacing: -.01em }
+.xpr-b { position: relative; padding-left: 15px; font-size: 13px; line-height: 1.6; color: var(--dim) }
+.xpr-b::before { content: ''; position: absolute; left: 2px; top: .62em; width: 4px; height: 4px; border-radius: 99px; background: var(--faint) }
+.xpr-b b { color: var(--ink); font-weight: 600 }
+/* Below the site's own fold — legible, but visibly a second tier. */
+.xpr-b.fold { color: var(--faint) }
+.xpr-b.fold b { color: var(--dim) }
+
+/* ---------- 05 · Projects ----------
+   The site opens with three cards and folds the rest, so the fold is drawn
+   through the grid rather than described in a hint nobody reads. */
+.proj-grid > .wk-cut { grid-column: 1 / -1; margin: 4px 0 0 }
+.prj-feat .pcover { border-bottom-color: color-mix(in srgb, var(--c1) 40%, var(--line2)) }
+.prj-feat .pnum { color: var(--accT); border-color: color-mix(in srgb, var(--c1) 40%, transparent) }
+.prj-flag {
+  position: absolute; right: 11px; bottom: 11px; display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 99px; background: var(--chipG); color: var(--ink);
+  border: 1px solid var(--line2); backdrop-filter: blur(6px)
+}
+
+/* ---------- 06 · Blogs ---------- */
+.blg-thumb {
+  width: 54px; height: 36px; border-radius: 7px; flex: none;
+  border: 1px solid var(--line2); background: var(--bg2) center / cover no-repeat
+}
+.blg-thumb.none { display: grid; place-items: center; color: var(--faint); border-style: dashed }
+
+/* ---------- 07 · Thought of the day ----------
+   The rotation rule is the section, so it gets the page's largest object: a
+   day dial and the two picks either side of it. */
+.tod-ledger { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) }
+.tod-cell { padding: 15px 17px; border-right: 1px solid var(--line2); min-width: 0 }
+.tod-cell:last-child { border-right: none }
+.tod-cell.now { background: linear-gradient(180deg, var(--accS), transparent 78%) }
+.tod-k { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint) }
+.tod-q { font-family: var(--disp); font-size: 13.5px; font-weight: 600; line-height: 1.5; letter-spacing: -.005em; margin-top: 9px }
+.tod-a { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 7px }
+.tod-dial { display: grid; place-items: center; gap: 7px; padding: 15px 20px }
+.tod-dial figcaption { font-family: var(--mono); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); text-align: center }
+.tod-dial .val { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--disp); font-size: 17px; font-weight: 650; letter-spacing: -.03em }
+@media (max-width: 720px) {
+  .tod-ledger { grid-template-columns: 1fr }
+  .tod-cell { border-right: none; border-bottom: 1px solid var(--line2) }
+  .tod-cell:last-child { border-bottom: none }
+}
+/* Tomorrow's pick, on the same rail device as today's. */
+.qcard.tod-next::before { background: var(--amber) }
+
+/* ---------- Site chrome ----------
+   The pane keeps the public site's palette, so these two strips are the only
+   place in the admin that hard-codes the site's own ink. */
+.chr-strip { border-radius: 10px; border: 1px solid rgba(255, 255, 255, .1); padding: 9px 12px }
+.chr-nav { display: flex; align-items: center; gap: 14px }
+.chr-word { font-weight: 700; font-size: 12px; letter-spacing: -.01em }
+.chr-links { display: flex; gap: 11px; font-size: 9.5px }
+.chr-toggles { display: flex; gap: 6px; margin-left: auto }
+.chr-toggles span { width: 15px; height: 15px; border-radius: 99px; border: 1px solid rgba(255, 255, 255, .16); display: grid; place-items: center; font-size: 8px }
+
 /* ══ HERO · section 01 — and CONTACT · section 08 ═════════════════════════════
    Two pages, one block, own prefixes (.hro- .ctc-). The shared families the
    regroup introduced — .sec-*, .cfg-*, .borrowed — are declared further up and

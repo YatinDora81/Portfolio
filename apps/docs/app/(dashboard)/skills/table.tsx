@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Card, CardHead } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,30 +13,25 @@ import { IconPicker } from "@/components/shared/icon-picker";
 import { useStaging } from "@/components/staging/staging-provider";
 import { useSortable } from "@/lib/use-sortable";
 import {
-  IconPlus, IconPencil, IconEye, IconEyeOff, IconCpu, IconAlertTriangle,
+  IconPlus, IconPencil, IconEye, IconEyeOff, IconCpu,
   IconGripVertical, IconArrowBackUp,
 } from "@tabler/icons-react";
 import { findSkillIcon } from "@repo/ui/icons/registry";
+// The category vocabulary the site's periodic table actually filters on. It
+// already lives once in this app (the preview mirrors apps/web's skill-meta.ts,
+// which sits behind that app's own `@/` alias), so the admin's clusters can
+// never name a chip the site does not draw.
+import { CATEGORIES, metaFor, deriveSymbol, type CategoryId } from "@/components/preview/skills";
 
 interface Skill { id: string; name: string; iconKey: string; show: boolean; sortOrder: number }
 
 type Sortable = ReturnType<typeof useSortable>;
 
-/**
- * Skills have no `category` column, so the grouping key is the one real axis the
- * data gives us: whether a skill is published to the grid or kept around purely
- * as a relation tag. Sort order inside each group is the query's sortOrder.
- */
-function groupSkills(skills: Skill[]) {
-  return [
-    { key: "grid", title: "in the skills grid", rows: skills.filter(s => s.show) },
-    { key: "hidden", title: "hidden · tags only", rows: skills.filter(s => !s.show) },
-  ].filter(g => g.rows.length > 0);
-}
-
-function SkillChip({ skill, sortable }: { skill: Skill; sortable: Sortable }) {
+function SkillChip({ skill, sortable, muted }: { skill: Skill; sortable: Sortable; muted: boolean }) {
   const { stageUpdate, stageDelete, unstageDelete, isDeleted, isNew, isEdited } = useStaging();
   const icon = findSkillIcon(skill.iconKey);
+  const { category, color } = metaFor(skill.name);
+  const cluster = CATEGORIES.find(c => c.id === category);
 
   const gone = isDeleted("skill", skill.id);
   /** Exactly one diff mark per chip: gone beats new beats edited. */
@@ -46,20 +41,34 @@ function SkillChip({ skill, sortable }: { skill: Skill; sortable: Sortable }) {
         : null;
 
   return (
-    <div className={cn("skill sortable", !skill.show && "hid", mark)} {...sortable.itemProps(skill.id)}>
+    <div
+      className={cn("skill sortable skl-el", !skill.show && "hid", muted && "skl-mute", mark)}
+      // The site's own accent for this cluster, decorative: it paints the 2px
+      // hairline and the legend dot only, never any text.
+      style={{ ["--cat" as string]: color }}
+      title={cluster ? `${skill.name} — ${cluster.label}` : skill.name}
+      {...sortable.itemProps(skill.id)}
+    >
       <span className="row-grip" title="Drag to reorder" {...sortable.handleProps(skill.id)}>
         <IconGripVertical size={13} />
       </span>
-      {/* The glyph the site will actually draw — a broken key reads as a warning
-          here instead of as an empty gap on the live page. */}
-      <span className={cn("ico-sw sm", !icon && "ink")} style={!icon ? { color: "var(--bad)" } : undefined}>
-        {icon ? <icon.Icon /> : <IconAlertTriangle size={12} stroke={1.8} />}
+      {/* The glyph the site will actually draw. With no registry entry the site
+          falls back to the two-letter element symbol, so that is what shows
+          here — a red warning would claim a hole the grid does not have. */}
+      <span className={cn("ico-sw sm", !icon && "ink")}>
+        {icon
+          ? <icon.Icon />
+          : <b style={{ fontSize: 10, fontWeight: 800, letterSpacing: "-.02em" }}>{deriveSymbol(skill.name)}</b>}
       </span>
-      <div>
+      <div style={{ minWidth: 0 }}>
         <div className="skill-n">{skill.name}</div>
-        {/* Only worth surfacing when it diverges from the name — that mismatch is
-            what decides which icon the site renders. */}
-        {skill.iconKey !== skill.name && <div className="skill-u">{skill.iconKey}</div>}
+        <div className="skl-sym">
+          {/* The icon key is only worth surfacing when it diverges from the name
+              — that mismatch is what decides which glyph the site renders. */}
+          {icon
+            ? (skill.iconKey !== skill.name ? skill.iconKey : cluster?.label ?? "")
+            : `no icon · draws ${deriveSymbol(skill.name)}`}
+        </div>
       </div>
       {gone ? (
         // The chip stays put, struck through, until the bar commits — so the undo
@@ -113,6 +122,8 @@ function SkillEditButton({ skill }: { skill: Skill }) {
 function SkillDialog({ onClose, editing }: { onClose: () => void; editing: Skill | null }) {
   const { stageCreate, stageUpdate } = useStaging();
   const [show, setShow] = useState(editing?.show ?? true);
+  const [name, setName] = useState(editing?.name ?? "");
+  const cluster = CATEGORIES.find(c => c.id === metaFor(name.trim()).category);
 
   return (
     <Dialog open onClose={onClose} title={editing ? "Edit skill" : "Add skill"} icon={IconCpu}>
@@ -133,7 +144,18 @@ function SkillDialog({ onClose, editing }: { onClose: () => void; editing: Skill
         }}
       >
         <div className="f-row">
-          <Input name="name" label="Name" defaultValue={editing?.name || ""} required />
+          <Input
+            name="name"
+            label="Name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            required
+            // The cluster is derived from the name and never stored, so the only
+            // honest place to show it is beside the field that decides it.
+            hint={name.trim()
+              ? `Filters under “${cluster?.label}” on the site`
+              : "The name decides which cluster it filters under"}
+          />
           <IconPicker
             kind="skill"
             label="Icon"
@@ -165,16 +187,18 @@ function SkillDialog({ onClose, editing }: { onClose: () => void; editing: Skill
 export function SkillsTable({ skills }: { skills: Skill[] }) {
   const { overlay, stageReorder } = useStaging();
   const [addOpen, setAddOpen] = useState(false);
+  const [filter, setFilter] = useState<CategoryId | null>(null);
 
   // Everything staged for this entity — new chips, pending edits and toggles,
   // the pending drag order — folded onto the server rows, so a toggled skill
-  // hops groups the moment it is clicked rather than after a round trip.
+  // hops lanes the moment it is clicked rather than after a round trip.
   const staged = overlay("skill", skills, (s) => s.id);
 
-  // One hook over the flat list, not one per group: `sortOrder` is a single
-  // sequence across both groups, and staging keeps exactly one reorder op per
-  // entity. Re-grouping the dragged order is what pulls a chip back into its own
-  // group if the drop crossed the divider.
+  // One hook over the flat list: `sortOrder` is a single sequence and the site
+  // renders it as one continuous grid. Category is a *filter* there, not a
+  // folder — which is exactly why it is a filter here too. Clusters as folders
+  // would make a cross-cluster drag mean nothing, since the category is derived
+  // from the name and cannot be changed by moving a chip.
   const sortable = useSortable(
     staged.map((s) => s.id),
     (ids) => stageReorder("skill", ids)
@@ -186,12 +210,29 @@ export function SkillsTable({ skills }: { skills: Skill[] }) {
   const rank = new Map(sortable.order.map((id, i) => [id, i] as const));
   const at = (id: string) => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
   const ordered = [...staged].sort((a, b) => at(a.id) - at(b.id));
-  const groups = groupSkills(ordered);
+
+  const grid = ordered.filter(s => s.show);
+  const tray = ordered.filter(s => !s.show);
+
+  // Counted over the published grid only — the legend describes what visitors
+  // can filter, and a hidden skill is not in that table at all.
+  const counts = useMemo(() => {
+    const m = new Map<CategoryId, number>();
+    for (const s of grid) {
+      const { category } = metaFor(s.name);
+      m.set(category, (m.get(category) ?? 0) + 1);
+    }
+    return m;
+  }, [grid]);
+
+  const clusters = CATEGORIES.filter(c => (counts.get(c.id) ?? 0) > 0);
+  const lit = filter ? counts.get(filter) ?? 0 : grid.length;
+  const muted = (name: string) => filter !== null && metaFor(name).category !== filter;
 
   return (
-    <Card flush>
+    <Card flush className="wk-in">
       <CardHead
-        title="Skills"
+        title="Periodic table"
         count={ordered.length}
         right={
           <Button size="sm" onClick={() => setAddOpen(true)}>
@@ -200,24 +241,84 @@ export function SkillsTable({ skills }: { skills: Skill[] }) {
         }
       />
 
+      {ordered.length > 0 && (
+        <div className="wk-meter">
+          <div className="wk-fig"><b>{grid.length}</b><span>in the grid</span></div>
+          <div className="wk-fig">
+            <b className={tray.length ? undefined : "q"}>{tray.length}</b><span>hidden · tags only</span>
+          </div>
+          <div className="wk-fig"><b className="q">{clusters.length}</b><span>clusters</span></div>
+          <div className="sp" />
+          <span className="hint"><IconGripVertical size={13} /> Drag a chip — position one opens the grid</span>
+        </div>
+      )}
+
+      {grid.length > 0 && (
+        <div className="skl-legend" role="group" aria-label="Highlight one cluster">
+          <button
+            type="button"
+            className="skl-chip"
+            aria-pressed={filter === null}
+            onClick={() => setFilter(null)}
+            style={{ ["--cat" as string]: "var(--faint)" }}
+          >
+            <i aria-hidden="true" /> All <b>{grid.length}</b>
+          </button>
+          {clusters.map(c => (
+            <button
+              key={c.id}
+              type="button"
+              className="skl-chip"
+              aria-pressed={filter === c.id}
+              onClick={() => setFilter(filter === c.id ? null : c.id)}
+              style={{ ["--cat" as string]: c.color }}
+            >
+              <i aria-hidden="true" /> {c.label} <b>{counts.get(c.id)}</b>
+            </button>
+          ))}
+          <div style={{ flex: 1 }} />
+          <span className="hint" aria-live="polite">
+            {filter ? `${lit} of ${grid.length} lit` : "clusters are a filter on the site, not a running order"}
+          </span>
+        </div>
+      )}
+
       <div className="card-b">
-        {groups.map((g, gi) => (
-          <div key={g.key} className="skill-cat" style={gi === groups.length - 1 ? { marginBottom: 0 } : undefined}>
-            <div className="skill-cat-h">
-              <div className="skill-cat-t">{g.title}</div>
-              <div className="skill-cat-n">/ {String(g.rows.length).padStart(2, "0")}</div>
+        {grid.length > 0 && (
+          <div className="skill-wrap">
+            {grid.map(s => (
+              <SkillChip key={s.id} skill={s} sortable={sortable} muted={muted(s.name)} />
+            ))}
+          </div>
+        )}
+
+        {tray.length > 0 && (
+          <>
+            <div className="wk-cut">
+              not in the grid <span className="n">/ {String(tray.length).padStart(2, "0")}</span>
             </div>
             <div className="skill-wrap">
-              {g.rows.map(s => <SkillChip key={s.id} skill={s} sortable={sortable} />)}
+              {tray.map(s => (
+                <SkillChip key={s.id} skill={s} sortable={sortable} muted={muted(s.name)} />
+              ))}
             </div>
-          </div>
-        ))}
+          </>
+        )}
 
         {ordered.length === 0 && (
           <div className="empty">
             <div className="empty-ic"><IconCpu size={20} stroke={1.5} /></div>
-            <b>No skills yet</b>
-            <span>Add the tools you actually work with — they fill the skills grid and become tags on projects and experience.</span>
+            <b>The periodic table is empty</b>
+            <span>Visitors reach section 03 and find a heading over nothing, and the hero drops its &ldquo;+N more&rdquo; chip.</span>
+            <Button size="sm" onClick={() => setAddOpen(true)}><IconPlus size={14} /> Add the first skill</Button>
+          </div>
+        )}
+
+        {ordered.length > 0 && grid.length === 0 && (
+          <div className="empty" style={{ paddingBottom: 6 }}>
+            <div className="empty-ic"><IconEyeOff size={19} stroke={1.5} /></div>
+            <b>Nothing is published to the grid</b>
+            <span>Every skill here is a tag only. Section 03 renders a heading over an empty table.</span>
           </div>
         )}
       </div>
