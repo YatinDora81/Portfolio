@@ -1435,3 +1435,50 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .hro-ph-empty span { font-size: 12px; max-width: 34ch }
 .hro-ph-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px }
 
+/* ---------- 04 · the contribution tile ----------
+   Contact's signature object. The archive lives in Postgres and only the site
+   writes it, so everything here is a readout — the one control is the refresh,
+   and it asks the site to go and look rather than editing anything. */
+.ctc-figs {
+  display: flex; align-items: baseline; gap: 0 26px; flex-wrap: wrap;
+  padding: 14px 16px; border-bottom: 1px solid var(--line2)
+}
+.ctc-fig { display: grid; gap: 3px; min-width: 0 }
+.ctc-fig b { font-family: var(--disp); font-size: 21px; font-weight: 650; letter-spacing: -.03em; line-height: 1 }
+.ctc-fig span {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--faint); white-space: nowrap
+}
+.ctc-weeks { padding: 14px 16px 10px; margin: 0 }
+.ctc-bars { display: flex; align-items: flex-end; gap: 2px; height: 46px }
+.ctc-bars i {
+  flex: 1; min-width: 2px; border-radius: 2px 2px 0 0; background: var(--c1); opacity: .8;
+  transition: opacity .13s
+}
+.ctc-bars:hover i { opacity: .55 }
+.ctc-bars i:hover { opacity: 1 }
+/* A week the archive cannot vouch for is a gap, never a zero — a zero would
+   claim a quiet week that may simply never have been captured. */
+.ctc-bars i.gap { height: 2px; background: var(--line); opacity: 1; border-radius: 99px }
+.ctc-weeks figcaption {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .06em; color: var(--faint)
+}
+.ctc-weeks figcaption span:nth-child(2) { text-align: center; min-width: 0 }
+.ctc-foot {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px; border-top: 1px solid var(--line2); background: var(--bg1)
+}
+/* `.ctc-foot` is a tinted band, so both strings on it take --dim, not --faint. */
+.ctc-asof { margin-left: auto; font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; color: var(--dim) }
+.ctc-refresh { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; min-width: 0 }
+.ctc-refresh-m { font-size: 11.5px; color: var(--dim); max-width: 52ch }
+
+/* 03 · the two halves of one message, and where the other half of it shows up. */
+.ctc-mirror {
+  display: flex; align-items: center; gap: 8px; padding: 11px 16px;
+  font-size: 12px; color: var(--dim)
+}
+.ctc-mirror::before {
+  content: ''; width: 5px; height: 5px; border-radius: 99px; background: var(--faint); flex: none
+}

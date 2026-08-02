@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 
 /**
@@ -31,7 +32,14 @@ export async function refreshGithub(): Promise<{ ok: boolean; error?: string }> 
       body: JSON.stringify({ secret }),
       cache: "no-store",
     });
-    if (res.ok) return { ok: true };
+    // The button now sits inside the tile that reads this archive, so the
+    // figures, the "captured …" stamp and the fresh/stale chip beside it all go
+    // stale the moment the refresh lands. Without this the button reports
+    // "Archive updated" over numbers that are visibly the old ones.
+    if (res.ok) {
+      revalidatePath("/contact-purposes");
+      return { ok: true };
+    }
 
     // The site distinguishes "no handle to read" from "the mirror wouldn't
     // answer", and they need different things done about them, so the message
