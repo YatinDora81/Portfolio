@@ -45,14 +45,42 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Don't touch the DOM until we've adopted the inline-script value, otherwise
     // we'd briefly clobber the correct class with our 'dark' default.
+    //
+    // This effect syncs the CLASS and nothing else. It used to write
+    // localStorage too, which meant the first page view persisted the theme the
+    // visitor had merely been *detected* as — after that the inline script's
+    // `if (!theme)` branch was dead and the site never followed their OS again.
     if (!ready) return;
     const root = document.documentElement;
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
-    localStorage.setItem('theme', theme);
   }, [theme, ready]);
 
-  const toggleTheme = () => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  // Until the toggle is used there is no stored preference, so keep tracking the
+  // OS the way a visitor who has never expressed a choice expects.
+  //
+  // The store is re-read INSIDE the handler, not once at subscribe time: toggling
+  // does not change `ready`, so this effect never re-runs and the listener
+  // outlives the choice. Read once, a visitor who toggled would have their
+  // explicit pick silently overridden the next time their OS flipped.
+  useEffect(() => {
+    if (!ready) return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const follow = (e: MediaQueryListEvent) => {
+      if (localStorage.getItem('theme')) return;
+      setTheme(e.matches ? 'dark' : 'light');
+    };
+    mq.addEventListener('change', follow);
+    return () => mq.removeEventListener('change', follow);
+  }, [ready]);
+
+  // The only place the choice is written down — an explicit act, not a detection.
+  const toggleTheme = () =>
+    setTheme((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', next);
+      return next;
+    });
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
