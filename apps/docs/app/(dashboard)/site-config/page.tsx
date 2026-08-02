@@ -1,71 +1,72 @@
 import { prisma } from "db";
 import { PageHeader } from "@/components/shared/page-header";
-import { SiteConfigForm } from "./form";
+import { SiteChromeForm } from "./form";
+import { KEYS, DEFAULTS, keysFor, isUnclaimed, type ConfigOwner } from "@/lib/site-config-keys";
 
-const CONFIG_KEYS = [
-  { key: "name", label: "Name", description: "First name in hero heading" },
-  { key: "avatarUrl", label: "Avatar URL", description: "Path to avatar image" },
-  { key: "navbarLogo", label: "Navbar Logo", description: "Logo text in navbar" },
-  { key: "contactEmail", label: "Contact Email", description: "Email in contact form mailto" },
-  { key: "availabilityStatus", label: "Availability Status", description: "Status text in contact" },
-  { key: "availabilityDetail", label: "Availability Detail", description: "Detail below status" },
-  { key: "heroDotColor", label: "Dot Colour", description: "The pulsing dot beside the hero's status line" },
-  { key: "heroDotPulse", label: "Pulse", description: "The ripple around the dot" },
-  { key: "catNapStyle", label: "Nap Style", description: "What the cat shows while it sleeps, or Never sleeps to switch napping off" },
-  { key: "catNapSeconds", label: "Nap Length", description: "Seconds the cat sleeps before it wakes and starts chasing again (3–300)" },
-  { key: "copyrightName", label: "Copyright Name", description: "Name in footer copyright" },
-];
+/**
+ * Site chrome — what wraps the page rather than what fills it.
+ *
+ * Nine of this page's eleven keys moved to the section that renders them. Two
+ * things are left behind, and the second is the important one:
+ *
+ *   1. `owner: "chrome"` — navbarLogo (Navbar) and copyrightName (Footer).
+ *   2. The safety net. This page reads the WHOLE siteConfig table and hands
+ *      ConfigCard every row the registry does not know about, so a key added by
+ *      a migration — or one whose owning section is deleted — can never become
+ *      uneditable. That logic was dead code while page.tsx passed a whitelist;
+ *      it is load-bearing now.
+ */
+
+/** Where a key went, for the read-only wayfinding list at the bottom. */
+const OWNERS: Record<Exclude<ConfigOwner, "chrome">, { label: string; href: string }> = {
+  hero: { label: "Hero", href: "/hero" },
+  contact: { label: "Contact", href: "/contact-purposes" },
+  cat: { label: "Cat", href: "/cat" },
+};
 
 export default async function SiteConfigPage() {
-  const [configs, titles, skillBadges, socialLinks, content, totalSkills] = await Promise.all([
+  const [configs, visibleBlogs] = await Promise.all([
     prisma.siteConfig.findMany(),
-    prisma.heroTitle.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
-    prisma.heroSkillBadge.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
-    prisma.socialLink.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
-    prisma.heroContent.findMany(),
-    // The same count apps/web hands the hero, so v2's "+N more" chip previews
-    // the number visitors actually see.
-    prisma.skill.count({ where: { show: true } }),
+    // The navbar drops its Blogs link when nothing is published, so the chrome
+    // preview has to know — otherwise it draws a link the site does not.
+    prisma.blog.count({ where: { show: true } }),
   ]);
 
   const configMap = Object.fromEntries(configs.map(c => [c.key, c.value]));
-  // Shown when the row is missing, so the form reads what the site is actually
-  // serving — apps/web falls back to exactly these. Everything else defaults to
-  // blank, where blank is a real value.
-  const DEFAULTS: Record<string, string> = { catNapStyle: "ticks", catNapSeconds: "30" };
-  // Same parse as apps/web/app/lib/data.ts — one comma-separated SiteConfig row.
-  // `cdnUrl` is applied inside the preview, so the raw paths go through.
-  const heroPhotos = (configMap["heroPhotos"] ?? "").split(",").map(p => p.trim()).filter(Boolean);
+  const chromeKeys = keysFor("chrome");
+  const unclaimedKeys = configs.map(c => c.key).filter(isUnclaimed).sort();
 
-  // The hero's copy and its live version are edited on /hero now, so this page
-  // only needs the one version it is previewing — the version can no longer
-  // change from here. A NULL SocialLink.version means "every version".
-  const live = content.find(c => c.live) ?? content.find(c => c.version === "v2") ?? null;
-  const version = live?.version === "v1" ? "v1" : "v2";
-  const hero = {
-    titles: titles.filter(t => t.version === version).map(t => t.title),
-    skills: skillBadges.filter(b => b.version === version).map(b => ({ name: b.name })),
-    socialLinks: socialLinks
-      .filter(l => l.version == null || l.version === version)
-      .map(l => ({ name: l.name, iconKey: l.iconKey })),
-  };
+  const values = Object.fromEntries(
+    [...chromeKeys, ...unclaimedKeys].map(k => [k, configMap[k] ?? DEFAULTS[k] ?? ""])
+  );
 
   return (
     <div className="view">
       <PageHeader
-        eyebrow="site-wide"
-        title="Site Config"
-        description="The strings the whole portfolio reads from — your name, avatar, contact and footer. The hero's own copy lives on the Hero page."
+        eyebrow="site-wide · navbar + footer"
+        title="Site chrome"
+        description="The frame around every page. Everything a section renders is edited on that section now — these are the rows with no section to belong to."
       />
-      {/* `availabilityStatus`, `iconKey` and `heroPhotos` all ride along to the
-          preview: the hero keys its glyphs on the icon key and its photo deck on
-          those paths, and the pill is verbatim CMS copy edited on this page. */}
-      <SiteConfigForm
-        configs={CONFIG_KEYS.map(k => ({ ...k, value: configMap[k.key] || DEFAULTS[k.key] || "" }))}
-        liveHero={{ version, intro: live?.intro ?? "", tagline: live?.tagline ?? "" }}
-        hero={hero}
-        photos={heroPhotos}
-        totalSkills={totalSkills}
+      <SiteChromeForm
+        chromeKeys={chromeKeys}
+        unclaimedKeys={unclaimedKeys}
+        values={values}
+        moved={Object.entries(KEYS)
+          // `legacy` rows are claimed purely so the safety net skips them —
+          // nothing reads them, so pointing the reader at an editor would be
+          // sending them somewhere that changes nothing.
+          .filter(([, def]) => def.owner !== "chrome" && !def.legacy)
+          .map(([key, def]) => {
+            const at = OWNERS[def.owner as Exclude<ConfigOwner, "chrome">];
+            return {
+              key,
+              label: def.label,
+              value: configMap[key] ?? DEFAULTS[key] ?? "",
+              owner: at.label,
+              href: at.href,
+            };
+          })}
+        hasBlogs={visibleBlogs > 0}
       />
     </div>
   );

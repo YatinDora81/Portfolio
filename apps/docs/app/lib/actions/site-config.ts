@@ -28,7 +28,8 @@ const ALLOWED_KEYS = new Set([
   "copyrightName",
   // Not in the form's registry, but real rows written by the links page.
   "heroPhotos",
-  "resumeUrl",
+  // resumeUrl is deliberately absent: `updateResumeUrl` in ./links.ts owns that
+  // row and Hero's own form uses it. Allowing it here gave one row two writers.
 ]);
 
 /** The only shape `heroDotColor` may take — see below. */
@@ -69,21 +70,46 @@ export async function updateSiteConfig(entries: { key: string; value: string }[]
   const session = await getSession();
   if (!session) return;
 
-  const clean = entries
-    .map(({ key, value }) => ({ key, value: validate(key, String(value ?? "")) }))
-    .filter((e): e is { key: string; value: string } => e.value !== null);
-  if (clean.length === 0) return;
+  const posted = entries.map(({ key, value }) => ({ key, value: String(value ?? "") }));
 
-  await prisma.$transaction(
-    clean.map(({ key, value }) =>
+  const clean = posted
+    .map(({ key, value }) => ({ key, value: validate(key, value) }))
+    .filter((e): e is { key: string; value: string } => e.value !== null);
+
+  // /site-config draws an editor for every row this file's registry does not
+  // claim, so a key added by a migration can never become uneditable. Such a key
+  // is outside ALLOWED_KEYS by definition, and dropping it here made that card
+  // silently discard its own writes under a green "Saved". It is UPDATED, never
+  // created, so the allow-list keeps the property it exists for: this action
+  // still cannot mint a key that is not already a row.
+  const unregistered = posted.filter((e) => !ALLOWED_KEYS.has(e.key));
+  const live = unregistered.length
+    ? new Set(
+        (
+          await prisma.siteConfig.findMany({
+            where: { key: { in: unregistered.map((e) => e.key) } },
+            select: { key: true },
+          })
+        ).map((r) => r.key)
+      )
+    : new Set<string>();
+  const unclaimed = unregistered.filter((e) => live.has(e.key));
+
+  if (clean.length === 0 && unclaimed.length === 0) return;
+
+  await prisma.$transaction([
+    ...clean.map(({ key, value }) =>
       prisma.siteConfig.upsert({ where: { key }, create: { key, value }, update: { value } })
-    )
-  );
+    ),
+    ...unclaimed.map(({ key, value }) =>
+      prisma.siteConfig.update({ where: { key }, data: { value } })
+    ),
+  ]);
   // Unconditional, and not just "/site-config". These keys are baked into the
   // preview panes on several other admin pages, and the layout-wide revalidate
   // that used to cover them only fired because the form happened to post
   // `heroVersion` on every save — which it no longer holds.
-  for (const path of ["/site-config", "/hero", "/social-links", "/links", "/contact-purposes"]) {
+  for (const path of ["/site-config", "/hero", "/cat", "/contact-purposes"]) {
     revalidatePath(path);
   }
 }
