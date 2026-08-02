@@ -67,10 +67,12 @@ export function TopBar({ user, onBurger, onPalette, toast }: {
 
   return (
     <>
-      <div className="tb">
+      <header className="tb">
         {busy ? <span className="pubbar" aria-hidden="true" /> : null}
         <button className="tb-burger" onClick={onBurger} aria-label="Menu"><IconMenu2 size={18} /></button>
 
+        {/* Eyebrow and title both come from nav.ts — the same row the sidebar
+            highlights — so the topbar can never name a page the nav doesn't. */}
         <div className="tb-crumb" key={pathname}>
           <div className="tb-eyebrow">{nav?.eyebrow ?? "control room"}</div>
           <div className="tb-title">{nav?.label ?? "Admin"}</div>
@@ -103,7 +105,7 @@ export function TopBar({ user, onBurger, onPalette, toast }: {
             </button>
           </form>
         </div>
-      </div>
+      </header>
 
       <Dialog
         open={open}

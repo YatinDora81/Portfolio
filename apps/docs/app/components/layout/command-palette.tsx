@@ -3,15 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconSearch, IconWorld } from "@tabler/icons-react";
-import { ALL_NAV } from "@/lib/nav";
+import { NAV_GROUPS, navMark } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/$/, "");
 
 interface PalItem {
   label: string;
+  /** The literal the unsaved-changes guard reads off `.pal-k` — "go" means this
+      row navigates and must be intercepted. Do not reword it. */
   kind: string;
+  /** Group heading, shown as the row's second line so "site" or "page" finds it. */
+  where: string | null;
+  /** Sidebar ordinal, so a row in the palette is recognisably the same row. */
+  mark?: string;
   icon: React.ComponentType<{ size?: number }>;
+  /** Everything the query is matched against, lowercased once. */
+  hay: string;
   run: () => void;
 }
 
@@ -21,22 +29,32 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const [hot, setHot] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
+  // Built from NAV_GROUPS rather than the flat list so the palette keeps the
+  // sidebar's order and can say which group a match came from.
   const items: PalItem[] = [
-    ...ALL_NAV.map((x) => ({
-      label: x.label,
-      kind: "go",
-      icon: x.icon,
-      run: () => { router.push(x.href); onClose(); },
-    })),
+    ...NAV_GROUPS.flatMap((g) =>
+      g.items.map((x) => ({
+        label: x.label,
+        kind: "go",
+        where: g.label,
+        mark: navMark(x),
+        icon: x.icon,
+        hay: `${x.label} ${g.label ?? ""} ${x.eyebrow} ${x.href} ${x.keywords ?? ""}`.toLowerCase(),
+        run: () => { router.push(x.href); onClose(); },
+      }))
+    ),
     {
       label: "Open live site",
       kind: "action",
+      where: null,
       icon: IconWorld,
+      hay: `open live site ${SITE}`.toLowerCase(),
       run: () => { window.open(SITE, "_blank"); onClose(); },
     },
   ];
 
-  const list = items.filter((x) => x.label.toLowerCase().includes(q.toLowerCase()));
+  const needle = q.trim().toLowerCase();
+  const list = needle ? items.filter((x) => x.hay.includes(needle)) : items;
 
   useEffect(() => { setHot(0); }, [q]);
 
@@ -59,14 +77,22 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", h);
   }, [list, hot, onClose]);
 
+  // Keeps the keyboard selection inside the scroller — arrowing past the fold
+  // otherwise highlights a row nobody can see.
+  useEffect(() => {
+    listRef.current?.querySelectorAll<HTMLElement>(".pal-it")[hot]
+      ?.scrollIntoView({ block: "nearest" });
+  }, [hot, list.length]);
+
   return (
     <div className="pal" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="pal-box">
+      <div className="pal-box" role="dialog" aria-modal="true" aria-label="Jump to a section">
         <div className="pal-in">
           <IconSearch size={15} style={{ color: "var(--faint)" }} />
           <input
             autoFocus
             placeholder="Jump to a section or run an action…"
+            aria-label="Search sections and actions"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -82,7 +108,13 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
                 onMouseEnter={() => setHot(i)}
                 onClick={x.run}
               >
-                <Icon size={15} /> {x.label} <span className="pal-k">{x.kind}</span>
+                <span className="pal-n" aria-hidden="true">{x.mark ?? ""}</span>
+                <Icon size={15} />
+                <span className="pal-t">
+                  {x.label}
+                  {x.where ? <span className="pal-w">{x.where}</span> : null}
+                </span>
+                <span className="pal-k">{x.kind}</span>
               </button>
             );
           }) : (

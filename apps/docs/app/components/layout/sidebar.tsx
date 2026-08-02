@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { IconCat, IconExternalLink, IconLogout } from "@tabler/icons-react";
-import { NAV_TOP, NAV_CONTENT, NAV_SITE, type NavLink as NavLinkType } from "@/lib/nav";
+import { NAV_GROUPS, navMark, type NavLink as NavLinkType } from "@/lib/nav";
 import { logout } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
 
@@ -17,12 +17,24 @@ function NavBtn({ x, active, unread, onNavigate }: {
   onNavigate: () => void;
 }) {
   const Icon = x.icon;
+  const ord = navMark(x);
   return (
-    <Link href={x.href} className={cn("nav-item", active && "on")} onClick={onNavigate}>
-      {x.n ? <span className="nav-num">{x.n}</span> : null}
-      <Icon size={15} className="nav-ic" />
+    <Link
+      href={x.href}
+      className={cn("nav-item", active && "on")}
+      aria-current={active ? "page" : undefined}
+      onClick={onNavigate}
+    >
+      {ord ? (
+        // Decorative: the accessible name is the label, and a screen reader
+        // announcing "caret dot dot caret, Cat" helps nobody.
+        <span className={cn("nav-num", x.mark && "glyph")} aria-hidden="true">{ord}</span>
+      ) : null}
+      <Icon size={15} className="nav-ic" stroke={1.7} />
       <span className="nav-txt">{x.label}</span>
-      {x.badge && unread > 0 ? <span className="nav-badge">{unread}</span> : null}
+      {x.badge && unread > 0 ? (
+        <span className="nav-badge" aria-label={`${unread} unread`}>{unread}</span>
+      ) : null}
     </Link>
   );
 }
@@ -49,18 +61,37 @@ export function Sidebar({ user, unread, open, onNavigate }: {
         </div>
       </div>
 
-      <nav className="sb-nav">
-        {NAV_TOP.map((x) => (
-          <NavBtn key={x.href} x={x} active={isActive(x.href)} unread={unread} onNavigate={onNavigate} />
-        ))}
-        <div className="nav-label">Content · page order</div>
-        {NAV_CONTENT.map((x) => (
-          <NavBtn key={x.href} x={x} active={isActive(x.href)} unread={unread} onNavigate={onNavigate} />
-        ))}
-        <div className="nav-label">Site</div>
-        {NAV_SITE.map((x) => (
-          <NavBtn key={x.href} x={x} active={isActive(x.href)} unread={unread} onNavigate={onNavigate} />
-        ))}
+      <nav className="sb-nav" aria-label="Control room">
+        {NAV_GROUPS.map((g, gi) => {
+          const labelId = `nav-g${gi}`;
+          // The ordinal rail is drawn only where the ordinals mean something:
+          // the run down the public page. The operational and site groups are
+          // sets, not sequences, and a rail would claim an order they don't have.
+          const run = g.items.some((x) => navMark(x));
+          return (
+            <div
+              key={g.label ?? "top"}
+              className={cn("nav-grp", run && "run")}
+              role="group"
+              aria-labelledby={g.label ? labelId : undefined}
+            >
+              {g.label ? (
+                <div className="nav-label" id={labelId}><span>{g.label}</span></div>
+              ) : null}
+              <div className="nav-run">
+                {g.items.map((x) => (
+                  <NavBtn
+                    key={x.href}
+                    x={x}
+                    active={isActive(x.href)}
+                    unread={unread}
+                    onNavigate={onNavigate}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </nav>
 
       <div className="sb-foot">

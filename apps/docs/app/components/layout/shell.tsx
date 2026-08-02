@@ -6,13 +6,35 @@ import { IconCircleCheck, IconAlertTriangle } from "@tabler/icons-react";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 import { CommandPalette } from "./command-palette";
-import { StagingProvider } from "@/components/staging/staging-provider";
+import { StagingProvider, useStaging } from "@/components/staging/staging-provider";
 import { SaveBar } from "@/components/staging/save-bar";
 import { cn } from "@/lib/utils";
 
 interface Toast { id: number; msg: string; tone: "good" | "bad"; out?: boolean }
 
 let toastId = 0;
+
+/**
+ * Drives `.cr.hot` — the amber topbar keyline that control-room.css has always
+ * had and nothing has ever switched on. It marks the whole room as holding
+ * unsaved work, so the state is visible from any page even when the save bar is
+ * scrolled past or the reader has navigated away from the rows it belongs to.
+ *
+ * The class goes on the node rather than through Shell's state because `.cr` is
+ * rendered *above* the staging provider (the provider's dialog portals into it),
+ * and threading the count back up would mean lifting the store out of the tree
+ * that owns it.
+ */
+function StagingHeat() {
+  const { count } = useStaging();
+  useEffect(() => {
+    const el = document.querySelector(".cr");
+    if (!el) return;
+    el.classList.toggle("hot", count > 0);
+    return () => el.classList.remove("hot");
+  }, [count]);
+  return null;
+}
 
 export function Shell({ user, unread, children }: {
   user: { userId: string; email: string; role: string };
@@ -52,6 +74,9 @@ export function Shell({ user, unread, children }: {
       {/* Staged edits live above the routed content, so they survive a jump to
           another page and the save bar travels with them. */}
       <StagingProvider toast={toast}>
+        <StagingHeat />
+        {/* Eighteen nav rows sit before the page for anyone tabbing in. */}
+        <a className="skip" href="#content">Skip to content</a>
         {sbOpen ? <div className="sb-veil" onClick={() => setSbOpen(false)} /> : null}
 
         <Sidebar user={user} unread={unread} open={sbOpen} onNavigate={() => setSbOpen(false)} />
@@ -65,7 +90,7 @@ export function Shell({ user, unread, children }: {
           />
           {/* Outside the keyed scroller: the batch outlives the route, so
               navigating must not remount the bar mid-save. */}
-          <div className="content" key={pathname}>{children}</div>
+          <div className="content" id="content" tabIndex={-1} key={pathname}>{children}</div>
           <SaveBar />
         </main>
 
