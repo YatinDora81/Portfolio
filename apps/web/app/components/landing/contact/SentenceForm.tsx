@@ -1,16 +1,13 @@
 'use client';
 
 /**
- * The sentence — the form written as one line of prose you finish rather than a
- * stack of labelled boxes. The fields have no labels because the sentence around
- * them is the label, and each blank is sized to what has been typed into it, so
- * the paragraph reflows as it is filled in.
+ * The form written as one line of prose you finish. The fields carry no labels
+ * because the sentence around them is the label, and each blank is sized to
+ * what has been typed into it.
  *
- * Every keystroke also feeds the instrument above: the scope is driven through
- * its imperative handle, never through props, because a wave that re-rendered
- * this form at typing speed would cost a re-render per character in both
- * directions. The receipt is typed into the DOM for the same reason — a hundred
- * characters is a hundred commits if the string lives in state.
+ * The scope is driven through its imperative handle, never props — a wave that
+ * re-rendered this form at typing speed would cost a render per character in
+ * both directions. The receipt is typed into the DOM for the same reason.
  */
 
 import {
@@ -165,11 +162,10 @@ export default function SentenceForm({ purposes, contactEmail, note, scope }: Se
     let live = true;
     let w = 0;
 
-    // An observer rather than a mount-time read: the first honest width of a
-    // section that is skipping its contents arrives when it starts rendering,
-    // which is neither mount nor a window resize. Width only — the textarea
-    // grows into this same box, and refitting on height would feed the observer
-    // its own output.
+    // An observer, not a mount-time read: the first honest width of a section
+    // skipping its contents arrives when it starts rendering, which is neither
+    // mount nor resize. Width only — refitting on height would feed the
+    // observer its own output.
     const ro = new ResizeObserver((entries) => {
       const next = entries[0]?.contentRect.width ?? 0;
       if (next === w) return;

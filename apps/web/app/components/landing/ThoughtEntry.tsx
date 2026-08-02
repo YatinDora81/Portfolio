@@ -27,10 +27,8 @@ export default function ThoughtEntry({
   len: 'short' | 'long';
   children: ReactNode;
 }) {
-  // 0.4 rather than the usual 0.1: this block is short, so a tenth of it is on
-  // screen while it is still a sliver at the bottom edge and the word ramp would
-  // play to nobody. Observed here rather than on the section because `.thought`
-  // carries no content-visibility, so nothing suppresses the callback.
+  // 0.4, not 0.1: the block is short, so a tenth of it is on screen while it is
+  // still a sliver at the bottom edge and the ramp would play to nobody.
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.4 });
   const reduced = useReducedMotion() ?? false;
@@ -113,11 +111,9 @@ export default function ThoughtEntry({
     quote.addEventListener('pointerleave', onLeave);
     window.addEventListener('resize', stale, { passive: true });
     window.addEventListener('scroll', stale, { passive: true });
-    // The entrance is the third thing that moves the words, and the only one
-    // that fires no event: a pointer resting over the block as it ramps in
-    // measures centres for where the words were mid-translate, and without this
-    // nothing would ever correct them. `wIn` is the per-word entrance keyframe;
-    // the last word to land settles the whole paragraph.
+    // The entrance moves the words too and fires no scroll/resize event, so a
+    // pointer resting over the block as it ramps in would keep centres measured
+    // mid-translate forever.
     quote.addEventListener('animationend', stale);
     return () => {
       quote.removeEventListener('pointermove', onMove);

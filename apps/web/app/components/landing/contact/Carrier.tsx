@@ -1,13 +1,9 @@
 'use client';
 
 /**
- * Carrier — the address riding its own wave.
- *
- * A pulse of weight walks through the letters like current down a wire, and the
- * rule under them is not a border but a live carrier signal: it lifts when the
- * pointer arrives and breaks into a burst → flatline → double-pulse ACK the
- * moment the address is copied. The whole strip is one button, because on a line
- * this wide the run past the end of the address is the largest target here.
+ * Carrier — the address riding its own wave. The rule under it is not a border
+ * but a live signal, and the whole strip is one button: on a line this wide the
+ * run past the end of the address is the largest target here.
  */
 
 import { useEffect, useRef, useState, type RefObject } from 'react';

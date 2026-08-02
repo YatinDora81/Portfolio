@@ -1,18 +1,12 @@
 'use client';
 
 /**
- * Contact — "the open channel"
+ * Contact — the composition root and nothing else.
  *
- * An oscilloscope idles across the section and reacts to the form below it: the
- * form is a sentence you complete, transmitting fires a burst through the wave,
- * and under it the address rides a carrier of its own.
- *
- * This file is the composition root and nothing else. Every moving part lives in
- * ./contact/*, so a keystroke re-renders one field instead of the instrument
- * above it — and the wave is driven through an imperative handle rather than
- * props, because poking it from state would re-render the section at typing
- * speed. The only state kept here is the clock, which belongs to the header line
- * and would otherwise fight the caret once a second.
+ * Every moving part lives in ./contact/*, so a keystroke re-renders one field
+ * rather than the instrument above it, and the wave is driven through an
+ * imperative handle rather than props — poking it from state would re-render
+ * the section at typing speed.
  */
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
@@ -50,13 +44,10 @@ interface ContactProps {
 /** IST wall clock, and whether that hour is a plausible one to get a reply.
     `seconds` is false under reduced motion — a second hand is motion. */
 function useIstClock(seconds: boolean) {
-  // Server-rendered as a placeholder: the real value depends on the visitor's
-  // clock, and formatting it during SSR would guarantee a hydration mismatch.
-  //
-  // The literal does NOT vary with `seconds`. That flag is derived from
-  // useReducedMotion(), which is null on the server and the true value on the
-  // client's first render — so branching here handed anyone with reduced motion
-  // a different string in the HTML than in the first hydration pass.
+  // A placeholder, because formatting the visitor's clock during SSR guarantees
+  // a mismatch. The literal does NOT vary with `seconds`: that comes from
+  // useReducedMotion(), which is null on the server and the real value on the
+  // client's first render, so branching here mismatched too.
   const [time, setTime] = useState('--:--:--');
   const [awake, setAwake] = useState<boolean | null>(null);
 
@@ -111,10 +102,9 @@ export default function Contact({
   const reduced = useReducedMotion();
   const { time, awake } = useIstClock(!reduced);
 
-  // Observed on the SECTION, not on `.ct`: `#contact` carries
-  // `content-visibility: auto` (globals.css), and a container that is skipping
-  // its contents suppresses IntersectionObserver for everything beneath it — an
-  // observer pointed at the inner block never receives a single callback.
+  // Observed on the SECTION, not `.ct`: `#contact` carries
+  // content-visibility:auto, and a container skipping its contents suppresses
+  // IntersectionObserver for everything beneath it.
   const sectionRef = useRef<HTMLElement>(null);
   const inView = useInView(sectionRef, { once: true, amount: 0.08 });
 

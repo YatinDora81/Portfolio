@@ -11,16 +11,9 @@ import {
 } from '@repo/ui/terminal';
 
 /**
- * About — drop-in replacement (interactive terminal edition).
- * Same props as before (paragraphs + education from the CMS).
- *
- * The terminal is now a real shell:
- *  - intro: types `whoami` on scroll, prints your CMS paragraphs
- *  - then it's YOURS: type `skills`, `projects`, `experience`,
- *    `education`, `blogs`, `contact` + Enter → smooth-scrolls there
- *  - zsh-style ghost autosuggestions; Tab or → accepts them
- *  - ↑ / ↓ walk command history; `help`, `ls`, `clear`, `resume`
- *  - unknown commands get a proper `zsh: command not found`
+ * About — the terminal is a real shell: it types `whoami` on scroll and prints
+ * the CMS paragraphs, then takes commands (section jumps, `help`, `ls`,
+ * `clear`, `resume`) with zsh-style ghost completion and ↑/↓ history.
  */
 
 interface EducationEntry {
@@ -47,12 +40,8 @@ const DEFAULT_RESUME_URL =
 
 /* ---------- markdown-bold -> spans ---------- */
 
-/**
- * Renders `**bold**` CMS markup. When a bolded run names a company we have a
- * logo for, its mark is shown inline just before the name — the lookup comes
- * from the same `logoUrl` field the Experience section uses, so it stays
- * CMS-driven and there is nothing to keep in sync here.
- */
+/** Renders `**bold**` CMS markup, showing a company mark inline when a bolded
+    run names one — from the same `logoUrl` the Experience section uses. */
 function BoldText({ text, logos }: { text: string; logos?: Record<string, string> }) {
   return (
     <>
@@ -116,12 +105,8 @@ type Line =
   | { t: 'hint'; v: string }
   | { t: 'about'; v: string };
 
-/**
- * Matches the default oh-my-zsh (robbyrussell) prompt you get in macOS
- * Terminal — `➜` then TWO spaces, then the path. `whitespace-pre` is on the
- * wrapper because the double space is otherwise collapsed everywhere the
- * prompt is rendered in normal inline flow (i.e. the echoed history lines).
- */
+/** The oh-my-zsh prompt: `➜` then TWO spaces. `whitespace-pre` on the wrapper,
+    or the double space collapses in the echoed history lines. */
 function Prompt() {
   return (
     <span className="whitespace-pre">
@@ -235,11 +220,8 @@ function Terminal({
     setShift(el.scrollLeft);
   };
 
-  // Value changed programmatically (history, completion, submit) — park the
-  // caret at the end of whatever we just put in the buffer. The DOM input is
-  // written directly as well: when the new string equals the old one React
-  // skips the commit, and without this the browser would keep the stale
-  // selection (recalling a duplicate history entry left the caret behind).
+  // The DOM input is written directly too: when the new string equals the old
+  // one React skips the commit, and the browser would keep the stale selection.
   const setBuffer = (next: string, pos = next.length) => {
     setValue(next);
     setSel({ start: pos, end: pos, caret: pos });
@@ -252,18 +234,11 @@ function Terminal({
   };
 
   /**
-   * Runs a command. Returns true only when the command TOOK YOU SOMEWHERE —
-   * a section jump or the resume tab — because that's the one case where
-   * holding focus would leave you typing into an off-screen prompt (and, on
-   * mobile, keep the keyboard covering the thing you just scrolled to).
-   *
-   * Everything that answers inside the terminal — `ls`, `help`, `whoami`,
-   * `cat`, `clear`, and every error — keeps the caret, since you're plainly
-   * still working here and the next thing you do is type again.
-   *
-   * Returns the command that ran (null for blank input, unknown words and
-   * failures). The caller reads `keepsFocus` off it rather than deciding here,
-   * so the admin's terminal reference documents the real behaviour.
+   * Runs a command and returns it (null for blank input, unknown words and
+   * failures). Only a command that TOOK YOU SOMEWHERE drops focus — holding it
+   * would leave you typing into an off-screen prompt, and on mobile keep the
+   * keyboard over the thing you just scrolled to. The caller reads `keepsFocus`
+   * off the result so the admin's reference documents the real behaviour.
    */
   const run = (raw: string): TerminalCommand | null => {
     const trimmed = raw.trim();
@@ -602,11 +577,10 @@ function Terminal({
                 syncFromInput(e.currentTarget);
               }}
               onBlur={() => setFocused(false)}
-              // pr-[1ch] only: the browser scrolls this input to keep its thin
-              // caret in view, but we draw a 1ch-wide *block*, so without the
-              // extra character of scroll extent the block overhangs the right
-              // edge. padding-left must stay 0 — it is what aligns the input's
-              // text box (and therefore click hit-testing) with the drawn text.
+              // pr-[1ch]: the browser scrolls to keep its thin caret in view
+              // but we draw a 1ch block, which would overhang without the extra
+              // scroll extent. padding-left must stay 0 — it aligns the text box
+              // (and hit-testing) with the drawn text.
               className="absolute inset-0 h-full w-full cursor-text bg-transparent py-0 pl-0 pr-[1ch] opacity-0 outline-none"
               autoCapitalize="none"
               autoCorrect="off"

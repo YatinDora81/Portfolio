@@ -261,20 +261,10 @@
 }
 .paw-btn.on:hover .paw { animation: pawWiggle 0.55s ease; }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   SECTION STYLES — merged from app/css/{hero,experience,projects}.css.
-
-   Everything below is deliberately UNLAYERED: Tailwind's preflight lives in
-   `@layer base`, and unlayered rules beat layered ones regardless of order.
-   Wrapping any of this in @layer would let `img { height: auto }` collapse
-   `.peek-stack img` and `.pj-thumb img`.
-
-   Every @keyframes in this file is defined exactly once. Pre-existing:
-   fadeInBlur, gradientShift, pawWiggle, pawPounce, pawGlow.
-   Added below: heroPing, heroCaret, pawStep, xpPing, pingPulse, ctPing, nudge,
-   eq, rot, blink, eqB, rise, ghlnPing, wIn, footIn.
-   All reduced-motion overrides live in the single block at the end of the file.
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* Deliberately UNLAYERED: Tailwind's preflight is in `@layer base`, and
+   unlayered rules beat layered ones regardless of order — wrapping any of this
+   in @layer would let `img { height: auto }` collapse `.peek-stack img`.
+   Reduced-motion overrides all live in the single block at the end. */
 
 /* ───────────────────────────────────────────────────────────────────────────
    HERO — "The Title Card"
@@ -392,11 +382,8 @@
   border-color: color-mix(in srgb, var(--foreground) 25%, transparent);
 }
 .soc svg { width: 16px; height: 16px; }
-/* The pill widens and the label fades in behind it. Two things keep this from
-   feeling snappy: max-width sits just above the longest label so the curve maps
-   onto visible motion instead of running past the clip, and the easing is a
-   gentle in-out — an ease-out-quint here covers most of the distance in the
-   first quarter of the duration, which reads as fast no matter how long it is. */
+/* max-width sits just above the longest label so the curve maps onto visible
+   motion instead of running past the clip. */
 .soc .lbl {
   max-width: 0;
   overflow: hidden;
@@ -954,13 +941,9 @@ body.cat-on .cw .dot { display: none; }
   .xp-veil,
   .xp-more { display: none; }
 
-  /* Contact needs no rescue — every block in the channel animates with a
-     `backwards` fill, so none of them ever rests at opacity 0. What it does need
-     is honesty about the parts that genuinely stop working: an oscilloscope
-     that never draws is an empty ruled box, a clock frozen at `--:--:--` beside
-     a live dot is a claim the page cannot make, and the address can be read but
-     not copied. The address itself and every link on the dial are plain HTML
-     and carry the section on their own. */
+  /* Hide only what genuinely stops working without JS: an oscilloscope that
+     never draws is an empty ruled box, and a clock frozen at `--:--:--` beside
+     a live dot is a claim the page cannot make. */
   #contact .scope,
   #contact .car-wave,
   #contact .ct-now { display: none; }
@@ -1224,28 +1207,14 @@ body.cat-on .cw .dot { display: none; }
   color: var(--lab-2);
 }
 
-/* ───────────────────────────────────────────────────────────────────────────
-   CONTACT — "the open channel".
+/* CONTACT — the open channel.
 
-   The section is an instrument rather than a form. A canvas oscilloscope idles
-   across the top and everything below feeds it: the form is one sentence with
-   the fields cut out of it, the address rides a carrier whose underline is a
-   second live wave, and the dial at the bottom lists everywhere else I am —
-   with the one row that has an archive behind it unfolding into a year of
-   commits drawn as a single stroke.
+   Scoped under `#contact` throughout: the names are short and generic
+   (`.chip`, `.caret`, `.bars`) and several already mean something else on this
+   page — `.chip` is the hero's pill row, `.caret` its typing cursor.
 
-   THE WHOLE BLOCK IS SCOPED UNDER `#contact`. The names are short and generic
-   by design (`.chip`, `.bars`, `.up`, `.err`, `.caret`) and several of them
-   already mean something else on this page — `.chip` is the hero's pill row and
-   `.caret` is its typing cursor. Scoping the block rather than the four actual
-   collisions keeps the answer to "which one is this?" in a single place, and
-   `#contact` outranks every bare class it lands on top of.
-
-   THE INK. Monochrome except `--ok`, which is spent on the signal dot, the
-   transmit HUD, the ACK and the live end of the year line — the four places the
-   channel says it is open. `--ok-ink` is its text-safe twin: the graphic green
-   clears 3:1 on white and no more, and the ACK receipt is 12.5px type.
-   ─────────────────────────────────────────────────────────────────────────── */
+   Monochrome except `--ok`. `--ok-ink` is its text-safe twin: the graphic green
+   clears 3:1 on white and no more, and the ACK receipt is 12.5px type. */
 
 #contact {
   position: relative;
@@ -1527,10 +1496,8 @@ body.cat-on .cw .dot { display: none; }
 #contact .tx-btn:hover { transform: translateY(-2px); }
 #contact .tx-btn:active { transform: translateY(0) scale(.98); }
 /* `aria-disabled`, not `disabled`: the browser blurs an element the moment it
-   becomes disabled, so a keyboard visitor who pressed Transmit would be dropped
-   to <body> and have to tab back through the whole sentence to hear the receipt.
-   The button stays focusable and the submit handler is what refuses the second
-   send. Ordered after :hover so the lift is cancelled while in flight. */
+   becomes disabled, dropping a keyboard visitor to <body> mid-send. Ordered
+   after :hover so the lift is cancelled while in flight. */
 #contact .tx-btn[aria-disabled='true'] { opacity: .55; cursor: wait; transform: none; }
 #contact .tx-btn .up { display: inline-flex; transition: transform .3s cubic-bezier(.22, 1, .36, 1); }
 #contact .tx-btn:hover .up { transform: translateY(-3px); }
@@ -1753,18 +1720,9 @@ body.cat-on .cw .dot { display: none; }
   #contact .sentence { line-height: 1.95; }
 }
 
-/* ───────────────────────────────────────────────────────────────────────────
-   88.1 · GITHUB — THE YEAR IN ONE LINE
-
-   A year of commits as a single smooth stroke — a seven-day trailing mean, with
-   the raw days drawn faintly beneath it as grain. The ink fades where the year
-   is old and sharpens toward now; the stroke ends on the live green dot. No
-   grid, no box, no bars — one line in whitespace, over the year it came from.
-
-   The row hides it and hover (or keyboard focus) unfolds it, on the same
-   contract as the site's own folds: grid 0fr→1fr, `:focus-visible` opens,
-   touch is always open.
-   ─────────────────────────────────────────────────────────────────────────── */
+/* 88.1 · GITHUB — the year in one line. Hover or keyboard focus unfolds it on
+   the same contract as the site's other folds: grid 0fr→1fr, `:focus-visible`
+   opens, touch is always open. */
 #contact .fqx { position: relative; }
 #contact .ghv {
   font-family: var(--font-mono);
@@ -1927,27 +1885,13 @@ body.cat-on .cw .dot { display: none; }
 }
 #contact .ghln-cap b { font-weight: 500; color: var(--lab-2); }
 
-/* ───────────────────────────────────────────────────────────────────────────
-   THOUGHT OF THE DAY — living type.
+/* THOUGHT OF THE DAY — living type.
 
-   The quote is set in variable-weight Inter, split a word to a span, and every
-   word's `wght` axis swells toward the cursor (ThoughtEntry writes `--w`
-   straight to the node, spring-smoothed). On touch there is nothing to chase,
-   so a gaussian pulse walks the line instead. The words assemble on scroll-in
-   as a weight-and-blur ramp, which is the same mechanic played once.
-
-   NO CARD, NO RULE ABOVE. The section opens on the keyline and closes on the
-   attribution's own hairline, so it stays a beat between two sections rather
-   than becoming a third object.
-
-   ONE MEASURE, TWO RUNGS. `ch` scales with the type, so both caps land at
+   Two rungs, one measure: `ch` scales with the type, so both caps land at
    roughly the same ~620px of column while holding a different number of
-   characters a line: the pull-quote rung is 19ch of 52px, the reading rung
-   26ch of 38px. Which one a quote lands on is decided server-side from its own
-   length (`rung()` in ThoughtOfTheDay.tsx) — that number and these two caps are
-   the whole tuning surface. Nothing steps UP: a long quote set at the display
-   size is how a short section starts competing with the page it sits inside.
-   ─────────────────────────────────────────────────────────────────────────── */
+   characters a line. Which rung a quote gets is decided server-side from its
+   length (`rung()` in ThoughtOfTheDay.tsx); that and these two caps are the
+   whole tuning surface. Nothing steps UP. */
 
 .thought {
   /* 72px above the keyline in the design, all of which arrives as the
@@ -2130,11 +2074,8 @@ body.cat-on .cw .dot { display: none; }
   #contact .fq:hover .bars i { animation: none !important; }
   #contact .ghln-dot::after { animation: none; opacity: 0; }
 
-  /* The two the prototype only ever caught with its blanket duration override:
-     a ±3px horizontal shake is the canonical vestibular trigger, and the
-     spinner runs unbounded until the fetch resolves. Neither carries meaning on
-     its own — the red rule marks the field, the ACK names it, and the button
-     says "Transmitting" in words. */
+  /* Neither carries meaning on its own: the red rule marks the field, the ACK
+     names it, and the button says "Transmitting" in words. */
   #contact .blank.err input,
   #contact .msg-line.err textarea,
   #contact .spin { animation: none !important; }

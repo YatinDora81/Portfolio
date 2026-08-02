@@ -1,14 +1,11 @@
 'use client';
 
 /**
- * The oscilloscope — the instrument the contact section is built around. It
- * idles on a calm carrier, swells with every keystroke the form feeds it, and
- * on transmit throws the message out as chaos, flatlines, then double-pulses
- * an ACK back left → right.
+ * The oscilloscope. Idles on a calm carrier, swells with every keystroke, and
+ * on transmit goes chaos → flatline → double-pulse ACK.
  *
- * Nothing that changes per frame goes through React: the energy, the burst
- * clock and the amp readout are refs and one direct textContent write. A wave
- * at 60fps that re-rendered its parent would re-render the whole form with it.
+ * Nothing per-frame goes through React: the energy, burst clock and amp readout
+ * are refs and one direct textContent write.
  */
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
