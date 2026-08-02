@@ -47,6 +47,8 @@ interface MobileNavMenuProps {
   className?: string;
   isOpen: boolean;
   onClose: () => void;
+  /** Anchor id for the panel. */
+  id?: string;
 }
 
 export const Navbar = ({ children, className }: NavbarProps) => {
@@ -117,7 +119,10 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
   const [hovered, setHovered] = useState<number | null>(null);
 
   return (
-    <motion.div
+    // A landmark, not a div. `hidden lg:flex` takes it out of the a11y tree
+    // below the breakpoint, so it never competes with the mobile menu's own nav.
+    <motion.nav
+      aria-label="Main"
       onMouseLeave={() => setHovered(null)}
       className={cn(
         'absolute inset-0 hidden flex-1 flex-row items-center justify-center space-x-2 text-sm font-medium text-zinc-600 transition duration-200 hover:text-zinc-800 lg:flex lg:space-x-2',
@@ -141,7 +146,7 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
           <span className="relative z-20">{item.name}</span>
         </a>
       ))}
-    </motion.div>
+    </motion.nav>
   );
 };
 
@@ -195,11 +200,14 @@ export const MobileNavMenu = ({
   children,
   className,
   isOpen,
+  id,
 }: MobileNavMenuProps) => {
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
+        <motion.nav
+          id={id}
+          aria-label="Site"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -209,12 +217,19 @@ export const MobileNavMenu = ({
           )}
         >
           {children}
-        </motion.div>
+        </motion.nav>
       )}
     </AnimatePresence>
   );
 };
 
+/**
+ * A real <button>, not an <svg> with an onClick. Below `lg` the desktop NavItems
+ * row is hidden, so this control is the ONLY route to Skills/Experience/
+ * Projects/Contact — as a bare icon it was skipped by Tab entirely and
+ * announced as nothing, which put the whole navigation out of reach of a
+ * keyboard or screen-reader visitor on a phone.
+ */
 export const MobileNavToggle = ({
   isOpen,
   onClick,
@@ -222,10 +237,21 @@ export const MobileNavToggle = ({
   isOpen: boolean;
   onClick: () => void;
 }) => {
-  return isOpen ? (
-    <IconX className="text-black dark:text-white" onClick={onClick} />
-  ) : (
-    <IconMenu2 className="text-black dark:text-white" onClick={onClick} />
+  const Icon = isOpen ? IconX : IconMenu2;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={isOpen ? 'Close menu' : 'Open menu'}
+      aria-expanded={isOpen}
+      /* No aria-controls: the panel is only in the DOM while open, which is the
+         one state the attribute would never be read in — a dangling IDREF every
+         time it matters. aria-expanded plus DOM adjacency is the real
+         association here. */
+      className="relative z-20 -m-2 flex items-center justify-center p-2 text-black dark:text-white"
+    >
+      <Icon aria-hidden="true" />
+    </button>
   );
 };
 

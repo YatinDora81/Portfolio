@@ -83,7 +83,10 @@ function NameMark({
       }}
       className={[
         'yfw-wrap relative mt-8 w-full cursor-pointer select-none text-foreground',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20',
+        // `ring-inset`: the footer sets `overflow-hidden` for the sheen mask,
+        // and an outset ring on this full-width last child is clipped on three
+        // sides by it — only the top 2px survived.
+        'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground/70',
         className ?? '',
       ].join(' ')}
       style={{ touchAction: 'pan-y' }}

@@ -1044,8 +1044,10 @@ body.cat-on .cw .dot { display: none; }
   background: color-mix(in srgb, var(--foreground) 25%, transparent);
 }
 
+/* 70%, not 40%: a focus indicator has to clear 3:1 against what it sits on,
+   and the 40% mix came out at 2.71:1 on white. */
 .xp-more:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--foreground) 40%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--foreground) 70%, transparent);
   outline-offset: 2px;
   border-radius: 4px;
 }

@@ -193,13 +193,21 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
                 decoding="async"
               />
             )}
-            {exp.website ? (
-              <a href={exp.website} target="_blank" rel="noopener noreferrer">
-                {exp.company}
-              </a>
-            ) : (
-              <h3 className="xp-name">{exp.company}</h3>
-            )}
+            {/* The heading is unconditional and the link lives INSIDE it. It
+                used to be the fallback branch, so a role with a website was a
+                bare <a> — and since both roles have one, the section
+                contributed nothing to the heading outline and a screen reader
+                went straight from "Experience" to "Projects" with no way to
+                move between roles. */}
+            <h3 className="xp-name">
+              {exp.website ? (
+                <a href={exp.website} target="_blank" rel="noopener noreferrer">
+                  {exp.company}
+                </a>
+              ) : (
+                exp.company
+              )}
+            </h3>
             {exp.isCurrent && (
               <span className="xp-cur">
                 <i />

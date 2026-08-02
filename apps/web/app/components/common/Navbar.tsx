@@ -15,6 +15,8 @@ import {
   MobileNavMenu,
 } from '@/components/ui/resizable-navbar';
 
+const MOBILE_MENU_ID = 'mobile-nav-menu';
+
 const allNavItems = [
   { name: 'Skills', link: '#skills' },
   { name: 'Experience', link: '#experience' },
@@ -31,7 +33,11 @@ export default function Navbar({ logo, hasBlogs }: { logo: string; hasBlogs: boo
   const navItems = hasBlogs ? allNavItems : allNavItems.filter(item => item.name !== 'Blogs');
 
   return (
-    <div className="relative w-full">
+    // <header>/<nav> rather than bare divs: the logo, the five section links and
+    // the two toggles used to sit outside every landmark, so landmark navigation
+    // (NVDA's D, the VoiceOver rotor) offered only "main" and "contentinfo" and
+    // no way to reach the site navigation at all.
+    <header className="relative w-full">
       <NavbarWrapper>
         <NavBody>
           <NavbarLogo label={logo} />
@@ -84,6 +90,7 @@ export default function Navbar({ logo, hasBlogs }: { logo: string; hasBlogs: boo
           </MobileNavHeader>
 
           <MobileNavMenu
+            id={MOBILE_MENU_ID}
             isOpen={isMobileMenuOpen}
             onClose={() => setIsMobileMenuOpen(false)}
           >
@@ -100,6 +107,6 @@ export default function Navbar({ logo, hasBlogs }: { logo: string; hasBlogs: boo
           </MobileNavMenu>
         </MobileNav>
       </NavbarWrapper>
-    </div>
+    </header>
   );
 }

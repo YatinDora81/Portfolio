@@ -107,6 +107,11 @@ function ElementCard({
         type="button"
         data-skills-control="card"
         aria-label={skill.name}
+        // Out of the tab order while dimmed, alongside the pointer-events
+        // removal. `opacity` composites the focus ring's own box-shadow, so a
+        // dimmed card at opacity-15 takes a 3:1 ring down to 1.26:1 — a tab
+        // stop with no visible focus position at all.
+        tabIndex={dimmed ? -1 : 0}
         onMouseEnter={() => onHover(skill.number)}
         onMouseLeave={() => onHover(null)}
         onFocus={() => onHover(skill.number)}

@@ -493,7 +493,12 @@ function Terminal({
         {/* interactive history — an invisible filler line holds this row's
             height while the history is empty (before the prompt unlocks, and
             after `clear`) so the terminal never resizes on its own */}
-        <div className="mt-3 space-y-1.5">
+        {/* role="log": every command's output lands here, and without a live
+            region a screen-reader visitor typed `help`, got ten lines of
+            command list appended above the caret, and heard nothing at all —
+            including the "taking you to Projects…" line that comes with a
+            silent scroll. `aria-atomic=false` so only the new lines speak. */}
+        <div className="mt-3 space-y-1.5" role="log" aria-live="polite" aria-atomic="false">
           {lines.length > 0 ? (
             lines.map(renderLine)
           ) : (
