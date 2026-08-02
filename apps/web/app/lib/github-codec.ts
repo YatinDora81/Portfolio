@@ -1,31 +1,16 @@
-/**
- * The stored format of the contribution archive, and the calendar arithmetic
- * that reads it. Everything here is pure — no database, no network — because the
- * off-by-ones live in this half and they are far easier to reason about, and to
- * check, on their own.
- *
- * See GithubYear in the schema for why a calendar year and not a sliding window.
- */
+/** Stored format of the contribution archive, and the calendar arithmetic that
+    reads it. Pure on purpose: the off-by-ones all live here. */
 
-/** Points on the line. A full year, the way GitHub counts its own — 53 covers
-    any year plus the partial week it starts on. The timeline it slices has
-    always held two calendar years, so the window costs nothing but the indices
-    it reads. Weeks before the archive starts come back null and are simply not
-    drawn, so an early-January render begins mid-panel rather than at a zero. */
+/** 53 covers any year plus the partial week it starts on. */
 export const WEEKS = 53;
 
-/** How many days back the window opens, given the weekday `today` falls on.
-    Shared by `buildWeeks` and by whatever needs to name the window's first day —
-    they must not each do this arithmetic and drift. */
+/** Shared with whatever names the window's first day, so the two can't drift. */
 export function windowStart(today: number, weekday: number): number {
   return today - ((WEEKS - 1) * 7 + weekday);
 }
 
-/**
- * Index is the count, so a stored year reads as `000310021045000…` in psql and
- * needs no decoder to skim. Digits come first deliberately: almost every day
- * lands in 0–9, and the letters only carry the tail.
- */
+/** Index is the count, so a year reads as `000310021045000…` in psql. Digits
+    first: almost every day lands in 0–9 and the letters only carry the tail. */
 const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_';
 const MAX_ENCODED = ALPHABET.length - 1;
 
@@ -80,20 +65,15 @@ export function decodeYear(stored: StoredYear): number[] {
   return counts;
 }
 
-/**
- * Writes one year's worth of fetched days over whatever is already stored, by
- * absolute date. Days the fetch didn't mention keep their stored value — that is
- * what lets an outage heal on the next success instead of blanking the gap, and
- * what keeps years that have scrolled out of the mirror's window untouched.
- */
+/** Days the fetch didn't mention keep their stored value, so an outage heals on
+    the next success instead of blanking the gap. */
 export function mergeYear(
   previous: StoredYear | null,
   year: number,
   entries: { date: string; count: number }[],
 ): StoredYear {
   const length = daysInYear(year);
-  // A stored row of the wrong length can't be indexed by day-of-year, so it is
-  // rebuilt from scratch rather than patched into something worse.
+  // Wrong length can't be indexed by day-of-year — rebuild rather than patch.
   const chars =
     previous && previous.days.length === length
       ? previous.days.split('')
@@ -101,9 +81,8 @@ export function mergeYear(
   const spikes = previous ? parseSpikes(previous.spikes) : new Map<number, number>();
 
   for (const entry of entries) {
-    // The year is checked, not just the index: every day-of-year in one year is
-    // also a valid index in the next, so a stray date would land silently on the
-    // wrong day rather than being rejected.
+    // The year, not just the index: every day-of-year is valid in the next year
+    // too, so a stray date would land silently on the wrong day.
     if (Number(entry.date.slice(0, 4)) !== year) continue;
     const index = dayOfYear(entry.date);
     if (index < 0 || index >= length) continue;
@@ -116,30 +95,16 @@ export function mergeYear(
   return { days: chars.join(''), spikes: formatSpikes(spikes) };
 }
 
-/**
- * A stored '0' means two different things — "no contributions that day" and
- * "that day was never fetched" — and the difference matters past the last
- * refresh. `observedThrough` is the index of the most recent day the archive has
- * actually seen, so everything after it is treated as unknown rather than empty.
- * Without it a two-day-old snapshot reads as two zero days, which silently
- * collapses a live streak to nothing.
- */
+/** A stored '0' means both "shipped nothing" and "never fetched". This marks
+    where the archive stops being able to speak — without it a two-day-old
+    snapshot reads as two zero days and collapses a live streak. */
 export function observedIndex(today: number, daysSinceFetch: number): number {
   return Math.min(today, today - Math.max(0, Math.floor(daysSinceFetch)));
 }
 
-/**
- * One entry per week over the trailing window, oldest first, each the sum of
- * that week's contributions. Walked back to the Sunday that opens the first
- * column so a point is always a whole calendar week; the last one is the current
- * week and is short by however many days are still to come.
- *
- * `null` marks a week the archive cannot vouch for — every day in it falls
- * before the first stored year or after the last refresh — so the line starts
- * and ends where the archive does, rather than diving to a zero that would read
- * as "shipped nothing". A week the archive only partly covers is the sum of the
- * days it does hold: that is a floor, and a floor is still true.
- */
+/** Weekly totals, oldest first, walked back to a Sunday. `null` marks a week the
+    archive can't vouch for, so the line stops where the archive does rather than
+    diving to a zero that would read as "shipped nothing". */
 export function buildWeeks(
   timeline: (number | null)[],
   today: number,
@@ -154,9 +119,8 @@ export function buildWeeks(
     for (let d = 0; d < 7; d++) {
       const i = start + w * 7 + d;
       const count = timeline[i];
-      // The tail of the last column runs past today, which no observedThrough
-      // can reach — that is what keeps the current week short instead of
-      // padding it with days that haven't happened.
+      // Past today no observedThrough can reach, which keeps the current week
+      // short instead of padding it with days that haven't happened.
       if (count == null || i > observedThrough) continue;
       sum += count;
       known = true;
@@ -166,16 +130,8 @@ export function buildWeeks(
   return weeks;
 }
 
-/**
- * Trailing run of active days, counted back from the last day the archive has
- * seen. That day counts as neutral rather than as a break: a 9am render — or one
- * taken before the day's commits were fetched — shouldn't report a live streak
- * as broken.
- *
- * An unknown day ends the run, same as an empty one. Both are honest here: a
- * streak is a claim, and one that walked through days nobody ever fetched would
- * be inventing the part it can't see.
- */
+/** Counted back from the last observed day, which is neutral rather than a
+    break: a 9am render shouldn't report a live streak as broken. */
 export function currentStreak(
   timeline: (number | null)[],
   today: number,

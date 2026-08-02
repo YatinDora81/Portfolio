@@ -1,22 +1,13 @@
 /**
  * Real commit activity for the contact section's GitHub row.
  *
- * The row draws the year as one line and a streak, so the numbers have to be
- * true — a decorative random curve would read as a claim about how much I
- * ship. GitHub's own counts are only exposed through the authenticated GraphQL
- * API, so this goes through a public, unauthenticated mirror.
+ * The mirror is an unauthenticated hobby service serving only a trailing 365
+ * days, so the site reads from Postgres and the mirror only ever feeds it: a day
+ * not captured before it scrolls out is gone from the source forever.
  *
- * That mirror is one person's hobby service with no SLA, and it serves only a
- * TRAILING 365 days. Both facts push the same way: the site reads from Postgres
- * and the mirror only ever feeds it. A day not captured before it scrolls out of
- * that window is gone from the source forever, so the stored years are a
- * permanent archive rather than a cache — see GithubYear in the schema.
- *
- * Raw per-day COUNTS are stored, never the mirror's `level`, which is quantile
- * derived over its own sliding window and so reports the same day differently
- * from one month to the next. The daily window, the streaks and everything the
- * line smooths are recomputed at read time by ./github-codec, which is also why
- * they stay tunable.
+ * Raw per-day counts are stored, never the mirror's `level` — that is quantile
+ * derived over its own window and reports the same day differently month to
+ * month.
  */
 
 import { prisma } from 'db';
@@ -34,34 +25,21 @@ import {
 
 const API = 'https://github-contributions-api.jogruber.de/v4';
 
-/**
- * A response shorter than this is treated as garbage rather than as a thin year.
- * `isDay` runs as a filter, so a truncated payload arrives looking structurally
- * perfect — only the length gives it away, and merging one would blank out every
- * day it failed to mention.
- */
+/** `isDay` is a filter, so a truncated payload looks structurally perfect and
+    only the length gives it away. Merging one would blank every day it omits. */
 const MIN_DAYS = 300;
 
-/**
- * How old the stored snapshot has to be before a render bothers polling again.
- * Under the page's own 24h revalidate, so a daily render always refreshes, but
- * high enough that a burst of revalidations makes one request rather than many.
- */
+/** Under the page's 24h revalidate, so a daily render refreshes — but high
+    enough that a burst of revalidations makes one request, not many. */
 const REFRESH_AFTER_HOURS = 20;
 
 export interface GithubActivity {
   handle: string;
-  /**
-   * One total per week for the last WEEKS weeks, oldest first — the line reads
-   * the year at the week, which is calm on purpose. Always starts on a Sunday;
-   * `null` marks a week the archive cannot vouch for and so does not draw.
-   */
+  /** Weekly totals, oldest first, always starting on a Sunday. `null` marks a
+      week the archive cannot vouch for and so does not draw. */
   weeks: (number | null)[];
-  /**
-   * The UTC date of the Sunday that opens weeks[0], as "YYYY-MM-DD", and the
-   * only date on the wire: the scrub names its week by index arithmetic off this
-   * one, so 53 date strings never cross the network.
-   */
+  /** UTC date of weeks[0]'s Sunday — the only date on the wire, so 53 date
+      strings never cross the network. */
   startDate: string;
   /** Consecutive days with at least one contribution, ending today. */
   streak: number;
@@ -71,11 +49,8 @@ export interface GithubActivity {
   total: number;
   /** When the numbers above were captured, e.g. "jul 24". The caption prints it. */
   asOf: string;
-  /**
-   * Whether the snapshot is old enough to be worth polling for again. A flag
-   * rather than the raw timestamp so the render payload carries one bit and the
-   * refresh policy stays in one place.
-   */
+  /** A flag, not the timestamp, so the payload carries one bit and the refresh
+      policy stays in one place. */
   stale: boolean;
 }
 
@@ -115,19 +90,12 @@ export async function readGithubActivity(
     prisma.githubProfile.findUnique({ where: { handle } }),
     prisma.githubYear.findMany({ where: { handle, year: { in: [year - 1, year] } } }),
   ]);
-  // No profile means no refresh has ever succeeded, and no rows means the archive
-  // can't cover the window. Either way the row drops the line rather than
-  // drawing an empty year that would read as "he shipped nothing".
+  // Drop the line rather than draw an empty year that reads as "shipped nothing".
   if (!profile || rows.length === 0) return null;
 
-  // A streak or a year-wide window can reach back across New Year, so the two rows
-  // are laid end to end into one continuous timeline starting Jan 1 of last year.
-  // A year with no row contributes NULLS of the right length: it keeps every index
-  // below aligned whether or not it was ever captured, and — unlike the zeros this
-  // used to pad with — it says the archive never saw those days rather than
-  // claiming a year of shipping nothing. On a fresh handle, where last year's row
-  // doesn't exist yet, that is the difference between a line that starts where the
-  // archive does and a flat floor running back to January.
+  // Two rows laid end to end, because a streak can reach back across New Year.
+  // A missing year contributes NULLS, not zeros: it keeps the indices aligned
+  // while still saying the archive never saw those days.
   const timeline: (number | null)[] = [];
   for (const y of [year - 1, year]) {
     const row = rows.find((r) => r.year === y);
@@ -137,9 +105,8 @@ export async function readGithubActivity(
   }
   const today = daysInYear(year - 1) + dayOfYear(now.toISOString().slice(0, 10));
 
-  // Where the archive stops being able to speak. Past this the stored '0's only
-  // mean "never fetched", so they are left undrawn and out of both streaks
-  // rather than counted as days with nothing shipped.
+  // Where the archive stops being able to speak: past this a stored '0' only
+  // means "never fetched".
   const observed = observedIndex(
     today,
     (Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) -
@@ -156,10 +123,8 @@ export async function readGithubActivity(
   return {
     handle,
     weeks: buildWeeks(timeline, today, weekday, observed),
-    // Both the array and this label read the window's first index from the same
-    // `windowStart`, and both count from the timeline's own origin — Jan 1 of
-    // last year, the day `today` is itself measured from — so weeks[0] and
-    // startDate cannot come to name different Sundays.
+    // Same `windowStart` and same origin as the array, so weeks[0] and this
+    // label cannot come to name different Sundays.
     startDate: new Date(Date.UTC(year - 1, 0, 1) + windowStart(today, weekday) * 86_400_000)
       .toISOString()
       .slice(0, 10),
@@ -173,14 +138,9 @@ export async function readGithubActivity(
   };
 }
 
-/**
- * Pulls the trailing year and merges it into the archive day by day, keyed on the
- * absolute date.
- *
- * Returns false on every failure — offline, rate-limited, renamed account, short
- * payload — having written nothing at all. `fetchedAt` advances only on the way
- * out, so the tile's "as of" label can never claim to be newer than its data.
- */
+/** Merges the trailing year into the archive by absolute date. Returns false on
+    every failure having written nothing; `fetchedAt` advances only on the way
+    out, so "as of" can never claim to be newer than its data. */
 export async function refreshGithubActivity(handle: string): Promise<boolean> {
   let days: Day[];
   let total: number;
@@ -206,11 +166,8 @@ export async function refreshGithubActivity(handle: string): Promise<boolean> {
   const byYear = new Map<number, Day[]>();
   for (const day of days) {
     const year = Number(day.date.slice(0, 4));
-    // Bounded to the same range as GithubYear_year_check. One nonsense date in
-    // the response would otherwise reach the upsert, and because every year is
-    // written in a single transaction, that CHECK violation would roll back the
-    // good years too — a refresh that fails completely, silently, and for as
-    // long as upstream keeps sending the bad row.
+    // Bounded to GithubYear_year_check: one nonsense date reaching the upsert
+    // would fail the whole transaction and roll back the good years too.
     if (!Number.isInteger(year) || year < 2005 || year > 2200) continue;
     const list = byYear.get(year);
     if (list) list.push(day);
@@ -248,9 +205,7 @@ export async function refreshGithubActivity(handle: string): Promise<boolean> {
     await prisma.$transaction(writes);
     return true;
   } catch {
-    // Swallowed because the caller is usually `after()`, where a rejection is
-    // logged and dropped anyway. The transaction means a failure here wrote
-    // nothing, so the archive is still whatever it was.
+    // The transaction means a failure here wrote nothing.
     return false;
   }
 }

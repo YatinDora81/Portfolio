@@ -3,21 +3,13 @@
 /**
  * Frequencies — the FM dial, and the year in one line.
  *
- * Every other place I exist, tuned like a radio: a band number, a name, a dashed
- * run of dead air, the handle, and four bars that only dance when you reach for
- * them. One row has something behind it — GitHub — and hovering it unfolds
- * fifty-three weeks of commits drawn as a single stroke. No grid, no box, no
- * bars: one line in whitespace, the ink fading where the year is old and
- * sharpening toward now, ending on the only green dot in the section.
+ * The line reads the year AT THE WEEK on purpose: a daily series is a
+ * fifty-two-tooth comb at this width, and smoothing it into a mean only trades
+ * that for a curve squashed into the bottom of the panel by the year's single
+ * busiest day.
  *
- * The line reads the year AT THE WEEK, which is calm on purpose. A daily series
- * is a fifty-two-tooth comb at this width — weekends are zeros — and smoothing
- * it into a mean only trades that for a curve squashed into the bottom of the
- * panel by whichever single day happened to be the year's busiest.
- *
- * The line is built once from the props and then never touched by React again:
- * the scrub hairline and its readout are written straight to their nodes,
- * because a pointer crossing a year of commits must not re-render anything.
+ * Built once from the props and then never touched by React again — the scrub
+ * hairline and readout are written straight to their nodes.
  */
 
 import { useMemo, useRef, type PointerEvent as ReactPointerEvent } from 'react';
@@ -67,14 +59,8 @@ interface Line {
   last: [number, number];
 }
 
-/**
- * Weekly totals → one continuous path, catmull-rom read as cubic bezier so the
- * curve passes through every week rather than near it.
- *
- * Returns null for every year that cannot be drawn honestly — no weeks, all
- * unknown, or a single lonely point. The caller uses that to drop the chevron
- * too, so the affordance never points at nothing.
- */
+/** Weekly totals → one catmull-rom path. Returns null for a year that cannot be
+    drawn honestly, which the caller uses to drop the chevron too. */
 function buildLine(days: (number | null)[]): Line | null {
   const n = days.length;
   const firstD = days.findIndex((v) => v !== null);
@@ -87,10 +73,8 @@ function buildLine(days: (number | null)[]): Line | null {
   }
   if (n < 2 || firstD < 0 || lastD - firstD < 1) return null;
 
-  // Nulls only occur at the head (before the archive starts) and the tail (after
-  // the last refresh), so this fallback is defensive: one in the middle would
-  // mean a week that fell out of two stored years at once, and reading it as
-  // zero keeps the stroke continuous instead of splitting it in two.
+  // Defensive: nulls only occur at the head and tail, and reading a middle one
+  // as zero keeps the stroke continuous instead of splitting it in two.
   const raw = days.map((v) => v ?? 0);
 
   let peakD = firstD;
@@ -136,10 +120,9 @@ function GhLine({ github, line }: { github: GithubActivity; line: Line }) {
   const curDot = useRef<SVGCircleElement>(null);
   const readout = useRef<HTMLSpanElement>(null);
 
-  // Touch has no dwell to spend, so the panel is open there from first paint and
-  // the stroke waits for the scroll instead of the pointer. On a pointer machine
-  // the fold's own hover rules draw it and this class does nothing — which is
-  // why never firing (the panel is 0fr tall until hovered) costs nothing.
+  // Touch has no dwell to spend, so the panel is open from first paint there and
+  // the stroke waits for the scroll. On a pointer machine this class does
+  // nothing — the fold's own hover rules draw it.
   const inView = useInView(stageRef, { once: true, amount: 0.4 });
 
   const { n, firstD, lastD, raw, maxV, peakD, d, under, last } = line;
@@ -150,10 +133,8 @@ function GhLine({ github, line }: { github: GithubActivity; line: Line }) {
   // line it is supposedly the high point of.
   const hasPeak = maxV > 0 && peakD !== lastD;
 
-  // The only date on the wire is the first column's Sunday, so every label is
-  // arithmetic off it — and all of it in UTC. `new Date('2025-08-02')` read back
-  // with local getters is yesterday for everyone west of Greenwich, which would
-  // quietly name the wrong week for half the planet.
+  // All UTC: `new Date('2025-08-02')` read back with local getters is yesterday
+  // for everyone west of Greenwich.
   const weekLabel = useMemo(() => {
     const t0 = Date.parse(`${github.startDate}T00:00:00Z`);
     const fmt = new Intl.DateTimeFormat('en-US', {

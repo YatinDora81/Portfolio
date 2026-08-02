@@ -1887,16 +1887,10 @@ body.cat-on .cw .dot { display: none; }
 #contact .ghln-stage:active .ghln-ro { opacity: 1; }
 
 /* the line writes itself each time the fold opens */
-/* 1.15, not 1, and the reason is subtle. `pathLength="1"` normalises the dash
-   against the path's USER-space length, but `vector-effect: non-scaling-stroke`
-   makes the browser lay the pattern down in SCREEN space — and this viewBox is
-   stretched, because preserveAspectRatio is `none`. The panel renders 660 units
-   across a column that Container caps at 720px, so the rendered line is ~1.09x
-   longer than the dash that is supposed to cover it and the last ~8% of the
-   year fell permanently inside the gap: the line stopped short of its own live
-   dot. Anything at or above that ratio covers it; 1.15 leaves margin and still
-   completes the reveal at ~95% of the transition, so the draw does not visibly
-   finish early. */
+/* 1.15, not 1: `pathLength="1"` normalises the dash against USER space but
+   `non-scaling-stroke` lays it down in SCREEN space, and this viewBox is
+   stretched (~1.09x). At 1 the last ~8% of the line fell inside the gap and
+   stopped short of its own live dot. */
 #contact .ghln .stroke { stroke-dasharray: 1.15; stroke-dashoffset: 1.15; }
 #contact .fqx:hover .stroke,
 #contact .fqx:has(.fq:focus-visible) .stroke {

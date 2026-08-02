@@ -1,6 +1,5 @@
 
 import { after } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { ThemeProvider } from './components/common/ThemeProvider';
 import { CatProvider } from './components/common/CatProvider';
 import MotionProvider from './components/common/MotionProvider';
@@ -27,7 +26,7 @@ import {
   getContactData,
   getSiteConfig,
 } from './lib/data';
-import { githubHandle, readGithubActivity, refreshGithubActivity } from './lib/github';
+import { githubHandle, readGithubActivity } from './lib/github';
 import { SITE_URL, SITE_NAME, absoluteUrl } from './lib/site';
 
 /** Which quote today lands on, and the date the section prints beside it — both
@@ -88,22 +87,39 @@ export default async function Home() {
   // purpose: the handle comes out of the social links above.
   const github = await readGithubActivity(contactData.socialLinks);
 
-  // The mirror is polled here because there is no cron, and this render already
-  // wakes about once a day on the 24h revalidate below — the cadence wanted. It
-  // runs in `after`, so the fetch happens once the response is already streamed:
-  // no visitor waits on a third-party service, and nothing writes mid-render.
-  // The 20h floor keeps a burst of revalidations to one poll; if two regions do
-  // race, the merge is idempotent.
+  // Polled here because there is no cron, and this render already wakes about
+  // once a day on the revalidate below. It runs in `after`, so no visitor waits
+  // on a third-party service.
   //
-  // The flush at the end is what makes the poll worth anything. This render has
-  // already read the archive, so the HTML now being cached still shows the
-  // PREVIOUS snapshot; without it the tile would serve data a full extra cycle
-  // old. Re-rendering is safe rather than circular: the next render finds a
-  // fresh `fetchedAt`, so `stale` is false and it does not poll again.
+  // It goes out over HTTP to the site's own endpoints rather than calling
+  // refreshGithubActivity()/revalidatePath() inline, which is what it used to
+  // do: in production `/` is fully static, so the render and its `after`
+  // callback sit in a prerender work unit where a no-store fetch and
+  // revalidatePath both throw DynamicServerError — and `after` swallows them.
+  // The mirror was never contacted at all in a production build. A route
+  // handler is always a request store, hence this shape.
+  //
+  // The flush is what makes the poll worth anything: this render already read
+  // the archive, so the HTML being cached still shows the previous snapshot.
   const handle = githubHandle(contactData.socialLinks.find((l) => l.iconKey === 'github')?.href);
   if (handle && (!github || github.stale)) {
     after(async () => {
-      if (await refreshGithubActivity(handle)) revalidatePath('/');
+      const secret = process.env.REVALIDATE_SECRET;
+      if (!secret) return;
+      // No `cache` option, deliberately: an explicit 'no-store' is the thing
+      // that marks the scope dynamic and throws, and a POST is uncacheable
+      // anyway. `absoluteUrl` aims at SITE_URL, the deployment holding the ISR
+      // entry being flushed.
+      const post = (path: string) =>
+        fetch(absoluteUrl(path), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ secret }),
+          signal: AbortSignal.timeout(20_000),
+        });
+      // Nothing catches a rejection here. `after` logs it, and after a bug that
+      // hid in a swallowed error, a poll that fails should say so.
+      if ((await post('/api/github/refresh')).ok) await post('/api/revalidate');
     });
   }
 
