@@ -311,13 +311,17 @@ const ENTITY_PATHS: Record<Entity, readonly string[]> = {
   heroSkillBadge: ["/hero"],
   // Every admin route that renders the live version or the hero's copy. This is
   // what the site-config form's `revalidatePath("/", "layout")` used to cover.
-  heroContent: ["/hero", "/site-config", "/social-links", "/dashboard"],
-  aboutParagraph: ["/about/paragraphs"],
-  education: ["/about/education"],
+  heroContent: ["/hero", "/site-config", "/dashboard"],
+  // Both live on one page now — /about/paragraphs and /about/education are
+  // redirect stubs, and revalidating a stub re-renders nothing.
+  aboutParagraph: ["/about"],
+  education: ["/about"],
   skill: ["/skills"],
   quote: ["/quotes"],
   contactPurpose: ["/contact-purposes"],
-  socialLink: ["/social-links", "/links"],
+  // /social-links and /links are redirect stubs now — the editor is on /hero,
+  // and revalidating a `redirect()` would refresh nothing.
+  socialLink: ["/hero"],
   adminUser: ["/admin-users"],
 };
 
