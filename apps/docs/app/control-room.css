@@ -1148,6 +1148,115 @@ select.sel option { background: var(--card); color: var(--ink) }
 .cfg-rows { display: grid; gap: 14px }
 .cfg-rows > .f { gap: 6px }
 
+/* ── About · section 02 ─────────────────────────────────────────────────────
+   Two routes, one place. `/about` holds the rows (bio paragraphs, education);
+   `/terminal` is the read-only reference for the shell those rows print inside.
+   Nothing in the data links them — the terminal has no model — so this family
+   is what makes them read as one section: the same tab pair, the same numbered
+   block rules, the same footer, in the same positions on both pages.
+
+   Everything resolves through existing tokens. `--well` is the one exception
+   worth naming: it exists only on the two dark themes, so every use here
+   carries the light-mode fallback `var(--bg1)` rather than collapsing to
+   transparent. */
+
+/* section nav — /about ⇄ /terminal */
+.abt-nav { display: flex; align-items: stretch; gap: 2px; margin: 0 0 18px; border-bottom: 1px solid var(--line2) }
+.abt-tab {
+  display: inline-flex; align-items: baseline; gap: 8px; padding: 8px 12px 10px;
+  font-size: 13.5px; font-weight: 500; color: var(--dim); border-radius: var(--r1) var(--r1) 0 0;
+  position: relative; transition: color .14s, background .14s
+}
+.abt-tab:hover { color: var(--ink); background: var(--bg1) }
+.abt-tab.on { color: var(--ink); font-weight: 650 }
+/* Sits ON the container's hairline rather than under it, so the active route
+   physically joins the page below the strip. */
+.abt-tab.on::after {
+  content: ''; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px;
+  border-radius: 99px 99px 0 0; background: var(--c1)
+}
+.abt-tab-g { font-family: var(--mono); font-size: 10px; letter-spacing: .04em; color: var(--faint); flex: none }
+.abt-tab.on .abt-tab-g { color: var(--c1) }
+/* `--dim`, not `--faint`: this rides the tab's `--bg1` hover fill, where light
+   mode's --faint measures under 4.5:1 for 9.5px type. */
+.abt-tab-s { font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); flex: none }
+@media (max-width: 560px) { .abt-tab-s { display: none } }
+
+/* masthead — About's table of contents, written in the section's own idiom.
+   Four commands, their live answers, and a link to whatever changes each one. */
+.abt-shell {
+  border: 1px solid var(--line2); border-radius: var(--r3); overflow: hidden;
+  background: var(--well, var(--bg1)); margin-bottom: 4px
+}
+.abt-shell-h {
+  display: flex; align-items: center; gap: 9px; padding: 8px 12px;
+  border-bottom: 1px solid var(--line2); background: var(--card)
+}
+.abt-shell-t { font-family: var(--mono); font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint) }
+.abt-shell-b { padding: 10px 8px 12px; display: flex; flex-direction: column }
+.abt-l {
+  display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+  padding: 6px 9px; border-radius: 7px; font-family: var(--mono); font-size: 12px;
+  color: var(--ink); text-align: left; transition: background .13s
+}
+a.abt-l:hover { background: var(--bg2) }
+.abt-l .cmd-prompt { flex: none }
+.abt-l-static { opacity: .8 }
+.abt-out { color: var(--dim); min-width: 0 }
+/* `--dim` even though it is decorative and aria-hidden: --faint on the light
+   theme's --bg1 is 3.0:1, under the floor this 12px glyph would need. */
+.abt-arrow { color: var(--dim) }
+.abt-go {
+  margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim)
+}
+a.abt-l:hover .abt-go { color: var(--accT) }
+/* The real terminal draws an OUTLINE caret when nothing is focused, which is
+   exactly this pane's state — so no blink, and no new keyframe. */
+.abt-caret { display: inline-block; width: 7px; height: 12px; border: 1px solid var(--dim); border-radius: 1px; transform: translateY(1px) }
+
+/* numbered block rule — the rhythm both routes share. Kept outside the cards so
+   the two staged tables keep their markup, and their staging behaviour, exactly. */
+.abt-h { margin: 26px 0 10px }
+.abt-h-r { display: flex; align-items: center; gap: 10px }
+.abt-h-r::after { content: ''; flex: 1; height: 1px; background: var(--line2) }
+.abt-h-n { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; color: var(--c1); flex: none }
+.abt-h-t { font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink); font-weight: 500; flex: none }
+.abt-h-d { font-size: 12px; color: var(--dim); margin-top: 7px; max-width: 68ch; line-height: 1.6 }
+.abt-h-d code, .abt-ro code, .abt-foot code, .row.borrowed code {
+  font-family: var(--mono); font-size: 11px; background: var(--bg1);
+  border: 1px solid var(--line2); border-radius: 5px; padding: 1px 5px; color: var(--ink)
+}
+/* Jump targets for the masthead links; clears the block rule above the card. */
+.abt-anchor { scroll-margin-top: 20px }
+
+/* read-only banner — the state this page is permanently in */
+.abt-ro {
+  display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px; margin-bottom: 12px;
+  border: 1px solid var(--line2); border-radius: var(--r2); background: var(--bg1);
+  font-size: 12.5px; color: var(--dim); line-height: 1.65
+}
+.abt-ro > svg { flex: none; margin-top: 2px; color: var(--dim) }
+.abt-ro b { display: block; color: var(--ink); font-size: 13px; font-weight: 600; margin-bottom: 2px }
+
+.abt-facts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px }
+
+/* Entrance stagger — four steps, then flat, per the motion budget. The global
+   reduced-motion rule kills `animation` outright, and with it the `both` fill,
+   so the blocks simply render in place. */
+.abt-stag > * { animation: up .3s cubic-bezier(.3, .7, .3, 1) both }
+.abt-stag > *:nth-child(2) { animation-delay: .06s }
+.abt-stag > *:nth-child(3) { animation-delay: .12s }
+.abt-stag > *:nth-child(n+4) { animation-delay: .18s }
+
+.abt-foot {
+  display: flex; align-items: flex-start; gap: 9px; margin-top: 26px; padding-top: 14px;
+  border-top: 1px solid var(--line2); font-size: 12px; color: var(--dim); line-height: 1.65
+}
+.abt-foot > svg { flex: none; margin-top: 2px; color: var(--faint) }
+.abt-foot-l { color: var(--accT); font-weight: 550; text-decoration: underline; text-underline-offset: 2px }
+.abt-foot-l:hover { text-decoration-thickness: 2px }
+
 /* ══ HERO · section 01 — and CONTACT · section 08 ═════════════════════════════
    Two pages, one block, own prefixes (.hro- .ctc-). The shared families the
    regroup introduced — .sec-*, .cfg-*, .borrowed — are declared further up and

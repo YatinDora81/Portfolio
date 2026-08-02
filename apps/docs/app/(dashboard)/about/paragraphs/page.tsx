@@ -1,38 +1,14 @@
-import { prisma } from "db";
-import { PageHeader } from "@/components/shared/page-header";
-import { AboutParagraphsTable } from "./table";
-import { StagedAboutPreview } from "@/components/preview/staged";
+import { redirect } from "next/navigation";
 
-export default async function AboutParagraphsPage() {
-  const [paragraphs, education, experiences] = await Promise.all([
-    prisma.aboutParagraph.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
-    prisma.education.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
-    // Only for the paragraphs' company marks — the site reuses the same logos.
-    prisma.experience.findMany({ select: { company: true, logoUrl: true } }),
-  ]);
-  return (
-    <div className="view">
-      <PageHeader
-        eyebrow="section 02"
-        title="About paragraphs"
-        description="The bio copy in the about section. Wrap text in **double asterisks** to bold it."
-      />
-      <AboutParagraphsTable paragraphs={paragraphs.map(p => ({ id: p.id, content: p.content, sortOrder: p.sortOrder }))} />
-      <StagedAboutPreview
-        paragraphs={paragraphs.map(p => ({ id: p.id, content: p.content }))}
-        experiences={experiences}
-        education={education.map(e => ({
-          id: e.id,
-          institution: e.institution,
-          degree: e.degree,
-          location: e.location,
-          scoreType: e.scoreType,
-          score: e.score,
-          scoreTotal: e.scoreTotal,
-          startYear: e.startYear,
-          endYear: e.endYear,
-        }))}
-      />
-    </div>
-  );
+/**
+ * Was its own nav row; the paragraphs and the education timeline are one
+ * section on the site, so they are one page here now. Kept as a stub — and out
+ * of `nav.ts`, so the palette lists `/about` once — because bookmarks and the
+ * dashboard's quick actions still point at this URL.
+ *
+ * Not seamless when logged out: `middleware.ts` gates this path, so an old
+ * bookmark hit cold lands on /login first.
+ */
+export default function AboutParagraphsRedirect() {
+  redirect("/about");
 }
