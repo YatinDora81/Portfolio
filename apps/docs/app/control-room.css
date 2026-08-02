@@ -1049,6 +1049,89 @@ select.sel option { background: var(--card); color: var(--ink) }
 .hist-val.was { background: var(--bad-soft); border-color: var(--bad) }
 .hist-val.now { background: var(--good-soft); border-color: var(--good) }
 .hist-val em { color: var(--faint) }
+
+/* ── Cat (/cat) ─────────────────────────────────────────────────────────────
+   The one page whose subject moves. Two SiteConfig rows are editable and four
+   surfaces are only documented, so the page has to look like two different
+   kinds of thing at once: config cards that can go dirty, and a ledger that
+   never can. The nap tiles carry their own (private, `.nsp`) stylesheet — see
+   components/cat/nap-stage.tsx. */
+
+/* dirty = amber keyline, on the card that actually changed. Sits after
+   `.card:hover` so it wins at equal specificity. */
+.cat-card.is-dirty, .cat-foot.is-dirty { border-color: var(--amber) }
+
+/* nap length — the number and its shortcuts are one control, so they share a row */
+.cat-secs { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: 16px; align-items: start }
+.cat-secs .f { margin-bottom: 0 }
+.cat-shorts { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 25px }
+/* `.filt` is a filter pill by origin, where a faint keyline is fine. These
+   write a value, so the boundary is raised to --line (3:1) and the label to
+   --dim (4.5:1 in all three themes). */
+.cat-shorts .filt { cursor: pointer; font-variant-numeric: tabular-nums; border-color: var(--line); color: var(--dim) }
+.cat-shorts .filt:hover:not(:disabled) { color: var(--ink) }
+.cat-shorts .filt[aria-pressed='true'] { border-color: var(--c1); color: var(--accT); background: var(--accS) }
+.cat-shorts .filt:disabled { opacity: .45; cursor: default }
+
+/* the sentence that reads both cards back as one behaviour */
+.cat-say {
+  margin-top: 16px; padding: 12px 14px; border-radius: var(--r2); background: var(--bg1);
+  border: 1px solid var(--line2); font-size: 12.5px; line-height: 1.75; color: var(--dim); max-width: 76ch
+}
+.cat-say b { color: var(--ink); font-weight: 600 }
+.cat-say i {
+  font-family: var(--mono); font-style: normal; font-size: 11.5px; color: var(--accT);
+  background: var(--accS); border-radius: 5px; padding: 1px 6px; white-space: nowrap
+}
+
+/* one save row for both config cards — never two on a page */
+.cat-foot {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
+  padding: 10px 14px; border: 1px solid var(--line2); border-radius: var(--r3);
+  background: var(--bg1); transition: border-color .18s
+}
+.cat-foot-note { display: flex; align-items: center; gap: 7px; margin-right: auto; font-size: 12px; color: var(--dim) }
+
+/* surfaces — documentation rows, so they read as prose rather than as list items */
+.cat-surf .row { align-items: flex-start; padding: 13px 14px }
+.cat-glyph {
+  width: 30px; height: 30px; flex: none; margin-top: 1px; border-radius: var(--r1);
+  display: grid; place-items: center; background: var(--bg1); border: 1px solid var(--line2); color: var(--dim)
+}
+.row:hover .cat-glyph { color: var(--ink); border-color: var(--line) }
+.cat-glyph-t { font-family: var(--mono); font-size: 9px; letter-spacing: .02em }
+.cat-surf .row-m { white-space: normal; color: var(--dim); line-height: 1.6; margin-top: 3px; max-width: 74ch }
+.cat-where { font-family: var(--mono); font-size: 9.5px; color: var(--faint); margin-top: 6px }
+.cat-tag {
+  flex: none; margin-top: 2px; font-family: var(--mono); font-size: 9px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--dim); border: 1px dashed var(--line); border-radius: 99px; padding: 4px 10px
+}
+
+/* facts — a ledger; the key column is fixed so the values line up */
+.cat-facts { display: flex; flex-direction: column }
+.cat-fact {
+  display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 14px;
+  padding: 12px 14px; border-bottom: 1px solid var(--line2)
+}
+.cat-fact:last-child { border-bottom: none }
+.cat-fact dt {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--faint); padding-top: 3px
+}
+.cat-fact dd { font-size: 12.5px; line-height: 1.65; color: var(--dim) }
+.cat-fact code {
+  font-family: var(--mono); font-size: 11px; background: var(--bg1); border: 1px solid var(--line2);
+  border-radius: 5px; padding: 1px 5px; color: var(--ink)
+}
+
+@media (max-width: 720px) {
+  .cat-secs { grid-template-columns: 1fr }
+  .cat-shorts { padding-top: 0 }
+  .cat-surf .row { flex-wrap: wrap }
+  .cat-tag { margin-left: 40px }
+  .cat-fact { grid-template-columns: 1fr; gap: 5px }
+}
+
 /* ══ SHARED · added once, by the shell ══════════════════════════════════════
    Three families every section page draws from. They live here rather than in
    each page so the regrouped admin reads as one product: the same strip under

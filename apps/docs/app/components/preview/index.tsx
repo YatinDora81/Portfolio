@@ -20,3 +20,4 @@ export { BlogsPreview } from "./blogs";
 export { QuotesPreview } from "./quotes";
 export { ContactPreview } from "./contact";
 export { LinksPreview } from "./links";
+export { CatPreview } from "./cat";
