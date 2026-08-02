@@ -1,71 +1,18 @@
-import { prisma } from "db";
-import { PageHeader } from "@/components/shared/page-header";
-import { Card, CardHead } from "@/components/ui/card";
-import { StagedLinksPreview } from "@/components/preview/staged";
-import { SocialLinksList } from "./social-links-list";
-import { ResumeForm } from "./resume-form";
-import { IconArrowUpRight } from "@tabler/icons-react";
+import { redirect } from "next/navigation";
 
-export default async function LinksPage() {
-  const [links, siteConfigRows] = await Promise.all([
-    prisma.socialLink.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
-    prisma.siteConfig.findMany(),
-  ]);
-
-  const config = new Map(siteConfigRows.map((c) => [c.key, c.value]));
-  const resumeUrl = config.get("resumeUrl") ?? "";
-  const contactEmail = config.get("contactEmail") ?? "";
-  const copyrightName = config.get("copyrightName") ?? "";
-
-  return (
-    <div className="view">
-      <PageHeader
-        eyebrow="site-wide · hero + footer"
-        title="Links"
-        description="Every outbound link on the portfolio — social profiles and the resume. Changes apply everywhere."
-      />
-
-      <div className="grid gap-3">
-        {/* Resume URL */}
-        <Card flush>
-          <CardHead
-            title="Resume / CV"
-            right={
-              resumeUrl ? (
-                <a className="btn ghost" href={resumeUrl} target="_blank" rel="noopener noreferrer">
-                  <IconArrowUpRight size={13} stroke={1.5} className="nudge" /> Open
-                </a>
-              ) : undefined
-            }
-          />
-          <div className="card-b">
-            <ResumeForm resumeUrl={resumeUrl} />
-          </div>
-        </Card>
-
-        {/* Social Links */}
-        <SocialLinksList
-          links={links.map((l) => ({
-            id: l.id,
-            name: l.name,
-            href: l.href,
-            iconKey: l.iconKey,
-            detail: l.detail,
-            sortOrder: l.sortOrder,
-          }))}
-        />
-      </div>
-
-      {/* Preview — `copyrightName` feeds the footer wordmark and copyright
-          line; without it the pane drew the PORTFOLIO placeholder over a name
-          the config already holds. */}
-      <StagedLinksPreview
-        label="Links Preview — How they appear across your portfolio"
-        socialLinks={links.map((l) => ({ id: l.id, name: l.name, href: l.href, iconKey: l.iconKey, detail: l.detail }))}
-        resumeUrl={resumeUrl}
-        contactEmail={contactEmail}
-        copyrightName={copyrightName}
-      />
-    </div>
-  );
+/**
+ * Folded into /hero — the social row and the résumé link are hero controls, and
+ * this page's immediate-write social editor lost to the staged one that used to
+ * live at /social-links.
+ *
+ * The stub stays so old bookmarks and any link still pointing here land on the
+ * page that now owns those controls rather than on a 404. It is deliberately not
+ * in nav.ts: a redirect listed in the sidebar or the palette would offer the
+ * reader a choice between a page and its own forwarding address. Note that
+ * middleware.ts gates this route, so a logged-out visitor sees /login first and
+ * arrives wherever the login flow sends them — the redirect only holds for a
+ * session that is already signed in.
+ */
+export default function LinksRedirect() {
+  redirect("/hero");
 }

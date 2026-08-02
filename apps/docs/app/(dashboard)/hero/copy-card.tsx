@@ -1,23 +1,24 @@
 "use client";
 
 import { Card, CardHead } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useStaging } from "@/components/staging/staging-provider";
-import { useLiveVersion, type HeroContentRow } from "@/components/staging/hero-live";
-import { IconCheck, IconWorldUpload } from "@tabler/icons-react";
+import { type HeroContentRow } from "@/components/staging/hero-live";
 
 type Version = "v1" | "v2";
 
-export function HeroCopyCard({ content, version, flipBlockedReason }: {
+/**
+ * The prose half of the hero. The flip that decides which version ships used to
+ * live in this card's header; it belongs to card 01 now, next to the tiles that
+ * say what each version currently holds — a publish decision and a text edit
+ * should not share a header strip.
+ */
+export function HeroCopyCard({ content, version }: {
   content: HeroContentRow[];
   /** Owned by HeroSections — the copy, titles and badges edit the same hero. */
   version: Version;
-  /** Set when this version isn't servable yet; disables the flip and says why. */
-  flipBlockedReason?: string;
 }) {
   const { overlay, stageUpdate, clearUpdate, saving } = useStaging();
-  const liveVersion = useLiveVersion(content);
 
   const server = content.find((c) => c.version === version);
   // Rendered from the overlay rather than local state, like every other staged
@@ -46,40 +47,9 @@ export function HeroCopyCard({ content, version, flipBlockedReason }: {
     else stageUpdate("heroContent", server.id, { [key]: next });
   };
 
-  const isLive = liveVersion === version;
-  const flip = () => {
-    // Clear both rows first so exactly one live op can exist — that invariant is
-    // what makes `useLiveVersion` exact, and it also means flipping back to the
-    // saved version stages nothing at all instead of a no-op update.
-    for (const c of content) clearUpdate("heroContent", c.id, ["live"]);
-    if (content.find((c) => c.live)?.version !== version) {
-      stageUpdate("heroContent", server.id, { live: true });
-    }
-  };
-
   return (
     <Card flush>
-      <CardHead
-        title="Hero copy"
-        right={
-          isLive ? (
-            <span className="chip" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              <IconCheck size={13} stroke={2} />
-              {version} is live
-            </span>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={flip}
-              disabled={saving || Boolean(flipBlockedReason)}
-              title={flipBlockedReason}
-            >
-              <IconWorldUpload size={14} stroke={1.8} /> Serve {version} to visitors
-            </Button>
-          )
-        }
-      />
+      <CardHead title="Hero copy" right={<span className="hro-scope">editing {version}</span>} />
       <div className="card-b" style={{ paddingBottom: 2 }}>
         <Textarea
           label="Intro"
@@ -105,12 +75,6 @@ export function HeroCopyCard({ content, version, flipBlockedReason }: {
               : "The italic voice line on its own, under the intro."
           }
         />
-        {/* Rendered on the live tab too: a version that is already serving and
-            has just lost its last title is the case that actually reaches
-            visitors, and gating this on `!isLive` hid exactly that one. */}
-        {flipBlockedReason && (
-          <div className="f-hint" style={{ color: "var(--bad)" }}>{flipBlockedReason}</div>
-        )}
       </div>
     </Card>
   );

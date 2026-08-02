@@ -1148,6 +1148,77 @@ select.sel option { background: var(--card); color: var(--ink) }
 .cfg-rows { display: grid; gap: 14px }
 .cfg-rows > .f { gap: 6px }
 
+/* ══ HERO · section 01 — and CONTACT · section 08 ═════════════════════════════
+   Two pages, one block, own prefixes (.hro- .ctc-). The shared families the
+   regroup introduced — .sec-*, .cfg-*, .borrowed — are declared further up and
+   nothing here redefines them. Every colour resolves through a token.
+
+   Both pages are long: Hero carries a version switch, three staged tables, five
+   SiteConfig fields, a résumé form and a preview; Contact carries a staged
+   table, three fields, the contribution tile and a preview. Without a rhythm
+   they read as a dump, so the numbered block strip below is doing structural
+   work, not decoration. */
+
+/* ---------- the numbered block strip ----------
+   One ordinal, one name, one aside, and a rule out to the margin. Rendered at
+   the same weight as `.hist-day` so a reader who knows the change log already
+   knows what this is: a divider that names what follows. */
+.hro-page, .ctc-page { display: grid; gap: 12px }
+.hro-blk, .ctc-blk { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 10px }
+.hro-page > .hro-blk:first-child, .ctc-page > .ctc-blk:first-child { margin-top: 0 }
+.hro-blk-n, .ctc-blk-n {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .1em; color: var(--faint); flex: none
+}
+.hro-blk-t, .ctc-blk-t {
+  font-family: var(--disp); font-weight: 600; font-size: 14px; letter-spacing: -.01em; color: var(--ink)
+}
+.hro-blk-m, .ctc-blk-m { font-size: 11.5px; color: var(--faint); min-width: 0 }
+.hro-blk i, .ctc-blk i { flex: 1; min-width: 24px; height: 1px; background: var(--line2) }
+
+/* ---------- 01 · version ----------
+   The old control was a pair of `.filt` pills carrying two unrelated facts at
+   once — which version you are editing, and which one visitors get. Split here:
+   the tile is the tab, the chip and the dot are the site. */
+.hro-vers { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line2) }
+.hro-ver {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--card);
+  text-align: left; transition: background .14s, box-shadow .14s
+}
+.hro-ver:hover { background: var(--bg1) }
+.hro-ver.on { background: var(--accS); box-shadow: inset 0 -2px 0 var(--c1) }
+.hro-ver-k {
+  font-family: var(--mono); font-size: 22px; line-height: 1; letter-spacing: -.02em;
+  color: var(--faint); flex: none
+}
+.hro-ver.on .hro-ver-k { color: var(--accT) }
+.hro-ver-m { display: grid; gap: 3px; min-width: 0 }
+.hro-ver-st { font-size: 12.5px; color: var(--dim) }
+.hro-ver-st.live { color: var(--goodT); font-weight: 600 }
+.hro-ver-c { font-family: var(--mono); font-size: 10px; letter-spacing: .04em; color: var(--faint) }
+/* --faint is 2.77:1 on a tint in light mode, and light is the theme the app
+   boots into — so the moment this tile gains a background, the count steps up. */
+.hro-ver:hover .hro-ver-c, .hro-ver.on .hro-ver-c { color: var(--dim) }
+.hro-ver .dot { margin-left: auto; flex: none }
+@media (max-width: 620px) { .hro-vers { grid-template-columns: 1fr } }
+
+/* The one place on the page that can say "this cannot ship yet". Amber, not
+   red: nothing is broken, the flip is simply blocked until a title exists. */
+.hro-warn {
+  display: flex; align-items: flex-start; gap: 8px; padding: 10px 16px;
+  border-top: 1px solid var(--line2); background: var(--amber-soft);
+  color: var(--ambT); font-size: 12.5px; line-height: 1.5
+}
+
+/* Which version the card below is scoped to — a label, never a control. */
+.hro-scope {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--faint)
+}
+
+/* Copy, titles and badges are one hero: tighter than the block gap so they read
+   as one object with three parts. */
+.hro-stack { display: grid; gap: 8px }
+
 /* ---------- 03 · the photo deck ----------
    `heroPhotos`' first editor anywhere. It is a list, not a text box, because
    the stored value is one comma-separated row and typing commas by hand is how

@@ -30,8 +30,7 @@ export async function createSocialLink(formData: FormData) {
   // version, which is what a link added here should be. Scoping one to v1 or v2
   // is deliberate and happens on /social-links.
   await prisma.socialLink.create({ data: { name, href, iconKey, detail, sortOrder: count } });
-  revalidatePath("/social-links");
-  revalidatePath("/links");
+  revalidatePath("/hero");
 }
 
 export async function updateSocialLink(id: string, formData: FormData) {
@@ -41,13 +40,11 @@ export async function updateSocialLink(id: string, formData: FormData) {
   const iconKey = formData.get("iconKey") as string;
   const detail = (formData.get("detail") as string) || null;
   await prisma.socialLink.update({ where: { id }, data: { name, href, iconKey, detail } });
-  revalidatePath("/social-links");
-  revalidatePath("/links");
+  revalidatePath("/hero");
 }
 
 export async function deleteSocialLink(id: string) {
   await requireSession();
   await prisma.socialLink.delete({ where: { id } });
-  revalidatePath("/social-links");
-  revalidatePath("/links");
+  revalidatePath("/hero");
 }

@@ -14,7 +14,7 @@ import { useSortable } from "@/lib/use-sortable";
 import { cn } from "@/lib/utils";
 import {
   IconPlus, IconEdit, IconLink, IconAlertTriangle, IconGripVertical, IconArrowBackUp,
-  IconChevronUp, IconChevronDown,
+  IconChevronUp, IconChevronDown, IconArrowUpRight,
 } from "@tabler/icons-react";
 import { findSocialIcon } from "@repo/ui/icons/registry";
 
@@ -26,6 +26,18 @@ interface Link {
 
 const ENTITY: Entity = "socialLink";
 
+/**
+ * Card 05 — the hero's icon row. Moved here verbatim from /social-links when
+ * that route folded into /hero.
+ *
+ * This is the editor that WON the fold. /links carried a second one that wrote
+ * immediately, with no staging, no drag-reorder and no per-version scoping; it
+ * was deleted rather than merged, because keeping either half of it would have
+ * meant two writers on one table with only one of them visible in the save bar.
+ * Everything that made this the survivor is below: staged create/edit/delete,
+ * drag and keyboard reorder, the icon picker, and `version === null` meaning
+ * "every hero version".
+ */
 export function SocialLinksTable({ links }: { links: Link[] }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Link | null>(null);
@@ -74,7 +86,7 @@ export function SocialLinksTable({ links }: { links: Link[] }) {
         <div className="empty">
           <div className="empty-ic"><IconLink size={19} /></div>
           <b>No links yet</b>
-          <span>GitHub first — recruiters click that one.</span>
+          <span>The hero draws no icon row, the contact dial has no frequencies, and the footer no socials.</span>
         </div>
       ) : (
         <div className="rows">
@@ -114,6 +126,20 @@ export function SocialLinksTable({ links }: { links: Link[] }) {
                     </IconButton>
                   ) : (
                     <>
+                      {/* Carried over from /links, which had it and /social-links
+                          did not. The row prints the href as text, so without
+                          this the only way to check a link from here is to copy
+                          it out by hand. Résumé, on the card below, kept its. */}
+                      <a
+                        className="ibtn"
+                        href={l.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Open ${l.name}`}
+                        title="Open in a new tab"
+                      >
+                        <IconArrowUpRight size={13} stroke={1.5} className="nudge" />
+                      </a>
                       <IconButton
                         className="move"
                         aria-label={`Move ${l.name} earlier`}
@@ -168,7 +194,11 @@ export function SocialLinksTable({ links }: { links: Link[] }) {
               // Blank clears it, exactly as the old action's `|| null` did.
               detail: String(data.get("detail") ?? ""),
               // Blank means NULL, which is "every version" — not "no version".
-              version: String(data.get("version") ?? ""),
+              // Normalised here rather than only in `versionOpt` on save: both
+              // readers of a staged row test `version === v || version == null`,
+              // and "" satisfies neither, so an un-normalised blank drops the
+              // link out of the hero preview and both version tiles until saved.
+              version: data.get("version") ? String(data.get("version")) : null,
             };
             if (editing) stageUpdate(ENTITY, editing.id, fields);
             else stageCreate(ENTITY, fields);

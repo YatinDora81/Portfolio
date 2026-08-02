@@ -21,7 +21,7 @@ export async function updateResumeUrl(url: string): Promise<{ ok: boolean }> {
     create: { key: "resumeUrl", value: url },
     update: { value: url },
   });
-  revalidatePath("/links");
-  revalidatePath("/site-config");
+  // /hero, not /links: the form moved there when /links became a redirect stub.
+  revalidatePath("/hero");
   return { ok: true };
 }
