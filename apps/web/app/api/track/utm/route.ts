@@ -25,16 +25,53 @@ function clean(v: unknown, max = 200): string | null {
 /** Repeat hits with an identical fingerprint inside this window are dropped. */
 const DEDUP_MINUTES = 10;
 
+/**
+ * Reads the body with a hard ceiling, streaming so an oversized one is dropped
+ * rather than buffered. `content-length` alone is not a guard: it is absent on a
+ * chunked request, which let any caller skip the check entirely and hand
+ * `request.json()` a body of any size.
+ */
+async function readCapped(request: Request, cap: number): Promise<string | null> {
+  const declared = Number(request.headers.get("content-length") ?? 0);
+  if (declared > cap) return null;
+
+  const body = request.body;
+  if (!body) return request.text();
+
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > cap) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(
+    chunks.reduce((acc, c) => {
+      const merged = new Uint8Array(acc.length + c.length);
+      merged.set(acc);
+      merged.set(c, acc.length);
+      return merged;
+    }, new Uint8Array()),
+  );
+}
+
 export async function POST(request: Request) {
-  // Cheapest win: stop a huge body before request.json() buffers it.
-  const len = Number(request.headers.get("content-length") ?? 0);
-  if (len > 4096) {
+  const raw = await readCapped(request, 4096);
+  if (raw === null) {
     return Response.json({ skipped: true, reason: "Payload too large" }, { status: 413 });
   }
 
   let body: UtmPayload;
   try {
-    body = (await request.json()) as UtmPayload;
+    // `?? {}` because a body of literal `null` parses without throwing, and
+    // reading a field off it threw a TypeError that surfaced as a bare 500.
+    body = (JSON.parse(raw) ?? {}) as UtmPayload;
   } catch {
     return Response.json({ skipped: true, reason: "Invalid JSON body" }, { status: 400 });
   }

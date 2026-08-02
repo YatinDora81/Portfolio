@@ -12,16 +12,51 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 /** Non-strings collapse to "" so they fail the required check. */
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
+/**
+ * Reads the body with a hard ceiling, streaming so an oversized one is dropped
+ * rather than buffered. `content-length` alone is not a guard: it is absent on a
+ * chunked request, which let any caller skip the check entirely and hand
+ * `request.json()` a body of any size.
+ */
+async function readCapped(request: Request, cap: number): Promise<string | null> {
+  const declared = Number(request.headers.get("content-length") ?? 0);
+  if (declared > cap) return null;
+
+  const body = request.body;
+  if (!body) return request.text();
+
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > cap) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(
+    chunks.reduce((acc, c) => {
+      const merged = new Uint8Array(acc.length + c.length);
+      merged.set(acc);
+      merged.set(c, acc.length);
+      return merged;
+    }, new Uint8Array()),
+  );
+}
+
 export async function POST(request: Request) {
-  // Refuse oversized payloads before buffering them into memory.
-  const len = Number(request.headers.get("content-length") ?? 0);
-  if (len > 64_000) {
+  const raw = await readCapped(request, 64_000);
+  if (raw === null) {
     return Response.json({ error: "Payload too large" }, { status: 413 });
   }
 
   let body: unknown;
   try {
-    body = await request.json();
+    body = JSON.parse(raw);
   } catch {
     // A malformed body is the caller's fault — 400, not 500.
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
