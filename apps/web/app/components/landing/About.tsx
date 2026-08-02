@@ -678,7 +678,10 @@ export default function About({ paragraphs, education, resumeUrl, companyLogos }
                 whileInView={reduceMotion ? undefined : { opacity: 1, x: 0, filter: 'blur(0px)' }}
                 viewport={{ once: true, margin: '-60px' }}
                 transition={{ duration: 0.5, ease: 'easeOut', delay: i * 0.1 }}
-                className="relative"
+                // js-reveal, like the bio paragraphs: motion renders this at
+                // inline opacity:0 on the server and only animates it to visible
+                // on mount, so without scripting the whole entry stayed blank.
+                className="relative js-reveal"
               >
                 <div className="absolute -left-8 top-4 flex size-6 items-center justify-center rounded-full border border-border bg-background text-secondary">
                   <span className="size-1.5 rounded-full bg-current" />

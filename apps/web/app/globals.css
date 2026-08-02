@@ -938,8 +938,11 @@ body.cat-on .cw .dot { display: none; }
     filter: none !important;
   }
   .xp-fold { grid-template-rows: 1fr; }
+  /* `!important` because `.xp-more`/`.show-more` declare `display:flex` later in
+     the file at the same specificity, and a media query adds none — without it
+     these hide-the-dead-control rules are silently overridden. */
   .xp-veil,
-  .xp-more { display: none; }
+  .xp-more { display: none !important; }
 
   /* Hide only what genuinely stops working without JS: an oscilloscope that
      never draws is an empty ruled box, and a clock frozen at `--:--:--` beside
@@ -948,6 +951,11 @@ body.cat-on .cw .dot { display: none; }
   #contact .car-wave,
   #contact .ct-now { display: none; }
   #contact .car-btn { cursor: text; }
+  /* The form has no `action`, so without JS the submit is a GET that reloads the
+     page with the visitor's name, email and message in the query string — into
+     the URL bar, history and the access log, and the message itself is dropped.
+     The address beside it is a working mailto, so the channel stays open. */
+  #contact .tx-btn { display: none !important; }
 }
 
 .xp-card.in .xp-log li {
@@ -1171,7 +1179,7 @@ body.cat-on .cw .dot { display: none; }
      content that is excluded from the accessibility tree and skipped by
      find-in-page. They are in the served HTML either way, which is what the
      crawler needed. */
-  .pj-more{display:none}
+  .pj-more{display:none !important}
 }
 
 /* shared: "Show More" button (Projects + Blogs) */

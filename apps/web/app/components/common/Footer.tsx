@@ -142,7 +142,7 @@ export default function Footer({
   copyrightName: string;
   wordmark?: string;
 }) {
-  const fullText = (wordmark ?? copyrightName.trim() ?? 'PORTFOLIO')
+  const fullText = (wordmark || copyrightName.trim() || 'PORTFOLIO')
     .trim()
     .toUpperCase();
   const shortText = fullText.split(/\s+/)[0] ?? fullText;

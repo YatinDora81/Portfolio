@@ -315,7 +315,16 @@ export default function Frequencies({ socialLinks, resumeUrl, github }: Frequenc
   if (!githubLink && elsewhere.length === 0 && !resumeUrl) return null;
 
   const band = (i: number) => BANDS[i % BANDS.length]!;
-  const ghHandle = github?.handle ?? githubLink?.detail?.replace('@', '') ?? 'github';
+  // Falls back to the handle parsed out of the href rather than the literal
+  // 'github', which advertised someone else's account whenever the archive was
+  // absent and the CMS detail blank — the normal state of a fresh deploy.
+  // Parsed here rather than imported from lib/github: that module reaches for
+  // prisma, and a value import would drag the server into this client bundle.
+  const ghHandle =
+    github?.handle ??
+    githubLink?.detail?.replace('@', '') ??
+    githubLink?.href.match(/github\.com\/([^/?#]+)/i)?.[1] ??
+    'github';
   // "as of", never "past year": the numbers come from an archive, and the
   // capture date is the only thing keeping a months-old snapshot from reading as
   // a claim about this week.
