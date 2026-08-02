@@ -2050,6 +2050,11 @@ body.cat-on .cw .dot { display: none; }
   .title-gradient,
   .dark .title-gradient { animation: none; }
 
+  /* The background beam sweep. Hidden here rather than only in the component,
+     because that gate runs in a passive effect after the hydration paint —
+     CSS applies before first paint, so there is no flash to remove. */
+  .bg-beams { display: none; }
+
   /* ── section additions (spec §5) ─────────────────────────────────────── */
 
   /* Hash jumps land instantly instead of gliding. */

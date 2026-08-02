@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { m as motion, useReducedMotion } from 'motion/react';
 
 const paths = [
@@ -59,7 +59,17 @@ const paths = [
 const allPathsD = paths.join('');
 
 export default React.memo(function BackgroundLines() {
+  // `useReducedMotion()` is NOT SSR-safe: motion-dom initialises its state
+  // lazily, so the server sees `null` and the client's very FIRST render
+  // already sees `true`. Branching rendered output straight off it meant the
+  // server emitted all 50 beams and a reduced-motion visitor's first client
+  // pass emitted none — a mismatch that made React throw away the server markup
+  // for this subtree. Gating on `mounted` keeps render one and the server
+  // identical; the beams are then dropped on the pass after hydration.
   const reduce = useReducedMotion();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const still = mounted && reduce;
 
   // Precompute each beam's random timing/target ONCE, so render stays pure
   // (no Math.random() during render -> deterministic, no hydration surprises).
@@ -89,22 +99,30 @@ export default React.memo(function BackgroundLines() {
           strokeOpacity="0.05"
           strokeWidth="0.5"
         />
-        {/* Animated beam sweep — skipped entirely under prefers-reduced-motion,
-            leaving only the faint static lines above. The beam paths never
-            animate themselves (only their gradients do), so they are plain
-            <path> elements rather than 50 motion component instances. */}
-        {!reduce &&
-          paths.map((path, index) => (
-            <path
-              key={`beam-${index}`}
-              d={path}
-              stroke={`url(#bg-beam-gradient-${index})`}
-              strokeOpacity="0.4"
-              strokeWidth="0.5"
-            />
-          ))}
+        {/* The beams are hidden by CSS under prefers-reduced-motion, not by the
+            `still` gate alone: `useEffect` is passive and runs AFTER the
+            hydration paint, so gating on it would start all 50 gradients
+            sweeping and then pop them out — a flash shown to precisely the
+            people who asked for no motion. CSS applies before first paint and
+            cannot mismatch. `still` then unmounts them a tick later, which is
+            invisible (they are already hidden) but stops the animation cost.
+            The paths never animate themselves, only their gradients, so these
+            are plain <path>s rather than 50 motion instances. */}
+        {!still && (
+          <g className="bg-beams">
+            {paths.map((path, index) => (
+              <path
+                key={`beam-${index}`}
+                d={path}
+                stroke={`url(#bg-beam-gradient-${index})`}
+                strokeOpacity="0.4"
+                strokeWidth="0.5"
+              />
+            ))}
+          </g>
+        )}
         <defs>
-          {!reduce &&
+          {!still &&
             beams.map((beam, index) => (
               <motion.linearGradient
                 id={`bg-beam-gradient-${index}`}
