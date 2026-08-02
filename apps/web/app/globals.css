@@ -2110,6 +2110,11 @@ body.cat-on .cw .dot { display: none; }
     transition: none !important;
   }
 
+  /* The "more builds" fold still opens — it carries content, not decoration —
+     it just arrives instead of travelling. */
+  .pj-fold,
+  .pj-more svg { transition: none; }
+
   /* Contact and thought both arrive already there. Every entrance in the two
      sections is `backwards`-filled off a keyframe rather than parked at
      `opacity: 0`, so dropping the animation leaves the natural state and no

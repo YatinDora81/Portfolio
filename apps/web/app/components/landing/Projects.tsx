@@ -31,6 +31,7 @@ function parseBullet(content: string) {
 }
 
 const FEATURED = 3;
+const FOLD_ID = 'pj-more-builds';
 
 function ArrowUpRight() {
   return (
@@ -166,24 +167,47 @@ export default function Projects({ projects }: { projects: ProjectData[] }) {
             />
           ))}
 
-          {expanded && rest.length > 0 && (
-            <>
-              <div className="pj-div mono">more builds</div>
-              {rest.map((project, i) => (
-                <ProjectRow
-                  key={project.title}
-                  project={project}
-                  isOpen={open.has(FEATURED + i)}
-                  onToggle={() => toggle(FEATURED + i)}
-                />
-              ))}
-            </>
+          {/* The overflow projects used to mount only once `expanded` flipped, so
+              half the portfolio never reached the served HTML — it existed only
+              inside the flight payload, invisible to crawlers, to a reader with
+              JS off and to find-in-page. They ship in the markup unconditionally
+              now and the fold hides them with CSS instead. `inert` is what makes
+              the collapsed state honest: a zero-height fold still holds real
+              links that Tab would land on with nothing visible under the focus
+              ring, and aria-expanded would be claiming otherwise. */}
+          {rest.length > 0 && (
+            <div
+              className={`pj-fold${expanded ? ' open' : ''}`}
+              id={FOLD_ID}
+              inert={!expanded}
+            >
+              <div>
+                <div className="pj-div mono">more builds</div>
+                {rest.map((project, i) => (
+                  <ProjectRow
+                    key={project.title}
+                    project={project}
+                    isOpen={open.has(FEATURED + i)}
+                    onToggle={() => toggle(FEATURED + i)}
+                  />
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
-        {!expanded && rest.length > 0 && (
-          <button className="show-more" onClick={() => setExpanded(true)}>
-            Show More Projects
+        {/* the button stays mounted and toggles both ways — unmounting it on
+            expand dropped keyboard focus onto the body, and a control that
+            vanishes can never report the state it controls */}
+        {rest.length > 0 && (
+          <button
+            type="button"
+            className={`show-more pj-more${expanded ? ' open' : ''}`}
+            aria-expanded={expanded}
+            aria-controls={FOLD_ID}
+            onClick={() => setExpanded((prev) => !prev)}
+          >
+            {expanded ? 'Show Fewer Projects' : 'Show More Projects'}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points="6 9 12 15 18 9" />
             </svg>
