@@ -133,6 +133,12 @@ function GhLine({ github, line }: { github: GithubActivity; line: Line }) {
   // line it is supposedly the high point of.
   const hasPeak = maxV > 0 && peakD !== lastD;
 
+  // Half the peak label, in its own em: the mono advances .6em a glyph and
+  // `letter-spacing: .14em` trails every one of them, so the label is .74em a
+  // character. Derived rather than measured — a layout read would cost the one
+  // thing this component promises, which is never touching the DOM to draw.
+  const pkHalf = `${(`peak ${maxV}`.length * 0.37).toFixed(2)}em`;
+
   // All UTC: `new Date('2025-08-02')` read back with local getters is yesterday
   // for everyone west of Greenwich.
   const weekLabel = useMemo(() => {
@@ -228,9 +234,14 @@ function GhLine({ github, line }: { github: GithubActivity; line: Line }) {
                 className="ghln-pk"
                 aria-hidden="true"
                 style={{
-                  // Held off both edges: the label is centred on its point and
-                  // would otherwise hang outside the panel at either end.
-                  left: `${Math.min(92, Math.max(6, (xOf(peakD, n) / VW) * 100))}%`,
+                  // Held off both edges by its own half-width, not by two round
+                  // percentages: the label is centred on its point, so how far
+                  // in it has to stop depends on how wide it is. A flat 6%/92%
+                  // was fine at 716px and wrong on a phone — "peak 128" lost its
+                  // first glyph to the panel edge under a ~390px viewport, and
+                  // the right stop landed it on the green live dot. The 14px
+                  // there is that dot plus the ring it pings.
+                  left: `clamp(calc(${pkHalf} + 2px), ${((xOf(peakD, n) / VW) * 100).toFixed(3)}%, calc(100% - ${pkHalf} - 14px))`,
                   top: `${((yOf(maxV, maxV) - 6) / VH) * 100}%`,
                 }}
               >
