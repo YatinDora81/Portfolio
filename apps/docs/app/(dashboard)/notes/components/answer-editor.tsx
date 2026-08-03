@@ -136,7 +136,13 @@ export default function AnswerEditor({ nodeId, href, title, body, tags }: Answer
           spellCheck
           onChange={(e) => setDraftBody(e.target.value)}
         />
-        <div className="nt-hint">⌘S saves · Esc discards · ``` fences render as code</div>
+        {/* The containers are worth naming here: nothing else in the editor
+            hints that a body can be more than prose, and a syntax nobody knows
+            about is a syntax nobody uses. */}
+        <div className="nt-hint">
+          ⌘S saves · Esc discards · ``` fences render as code · <code>::: quiz</code> ·{" "}
+          <code>::: details</code> · <code>::: note</code> / <code>tip</code> / <code>warn</code>
+        </div>
       </div>
 
       <div className="nt-field">

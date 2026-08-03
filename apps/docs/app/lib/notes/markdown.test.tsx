@@ -110,6 +110,106 @@ describe("renderMarkdown · links", () => {
   });
 });
 
+describe("renderMarkdown · containers", () => {
+  const QUIZ = ["::: quiz Which is O(log n)?", "- Linear search", "+ Binary search", "= It halves the range.", ":::"].join("\n");
+
+  test("a quiz asks, offers radios, and hides the answer behind a details", () => {
+    const out = html(QUIZ);
+    expect(out).toContain("Which is O(log n)?");
+    expect(out).toContain('type="radio"');
+    // The right choice is marked in the class, so the stylesheet can say so on
+    // :checked — nothing in the reading order gives it away first.
+    expect(out).toContain('class="nt-q-o ok"');
+    expect(out).toContain("<summary>Show answer</summary>");
+    expect(out).toContain("It halves the range.");
+    expect(out).not.toContain("<script");
+  });
+
+  test("the reveal names the correct choice rather than leaving it to a ✓ nobody can hear", () => {
+    expect(html(QUIZ)).toContain("<strong>Binary search</strong>");
+  });
+
+  test("two correct choices make it a checkbox, because radios cannot express that", () => {
+    const many = ["::: quiz Pick both", "+ one", "+ two", "- three", ":::"].join("\n");
+    expect(html(many)).toContain('type="checkbox"');
+    expect(html(many)).not.toContain('type="radio"');
+  });
+
+  test("every quiz gets its own radio group", () => {
+    const two = `${QUIZ}\n\n::: quiz Something else?\n+ yes\n- no\n:::`;
+    const names = [...html(two).matchAll(/name="(q[a-z0-9]+)"/g)].map((m) => m[1]);
+    expect(new Set(names).size).toBe(2);
+  });
+
+  test("a details is the browser's own accordion, and its body is still markdown", () => {
+    const out = html("::: details Why\nSome **bold** text.\n\n- a list\n:::");
+    expect(out).toContain("<summary>Why</summary>");
+    expect(out).toContain("<strong>bold</strong>");
+    expect(out).toContain("<ul><li>a list</li></ul>");
+  });
+
+  test("containers nest, and the outer one does not close on the inner one's :::", () => {
+    const out = html("::: details Outer\n::: note Inner\ninside\n:::\nafter\n:::");
+    expect(out).toContain("<summary>Outer</summary>");
+    expect(out).toContain("Inner");
+    expect(out).toContain("inside");
+    expect(out).toContain("after");
+  });
+
+  test("three colons inside a fence are code, not a closing marker", () => {
+    const out = html("::: note\n```\n:::\n```\nstill inside\n:::");
+    expect(out).toContain("<code>:::</code>");
+    expect(out).toContain("still inside");
+  });
+
+  test("the three callouts each get their own class, and a default title", () => {
+    expect(html("::: note\nx\n:::")).toContain('class="nt-call note"');
+    expect(html("::: tip\nx\n:::")).toContain("Tip");
+    expect(html("::: warn\nx\n:::")).toContain("Careful");
+    expect(html("::: warn Mind this\nx\n:::")).toContain("Mind this");
+  });
+
+  test("an unknown container word is prose, not a container that ate the rest", () => {
+    const out = html("::: sparkle\nstill here\n:::");
+    expect(out).toContain("::: sparkle");
+    expect(out).toContain("still here");
+    expect(out).not.toContain("nt-call");
+  });
+
+  test("a container nobody closed runs to the end rather than losing the text", () => {
+    expect(html("::: note\nleft open")).toContain("left open");
+  });
+
+  test("a stray closing marker is text, and does not hang the renderer", () => {
+    // It reached `blocks` with nothing to close, and a line that ends a
+    // paragraph without being consumed by anything is an infinite loop.
+    expect(html(":::")).toBe("<p>:::</p>");
+    expect(html("text\n:::\nmore")).toContain("more");
+  });
+
+  test("a loose line before the choices is more question, after them more reason", () => {
+    const out = html("::: quiz\nWhat prints?\n+ 1\n- 2\nbecause of the closure\n:::");
+    expect(out).toContain("What prints?");
+    expect(out).toContain("because of the closure");
+  });
+
+  test("containers render without a key warning", () => {
+    const errors: unknown[][] = [];
+    const real = console.error;
+    console.error = (...args: unknown[]) => void errors.push(args);
+    try {
+      html(`${QUIZ}\n\n::: details D\ntext\n:::\n\n::: tip T\ntext\n:::`);
+    } finally {
+      console.error = real;
+    }
+    expect(errors).toEqual([]);
+  });
+
+  test("a quiz is deterministic, so the server's markup and the client's agree", () => {
+    expect(html(QUIZ)).toBe(html(QUIZ));
+  });
+});
+
 describe("renderMarkdown · safety and hygiene", () => {
   test("markup in a body is text, not markup", () => {
     expect(html("<script>alert(1)</script>")).toBe("<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>");

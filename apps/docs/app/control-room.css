@@ -1780,6 +1780,75 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   overflow-x: auto
 }
 .nt-answer pre code { background: none; padding: 0; font-size: inherit }
+/* ---------- notes · answer blocks ----------
+   The three `:::` containers renderMarkdown emits. No JavaScript reaches any of
+   them: `details` is the browser's accordion, and the quiz's right/wrong marks
+   are `:checked` selectors — which is what lets the reader stay a server
+   component and the revise deck render the identical markup on the client. */
+.nt-q { margin: 16px 0; padding: 14px 16px; background: var(--bg1); border: 1px solid var(--line2); border-radius: var(--r2) }
+.nt-q-ask { font-weight: 500; margin-bottom: 11px }
+.nt-q-opts { display: flex; flex-direction: column; gap: 7px }
+.nt-q-o {
+  display: flex; align-items: flex-start; gap: 9px; padding: 7px 10px; border-radius: var(--r1);
+  border: 1px solid var(--line2); background: var(--card); cursor: pointer; transition: border-color .13s, background .13s
+}
+.nt-q-o:hover { border-color: var(--line) }
+/* Off-screen rather than `display: none`: the input still has to take focus and
+   answer the space bar, which is the whole keyboard story for this control. */
+.nt-q-o input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0 }
+.nt-q-o:has(input:focus-visible) { outline: 2px solid var(--c1); outline-offset: 2px }
+.nt-q-box {
+  flex: none; width: 15px; height: 15px; margin-top: 2px; border: 1px solid var(--line);
+  border-radius: 99px; transition: border-color .13s, background .13s
+}
+.nt-q-o input[type="checkbox"] ~ .nt-q-box { border-radius: 5px }
+.nt-q-t { flex: 1; min-width: 0 }
+/* The verdict. Marking wrong on every checked option and then overriding it for
+   the correct ones keeps the answer out of the markup's reading order — it is a
+   pair of selectors, not a label anyone can see before they choose. */
+.nt-q-o input:checked ~ .nt-q-box { border-color: var(--bad); background: var(--bad-soft) }
+.nt-q-o input:checked ~ .nt-q-t::after { content: ' ✕'; color: var(--bad); font-weight: 600 }
+.nt-q-o.ok input:checked ~ .nt-q-box { border-color: var(--good); background: var(--good-soft) }
+.nt-q-o.ok input:checked ~ .nt-q-t::after { content: ' ✓'; color: var(--goodT) }
+.nt-q-o:has(input:checked) { border-color: var(--bad) }
+.nt-q-o.ok:has(input:checked) { border-color: var(--good) }
+.nt-q-why { margin-top: 12px }
+.nt-q-why > summary { font-size: 12.5px; color: var(--accT); cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px }
+.nt-q-why > summary::-webkit-details-marker { display: none }
+.nt-q-why > summary::before {
+  content: ''; flex: none; width: 0; height: 0; transition: transform .15s;
+  border-left: 5px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent
+}
+.nt-q-why[open] > summary::before { transform: rotate(90deg) }
+.nt-q-why > summary:hover { text-decoration: underline }
+.nt-q-ans { margin-top: 9px }
+.nt-q-why p { margin-top: 8px; font-size: 13.5px; line-height: 1.7; color: var(--dim) }
+
+.nt-acc { margin: 14px 0; border: 1px solid var(--line2); border-radius: var(--r2); background: var(--card) }
+.nt-acc > summary {
+  padding: 10px 14px; font-size: 13.5px; font-weight: 500; cursor: pointer; list-style: none;
+  display: flex; align-items: center; gap: 8px
+}
+.nt-acc > summary::-webkit-details-marker { display: none }
+.nt-acc > summary::before {
+  content: ''; flex: none; width: 0; height: 0; color: var(--faint); transition: transform .15s;
+  border-left: 5px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent
+}
+.nt-acc[open] > summary::before { transform: rotate(90deg) }
+.nt-acc[open] > summary { border-bottom: 1px solid var(--line2) }
+.nt-acc-b { padding: 13px 14px }
+.nt-acc-b > *:last-child { margin-bottom: 0 }
+
+.nt-call { margin: 14px 0; padding: 11px 14px; border-radius: var(--r2); border-left: 3px solid var(--line); background: var(--bg1) }
+.nt-call-t { font-weight: 600; font-size: 12.5px; letter-spacing: .01em; margin-bottom: 6px }
+.nt-call > *:last-child { margin-bottom: 0 }
+.nt-call.note { border-left-color: var(--c1); background: var(--accS) }
+.nt-call.note .nt-call-t { color: var(--accT) }
+.nt-call.tip { border-left-color: var(--good); background: var(--good-soft) }
+.nt-call.tip .nt-call-t { color: var(--goodT) }
+.nt-call.warn { border-left-color: var(--amber); background: var(--amber-soft) }
+.nt-call.warn .nt-call-t { color: var(--ambT) }
+
 .nt-sibs { margin-top: 22px; padding-top: 15px; border-top: 1px solid var(--line2) }
 .nt-sibs-lb { margin-bottom: 9px; font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint) }
 .nt-sibs-row { display: flex; flex-wrap: wrap; gap: 7px }
