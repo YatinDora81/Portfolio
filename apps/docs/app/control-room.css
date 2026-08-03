@@ -1998,18 +1998,26 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 
 .sb.rail { width: 58px; min-width: 58px; overflow: hidden }
 /* Peeking lifts the full sidebar over the page rather than pushing it aside, so
-   the tree underneath keeps its scroll position and its measured column width. */
-.sb.rail:hover, .sb.rail:focus-within { overflow: visible; z-index: 70 }
-.sb.rail:hover .sb-inner, .sb.rail:focus-within .sb-inner { box-shadow: var(--shadow) }
+   the tree underneath keeps its scroll position and its measured column width.
+
+   The keyboard half is `:has(:focus-visible)` and not `:focus-within`, because a
+   mouse click leaves the row it clicked focused: the very click that navigates to
+   /notes rails the sidebar and then holds it peeked open by its own link, and no
+   amount of moving the pointer away closes it again. `:focus-visible` is exactly
+   the distinction wanted — tabbing in still opens the nav, clicking through it
+   does not. Wrapped in `:is()` so the list stays forgiving: where `:has()` is
+   unsupported this falls back to hover-peek instead of dropping the rule whole. */
+.sb.rail:is(:hover, :has(:focus-visible)) { overflow: visible; z-index: 70 }
+.sb.rail:is(:hover, :has(:focus-visible)) .sb-inner { box-shadow: var(--shadow) }
 
 /* Everything past the 58px gutter fades rather than moves. */
 .sb.rail .nav-txt, .sb.rail .nav-badge, .sb.rail .nav-label span,
 .sb.rail .sb-brand > div:last-child, .sb.rail .sb-foot { opacity: 0; transition: opacity .16s .02s }
-.sb.rail:hover .nav-txt, .sb.rail:hover .nav-badge, .sb.rail:hover .nav-label span,
-.sb.rail:hover .sb-brand > div:last-child, .sb.rail:hover .sb-foot,
-.sb.rail:focus-within .nav-txt, .sb.rail:focus-within .nav-badge,
-.sb.rail:focus-within .nav-label span, .sb.rail:focus-within .sb-brand > div:last-child,
-.sb.rail:focus-within .sb-foot { opacity: 1 }
+.sb.rail:is(:hover, :has(:focus-visible)) .nav-txt,
+.sb.rail:is(:hover, :has(:focus-visible)) .nav-badge,
+.sb.rail:is(:hover, :has(:focus-visible)) .nav-label span,
+.sb.rail:is(:hover, :has(:focus-visible)) .sb-brand > div:last-child,
+.sb.rail:is(:hover, :has(:focus-visible)) .sb-foot { opacity: 1 }
 
 /* The ordinal rail is wayfinding for the full nav. In a 58px gutter you navigate
    by glyph, and the numbers only shove the icons off centre, so they go — along
@@ -2027,8 +2035,7 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   border-radius: 99px; background: var(--pri); box-shadow: 0 0 0 2px var(--sb-rail);
   transition: opacity .16s
 }
-.sb.rail:hover .nav-item.has-badge .nav-ic::after,
-.sb.rail:focus-within .nav-item.has-badge .nav-ic::after { opacity: 0 }
+.sb.rail:is(:hover, :has(:focus-visible)) .nav-item.has-badge .nav-ic::after { opacity: 0 }
 
 .rail-btn { flex: none }
 
