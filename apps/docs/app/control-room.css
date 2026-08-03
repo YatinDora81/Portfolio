@@ -1967,3 +1967,16 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   .nt *, .nt-menu, .nt-menu *, .nt-live { transition: none !important }
 }
 
+/* ---------- the palette's notes footer ----------
+   The palette gained a second kind of row — vault questions, matched by Postgres
+   rather than by the in-memory nav list — so it needs a line that says what the
+   extra keystroke does and how much of the result set is on screen. */
+.pal-foot {
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-top: 1px solid var(--line2);
+  font-family: var(--mono); font-size: 10px; color: var(--faint)
+}
+.pal-foot span { display: flex; align-items: center; gap: 5px }
+/* The snippet under a note row wraps to two lines at most and never pushes the
+   row taller than the nav rows beside it. */
+.pal-it .pal-w { display: block; margin-left: 0; margin-top: 3px; font-family: var(--ui); font-size: 11.5px;
+  letter-spacing: 0; line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
