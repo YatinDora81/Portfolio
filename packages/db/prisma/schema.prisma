@@ -342,6 +342,70 @@ model AuditChange {
   @@index([entity, rowId])
 }
 
+/// Private admin notes. Never published, never staged — this tree does not
+/// appear on the public site and is deliberately absent from staging.ts's
+/// `Entity` union. Nothing in apps/web reads it.
+model NoteNode {
+  id       String     @id @default(uuid())
+  parentId String?
+  parent   NoteNode?  @relation("NoteTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children NoteNode[] @relation("NoteTree")
+
+  kind  NoteKind
+  title String
+  slug  String
+
+  /// Materialised ancestry: "/dsa/graphs/dijkstra". Denormalised from parentId
+  /// and rewritten on rename/move. `parentId` stays the source of truth for
+  /// structure; this is an index over it, so cycle checks and subtree scopes
+  /// are string comparisons rather than recursive queries.
+  ///
+  /// Unique — which is ALSO what stops two root folders sharing a name.
+  /// @@unique([parentId, slug]) cannot do that, because Postgres treats NULL
+  /// parentIds as distinct and every root row has one.
+  path  String @unique
+  depth Int    @default(0)
+
+  sortOrder Int @default(0)
+
+  /// Soft delete. A trashed folder takes its subtree with it; `trashRoot` marks
+  /// the node that was explicitly trashed so restore knows where to start, and
+  /// so Trash lists the gesture rather than every row it swept up.
+  deletedAt DateTime?
+  trashRoot Boolean   @default(false)
+
+  answer NoteAnswer?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId, sortOrder])
+  @@index([deletedAt])
+}
+
+/// Split from NoteNode so "load the whole tree" stays a narrow query — the
+/// sidebar renders hundreds of rows and never reads an answer body.
+model NoteAnswer {
+  nodeId String   @id
+  node   NoteNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  body String   @default("")
+  tags String[] @default([])
+
+  /// 0 unrated · 1 again · 2 shaky · 3 good · 4 solid. Drives the revise queue.
+  confidence    Int       @default(0)
+  lastRevisedAt DateTime?
+
+  updatedAt DateTime @updatedAt
+
+  @@index([confidence])
+}
+
+enum NoteKind {
+  FOLDER
+  QUESTION
+}
+
 enum ScoreType {
   CGPA
   PERCENTAGE
