@@ -1753,7 +1753,11 @@ body.cat-on .cw .dot { display: none; }
   transform: translateY(-4px);
   transition: opacity .3s ease, transform .3s ease;
 }
-#contact .ghln-body { position: relative; padding: 14px 2px 16px; border-bottom: 1px solid var(--border); }
+/* 22px of headroom, not 14: the scrub readout moved off the plot onto its own
+   rail above it, and that rail has to clear both the row's keyline and the peak
+   label under it — 5px above, 3px below. `.ghln-in` clips at this element's
+   border box, so anything the padding doesn't pay for is simply cut. */
+#contact .ghln-body { position: relative; padding: 22px 2px 16px; border-bottom: 1px solid var(--border); }
 #contact .fqx:hover .ghln,
 #contact .fqx:has(.fq:focus-visible) .ghln {
   grid-template-rows: 1fr;
@@ -1784,6 +1788,10 @@ body.cat-on .cw .dot { display: none; }
   pointer-events: none;
   font-family: var(--font-mono);
   font-size: 8.5px;
+  /* Stated, not inherited: this box's height is what holds it off the readout's
+     rail, and preflight's 1.5 would make that distance a function of whichever
+     mono actually loaded. */
+  line-height: 12px;
   letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--lab-dim);
@@ -1835,16 +1843,28 @@ body.cat-on .cw .dot { display: none; }
 #contact .ghln-stage:hover .curdot,
 #contact .ghln-stage:active .cur,
 #contact .ghln-stage:active .curdot { opacity: 1; }
+/* Two labels, two rails. Both used to sit in the same 12px band — `peak 42`
+   centred on its point, this one right-anchored and up to 220px long — so past
+   about a third of the year their baselines landed ~1px apart and the peak's
+   number read as noise inside the readout's. Nothing is ever drawn above y=16,
+   so the readout takes the empty rail above the plot and the peak keeps the one
+   over its own dot. Both state a 12px line box rather than inheriting 1.5, so
+   the two rails stay a fixed distance apart whatever font actually loads. */
 #contact .ghln-ro {
   position: absolute;
-  top: -2px;
+  top: -17px;
   right: 2px;
   pointer-events: none;
   font-family: var(--font-mono);
   font-size: 9px;
+  line-height: 12px;
   letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--foreground);
+  /* It only fits on one rail if it stays on one line: the longest string runs
+     220px against a 284px stage at the narrowest, and a wrap would drop the
+     second line straight back onto the peak. */
+  white-space: nowrap;
   opacity: 0;
   transition: opacity .15s;
   font-variant-numeric: tabular-nums;
