@@ -14,6 +14,7 @@ import {
 import { duplicateNode, saveAnswer, trashNode } from "@/lib/actions/notes";
 import { hrefFor, type NoteKind } from "@/lib/notes/view-types";
 import { ExportMenu } from "./export-menu";
+import { ImportButton } from "./import-dialog";
 
 /**
  * Scroll the tree to the note the reader is showing.
@@ -211,6 +212,10 @@ export function NoteActions({
               from the reader and flat markdown unreachable from a folder even
               though /notes/export answers both. */}
           <ExportMenu nodeId={id} kind={kind} title={title} />
+          {/* The inverse of Export, and only where a graft has somewhere to
+              land: a question holds no children, so importing "into" one is not
+              a thing that could mean anything. */}
+          {folder ? <ImportButton parentId={id} parentTitle={title} /> : null}
           <button className="btn danger" type="button" disabled={pending} onClick={confirmTrash}>
             <IconTrash size={13} stroke={1.7} /> Trash
           </button>

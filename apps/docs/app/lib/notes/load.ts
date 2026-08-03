@@ -24,7 +24,7 @@ const TREE_SELECT = {
   sortOrder: true,
 } as const;
 
-export async function loadTree(): Promise<{ tree: TreeItem[]; trashCount: number }> {
+export async function loadTree(): Promise<{ tree: TreeItem[]; trashCount: number; vaultEmpty: boolean }> {
   const [rows, roots] = await Promise.all([
     prisma.noteNode.findMany({
       where: { deletedAt: null },
@@ -41,7 +41,14 @@ export async function loadTree(): Promise<{ tree: TreeItem[]; trashCount: number
   ]);
   const trashCount = roots.filter(isOutermostTrashRoot).length;
 
-  return { tree: withCounts(buildTree(rows as TreeRow[])), trashCount };
+  // Read off the two queries already in flight rather than counting again, and
+  // exact rather than approximate: trashing always marks the row it was called
+  // on, so a vault with no live rows and no trashRoot rows has no rows at all.
+  // It gates `restore`, which is the one mode that refuses a vault holding
+  // anything — trashed rows included.
+  const vaultEmpty = rows.length === 0 && roots.length === 0;
+
+  return { tree: withCounts(buildTree(rows as TreeRow[])), trashCount, vaultEmpty };
 }
 
 /** Question totals are folded in during the same walk that builds the tree, so

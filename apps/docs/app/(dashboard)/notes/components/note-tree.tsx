@@ -20,6 +20,7 @@ import {
   IconHelpCircle,
   IconSearch,
   IconTrash,
+  IconX,
 } from "@tabler/icons-react";
 import {
   createNode, duplicateNode, moveNode, nudgeNode, renameNode, restoreNode, trashNode,
@@ -31,6 +32,7 @@ import {
 } from "@/lib/notes/query";
 import { hrefFor, NOTES_ROOT, type NoteKind, type TreeItem } from "@/lib/notes/view-types";
 import { cn } from "@/lib/utils";
+import { ImportButton } from "./import-dialog";
 import { TreeMenu, type MenuTarget } from "./tree-menu";
 
 /**
@@ -100,7 +102,17 @@ function revealSet(tree: TreeItem[], path: string): Set<string> {
 const countBelow = (n: TreeItem): number =>
   n.children.reduce((a, c) => a + 1 + countBelow(c), 0);
 
-export function NoteTree({ tree, trashCount }: { tree: TreeItem[]; trashCount: number }) {
+export function NoteTree({
+  tree,
+  trashCount,
+  vaultEmpty = false,
+}: {
+  tree: TreeItem[];
+  trashCount: number;
+  /** Gates the `restore` mode in the import dialog, which only an entirely
+   *  empty vault — trashed rows included — can accept. */
+  vaultEmpty?: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [pending, startTransition] = useTransition();
@@ -747,6 +759,12 @@ export function NoteTree({ tree, trashCount }: { tree: TreeItem[]; trashCount: n
       if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      // A modal owns the keyboard while it is up. Without this, "/" pressed in
+      // the import dialog — before the caret has been put in the textarea —
+      // moves focus to a filter box behind the veil, where the typing that
+      // follows is invisible and Escape closes the dialog and the paste with it.
+      // Same guard as the command palette (shell.tsx) and the revise deck.
+      if (t?.closest(".modal") || document.querySelector(".veil")) return;
       e.preventDefault();
       filterRef.current?.focus();
       filterRef.current?.select();
@@ -954,10 +972,13 @@ export function NoteTree({ tree, trashCount }: { tree: TreeItem[]; trashCount: n
         >
           <IconFolderPlus size={15} />
         </button>
+        {/* Beside the two create buttons because it is the third way a note
+            gets into the vault, and the only one that can make more than one. */}
+        <ImportButton parentId={null} canRestore={vaultEmpty} variant="icon" />
         <button
           type="button"
           className="nt-iconbtn"
-          title="Collapse all"
+          title="Collapse every open folder"
           aria-label="Collapse all folders"
           onClick={() => setExpanded(new Set())}
         >
@@ -965,16 +986,27 @@ export function NoteTree({ tree, trashCount }: { tree: TreeItem[]; trashCount: n
         </button>
       </div>
 
-      <div className="nt-filter">
+      {/* The whole box is the target, not just the 190px of input inside it —
+          clicking the icon or the padding used to land on nothing. */}
+      <div
+        className={cn("nt-filter", filter && "on")}
+        onMouseDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          e.preventDefault();
+          filterRef.current?.focus();
+        }}
+      >
         <IconSearch size={12} aria-hidden="true" />
         <input
           ref={filterRef}
           type="search"
           value={filter}
-          placeholder="Filter · in:dsa"
+          placeholder="Filter · tag:graphs"
           aria-label="Filter notes"
           aria-describedby="nt-filter-count"
           autoComplete="off"
+          spellCheck={false}
+          enterKeyHint="search"
           onChange={(e) => setFilter(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -990,7 +1022,24 @@ export function NoteTree({ tree, trashCount }: { tree: TreeItem[]; trashCount: n
             }
           }}
         />
-        <span className="kbd" aria-hidden="true">/</span>
+        {/* The `/` hint has done its job once there is something in the box;
+            what you want then is the way out, and Escape is not discoverable. */}
+        {filter ? (
+          <button
+            type="button"
+            className="nt-filter-x"
+            title="Clear the filter · Esc"
+            aria-label="Clear the filter"
+            onClick={() => {
+              setFilter("");
+              filterRef.current?.focus();
+            }}
+          >
+            <IconX size={13} stroke={2} />
+          </button>
+        ) : (
+          <span className="kbd" aria-hidden="true">/</span>
+        )}
       </div>
 
       <div className="nt-count" id="nt-filter-count">

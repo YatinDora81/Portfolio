@@ -11,11 +11,11 @@ import { NoteTree } from "./components/note-tree";
  * persistence code.
  */
 export default async function NotesLayout({ children }: { children: React.ReactNode }) {
-  const { tree, trashCount } = await loadTree();
+  const { tree, trashCount, vaultEmpty } = await loadTree();
 
   return (
     <div className="nt">
-      <NoteTree tree={tree} trashCount={trashCount} />
+      <NoteTree tree={tree} trashCount={trashCount} vaultEmpty={vaultEmpty} />
       <div className="nt-pane">{children}</div>
     </div>
   );

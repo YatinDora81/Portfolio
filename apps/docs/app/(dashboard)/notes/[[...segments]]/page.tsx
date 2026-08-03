@@ -12,7 +12,10 @@ export const dynamic = "force-dynamic";
 
 export default async function NotePage({ params }: { params: Promise<{ segments?: string[] }> }) {
   const { segments } = await params;
-  if (!segments?.length) return <NotesBlank />;
+  // Counted rather than inferred from the tree: `restore` refuses a vault that
+  // holds anything at all, trashed rows included, and the tree only knows about
+  // live ones.
+  if (!segments?.length) return <NotesBlank vaultEmpty={(await prisma.noteNode.count()) === 0} />;
 
   // One indexed lookup on the unique path column. The URL under /notes IS the
   // note's path, so resolving a deep link costs exactly one query no matter how
