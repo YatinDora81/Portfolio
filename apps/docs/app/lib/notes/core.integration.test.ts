@@ -4,13 +4,17 @@ import {
   NoteError,
   createIn,
   duplicateIn,
+  importIn,
   moveIn,
   reorderIn,
   restoreIn,
+  subtreeIds,
   trashIn,
   renameIn,
   type Tx,
 } from "./core";
+import { vaultJson, type ExportRow } from "./export";
+import { parseImport, type VaultNode } from "./import";
 import { TRASH_PREFIX, untomb } from "./paths";
 
 /**
@@ -420,6 +424,363 @@ describe.skipIf(!live)("notes · data integrity", () => {
       expect(await tx.noteNode.count()).toBe(before);
     });
   });
+});
+
+/* ---------------------------------------------------------------- import -- */
+
+/**
+ * The bytes /notes/export would serve for one subtree, parsed back into a value.
+ *
+ * Deliberately routed through `vaultJson` and `parseImport` rather than handing
+ * `importIn` a list built in the test: what these cases are for is the seam
+ * between the two halves, and a fixture that skips the serialiser proves the
+ * importer works on a file nobody will ever have.
+ */
+async function exportOf(tx: Tx, rootId: string): Promise<VaultNode[]> {
+  const ids = await subtreeIds(tx, rootId);
+  const rows = await tx.noteNode.findMany({ where: { id: { in: ids } }, include: { answer: true } });
+  const shaped: ExportRow[] = rows.map((r) => ({
+    id: r.id,
+    parentId: r.parentId,
+    kind: r.kind,
+    title: r.title,
+    slug: r.slug,
+    path: r.path,
+    depth: r.depth,
+    sortOrder: r.sortOrder,
+    answer: r.answer
+      ? {
+          body: r.answer.body,
+          tags: r.answer.tags,
+          confidence: r.answer.confidence,
+          lastRevisedAt: r.answer.lastRevisedAt?.toISOString() ?? null,
+        }
+      : null,
+  }));
+  return parsed(JSON.parse(vaultJson(shaped)));
+}
+
+/** `parseImport`, with its refusal turned into a failed test rather than a
+ *  silently skipped one. */
+function parsed(raw: unknown): VaultNode[] {
+  const r = parseImport(raw);
+  if (!r.ok) throw new Error(`the file was refused: ${r.error}`);
+  return r.nodes;
+}
+
+const kidsOf = (tx: Tx, id: string) =>
+  tx.noteNode.findMany({
+    where: { parentId: id, deletedAt: null },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+  });
+
+describe.skipIf(!live)("notes · import", () => {
+  test("a folder export lands intact inside another folder", async () => {
+    // The case a literal reading of parentId gets wrong: the file's top row
+    // points at a parent that was deliberately left out of the export, and the
+    // graft re-parents it somewhere else entirely.
+    await inRollback(async (tx) => {
+      const home = await createIn(tx, null, "FOLDER", "acc imp home");
+      const src = await createIn(tx, home.id, "FOLDER", "src");
+      const graphs = await createIn(tx, src.id, "FOLDER", "graphs");
+      const q = await createIn(tx, graphs.id, "QUESTION", "bridges");
+      await tx.noteAnswer.update({
+        where: { nodeId: q.id },
+        data: { body: "a bridge is an edge whose removal disconnects", tags: ["graphs"], confidence: 3 },
+      });
+      const dest = await createIn(tx, null, "FOLDER", "acc imp dest");
+
+      const file = await exportOf(tx, src.id);
+      const r = await importIn(tx, dest.id, file, "into");
+
+      expect(r.created).toBe(3);
+      expect(r.rootIds).toHaveLength(1);
+
+      const landed = await rowOf(tx, r.rootIds[0]!);
+      expect(landed.path).toBe("/acc-imp-dest/src");
+      expect(landed.depth).toBe(1);
+      expect(landed.parentId).toBe(dest.id);
+
+      const inner = await tx.noteNode.findMany({
+        where: { path: { startsWith: "/acc-imp-dest/" } },
+        orderBy: { path: "asc" },
+        include: { answer: true },
+      });
+      expect(inner.map((n) => n.path)).toEqual([
+        "/acc-imp-dest/src",
+        "/acc-imp-dest/src/graphs",
+        "/acc-imp-dest/src/graphs/bridges",
+      ]);
+      expect(inner.map((n) => n.depth)).toEqual([1, 2, 3]);
+
+      // A question keeps its answer; a folder never gains one.
+      const copy = inner.find((n) => n.kind === "QUESTION")!;
+      expect(copy.answer?.body).toBe("a bridge is an edge whose removal disconnects");
+      expect(copy.answer?.tags).toEqual(["graphs"]);
+      expect(copy.answer?.confidence).toBe(3);
+      expect(inner.filter((n) => n.kind === "FOLDER").every((n) => n.answer === null)).toBe(true);
+
+      // and the original is untouched
+      expect(await pathOf(tx, src.id)).toBe("/acc-imp-home/src");
+    });
+  });
+
+  test("importing an export back where it came from lands beside it, never on it", async () => {
+    await inRollback(async (tx) => {
+      const home = await createIn(tx, null, "FOLDER", "acc imp home");
+      const dsa = await createIn(tx, home.id, "FOLDER", "dsa");
+      await createIn(tx, dsa.id, "QUESTION", "inner");
+
+      const file = await exportOf(tx, dsa.id);
+      const r = await importIn(tx, home.id, file, "into");
+
+      expect(await pathOf(tx, r.rootIds[0]!)).toBe("/acc-imp-home/dsa-2");
+      expect((await kidsOf(tx, r.rootIds[0]!)).map((k) => k.path)).toEqual(["/acc-imp-home/dsa-2/inner"]);
+      // the original kept its name and its child
+      expect(await pathOf(tx, dsa.id)).toBe("/acc-imp-home/dsa");
+      expect(await tx.noteNode.count({ where: { parentId: home.id, deletedAt: null } })).toBe(2);
+    });
+  });
+
+  test("ids are reissued, so an import can never overwrite what it was copied from", async () => {
+    await inRollback(async (tx) => {
+      const home = await createIn(tx, null, "FOLDER", "acc imp home");
+      const one = await createIn(tx, home.id, "QUESTION", "only");
+      const file = await exportOf(tx, one.id);
+
+      const r = await importIn(tx, home.id, file, "into");
+      expect(r.rootIds[0]).not.toBe(one.id);
+      expect(await tx.noteNode.count({ where: { id: one.id } })).toBe(1);
+    });
+  });
+
+  test("a nested outline four levels deep arrives with its parentId chain intact", async () => {
+    await inRollback(async (tx) => {
+      const dest = await createIn(tx, null, "FOLDER", "acc imp nested");
+      const nodes = parsed([
+        {
+          title: "DSA",
+          children: [
+            {
+              title: "Graphs",
+              children: [
+                { title: "Shortest path", children: ["Dijkstra vs Bellman-Ford", "When is BFS enough?"] },
+              ],
+            },
+            { title: "Dynamic Programming", children: [] },
+          ],
+        },
+      ]);
+
+      await importIn(tx, dest.id, nodes, "into");
+
+      const rows = await tx.noteNode.findMany({
+        where: { path: { startsWith: "/acc-imp-nested/" } },
+        orderBy: { path: "asc" },
+        include: { answer: true },
+      });
+      expect(rows.map((n) => `${n.path} · ${n.depth} · ${n.kind}`)).toEqual([
+        "/acc-imp-nested/dsa · 1 · FOLDER",
+        "/acc-imp-nested/dsa/dynamic-programming · 2 · FOLDER",
+        "/acc-imp-nested/dsa/graphs · 2 · FOLDER",
+        "/acc-imp-nested/dsa/graphs/shortest-path · 3 · FOLDER",
+        "/acc-imp-nested/dsa/graphs/shortest-path/dijkstra-vs-bellman-ford · 4 · QUESTION",
+        "/acc-imp-nested/dsa/graphs/shortest-path/when-is-bfs-enough · 4 · QUESTION",
+      ]);
+
+      // "children": [] is an empty folder, and it is the only way to say so.
+      const dp = rows.find((n) => n.slug === "dynamic-programming")!;
+      expect(dp.kind).toBe("FOLDER");
+      expect(dp.answer).toBeNull();
+
+      // A bare string is a question with an empty body — and it still gets a row.
+      const bfs = rows.find((n) => n.slug === "when-is-bfs-enough")!;
+      expect(bfs.answer?.body).toBe("");
+      expect(bfs.answer?.confidence).toBe(0);
+
+      // every question has an answer, no folder does
+      for (const n of rows) expect(n.answer === null).toBe(n.kind === "FOLDER");
+
+      const parentOf = new Map(rows.map((n) => [n.slug, n.parentId]));
+      expect(parentOf.get("dijkstra-vs-bellman-ford")).toBe(rows.find((n) => n.slug === "shortest-path")!.id);
+    });
+  });
+
+  test("two sibling folders with the same title both arrive, each keeping its own children", async () => {
+    // The collision the in-memory `taken` list exists for. A hand-written
+    // outline repeats names constantly, and without it the second "Graphs"
+    // resolves to the same slug and dies on the path unique index.
+    await inRollback(async (tx) => {
+      const dest = await createIn(tx, null, "FOLDER", "acc imp dupes");
+      await createIn(tx, dest.id, "FOLDER", "graphs");
+
+      await importIn(
+        tx,
+        dest.id,
+        parsed([
+          { title: "Graphs", children: ["What is a bridge?"] },
+          { title: "Graphs", children: ["duplicate on purpose"] },
+        ]),
+        "into",
+      );
+
+      const rows = await tx.noteNode.findMany({
+        where: { path: { startsWith: "/acc-imp-dupes/" } },
+        orderBy: { path: "asc" },
+      });
+      expect(rows.map((n) => n.path)).toEqual([
+        "/acc-imp-dupes/graphs",
+        "/acc-imp-dupes/graphs-2",
+        "/acc-imp-dupes/graphs-2/what-is-a-bridge",
+        "/acc-imp-dupes/graphs-3",
+        "/acc-imp-dupes/graphs-3/duplicate-on-purpose",
+      ]);
+      expect(new Set(rows.map((n) => n.path)).size).toBe(rows.length);
+    });
+  });
+
+  test("a root folder cannot occupy a route the section already owns", async () => {
+    await inRollback(async (tx) => {
+      const r = await importIn(tx, null, parsed([{ title: "Export", children: [] }]), "into");
+      expect(await pathOf(tx, r.rootIds[0]!)).toBe("/export-2");
+    });
+  });
+
+  test("path and depth come from the tree, never from the file", async () => {
+    await inRollback(async (tx) => {
+      const dest = await createIn(tx, null, "FOLDER", "acc imp lies");
+      const nodes = parsed({
+        format: "yatindora.notes.vault",
+        version: 1,
+        count: 2,
+        nodes: [
+          {
+            id: "liar-1",
+            parentId: null,
+            kind: "FOLDER",
+            title: "Truthful title",
+            slug: "somewhere-else",
+            path: "/not/where/this/lands",
+            depth: 41,
+            sortOrder: 0,
+            body: "",
+            tags: [],
+            confidence: 0,
+            lastRevisedAt: null,
+          },
+          {
+            id: "liar-2",
+            parentId: "liar-1",
+            kind: "QUESTION",
+            title: "Child",
+            slug: "lies-too",
+            path: "/nowhere",
+            depth: 99,
+            sortOrder: 0,
+            body: "kept",
+            tags: ["kept"],
+            confidence: 4,
+            lastRevisedAt: "2026-07-19T11:02:00.000Z",
+          },
+        ],
+      });
+
+      await importIn(tx, dest.id, nodes, "into");
+
+      const rows = await tx.noteNode.findMany({
+        where: { path: { startsWith: "/acc-imp-lies/" } },
+        orderBy: { path: "asc" },
+        include: { answer: true },
+      });
+      expect(rows.map((n) => [n.path, n.depth, n.slug])).toEqual([
+        ["/acc-imp-lies/truthful-title", 1, "truthful-title"],
+        ["/acc-imp-lies/truthful-title/child", 2, "child"],
+      ]);
+      // the content, though, is exactly what the file said
+      expect(rows[1]!.answer?.body).toBe("kept");
+      expect(rows[1]!.answer?.tags).toEqual(["kept"]);
+      expect(rows[1]!.answer?.confidence).toBe(4);
+      expect(rows[1]!.answer?.lastRevisedAt?.toISOString()).toBe("2026-07-19T11:02:00.000Z");
+      // and no id from the file was used
+      expect(await tx.noteNode.count({ where: { id: { in: ["liar-1", "liar-2"] } } })).toBe(0);
+    });
+  });
+
+  test("a file whose folders loop is refused before a single row is written", async () => {
+    await inRollback(async (tx) => {
+      const before = await tx.noteNode.count();
+      const cyclic: VaultNode[] = [
+        { id: "a", parentId: "b", kind: "FOLDER", title: "A", body: "", tags: [], confidence: 0, lastRevisedAt: null },
+        { id: "b", parentId: "a", kind: "FOLDER", title: "B", body: "", tags: [], confidence: 0, lastRevisedAt: null },
+      ];
+      await expect(importIn(tx, null, cyclic, "into")).rejects.toThrow(NoteError);
+      expect(await tx.noteNode.count()).toBe(before);
+    });
+  });
+
+  test("a folder carrying an answer body is refused, and nothing is written", async () => {
+    await inRollback(async (tx) => {
+      const before = await tx.noteNode.count();
+      await expect(
+        importIn(tx, null, parsed([{ title: "acc imp bad", kind: "FOLDER" }]).map((n) => ({ ...n, body: "nope" })), "into"),
+      ).rejects.toThrow(/can't hold an answer/i);
+      expect(await tx.noteNode.count()).toBe(before);
+    });
+  });
+
+  test("a destination that is a question, or in the trash, is refused like any other write", async () => {
+    await inRollback(async (tx) => {
+      const q = await createIn(tx, null, "QUESTION", "acc imp lonely");
+      const nodes = parsed([{ title: "anything" }]);
+      await expect(importIn(tx, q.id, nodes, "into")).rejects.toThrow(/only folders/i);
+
+      const gone = await createIn(tx, null, "FOLDER", "acc imp gone");
+      await trashIn(tx, gone.id);
+      await expect(importIn(tx, gone.id, nodes, "into")).rejects.toThrow(/in the trash/i);
+
+      await expect(importIn(tx, "no-such-folder", nodes, "into")).rejects.toThrow(/no longer exists/i);
+    });
+  });
+
+  test("restore refuses a vault that already holds anything", async () => {
+    await inRollback(async (tx) => {
+      await createIn(tx, null, "FOLDER", "acc imp occupied");
+      const before = await tx.noteNode.count();
+      await expect(importIn(tx, null, parsed([{ title: "x" }]), "restore")).rejects.toThrow(/empty vault/i);
+      // and it cannot be aimed at a folder to sidestep that
+      const somewhere = await createIn(tx, null, "FOLDER", "acc imp anywhere");
+      await expect(importIn(tx, somewhere.id, parsed([{ title: "x" }]), "restore")).rejects.toThrow(/can't be aimed/i);
+      expect(await tx.noteNode.count()).toBe(before + 1);
+    });
+  });
+
+  test("a thousand nodes go in as one graft, dense and correctly ordered", async () => {
+    await inRollback(async (tx) => {
+      const dest = await createIn(tx, null, "FOLDER", "acc imp big");
+      // 10 folders of 99 questions each, plus the folders themselves.
+      const outline = Array.from({ length: 10 }, (_, f) => ({
+        title: `Folder ${f}`,
+        children: Array.from({ length: 99 }, (_, q) => `Question ${f}-${q}`),
+      }));
+      const nodes = parsed(outline);
+      expect(nodes).toHaveLength(1_000);
+
+      const r = await importIn(tx, dest.id, nodes, "into");
+      expect(r.created).toBe(1_000);
+      expect(r.rootIds).toHaveLength(10);
+
+      const roots = await kidsOf(tx, dest.id);
+      expect(roots.map((n) => n.sortOrder)).toEqual([...Array(10).keys()]);
+      expect(roots.map((n) => n.title)).toEqual(outline.map((o) => o.title));
+
+      const inside = await kidsOf(tx, roots[3]!.id);
+      expect(inside).toHaveLength(99);
+      expect(inside.map((n) => n.sortOrder)).toEqual([...Array(99).keys()]);
+      expect(inside[0]!.path).toBe("/acc-imp-big/folder-3/question-3-0");
+      expect(inside[0]!.depth).toBe(2);
+      expect(await tx.noteAnswer.count({ where: { nodeId: { in: inside.map((n) => n.id) } } })).toBe(99);
+    });
+  }, 60_000);
 });
 
 describe.skipIf(!live)("notes · the suite left nothing behind", () => {

@@ -8,6 +8,7 @@ import {
   NoteError,
   createIn,
   duplicateIn,
+  importIn,
   moveIn,
   normaliseTags,
   renameIn,
@@ -15,6 +16,7 @@ import {
   restoreIn,
   trashIn,
 } from "@/lib/notes/core";
+import { MAX_JSON_BYTES, parseImport, type ImportMode } from "@/lib/notes/import";
 
 /**
  * The private notes vault's write surface.
@@ -48,10 +50,19 @@ const touched = () => revalidatePath("/notes", "layout");
 
 /** Runs `fn` in one transaction, and turns the two failure modes a component
  *  needs to tell apart — a refusal it should show, and a crash it should not
- *  paraphrase — into the same shape. */
-async function write<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+ *  paraphrase — into the same shape.
+ *
+ *  `opts` exists for exactly one caller. Prisma's 5-second interactive
+ *  transaction budget is right for every write here that touches a handful of
+ *  rows, and wrong for an import that may insert thousands; raising it globally
+ *  would let an ordinary write hold a connection for two minutes before failing.
+ */
+async function write<T>(
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  opts?: { timeout?: number; maxWait?: number },
+): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
   try {
-    const value = await prisma.$transaction(fn);
+    const value = await prisma.$transaction(fn, opts);
     touched();
     return { ok: true, value };
   } catch (e) {
@@ -159,6 +170,69 @@ export async function duplicateNode(id: string): Promise<NodeResult> {
   await requireSession();
   const r = await write((tx) => duplicateIn(tx, id));
   return r.ok ? { ok: true, id: r.value.id, path: r.value.path } : { ok: false, error: r.error };
+}
+
+/**
+ * Paste a file back in. The inverse of /notes/export, and the only write in this
+ * file that can create more than one row.
+ *
+ * Everything before `write()` is refusal, in cost order: the session, then the
+ * cheap type guards, then the size cap BEFORE `JSON.parse` — parsing is the
+ * expensive step and a size check after it has already lost the argument — then
+ * the shape. `parseImport` is the same function the dialog runs on every
+ * keystroke to draw its preview, so what the user was shown and what the
+ * transaction writes cannot disagree.
+ *
+ * Nothing here publishes and nothing is audited, which is deliberate and matches
+ * every other note write: the vault is absent from staging.ts's `Entity` union,
+ * and an import is undone by trashing the roots it grafted.
+ */
+export async function importVault(
+  destParentId: string | null,
+  json: string,
+  mode: ImportMode = "into",
+): Promise<NodeResult> {
+  await requireSession();
+
+  if (destParentId !== null && typeof destParentId !== "string") {
+    return { ok: false, error: "Pick a folder to import into" };
+  }
+  if (typeof json !== "string") return { ok: false, error: "Paste the JSON text" };
+  if (mode !== "into" && mode !== "restore") return { ok: false, error: "Unknown import mode" };
+  // Bytes, not characters. A cap read off `.length` is three times looser than
+  // it looks the moment the payload is not ASCII.
+  if (Buffer.byteLength(json, "utf8") > MAX_JSON_BYTES) {
+    return { ok: false, error: "That file is too large to import" };
+  }
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    return { ok: false, error: "That isn't valid JSON" };
+  }
+
+  const parsed = parseImport(raw);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
+  // A nested outline has no ids, so there is nothing to restore *to*. Offering
+  // the mode for it would be a button that always fails.
+  if (mode === "restore" && parsed.shape !== "vault") {
+    return { ok: false, error: "Restore needs a vault export, not a nested outline." };
+  }
+
+  const r = await write((tx) => importIn(tx, destParentId, parsed.nodes, mode), {
+    timeout: 120_000,
+    maxWait: 10_000,
+  });
+  if (!r.ok) return { ok: false, error: r.error };
+
+  // The first grafted root is where the browser is sent, and its path is read
+  // after the commit because rebuildSubtree wrote it during the transaction.
+  const first = r.value.rootIds[0];
+  const node = first
+    ? await prisma.noteNode.findUnique({ where: { id: first }, select: { id: true, path: true } })
+    : null;
+  return node ? { ok: true, id: node.id, path: node.path } : { ok: false, error: "Imported, but couldn't find the result" };
 }
 
 export async function saveAnswer(

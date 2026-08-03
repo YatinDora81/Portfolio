@@ -1,5 +1,6 @@
 import { Prisma } from "db";
-import { slugify, uniqueSlug, moveError, tombstone, untomb } from "./paths";
+import { slugify, uniqueSlug, moveError, normaliseTags, tombstone, untomb } from "./paths";
+import { levelOrder, vaultProblems, type ImportMode, type VaultNode } from "./import";
 
 /**
  * Every write the notes vault makes, as a function of a transaction client.
@@ -76,6 +77,25 @@ const liveOf = (p: string) => untomb(p);
  * few hundred rows — the same scale argument that makes the sidebar load flat.
  */
 export async function rebuildSubtree(tx: Tx, rootId: string): Promise<void> {
+  return rebuildSubtrees(tx, [rootId]);
+}
+
+/**
+ * The same walk over several roots at once, reading the table once for all of
+ * them and writing one statement.
+ *
+ * It exists for the importer, which grafts every root in a file under the same
+ * destination. Called per root, an import of two hundred top-level notes reads
+ * every row in the table two hundred times inside one interactive transaction —
+ * which is how a feature that batches its inserts still manages to be the thing
+ * that trips Prisma's transaction budget.
+ *
+ * The roots must be disjoint. Paths are computed from the snapshot taken before
+ * any of them are written, so a root nested inside another would be rebuilt
+ * against its parent's stale path.
+ */
+export async function rebuildSubtrees(tx: Tx, rootIds: string[]): Promise<void> {
+  if (!rootIds.length) return;
   const all = (await tx.noteNode.findMany({ select: SHAPE })) as Shape[];
   const byId = new Map(all.map((n) => [n.id, n]));
   const childrenOf = new Map<string, Shape[]>();
@@ -85,10 +105,6 @@ export async function rebuildSubtree(tx: Tx, rootId: string): Promise<void> {
     if (list) list.push(n);
     else childrenOf.set(n.parentId, [n]);
   }
-
-  const root = byId.get(rootId);
-  if (!root) return;
-  const parent = root.parentId ? byId.get(root.parentId) : null;
 
   const ids: string[] = [];
   const paths: string[] = [];
@@ -105,7 +121,10 @@ export async function rebuildSubtree(tx: Tx, rootId: string): Promise<void> {
   // tombstone stacked on the first; it is absorbed into its ancestor's, and
   // recovers its own the moment that ancestor is restored, because this walk
   // recomputes from scratch every time rather than patching what is there.
+  const seen = new Set<string>();
   const walk = (n: Shape, basePath: string, depth: number, tombId: string | null) => {
+    if (seen.has(n.id)) return;
+    seen.add(n.id);
     const live = `${basePath}/${n.slug}`;
     const tomb = tombId ?? (n.trashRoot ? n.id : null);
     const path = tomb ? tombstone(tomb, live) : live;
@@ -116,7 +135,13 @@ export async function rebuildSubtree(tx: Tx, rootId: string): Promise<void> {
     }
     for (const c of childrenOf.get(n.id) ?? []) walk(c, live, depth + 1, tomb);
   };
-  walk(root, parent ? liveOf(parent.path) : "", parent ? parent.depth + 1 : 0, null);
+
+  for (const rootId of rootIds) {
+    const root = byId.get(rootId);
+    if (!root) continue;
+    const parent = root.parentId ? byId.get(root.parentId) : null;
+    walk(root, parent ? liveOf(parent.path) : "", parent ? parent.depth + 1 : 0, null);
+  }
 
   if (!ids.length) return;
   await tx.$executeRaw`
@@ -176,15 +201,36 @@ export async function liveSiblingSlugs(tx: Tx, parentId: string | null, exceptId
   return parentId === null ? [...taken, ...RESERVED_ROOT_SLUGS] : taken;
 }
 
+/**
+ * Close the gaps in one level's `sortOrder`, so it is always 0..n-1.
+ *
+ * One statement, and only for the rows whose number actually changes — the
+ * common case after a trash or a move is that everything below the gap shifts by
+ * one and everything above it is already right. Written as a loop of updates
+ * this is a round trip per sibling, which an import of a few hundred roots pays
+ * inside the same transaction it just batched its inserts into.
+ */
 export async function reindex(tx: Tx, parentId: string | null) {
   const sibs = await tx.noteNode.findMany({
     where: { parentId, deletedAt: null },
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-    select: { id: true },
+    select: { id: true, sortOrder: true },
   });
+
+  const ids: string[] = [];
+  const orders: number[] = [];
   for (const [i, s] of sibs.entries()) {
-    if (i !== undefined) await tx.noteNode.update({ where: { id: s.id }, data: { sortOrder: i } });
+    if (s.sortOrder === i) continue;
+    ids.push(s.id);
+    orders.push(i);
   }
+  if (!ids.length) return;
+
+  await tx.$executeRaw`
+    UPDATE "NoteNode" AS n
+       SET "sortOrder" = v.ord
+      FROM (SELECT * FROM unnest(${ids}::text[], ${orders}::int[]) AS t(id, ord)) AS v
+     WHERE n.id = v.id`;
 }
 
 const clean = (title: string) => {
@@ -387,8 +433,139 @@ async function copyChildren(tx: Tx, fromId: string, toId: string) {
   }
 }
 
-/** Tags are the search language's vocabulary, so they are normalised on the way
- *  in rather than at every point of comparison: `tag:Redis` and `#redis` have to
- *  be one thing, and the GIN index on the column is exact-match. */
-export const normaliseTags = (tags: string[]) =>
-  [...new Set(tags.map((t) => t.trim().toLowerCase()).filter(Boolean))].slice(0, 40);
+/**
+ * Graft a parsed file into the tree, under `destParentId` or at the vault root.
+ *
+ * It takes the already-normalised flat list, so it is shape-agnostic: a vault
+ * export and a hand-written nested outline reach this function as the same
+ * thing, and there is exactly one insert path to get wrong. What arrives is
+ * content — `kind`, `title`, `body`, `tags`, `confidence` — plus `parentId` as
+ * structure. Everything positional is recomputed here, because a graft
+ * re-parents the file's roots and that invalidates every path beneath them:
+ * `slug` against the live siblings, `path` and `depth` by `rebuildSubtree`,
+ * `sortOrder` by position among new siblings.
+ *
+ * **Modes.** `into` mints a fresh id per node and rewrites every `parentId`
+ * through the map, so it cannot collide with anything and is the everyday case.
+ * `restore` keeps the file's ids verbatim so a vault round-trips exactly, which
+ * is only honest into an empty vault — `NoteNode.id` is uuid-defaulted but
+ * supplying one is legal, and any collision is a P2002 on the primary key.
+ *
+ * **On the batching.** Rows go in a level at a time rather than one at a time.
+ * A thousand-node restore is otherwise two thousand sequential round trips
+ * inside one interactive transaction, which is the P2028 in §13 of the guide
+ * waiting to happen against a hosted database. Batching by DEPTH rather than all
+ * at once is what keeps the self-referencing `parentId` foreign key trivially
+ * satisfied: every parent is already committed by the statement before, so
+ * nothing depends on when Postgres fires its constraint triggers.
+ */
+export async function importIn(
+  tx: Tx,
+  destParentId: string | null,
+  nodes: VaultNode[],
+  mode: ImportMode,
+): Promise<{ created: number; rootIds: string[] }> {
+  const problems = vaultProblems(nodes);
+  if (problems.length) throw new NoteError(problems[0]!);
+
+  if (mode === "restore") {
+    if (destParentId !== null) throw new NoteError("Restore rebuilds a whole vault, so it can't be aimed at a folder");
+    if ((await tx.noteNode.count()) !== 0) {
+      throw new NoteError("Restore only works into an empty vault. Use Import into a folder instead.");
+    }
+  }
+
+  // The same three checks createIn makes, with the same words. A destination
+  // that is a question, or in the trash, fails for the same reason either way.
+  if (destParentId) {
+    const p = await tx.noteNode.findUnique({
+      where: { id: destParentId },
+      select: { kind: true, deletedAt: true },
+    });
+    if (!p) throw new NoteError("That folder no longer exists");
+    if (p.kind !== "FOLDER") throw new NoteError("Only folders can hold children");
+    if (p.deletedAt) throw new NoteError("That folder is in the trash");
+  }
+
+  const levels = levelOrder(nodes);
+  const idOf = new Map(nodes.map((n) => [n.id, mode === "restore" ? n.id : crypto.randomUUID()] as const));
+
+  // Slugs are allocated per parent against an in-memory list, seeded for the
+  // destination from ONE query. Pushing each result back is what stops two
+  // siblings both titled "DP" from both resolving to `dp` and the second dying
+  // on the path unique index — and a hand-written outline repeats names
+  // constantly, so this is the common case rather than an edge one.
+  // `liveSiblingSlugs(tx, null)` folds in RESERVED_ROOT_SLUGS, so a root folder
+  // titled "Export" lands on `export-2` without this function knowing why.
+  const taken = new Map<string | null, string[]>([[destParentId, await liveSiblingSlugs(tx, destParentId)]]);
+  // One past the highest number in use, rather than the count. They are the same
+  // on a level that has been reindexed and they are not on a level with a gap,
+  // where counting would interleave the graft with what is already there.
+  const highest = await tx.noteNode.aggregate({
+    where: { parentId: destParentId, deletedAt: null },
+    _max: { sortOrder: true },
+  });
+  const nextOrder = new Map<string | null, number>([[destParentId, (highest._max.sortOrder ?? -1) + 1]]);
+
+  const rootIds: string[] = [];
+  const answers: Prisma.NoteAnswerCreateManyInput[] = [];
+
+  for (const [depth, level] of levels.entries()) {
+    const rows: Prisma.NoteNodeCreateManyInput[] = [];
+
+    for (const n of level) {
+      const id = idOf.get(n.id)!;
+      // Level 0 is the file's roots — whatever their parentId claims, the file
+      // may not carry the parent it names, and the graft re-parents them here.
+      const parentId = depth === 0 ? destParentId : idOf.get(n.parentId!)!;
+
+      let slugs = taken.get(parentId);
+      if (!slugs) taken.set(parentId, (slugs = []));
+      const slug = uniqueSlug(slugify(n.title), slugs);
+      slugs.push(slug);
+
+      const sortOrder = nextOrder.get(parentId) ?? 0;
+      nextOrder.set(parentId, sortOrder + 1);
+
+      rows.push({
+        id,
+        parentId,
+        kind: n.kind,
+        title: n.title,
+        slug,
+        // Every row is born on the sentinel: `path` is NOT NULL and UNIQUE and
+        // its real value needs the parent's, which is written below.
+        path: placeholder(),
+        sortOrder,
+      });
+      // `deletedAt` and `trashRoot` are never read from the file. An import
+      // lands in the vault, whatever a hand-edited payload claims.
+      if (n.kind === "QUESTION") {
+        answers.push({
+          nodeId: id,
+          body: n.body,
+          tags: normaliseTags(n.tags),
+          confidence: n.confidence,
+          lastRevisedAt: n.lastRevisedAt ?? null,
+        });
+      }
+      if (depth === 0) rootIds.push(id);
+    }
+
+    await tx.noteNode.createMany({ data: rows });
+  }
+
+  if (answers.length) await tx.noteAnswer.createMany({ data: answers });
+
+  // Once for the whole graft, outside the insert loop. This is what turns every
+  // placeholder into a real path and sets `depth` from the new parentage — the
+  // file's own path and depth are never written, at any point above.
+  await rebuildSubtrees(tx, rootIds);
+  await reindex(tx, destParentId);
+
+  return { created: nodes.length, rootIds };
+}
+
+/** Re-exported so every write still reaches it through this module, while the
+ *  definition sits in the Prisma-free half the import preview can bundle. */
+export { normaliseTags } from "./paths";

@@ -148,6 +148,19 @@ export function buildTree(rows: TreeRow[]): TreeNode[] {
 }
 
 /**
+ * Tags are the search language's vocabulary, so they are normalised on the way
+ * in rather than at every point of comparison: `tag:Redis` and `#redis` have to
+ * be one thing, and the GIN index on the column is exact-match.
+ *
+ * It lives here, beside the other pure helpers, because two callers need it from
+ * opposite sides of the bundle: `core.ts` writes the column, and `import.ts`
+ * normalises a pasted file for a preview that runs in the browser. One
+ * definition is what keeps the preview honest about what the write will store.
+ */
+export const normaliseTags = (tags: string[]) =>
+  [...new Set(tags.map((t) => t.trim().toLowerCase()).filter(Boolean))].slice(0, 40);
+
+/**
  * Every path from the root down to `path`, the node's own path included. Two
  * callers want exactly that set: revealing a node expands each folder above it,
  * and filtering keeps ancestors visible so a match never appears detached from
