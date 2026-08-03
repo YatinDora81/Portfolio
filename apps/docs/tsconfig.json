@@ -25,5 +25,11 @@
     "next.config.js",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  // Tests are run by `bun test`, not by Next. They import "bun:test", which has
+  // no types until @types/bun is installed, and installing it here would drop
+  // Bun's globals alongside the DOM lib for every component in the app — a
+  // bigger change than a test runner is owed. Excluded so `next build`
+  // typechecks app code and nothing else; the cost is that a test referencing a
+  // deleted export fails at `bun test` rather than at check-types.
+  "exclude": ["node_modules", "**/*.test.ts", "**/*.test.tsx"]
 }
