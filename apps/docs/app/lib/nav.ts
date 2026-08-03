@@ -3,6 +3,7 @@ import {
   IconLayoutGrid, IconInbox, IconSparkles, IconUser, IconCpu, IconBriefcase,
   IconFolderCode, IconPencil, IconQuote, IconTag, IconSettings2, IconShieldCheck,
   IconSend, IconChartBar, IconPalette, IconTerminal2, IconHistory, IconPaw,
+  IconNotebook,
 } from "@tabler/icons-react";
 
 export type NavIcon = ComponentType<{ size?: number; className?: string; stroke?: number }>;
@@ -61,6 +62,12 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: IconLayoutGrid, eyebrow: "control room · overview" },
       { href: "/messages", label: "Inbox", icon: IconInbox, eyebrow: "contact form → you", badge: true },
+      // In the unlabelled run rather than the 01–08 one: the vault is a tool the
+      // owner uses, not a band of the public page, and nothing in it is ever
+      // published. Putting it under "The page · top to bottom" would give it an
+      // ordinal that promises a section visitors can scroll to.
+      { href: "/notes", label: "Notes", icon: IconNotebook, eyebrow: "private · q&a vault",
+        keywords: "questions answers revision interview prep folders dsa tags vault search" },
       { href: "/refer-emails", label: "Refer emails", icon: IconSend, eyebrow: "outreach · campaign sheet" },
       { href: "/tracker", label: "Tracker", icon: IconChartBar, eyebrow: "outreach · attribution" },
     ],

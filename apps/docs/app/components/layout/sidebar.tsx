@@ -18,10 +18,14 @@ function NavBtn({ x, active, unread, onNavigate }: {
 }) {
   const Icon = x.icon;
   const ord = navMark(x);
+  // The badge sits in exactly the part a 58px rail clips away, and silently
+  // losing "you have mail" is a real regression — so the rail redraws it as a
+  // dot on the glyph, and this class is what tells it there is one to draw.
+  const flagged = !!x.badge && unread > 0;
   return (
     <Link
       href={x.href}
-      className={cn("nav-item", active && "on")}
+      className={cn("nav-item", active && "on", flagged && "has-badge")}
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
     >
@@ -39,9 +43,10 @@ function NavBtn({ x, active, unread, onNavigate }: {
   );
 }
 
-export function Sidebar({ user, unread, open, onNavigate }: {
+export function Sidebar({ user, unread, railed, open, onNavigate }: {
   user: { email: string; role: string };
   unread: number;
+  railed: boolean;
   open: boolean;
   onNavigate: () => void;
 }) {
@@ -52,7 +57,15 @@ export function Sidebar({ user, unread, open, onNavigate }: {
   const roleLabel = user.role === "SUB_ADMIN" ? "Sub-Admin" : user.role === "OWNER" ? "Owner" : "Admin";
 
   return (
-    <aside className={cn("sb", open && "open")}>
+    /**
+     * Two boxes, and the reason is the whole trick. `.sb-inner` is ALWAYS 254px
+     * and absolutely positioned; railing narrows and clips `.sb` around it.
+     * Nothing inside ever reflows, so collapsing costs one width transition
+     * instead of relaying out eighteen rows, and hover-peek is a pure overflow
+     * and opacity reveal with no layout work at all.
+     */
+    <aside id="cr-sidebar" className={cn("sb", open && "open", railed && "rail")}>
+     <div className="sb-inner">
       <div className="sb-brand">
         <div className="sb-mark"><IconCat size={19} /></div>
         <div>
@@ -118,6 +131,7 @@ export function Sidebar({ user, unread, open, onNavigate }: {
           </form>
         </div>
       </div>
+     </div>
     </aside>
   );
 }

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   IconLogout, IconLock, IconMenu2, IconWorld, IconSearch,
   IconRefresh, IconCheck,
+  IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand,
 } from "@tabler/icons-react";
 import { logout, changePassword } from "@/lib/actions/auth";
 import { publishSite } from "@/lib/actions/publish";
@@ -17,10 +18,12 @@ import { cn } from "@/lib/utils";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/$/, "");
 
-export function TopBar({ user, onBurger, onPalette, toast }: {
+export function TopBar({ user, onBurger, onPalette, railed, onRail, toast }: {
   user: { userId: string; email: string; role: string };
   onBurger: () => void;
   onPalette: () => void;
+  railed: boolean;
+  onRail: () => void;
   toast: (msg: string, tone?: "good" | "bad") => void;
 }) {
   const pathname = usePathname();
@@ -70,6 +73,20 @@ export function TopBar({ user, onBurger, onPalette, toast }: {
       <header className="tb">
         {busy ? <span className="pubbar" aria-hidden="true" /> : null}
         <button className="tb-burger" onClick={onBurger} aria-label="Menu"><IconMenu2 size={18} /></button>
+
+        {/* `aria-expanded` on a control that collapses the nav it sits beside,
+            with `aria-controls` naming it, so the state is announced rather than
+            left to the icon. */}
+        <button
+          className="ibtn rail-btn"
+          onClick={onRail}
+          aria-expanded={!railed}
+          aria-controls="cr-sidebar"
+          title={railed ? "Pin sidebar open (⌘\\)" : "Collapse sidebar (⌘\\)"}
+          aria-label={railed ? "Pin sidebar open" : "Collapse sidebar"}
+        >
+          {railed ? <IconLayoutSidebarLeftExpand size={16} /> : <IconLayoutSidebarLeftCollapse size={16} />}
+        </button>
 
         {/* Eyebrow and title both come from nav.ts — the same row the sidebar
             highlights — so the topbar can never name a page the nav doesn't. */}

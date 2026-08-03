@@ -8,6 +8,7 @@ import { TopBar } from "./top-bar";
 import { CommandPalette } from "./command-palette";
 import { StagingProvider, useStaging } from "@/components/staging/staging-provider";
 import { SaveBar } from "@/components/staging/save-bar";
+import { setRailPref as setRailCookie } from "@/lib/actions/ui-prefs";
 import { cn } from "@/lib/utils";
 
 interface Toast { id: number; msg: string; tone: "good" | "bad"; out?: boolean }
@@ -36,15 +37,21 @@ function StagingHeat() {
   return null;
 }
 
-export function Shell({ user, unread, children }: {
+export function Shell({ user, unread, rail, children }: {
   user: { userId: string; email: string; role: string };
   unread: number;
+  /** `null` follows the route; `true`/`false` is an explicit choice that outranks it. */
+  rail: boolean | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [sbOpen, setSbOpen] = useState(false);
   const [pal, setPal] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  // Seeded from the cookie the server already read, so the first paint is
+  // already the right width; local state only so the toggle is instant rather
+  // than waiting on the round trip that persists it.
+  const [railPref, setRailPref] = useState<boolean | null>(rail);
 
   const toast = useCallback((msg: string, tone: "good" | "bad" = "good") => {
     const id = ++toastId;
@@ -52,6 +59,44 @@ export function Shell({ user, unread, children }: {
     setTimeout(() => setToasts((t) => t.map((x) => (x.id === id ? { ...x, out: true } : x))), 2600);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2950);
   }, []);
+
+  // The route's own preference, used only while nobody has expressed one:
+  // /notes owns a tree pane of its own, and 254px of nav beside it is chrome
+  // competing with chrome.
+  const railedByRoute = pathname === "/notes" || pathname.startsWith("/notes/");
+  const railed = railPref ?? railedByRoute;
+
+  /**
+   * The key on `.content` exists to replay the entry animation on each new page.
+   * Keying it on the full pathname also remounts everything beneath it, which is
+   * fine for a page but wrong for a *section* that keeps state in a shared
+   * layout: inside the vault it would tear down the tree on every note you open,
+   * losing its scroll position, its expanded folders and the keyboard focus you
+   * were navigating with — the exact things putting the tree in the layout was
+   * meant to preserve. So the vault is one key, and moving within it is a
+   * navigation of the right-hand pane alone.
+   */
+  const contentKey = railedByRoute ? "/notes" : pathname;
+
+  const toggleRail = useCallback(() => {
+    const next = !railed;
+    setRailPref(next);
+    // Fire and forget: the sidebar has already moved, and a failed cookie write
+    // costs the user a preference, not their work.
+    void setRailCookie(next ? "1" : "0");
+  }, [railed]);
+
+  // ⌘\ overrides the route default and sticks.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
+        e.preventDefault();
+        toggleRail();
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [toggleRail]);
 
   // ⌘K / Ctrl-K toggles the palette.
   useEffect(() => {
@@ -79,18 +124,26 @@ export function Shell({ user, unread, children }: {
         <a className="skip" href="#content">Skip to content</a>
         {sbOpen ? <div className="sb-veil" onClick={() => setSbOpen(false)} /> : null}
 
-        <Sidebar user={user} unread={unread} open={sbOpen} onNavigate={() => setSbOpen(false)} />
+        <Sidebar
+          user={user}
+          unread={unread}
+          open={sbOpen}
+          railed={railed}
+          onNavigate={() => setSbOpen(false)}
+        />
 
         <main className="main">
           <TopBar
             user={user}
             onBurger={() => setSbOpen(true)}
             onPalette={() => setPal(true)}
+            railed={railed}
+            onRail={toggleRail}
             toast={toast}
           />
           {/* Outside the keyed scroller: the batch outlives the route, so
               navigating must not remount the bar mid-save. */}
-          <div className="content" id="content" tabIndex={-1} key={pathname}>{children}</div>
+          <div className="content" id="content" tabIndex={-1} key={contentKey}>{children}</div>
           <SaveBar />
         </main>
 

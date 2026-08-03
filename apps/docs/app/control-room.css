@@ -1967,6 +1967,83 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   .nt *, .nt-menu, .nt-menu *, .nt-live { transition: none !important }
 }
 
+/* ---------- the sidebar rail ----------
+   /notes owns a tree pane of its own, so 254px of nav beside it is chrome
+   competing with chrome. On that route the sidebar collapses to a 58px glyph
+   gutter, and an explicit ⌘\ overrides the route either way.
+
+   The technique is the whole reason this is cheap: `.sb-inner` is ALWAYS 254px
+   and absolutely positioned, and railing narrows and clips `.sb` around it.
+   Nothing inside the sidebar reflows, so the collapse animates one width instead
+   of relaying out eighteen rows, and hover-peek is a pure overflow and opacity
+   reveal with no layout work at all.
+
+   Railing is a server-rendered class, not a `useEffect`. Reading it after
+   hydration would paint every /notes load at 254px and snap it to 58px — the
+   same flash the inline theme script in apps/web exists to prevent, and far more
+   visible, because it shoves the whole page sideways. */
+.sb {
+  background: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-right: none;
+  transition: width .22s cubic-bezier(.4, 0, .2, 1), min-width .22s cubic-bezier(.4, 0, .2, 1),
+              transform .3s cubic-bezier(.4, 0, .2, 1)
+}
+.sb-inner {
+  position: absolute; inset: 0; width: 254px; display: flex; flex-direction: column;
+  background: var(--glass); backdrop-filter: blur(18px) saturate(1.6);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6); border-right: 1px solid var(--line2);
+  transition: box-shadow .2s
+}
+.dark .sb { background: none }
+.dark .sb-inner { background: var(--sbg) }
+
+.sb.rail { width: 58px; min-width: 58px; overflow: hidden }
+/* Peeking lifts the full sidebar over the page rather than pushing it aside, so
+   the tree underneath keeps its scroll position and its measured column width. */
+.sb.rail:hover, .sb.rail:focus-within { overflow: visible; z-index: 70 }
+.sb.rail:hover .sb-inner, .sb.rail:focus-within .sb-inner { box-shadow: var(--shadow) }
+
+/* Everything past the 58px gutter fades rather than moves. */
+.sb.rail .nav-txt, .sb.rail .nav-badge, .sb.rail .nav-label span,
+.sb.rail .sb-brand > div:last-child, .sb.rail .sb-foot { opacity: 0; transition: opacity .16s .02s }
+.sb.rail:hover .nav-txt, .sb.rail:hover .nav-badge, .sb.rail:hover .nav-label span,
+.sb.rail:hover .sb-brand > div:last-child, .sb.rail:hover .sb-foot,
+.sb.rail:focus-within .nav-txt, .sb.rail:focus-within .nav-badge,
+.sb.rail:focus-within .nav-label span, .sb.rail:focus-within .sb-brand > div:last-child,
+.sb.rail:focus-within .sb-foot { opacity: 1 }
+
+/* The ordinal rail is wayfinding for the full nav. In a 58px gutter you navigate
+   by glyph, and the numbers only shove the icons off centre, so they go — along
+   with the hairline that threads them. */
+.sb.rail .nav-num, .sb.rail .nav-grp.run .nav-run::before { display: none }
+.sb.rail .nav-item { padding-left: 11px }
+.sb.rail .nav-label { padding: 14px 8px 8px }
+
+/* The `4` badge sits in exactly the part that gets clipped, and silently losing
+   "you have mail" is a real regression — so it is redrawn as a dot on the glyph,
+   ringed in the sidebar's own fill so it reads as attached to the icon. */
+.nav-ic { position: relative }
+.sb.rail .nav-item.has-badge .nav-ic::after {
+  content: ''; position: absolute; top: -2px; right: -3px; width: 6px; height: 6px;
+  border-radius: 99px; background: var(--pri); box-shadow: 0 0 0 2px var(--sb-rail);
+  transition: opacity .16s
+}
+.sb.rail:hover .nav-item.has-badge .nav-ic::after,
+.sb.rail:focus-within .nav-item.has-badge .nav-ic::after { opacity: 0 }
+
+.rail-btn { flex: none }
+
+/* Below this width the sidebar is already a drawer over the page, so railing it
+   would collapse a thing that is not on screen to begin with. */
+@media (max-width: 960px) {
+  .sb.rail { width: 254px; min-width: 254px; overflow: visible }
+  .sb.rail .nav-txt, .sb.rail .nav-badge, .sb.rail .nav-label span,
+  .sb.rail .sb-brand > div:last-child, .sb.rail .sb-foot { opacity: 1 }
+  .sb.rail .nav-num, .sb.rail .nav-grp.run .nav-run::before { display: revert }
+  .sb.rail .nav-item.has-badge .nav-ic::after { display: none }
+  .sb-inner { background: var(--panel) }
+  .rail-btn { display: none }
+}
+
 /* ---------- the palette's notes footer ----------
    The palette gained a second kind of row — vault questions, matched by Postgres
    rather than by the in-memory nav list — so it needs a line that says what the
