@@ -5,6 +5,7 @@
 import NextImage from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { skillIconMap, socialIconMap } from '@repo/ui/icons/registry';
+import MagneticLink from '../interactions/MagneticLink';
 
 /**
  * The peek photo cannot be a next/image: the pointer handler assigns `img.src`
@@ -106,7 +107,7 @@ function HeroBodyV1({ intro, tagline, skills, resumeUrl }: BodyProps) {
       </p>
 
       <div className="actions animate-fade-in-blur animate-delay-4">
-        <a
+        <MagneticLink
           className="btn btn-ghost"
           href={resumeUrl}
           target="_blank"
@@ -114,11 +115,11 @@ function HeroBodyV1({ intro, tagline, skills, resumeUrl }: BodyProps) {
         >
           <ResumeIcon fifthLine />
           Resume / CV
-        </a>
-        <a className="btn btn-solid" href="#contact">
+        </MagneticLink>
+        <MagneticLink className="btn btn-solid" href="#contact">
           Get in touch
           <ArrowIcon />
-        </a>
+        </MagneticLink>
       </div>
     </>
   );
@@ -147,11 +148,11 @@ function HeroBodyV2({ intro, tagline, skills, resumeUrl, totalSkills }: BodyProp
       </div>
 
       <div className="actions animate-fade-in-blur animate-delay-5">
-        <a className="btn btn-solid" href="#contact">
+        <MagneticLink className="btn btn-solid" href="#contact">
           Get in touch
           <ArrowIcon />
-        </a>
-        <a
+        </MagneticLink>
+        <MagneticLink
           className="btn btn-ghost"
           href={resumeUrl}
           target="_blank"
@@ -159,7 +160,7 @@ function HeroBodyV2({ intro, tagline, skills, resumeUrl, totalSkills }: BodyProp
         >
           <ResumeIcon fifthLine={false} />
           View Resume
-        </a>
+        </MagneticLink>
       </div>
     </>
   );

@@ -604,15 +604,21 @@ html.no-peek .peek-stack { display: block; }
 }
 .btn:hover { transform: translateY(-2px); }
 .btn:active { transform: translateY(0); }
-.btn svg { width: 16px; height: 16px; }
+/* The magnetic lean (useMagnetic) writes the independent `translate` property,
+   which composes ahead of `transform` — so the lift and the press above keep
+   their own transforms, and the per-frame tracking stays out of the transition
+   declared on this rule. Nothing here needs to know about it. */
+.btn svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.44, 1);
+}
 .btn-ghost { border: 1px solid var(--border); background: var(--background); }
 .btn-ghost:hover { background: var(--muted); }
-.btn-ghost svg { transition: transform 0.3s; }
 .btn-ghost:hover svg { transform: rotate(-6deg); }
 .btn-solid { background: var(--foreground); color: var(--background); border: none; }
 .btn-solid:hover { opacity: 0.9; }
-.btn-solid svg { transition: transform 0.2s; }
-.btn-solid:hover svg { transform: translateX(2px); }
+.btn-solid:hover svg { transform: translateX(4px); }
 
 /* scroll cue — paw prints leading down to the cat on the wire */
 .cue {
@@ -2070,11 +2076,15 @@ body.cat-on .cw .dot { display: none; }
   .roleword,
   .chip,
   .btn:hover,
+  .btn svg,
   .soc,
   .soc .lbl,
   .badge,
   .pj-x,
   .pj-xin { transition: none !important; }
+  /* useMagnetic never attaches under this preference, so this only catches a
+     lean left mid-flight by a preference flipped while the pointer was down. */
+  .btn { translate: none !important; }
   .rv-stagger li {
     opacity: 1 !important;
     transform: none !important;
