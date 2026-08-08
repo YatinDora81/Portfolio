@@ -1879,11 +1879,16 @@ body.cat-on .cw .dot { display: none; }
 #contact .ghln-stage:active .ghln-ro { opacity: 1; }
 
 /* the line writes itself each time the fold opens */
-/* 1.15, not 1: `pathLength="1"` normalises the dash against USER space but
-   `non-scaling-stroke` lays it down in SCREEN space, and this viewBox is
-   stretched (~1.09x). At 1 the last ~8% of the line fell inside the gap and
-   stopped short of its own live dot. */
-#contact .ghln .stroke { stroke-dasharray: 1.15; stroke-dashoffset: 1.15; }
+/* `pathLength="1"` normalises the dash against the curve's length in USER
+   space, but `non-scaling-stroke` lays that dash down in DEVICE pixels — so a
+   dash of 1 covers `device length / user length` of the line, never all of it.
+   That ratio is the viewBox's stretch times the display's pixel ratio, which is
+   two different unknowns at author time: a hard-coded 1.15 drew the whole year
+   on a 1x monitor and stopped it barely past halfway on a retina one. GhLine
+   measures the ratio and sets `--draw`; the fallback here is only what shows if
+   that never runs, and it errs long, because a dash that overshoots finishes
+   drawing early and one that falls short never finishes at all. */
+#contact .ghln .stroke { stroke-dasharray: var(--draw, 3.2); stroke-dashoffset: var(--draw, 3.2); }
 #contact .fqx:hover .stroke,
 #contact .fqx:has(.fq:focus-visible) .stroke {
   transition: stroke-dashoffset 1.4s cubic-bezier(.4, 0, .2, 1) .25s;

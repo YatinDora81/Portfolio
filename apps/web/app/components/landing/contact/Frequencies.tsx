@@ -12,7 +12,7 @@
  * hairline and readout are written straight to their nodes.
  */
 
-import { useMemo, useRef, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { useInView, useReducedMotion } from 'motion/react';
 import type { GithubActivity } from '../../../lib/github';
 import type { SocialLink } from '../Contact';
@@ -113,9 +113,14 @@ function buildLine(days: (number | null)[]): Line | null {
   };
 }
 
+/** Enough to hold the sampled length within a fraction of a pixel on a curve
+    this shallow, and cheap enough to redo on every resize. */
+const LEN_SAMPLES = 200;
+
 function GhLine({ github, line }: { github: GithubActivity; line: Line }) {
   const reduced = useReducedMotion();
   const stageRef = useRef<HTMLDivElement>(null);
+  const strokeRef = useRef<SVGPathElement>(null);
   const curLine = useRef<SVGLineElement>(null);
   const curDot = useRef<SVGCircleElement>(null);
   const readout = useRef<HTMLSpanElement>(null);
@@ -153,6 +158,58 @@ function GhLine({ github, line }: { github: GithubActivity; line: Line }) {
         ? `t−${n - 1 - i}w`
         : fmt.format(new Date(t0 + i * 7 * 86_400_000)).toLowerCase();
   }, [github.startDate, n]);
+
+  /* How long the dash has to be for the line to finish drawing — see the
+     `--draw` note in globals.css. The number is the curve's length in the space
+     `non-scaling-stroke` strokes in, over its length in the space `pathLength`
+     normalises against, and neither the column's width nor the display's pixel
+     ratio is knowable from a stylesheet. Measured off the real path so it is
+     right on every screen, and re-measured whenever either one moves. */
+  useEffect(() => {
+    const path = strokeRef.current;
+    const svg = path?.ownerSVGElement;
+    if (!path || !svg) return;
+
+    const measure = () => {
+      const ctm = path.getScreenCTM();
+      const userLen = path.getTotalLength();
+      if (!ctm || userLen === 0) return;
+
+      let screenLen = 0;
+      let px = 0;
+      let py = 0;
+      for (let i = 0; i <= LEN_SAMPLES; i++) {
+        const p = path.getPointAtLength((userLen * i) / LEN_SAMPLES);
+        const x = ctm.a * p.x + ctm.c * p.y + ctm.e;
+        const y = ctm.b * p.x + ctm.d * p.y + ctm.f;
+        if (i > 0) screenLen += Math.hypot(x - px, y - py);
+        px = x;
+        py = y;
+      }
+
+      // 1.5% over, so the last few device pixels of the tip cannot be lost to
+      // rounding — the cost is that the draw lands a frame early, which is
+      // nothing next to a line that stops short of its own live dot.
+      const draw = ((screenLen * devicePixelRatio) / userLen) * 1.015;
+      // A ratio this far out means the panel was measured before it had any
+      // layout to measure; the observer comes back when it does.
+      if (!Number.isFinite(draw) || draw < 0.2 || draw > 24) return;
+      path.style.setProperty('--draw', draw.toFixed(3));
+    };
+
+    // Directly as well as through the observer: a ResizeObserver's first
+    // delivery waits for a rendering opportunity, and a tab that mounts in the
+    // background does not get one until it is looked at.
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(svg);
+    // A resize is what the column reports; a zoom only shows up as a new ratio.
+    window.addEventListener('resize', measure, { passive: true });
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
 
   const scrub = (e: ReactPointerEvent<HTMLDivElement>) => {
     const box = e.currentTarget.getBoundingClientRect();
@@ -214,7 +271,7 @@ function GhLine({ github, line }: { github: GithubActivity; line: Line }) {
               <path className="under" d={under} />
               {/* pathLength 1 is what lets the CSS draw it with a dashoffset
                   without knowing how long the year's curve happens to be. */}
-              <path className="stroke" pathLength="1" d={d} />
+              <path className="stroke" ref={strokeRef} pathLength="1" d={d} />
               {hasPeak && (
                 <circle className="pkdot" cx={fx(xOf(peakD, n))} cy={fx(yOf(maxV, maxV))} r="1.8" />
               )}
