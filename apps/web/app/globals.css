@@ -1967,6 +1967,18 @@ body.cat-on .cw .dot { display: none; }
   font-variation-settings: 'wght' var(--w, 250), 'opsz' 32;
   will-change: font-variation-settings;
 }
+/* Pinned by ThoughtEntry to the word's resting width, so a swell can no longer
+   rewrap the line under the cursor. The extra weight has to leave the box
+   rather than fold inside it, and `pre` is the one value that forbids every
+   break — `pre-wrap` would take the trailing space as its opportunity and drop
+   an empty second line under the word. Safe here and nowhere else: `.w-pin`
+   only ever lands on a span that already fit on one line, and both values
+   measure the box identically. Centring sends the spill both ways, so the word
+   grows around its own middle. */
+.thought .th-quote .w.w-pin {
+  white-space: pre;
+  text-align: center;
+}
 /* `backwards` fill with no resting `opacity: 0` is the whole no-JS story: `.in`
    arrives from an IntersectionObserver, so without scripting nothing runs and
    the quote is simply there, at its resting weight. */

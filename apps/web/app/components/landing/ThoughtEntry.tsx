@@ -20,6 +20,57 @@ const RADIUS = 170;
 const gauss = (x: number, mu: number, sigma: number) =>
   Math.exp(-((x - mu) ** 2) / (2 * sigma * sigma));
 
+/**
+ * Weight is width. A word swelling 250 → 760 gets measurably wider, and on a
+ * measure this tight that was enough to push the last word of a line down to
+ * the next one — which carried it out from under the cursor, which shrank it
+ * back, which pulled it up again, forever.
+ *
+ * Pinning every box to its resting width breaks the loop: the glyphs still
+ * swell, they just do it inside a box that moves nothing. `.w-pin` is what lets
+ * them — it stops the span wrapping at all, so the extra weight spills past the
+ * box instead of folding the word onto a second line inside it, and centres the
+ * spill so the word still grows around its own middle.
+ *
+ * Widths are read at BASE and any weight already on a span is put back, so this
+ * is safe to re-run mid-hover — which a resize does.
+ */
+function pinWidths(quote: HTMLElement, spans: HTMLSpanElement[]) {
+  const held = spans.map((el) => el.style.getPropertyValue('--w'));
+  spans.forEach((el) => {
+    el.classList.remove('w-pin');
+    el.style.width = '';
+    el.style.setProperty('--w', String(BASE));
+  });
+
+  // Measured before `.w-pin` lands, while the span can still wrap: one taller
+  // than a line holds a long token already broken across two, and `.w-pin`
+  // would only trap the overflow that break exists to avoid. Those stay fluid —
+  // a token that long has no resting width worth holding on to anyway.
+  const line = parseFloat(getComputedStyle(quote).lineHeight) || 0;
+  const fits = spans.map((el) => line === 0 || el.offsetHeight <= line * 1.5);
+  spans.forEach((el, i) => {
+    if (fits[i]) el.classList.add('w-pin');
+  });
+
+  const widths = spans.map((el, i) => (fits[i] ? el.getBoundingClientRect().width : 0));
+  spans.forEach((el, i) => {
+    const width = widths[i]!;
+    if (width > 0) el.style.width = `${width}px`;
+    else el.classList.remove('w-pin');
+    const weight = held[i];
+    if (weight) el.style.setProperty('--w', weight);
+    else el.style.removeProperty('--w');
+  });
+}
+
+function unpinWidths(spans: HTMLSpanElement[]) {
+  spans.forEach((el) => {
+    el.classList.remove('w-pin');
+    el.style.width = '';
+  });
+}
+
 export default function ThoughtEntry({
   len,
   children,
@@ -32,6 +83,55 @@ export default function ThoughtEntry({
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.4 });
   const reduced = useReducedMotion() ?? false;
+
+  /* Layout has to stop moving before the weights are allowed to — see
+     pinWidths. Fonts first: pinned to a fallback face's metrics, every box
+     would hold a width the real face never has. */
+  useEffect(() => {
+    const wrap = ref.current;
+    const quote = wrap?.querySelector<HTMLElement>('.th-quote');
+    if (!wrap || !quote || reduced) return;
+
+    const spans = Array.from(wrap.querySelectorAll<HTMLSpanElement>('.w'));
+    if (spans.length === 0) return;
+
+    let mounted = true;
+    let raf: number | null = null;
+    let pinnedAt = -1;
+
+    const pin = () => {
+      raf = null;
+      // A block with no box measures every word at zero, and pinning THAT
+      // collapses the quote to a point. It gets another go the moment the
+      // observer sees a width.
+      const width = quote.clientWidth;
+      if (!mounted || width === 0 || width === pinnedAt) return;
+      pinnedAt = width;
+      pinWidths(quote, spans);
+    };
+    // Resizes arrive in bursts and each pin costs two layout flushes.
+    const schedule = () => {
+      if (raf === null) raf = requestAnimationFrame(pin);
+    };
+
+    // The observer is both the width watch and the first measurement: it fires
+    // once on observe, then whenever the column is a different size — a resize,
+    // a zoom, or a block that had no box to start with.
+    const ro = new ResizeObserver(schedule);
+    ro.observe(quote);
+    // A font landing rewrites every advance without moving the column an inch,
+    // so that one has to ask for the re-measure the width gate would refuse.
+    void document.fonts.ready.then(() => {
+      pinnedAt = -1;
+      schedule();
+    });
+    return () => {
+      mounted = false;
+      if (raf !== null) cancelAnimationFrame(raf);
+      ro.disconnect();
+      unpinWidths(spans);
+    };
+  }, [reduced]);
 
   /* Pointer gravity: each word's weight springs toward the cursor. */
   useEffect(() => {
