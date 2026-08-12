@@ -55,6 +55,9 @@ const META: Record<string, SkillMeta> = {
   Java: { symbol: 'Jv', color: '#E76F00', category: 'backend' },
   Python: { symbol: 'Py', color: '#3776AB', category: 'backend' },
   FastAPI: { symbol: 'Fa', color: '#009688', category: 'backend' },
+  // Flask's brand mark is black; it borrows Express's neutral grey so the tile
+  // reads on both surfaces rather than disappearing into the dark one.
+  Flask: { symbol: 'Fl', color: '#9CA3AF', category: 'backend' },
 
   // ── Databases ─────────────────────────────────────────────
   PostgreSQL: { symbol: 'Pg', color: '#4F9DDE', category: 'database' },

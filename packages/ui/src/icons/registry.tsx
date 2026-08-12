@@ -8,7 +8,7 @@ import {
   JiraIcon, VercelIcon, LinuxIcon, NginxIcon, HtmlCssIcon, ReduxIcon, ZustandIcon,
   JwtIcon, OAuthIcon, ClerkIcon, PostmanIcon, SwaggerIcon, EslintPrettierIcon,
   S3Icon, EC2Icon, CloudflareIcon, BashIcon, NpmIcon, AgileIcon, NotionIcon,
-  GoogleApisIcon, PythonIcon, FastAPIIcon, GeminiIcon, BunIcon, CloudflareR2Icon,
+  GoogleApisIcon, PythonIcon, FastAPIIcon, FlaskIcon, GeminiIcon, BunIcon, CloudflareR2Icon,
 } from "./skills";
 import { GithubIcon, LinkedInIcon, MailIcon, LeetCodeIcon, XIcon } from "./brand";
 
@@ -75,6 +75,7 @@ export const SKILL_ICONS: SkillIconEntry[] = [
   { key: "Kafka", group: "Backend", Icon: KafkaIcon, search: "queue stream events" },
   { key: "Zod", group: "Backend", Icon: ZodIcon, search: "validation schema" },
   { key: "FastAPI", group: "Backend", Icon: FastAPIIcon, search: "python asgi uvicorn api" },
+  { key: "Flask", group: "Backend", Icon: FlaskIcon, search: "python wsgi jinja micro api" },
 
   // ---- Databases & ORM ----
   { key: "PostgreSQL", group: "Databases & ORM", Icon: PostgreSQLIcon, search: "postgres pg" },

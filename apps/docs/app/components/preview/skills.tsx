@@ -51,7 +51,7 @@ const META: Record<CategoryId, Record<string, string>> = {
   backend: {
     "Node.js": "#8CC84B", "Express.js": "#9CA3AF", "Go": "#00ADD8", "Golang": "#00ADD8",
     "REST APIs": "#34D399", "WebSockets": "#EC4899", "WebSocket": "#EC4899", "Kafka": "#D1D5DB",
-    "Java": "#E76F00", "Python": "#3776AB", "FastAPI": "#009688",
+    "Java": "#E76F00", "Python": "#3776AB", "FastAPI": "#009688", "Flask": "#9CA3AF",
   },
   database: {
     "PostgreSQL": "#4F9DDE", "MongoDB": "#47A248", "MySQL": "#4479A1", "Redis": "#DC382D",
