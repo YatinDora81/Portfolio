@@ -30,20 +30,26 @@ import {
   highlightParts, isEmptyQuery, matchFolder, matchQuestion, parseQuery, terms,
   type ParsedQuery,
 } from "@/lib/notes/query";
-import { hrefFor, NOTES_ROOT, type NoteKind, type TreeItem } from "@/lib/notes/view-types";
+import type { VaultItem } from "@/lib/notes/vault-view";
+import { hrefFor, NOTES_ROOT, notePathOf, type NoteKind } from "@/lib/notes/view-types";
 import { cn } from "@/lib/utils";
 import { ImportButton } from "./import-dialog";
 import { TreeMenu, type MenuTarget } from "./tree-menu";
+import { useNoteNav, useVault } from "./vault-provider";
 
 /**
  * The vault's spine: a real ARIA tree, the whole APG keyboard contract, a local
  * filter and a keyboard-only move mode.
  *
- * It renders from one prop and holds no copy of it. Expanded folders, keyboard
- * focus and the filter string are the only client state here; everything about
- * the vault itself is the server's, re-read after each action through
- * `revalidatePath`. That is what lets a rename land in the sidebar, the
- * breadcrumb and the folder overview at once without a store to keep in sync.
+ * It renders from the vault the layout loaded and holds no copy of it. Expanded
+ * folders, keyboard focus and the filter string are the only client state here;
+ * everything about the vault itself is the server's, re-read after each action
+ * through `touched()`. That is what lets a rename land in the sidebar, the
+ * breadcrumb and the folder overview at once without a store to keep in sync —
+ * the three of them are reading the same object.
+ *
+ * Which is also why the filter can now answer `tag:`, `conf:`, `is:` and `has:`
+ * without leaving the browser: that same object carries the answers.
  *
  * The one rule the rest of the file answers to: a half-built `role="tree"` is an
  * accessibility regression, not a step towards one. Announcing levels and
@@ -54,7 +60,7 @@ import { TreeMenu, type MenuTarget } from "./tree-menu";
 
 /** One row, flattened once so lookups and the keyboard never walk the tree. */
 interface Flat {
-  node: TreeItem;
+  node: VaultItem;
   /** 1-based, and set explicitly on the element — see the render. */
   level: number;
   pos: number;
@@ -80,7 +86,7 @@ const DEFERRED_HINT = "needs the full search";
 
 const EMPTY: ReadonlySet<string> = new Set();
 
-function indexByPath(list: TreeItem[], into = new Map<string, TreeItem>()) {
+function indexByPath(list: VaultItem[], into = new Map<string, VaultItem>()) {
   for (const n of list) {
     into.set(n.path, n);
     indexByPath(n.children, into);
@@ -89,7 +95,7 @@ function indexByPath(list: TreeItem[], into = new Map<string, TreeItem>()) {
 }
 
 /** Every folder above `path`, plus `path` itself when it is one. */
-function revealSet(tree: TreeItem[], path: string): Set<string> {
+function revealSet(tree: VaultItem[], path: string): Set<string> {
   const byPath = indexByPath(tree);
   const out = new Set<string>();
   for (const p of ancestorPaths(path)) {
@@ -99,35 +105,27 @@ function revealSet(tree: TreeItem[], path: string): Set<string> {
   return out;
 }
 
-const countBelow = (n: TreeItem): number =>
+const countBelow = (n: VaultItem): number =>
   n.children.reduce((a, c) => a + 1 + countBelow(c), 0);
 
-export function NoteTree({
-  tree,
-  trashCount,
-  vaultEmpty = false,
-}: {
-  tree: TreeItem[];
-  trashCount: number;
-  /** Gates the `restore` mode in the import dialog, which only an entirely
-   *  empty vault — trashed rows included — can accept. */
-  vaultEmpty?: boolean;
-}) {
+export function NoteTree() {
+  // Straight off the layout's one payload rather than through props: the reading
+  // pane is looking at the same object, so a title cannot be current in one and
+  // stale in the other. `vaultEmpty` gates the `restore` mode in the import
+  // dialog, which only an entirely empty vault — trashed rows included — accepts.
+  const { tree, trashCount, vaultEmpty, byPath } = useVault();
   const router = useRouter();
   const pathname = usePathname();
+  const go = useNoteNav();
   const [pending, startTransition] = useTransition();
 
   /**
    * The note's own path, carved off the URL. `/notes` *is* the vault root and a
    * note's path is its URL beneath it, so no lookup is needed in either
-   * direction — and the sibling routes (/notes/search, /notes/trash) simply
-   * resolve to a path nothing in the tree holds.
+   * direction — and the sibling routes (/notes/search, /notes/trash) resolve to
+   * null, which is a path nothing in the tree holds.
    */
-  const activePath = useMemo(() => {
-    if (!pathname.startsWith(NOTES_ROOT)) return "";
-    const rest = pathname.slice(NOTES_ROOT.length).split("/").filter(Boolean);
-    return rest.length ? "/" + rest.map(decodeURIComponent).join("/") : "";
-  }, [pathname]);
+  const activePath = useMemo(() => notePathOf(pathname) ?? "", [pathname]);
 
   const [expanded, setExpanded] = useState<Set<string>>(() => revealSet(tree, activePath));
   const [filter, setFilter] = useState("");
@@ -149,7 +147,7 @@ export function NoteTree({
 
   const flat = useMemo(() => {
     const out: Flat[] = [];
-    const walk = (list: TreeItem[], level: number, parentId: string | null, titles: string[]) => {
+    const walk = (list: VaultItem[], level: number, parentId: string | null, titles: string[]) => {
       list.forEach((node, i) => {
         out.push({ node, level, pos: i + 1, size: list.length, parentId, ancestorTitles: titles });
         if (node.children.length) walk(node.children, level + 1, node.id, [...titles, node.title]);
@@ -159,8 +157,10 @@ export function NoteTree({
     return out;
   }, [tree]);
 
+  // `byId` maps to the flattened record the keyboard walks, so it stays local.
+  // `byPath` is the vault's own index — a second one built from a different
+  // structure is a second thing that can be wrong.
   const byId = useMemo(() => new Map(flat.map((f) => [f.node.id, f])), [flat]);
-  const byPath = useMemo(() => new Map(flat.map((f) => [f.node.path, f.node])), [flat]);
   const selectedId = byPath.get(activePath)?.id ?? null;
 
   /* ---------- filter ---------- */
@@ -245,7 +245,7 @@ export function NoteTree({
    * keystroke in the filter box — the whole tree calls this per node.
    */
   const shownKids = useCallback(
-    (node: TreeItem) => (hidden.size ? node.children.filter((c) => !hidden.has(c.id)) : node.children),
+    (node: VaultItem) => (hidden.size ? node.children.filter((c) => !hidden.has(c.id)) : node.children),
     [hidden]
   );
 
@@ -258,12 +258,12 @@ export function NoteTree({
    * of becoming a dead key.
    */
   const heldOpen = useCallback(
-    (node: TreeItem) => filtering && shownKids(node).length > 0,
+    (node: VaultItem) => filtering && shownKids(node).length > 0,
     [filtering, shownKids]
   );
 
   const openOf = useCallback(
-    (node: TreeItem) => {
+    (node: VaultItem) => {
       if (node.kind !== "FOLDER" || !shownKids(node).length) return false;
       return expanded.has(node.id) || heldOpen(node);
     },
@@ -273,7 +273,7 @@ export function NoteTree({
   /** Rows the arrow keys may land on, in the order they appear on screen. */
   const visible = useMemo(() => {
     const out: Flat[] = [];
-    const walk = (list: TreeItem[]) => {
+    const walk = (list: VaultItem[]) => {
       for (const node of list) {
         if (hidden.has(node.id)) continue;
         const f = byId.get(node.id);
@@ -347,24 +347,12 @@ export function NoteTree({
     [showToast]
   );
 
-  /**
-   * A rename or a move rewrites `path`, and the browser is still parked on the
-   * old URL — the next render of that route would 404 on a note that is fine.
-   * So the open note is followed to wherever the refreshed tree says it went,
-   * rather than the new slug being guessed here and guessed differently from
-   * the server's `uniqueSlug`.
-   */
-  const followRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const id = followRef.current;
-    if (!id || pending) return;
-    followRef.current = null;
-    const n = byId.get(id)?.node;
-    if (n && n.path !== activePath) router.replace(hrefFor(n.path));
-  }, [pending, byId, activePath, router]);
-
-  const follow = () => { followRef.current = selectedId; };
+  /* A rename or a move rewrites `path` while the browser is still parked on the
+     old URL. That used to be followed from here, with a latch and a `!pending`
+     race; note-pane.tsx re-finds the open note by id and corrects the address
+     itself now, which also covers a rename from the editor or the action row.
+     Two mechanisms chasing the same note is one more than can be kept in
+     agreement. */
 
   /* ---------- expand ---------- */
 
@@ -487,7 +475,6 @@ export function NoteTree({
       focusRow(id);
       return;
     }
-    follow();
     const { destId, dest, index, node } = info;
     run(
       () => moveNode(id, destId, index),
@@ -522,7 +509,7 @@ export function NoteTree({
       () => createNode(c.parentId, c.kind, title),
       (res) => {
         setNotice(`${c.kind === "FOLDER" ? "Folder" : "Question"} “${title}” created.`);
-        router.push(hrefFor(res.path));
+        go(hrefFor(res.path), { afterWrite: true });
         focusRow(res.id);
       }
     );
@@ -535,7 +522,6 @@ export function NoteTree({
       focusRow(id);
       return;
     }
-    follow();
     run(
       () => renameNode(id, title),
       () => {
@@ -561,7 +547,7 @@ export function NoteTree({
       () => duplicateNode(id),
       (res) => {
         showToast(`“${title}” duplicated`, "good");
-        router.push(hrefFor(res.path));
+        go(hrefFor(res.path), { afterWrite: true });
       }
     );
   };
@@ -597,13 +583,13 @@ export function NoteTree({
         );
         // The reader is showing a note that no longer resolves; leaving it there
         // would turn the next render into a 404 on a note the user can restore.
-        if (wasOpen) router.push(NOTES_ROOT);
+        if (wasOpen) go(NOTES_ROOT, { afterWrite: true });
         focusRow(nextFocus);
       }
     );
   };
 
-  const openMenu = (node: TreeItem, x: number, y: number) => {
+  const openMenu = (node: VaultItem, x: number, y: number) => {
     setGrab(null);
     setMenu({ id: node.id, title: node.title, kind: node.kind, x, y });
   };
@@ -702,7 +688,7 @@ export function NoteTree({
       case "Enter":
         e.preventDefault();
         if (node.kind === "FOLDER") toggle(node.id, true);
-        router.push(hrefFor(node.path));
+        go(hrefFor(node.path));
         break;
       case " ":
         e.preventDefault();
@@ -804,14 +790,14 @@ export function NoteTree({
 
   /* ---------- render ---------- */
 
-  const label = (node: TreeItem) => {
+  const label = (node: VaultItem) => {
     if (!hits.length) return node.title;
     return highlightParts(node.title, hits).map((p, k) =>
       p.hit ? <span key={k} className="nt-hit">{p.text}</span> : <Fragment key={k}>{p.text}</Fragment>
     );
   };
 
-  const ariaLabel = (node: TreeItem) =>
+  const ariaLabel = (node: VaultItem) =>
     node.kind === "FOLDER"
       ? `${node.title}, folder${node.questions ? `, ${node.questions} question${node.questions === 1 ? "" : "s"}` : ""}`
       : node.title;
@@ -823,7 +809,7 @@ export function NoteTree({
    * running commentary useless — the numbers have to describe the tree the
    * arrow keys can actually reach.
    */
-  const renderChildren = (list: TreeItem[], level: number, parentId: string | null): React.ReactNode => {
+  const renderChildren = (list: VaultItem[], level: number, parentId: string | null): React.ReactNode => {
     const shown = hidden.size ? list.filter((n) => !hidden.has(n.id)) : list;
     return (
       <>
@@ -841,7 +827,7 @@ export function NoteTree({
   };
 
   const renderNode = (
-    node: TreeItem,
+    node: VaultItem,
     level: number,
     pos: number,
     size: number
@@ -900,7 +886,7 @@ export function NoteTree({
                 toggle(node.id);
                 return;
               }
-              router.push(hrefFor(node.path));
+              go(hrefFor(node.path));
             }}
             // `setFocusId`, not `focusRow`: the roving tabindex has to land on
             // this row so closing the menu returns here, but the menu is about

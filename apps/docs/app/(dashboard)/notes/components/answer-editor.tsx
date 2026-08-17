@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { saveAnswer } from "@/lib/actions/notes";
 import { hrefFor } from "@/lib/notes/view-types";
+import { unsavedDraft, useNoteNav } from "./vault-provider";
 
 export interface AnswerEditorProps {
   nodeId: string;
@@ -26,7 +26,7 @@ export interface AnswerEditorProps {
  * not an edit, and a flag would insist it was.
  */
 export default function AnswerEditor({ nodeId, href, title, body, tags }: AnswerEditorProps) {
-  const router = useRouter();
+  const go = useNoteNav();
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
   const [pending, start] = useTransition();
@@ -70,13 +70,24 @@ export default function AnswerEditor({ nodeId, href, title, body, tags }: Answer
        * actually wrote, and this follows it rather than guessing or retreating
        * to the parent folder.
        */
-      router.replace(hrefFor(r.path));
+      go(hrefFor(r.path), { replace: true, afterWrite: true });
     });
 
   const discard = () => {
     if (dirty && !window.confirm("Discard the changes you haven't saved?")) return;
-    router.replace(href);
+    // Cleared before the move, or `useNoteNav` asks the same question again.
+    unsavedDraft.current = false;
+    go(href, { replace: true });
   };
+
+  // Published so that leaving by any other door — a row in the tree, a crumb, a
+  // sibling chip — has to ask first. All of those are one frame away now.
+  useEffect(() => {
+    unsavedDraft.current = dirty;
+    return () => {
+      unsavedDraft.current = false;
+    };
+  }, [dirty]);
 
   // A box holding the current closures, so the window listener below binds once
   // instead of being torn down and rebuilt on every keystroke.

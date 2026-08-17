@@ -1,68 +1,49 @@
-import { notFound } from "next/navigation";
-import { prisma } from "db";
-import { childRows, crumbsFor, folderStats, titleByPath } from "@/lib/notes/load";
-import { hrefFor } from "@/lib/notes/view-types";
-import { AnswerView } from "../components/answer-view";
-import { FolderOverview } from "../components/folder-overview";
-import { NotesBlank } from "../components/notes-blank";
+import type { Metadata } from "next";
+import { loadVault } from "@/lib/notes/vault";
+import { indexVault } from "@/lib/notes/vault-view";
+import { NOTES_ROOT, notePathOf } from "@/lib/notes/view-types";
+import { NotePane } from "../components/note-pane";
 
-/** The vault moves under the user's own hands; a cached render would show them
- *  a tree they have already changed. */
-export const dynamic = "force-dynamic";
+/**
+ * The reader, and deliberately nothing else.
+ *
+ * Every note under /notes is drawn from the payload the layout already loaded,
+ * so this segment has no data of its own and its output does not depend on the
+ * URL that asked for it. That is the whole point: the tree moves between notes
+ * with `history.pushState` and this never re-renders on the server at all.
+ * `<NotePane>` reads the address bar instead.
+ *
+ * `force-dynamic` came off with the queries. It bought nothing once there were
+ * none — the dashboard layout above reads cookies, so the route renders per
+ * request regardless — and it cost the router cache on the real navigations
+ * that are left, the ones back from Trash and Search.
+ */
+export default function NotePage() {
+  return <NotePane />;
+}
 
-export default async function NotePage({ params }: { params: Promise<{ segments?: string[] }> }) {
+/**
+ * The title, on the two occasions the server still gets a say: a full load and a
+ * deep link.
+ *
+ * `<NotePane>` sets it from the client on every shallow move — which is what
+ * re-arms Next's route announcer, since that speaks on a title change and
+ * nothing else. But route metadata is streamed after hydration and overwrites
+ * the first one, so without this a shared link opened cold read "Admin
+ * Dashboard" in the tab, like every other page in the portal.
+ *
+ * It costs nothing: `loadVault()` is the same cached read the layout beside it
+ * has already made this request, so this is a Map lookup wearing an async
+ * signature.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ segments?: string[] }>;
+}): Promise<Metadata> {
   const { segments } = await params;
-  // Counted rather than inferred from the tree: `restore` refuses a vault that
-  // holds anything at all, trashed rows included, and the tree only knows about
-  // live ones.
-  if (!segments?.length) return <NotesBlank vaultEmpty={(await prisma.noteNode.count()) === 0} />;
-
-  // One indexed lookup on the unique path column. The URL under /notes IS the
-  // note's path, so resolving a deep link costs exactly one query no matter how
-  // deep it is — no walk down from the root, no join per level.
-  const path = `/${segments.map(decodeURIComponent).join("/")}`;
-  const node = await prisma.noteNode.findUnique({
-    where: { path },
-    include: { answer: true },
-  });
-  if (!node || node.deletedAt) notFound();
-
-  const titles = await titleByPath(path);
-  const crumbs = crumbsFor(path, titles);
-
-  if (node.kind === "FOLDER") {
-    const [children, stats] = await Promise.all([childRows(node.id), folderStats(path)]);
-    return (
-      <FolderOverview
-        node={{ id: node.id, title: node.title, path, href: hrefFor(path), crumbs, children, stats }}
-      />
-    );
-  }
-
-  const siblings = await prisma.noteNode.findMany({
-    where: { parentId: node.parentId, kind: "QUESTION", deletedAt: null, NOT: { id: node.id } },
-    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-    select: { id: true, title: true, path: true },
-    take: 12,
-  });
-
-  return (
-    <AnswerView
-      node={{
-        id: node.id,
-        title: node.title,
-        path,
-        href: hrefFor(path),
-        crumbs,
-        answer: {
-          body: node.answer?.body ?? "",
-          tags: node.answer?.tags ?? [],
-          confidence: node.answer?.confidence ?? 0,
-          lastRevisedAt: node.answer?.lastRevisedAt?.toISOString() ?? null,
-        },
-      }}
-      siblings={siblings.map((s) => ({ id: s.id, title: s.title, href: hrefFor(s.path) }))}
-      parentTitle={crumbs.length > 1 ? crumbs[crumbs.length - 2]!.title : "the vault"}
-    />
-  );
+  const path = notePathOf([NOTES_ROOT, ...(segments ?? [])].join("/"));
+  if (!path) return { title: "Notes" };
+  const ix = indexVault(await loadVault());
+  return { title: `${ix.byPath.get(path)?.title ?? "Not in the vault"} · Notes` };
 }

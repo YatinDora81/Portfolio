@@ -1,11 +1,13 @@
 import type { ReactNode } from "react";
 
 /**
- * Markdown for answer bodies, rendered on the server into React elements.
+ * Markdown for answer bodies, rendered into React elements.
  *
- * Read mode ships no editor JS, so the reader is a server component and this is
- * the whole renderer: elements out, never an HTML string, and never
- * `dangerouslySetInnerHTML`. That is not stylistic — React escapes text nodes
+ * It used to say "on the server", and the reader was a server component. Both
+ * halves of this file now run in the browser as well — the revise deck always
+ * did, and the reader joined it when the vault moved into memory. The rule below
+ * did not change, and is more load-bearing for the move, not less: elements out,
+ * never an HTML string, and never `dangerouslySetInnerHTML`. That is not stylistic — React escapes text nodes
  * for us, so nothing an answer body contains can become markup by accident, and
  * the only place a body can still reach the DOM as anything but text is an
  * `href`. `safeHref` guards it.

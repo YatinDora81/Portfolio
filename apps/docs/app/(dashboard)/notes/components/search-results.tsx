@@ -1,7 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { confLabel } from "@/lib/notes/load";
-import { isEmptyQuery, type ParsedQuery } from "@/lib/notes/query";
+import { confLabel, isEmptyQuery, type ParsedQuery } from "@/lib/notes/query";
 import { NOTES_ROOT, type ResultCard } from "@/lib/notes/view-types";
 
 const SEARCH = `${NOTES_ROOT}/search`;

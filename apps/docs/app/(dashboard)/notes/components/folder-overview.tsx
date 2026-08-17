@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { IconFileText, IconFolder } from "@tabler/icons-react";
 import type { FolderView } from "@/lib/notes/view-types";
 import { NoteCrumbs, parentHrefOf } from "./answer-view";
 import { NewNoteButtons } from "./new-note-buttons";
 import { NoteActions } from "./note-actions";
+import { NoteLink } from "./vault-provider";
 
 /**
  * What a folder is, rather than what it contains: three numbers, the things you
@@ -48,7 +48,7 @@ export function FolderOverview({ node }: { node: FolderView }) {
       {node.children.length ? (
         <div className="nt-list">
           {node.children.map((c) => (
-            <Link className="nt-litem" key={c.id} href={c.href}>
+            <NoteLink className="nt-litem" key={c.id} href={c.href}>
               <span className="nt-lic" aria-hidden>
                 {c.kind === "FOLDER"
                   ? <IconFolder size={15} stroke={1.6} />
@@ -56,7 +56,7 @@ export function FolderOverview({ node }: { node: FolderView }) {
               </span>
               <span className="nt-lt">{c.title}</span>
               <span className="nt-lm">{c.meta}</span>
-            </Link>
+            </NoteLink>
           ))}
         </div>
       ) : (

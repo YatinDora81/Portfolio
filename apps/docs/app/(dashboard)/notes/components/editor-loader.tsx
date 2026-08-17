@@ -35,10 +35,12 @@ function Gate({ children, ...props }: EditorLoaderProps) {
 
 export function EditorLoader({ children, ...props }: EditorLoaderProps) {
   // `useSearchParams` makes its caller opt out of prerendering unless a boundary
-  // stands above it. The page is `force-dynamic`, so this never fires today —
-  // but the fallback is the read view rather than a spinner, so the day someone
-  // makes this route static the reader still renders and only the Edit affordance
-  // waits.
+  // stands above it. Nothing under /notes is prerendered — the dashboard layout
+  // above reads a cookie, which ends the attempt long before this renders — so
+  // the boundary has never fired and taking it away would not fail the build
+  // either. It stays because the fallback is the read view rather than a spinner:
+  // the day this route can be prerendered, the prose lands in the HTML anyway and
+  // only the Edit affordance waits for JavaScript.
   return (
     <Suspense fallback={children}>
       <Gate {...props}>{children}</Gate>

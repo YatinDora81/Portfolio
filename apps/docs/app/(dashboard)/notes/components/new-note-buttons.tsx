@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { IconFilePlus, IconFolderPlus } from "@tabler/icons-react";
 import { createNode } from "@/lib/actions/notes";
 import { hrefFor, type NoteKind } from "@/lib/notes/view-types";
+import { useNoteNav } from "./vault-provider";
 
 /**
  * The two create buttons, and the one input they open into.
@@ -15,7 +15,7 @@ import { hrefFor, type NoteKind } from "@/lib/notes/view-types";
  * somewhere it knows exists — see answer-editor.tsx.
  */
 export function NewNoteButtons({ parentId }: { parentId: string | null }) {
-  const router = useRouter();
+  const go = useNoteNav();
   const [pending, start] = useTransition();
   const [kind, setKind] = useState<NoteKind | null>(null);
   const [title, setTitle] = useState("");
@@ -35,7 +35,7 @@ export function NewNoteButtons({ parentId }: { parentId: string | null }) {
         return;
       }
       close();
-      router.push(hrefFor(r.path));
+      go(hrefFor(r.path), { afterWrite: true });
     });
 
   if (kind) {

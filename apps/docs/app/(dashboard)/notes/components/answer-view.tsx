@@ -1,18 +1,24 @@
 import { Fragment } from "react";
-import Link from "next/link";
 import { renderMarkdown } from "@/lib/notes/markdown";
 import { NOTES_ROOT, type Crumb, type QuestionView } from "@/lib/notes/view-types";
 import { ConfidenceDots } from "./confidence-dots";
 import { EditorLoader } from "./editor-loader";
 import { NoteActions, RevealInTree } from "./note-actions";
 import { TagEditor } from "./tag-editor";
+import { NoteLink } from "./vault-provider";
 
 /**
- * The reader. A Server Component, and it stays one: the answer body is turned
- * into elements here by renderMarkdown, so opening a note ships prose and not a
- * parser. The only client code on the page is the three small controls that
- * write — tags, confidence, the action row — plus the shim that can fetch the
- * editor if it is ever asked to.
+ * The reader.
+ *
+ * It was a Server Component, so that opening a note shipped prose rather than a
+ * parser. It is a client one now, and the trade is worth naming: `renderMarkdown`
+ * costs about ten kilobytes and was already in the browser anyway — the revise
+ * deck imports the same function — while every note the reader draws from memory
+ * saves three round trips to Neon. Ten kilobytes once against most of a second
+ * every time somebody clicks a question.
+ *
+ * Nothing else moved. The body still becomes elements rather than an HTML
+ * string, and the same three controls still do the writing.
  */
 export function AnswerView({
   node,
@@ -58,7 +64,7 @@ export function AnswerView({
             <div className="nt-sibs-lb">also in {parentTitle}</div>
             <div className="nt-sibs-row">
               {siblings.map((s) => (
-                <Link className="nt-sib" key={s.id} href={s.href}>{s.title}</Link>
+                <NoteLink className="nt-sib" key={s.id} href={s.href}>{s.title}</NoteLink>
               ))}
             </div>
           </nav>
@@ -79,9 +85,8 @@ export function AnswerView({
 
 /**
  * Shared with the folder overview, and living here because the reader is the
- * page it was drawn for. Server-rendered on purpose: a breadcrumb is a row of
- * links, and the one interactive thing in it — reveal — is the only part that
- * needs to be a client component.
+ * page it was drawn for. A breadcrumb is a row of links; the only reason any of
+ * it is interactive is reveal, at the end.
  */
 export function NoteCrumbs({ crumbs, path }: { crumbs: Crumb[]; path: string }) {
   const trail = crumbs.slice(0, -1);
@@ -91,7 +96,7 @@ export function NoteCrumbs({ crumbs, path }: { crumbs: Crumb[]; path: string }) 
     <nav className="nt-crumb" aria-label="Breadcrumb">
       {trail.map((c) => (
         <Fragment key={c.href}>
-          <Link href={c.href}>{c.title}</Link>
+          <NoteLink href={c.href}>{c.title}</NoteLink>
           <span className="nt-crumb-sep" aria-hidden>/</span>
         </Fragment>
       ))}

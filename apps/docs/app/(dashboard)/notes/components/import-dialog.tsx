@@ -1,7 +1,6 @@
 "use client";
 
 import { useDeferredValue, useMemo, useState, useTransition, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { IconAlertTriangle, IconFileImport, IconFileText, IconFolder, IconUpload } from "@tabler/icons-react";
 import { Dialog } from "@/components/ui/dialog";
 import { importVault } from "@/lib/actions/notes";
@@ -20,6 +19,7 @@ import {
 import { buildTree, type TreeNode } from "@/lib/notes/paths";
 import { CONF_LABELS } from "@/lib/notes/query";
 import { hrefFor } from "@/lib/notes/view-types";
+import { useNoteNav } from "./vault-provider";
 
 /**
  * Paste a file, see exactly what it would build, then build it.
@@ -221,7 +221,7 @@ export function ImportButton({
    *  the tooltip because there is no room for it on the button. */
   variant?: "btn" | "pri" | "icon";
 }) {
-  const router = useRouter();
+  const go = useNoteNav();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [mode, setMode] = useState<ImportMode>("into");
@@ -285,7 +285,7 @@ export function ImportButton({
       }
       setText("");
       setOpen(false);
-      router.push(hrefFor(r.path));
+      go(hrefFor(r.path), { afterWrite: true });
     });
 
   const count = preview?.ok ? preview.nodes.length : 0;

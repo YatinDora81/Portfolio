@@ -2,7 +2,6 @@
 
 import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   IconCards,
   IconCopy,
@@ -15,6 +14,7 @@ import { duplicateNode, saveAnswer, trashNode } from "@/lib/actions/notes";
 import { hrefFor, type NoteKind } from "@/lib/notes/view-types";
 import { ExportMenu } from "./export-menu";
 import { ImportButton } from "./import-dialog";
+import { NoteLink, useNoteNav } from "./vault-provider";
 
 /**
  * Scroll the tree to the note the reader is showing.
@@ -27,8 +27,9 @@ import { ImportButton } from "./import-dialog";
  * Expanding is the part that cannot be done from here, and it is only needed in
  * one case: a folder the user collapsed by hand *after* arriving, which the
  * tree's additive reveal effect deliberately leaves alone. The event is the hook
- * for that case. Nothing listens for it yet, so today the button scrolls and
- * that is all it claims to do.
+ * for that case, and note-tree.tsx listens for it — so the button both opens the
+ * branch and scrolls to the row, and pressing it twice is idempotent rather than
+ * cumulative.
  */
 export function RevealInTree({ path }: { path: string }) {
   return (
@@ -72,7 +73,7 @@ export function NoteActions({
   stamp,
   children,
 }: NoteActionsProps) {
-  const router = useRouter();
+  const go = useNoteNav();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
@@ -100,7 +101,7 @@ export function NoteActions({
         return;
       }
       setRenaming(false);
-      router.replace(hrefFor(r.path));
+      go(hrefFor(r.path), { replace: true, afterWrite: true });
     });
 
   const duplicate = () =>
@@ -111,7 +112,7 @@ export function NoteActions({
         setError(r.error);
         return;
       }
-      router.push(hrefFor(r.path));
+      go(hrefFor(r.path), { afterWrite: true });
     });
 
   const trash = () =>
@@ -124,7 +125,7 @@ export function NoteActions({
       }
       // Whatever was open is no longer at this URL. Staying is a 404 on a page
       // the user is already looking at.
-      router.replace(parentHref);
+      go(parentHref, { replace: true, afterWrite: true });
     });
 
   // `window.confirm` rather than the admin's Dialog: this section styles itself
@@ -184,9 +185,9 @@ export function NoteActions({
           {children}
           {folder ? null : (
             <>
-              <Link className="btn" href={`${href}?edit=1`}>
+              <NoteLink className="btn" href={`${href}?edit=1`}>
                 <IconPencil size={13} stroke={1.7} /> Edit
-              </Link>
+              </NoteLink>
               <Link className="btn" href="/notes/revise">
                 <IconCards size={13} stroke={1.7} /> Revise
               </Link>

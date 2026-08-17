@@ -1,22 +1,31 @@
-import { loadTree } from "@/lib/notes/load";
+import { loadVault } from "@/lib/notes/vault";
 import { NoteTree } from "./components/note-tree";
+import { NotePaneShell, VaultProvider } from "./components/vault-provider";
 
 /**
- * The tree lives in the layout, not in the page.
+ * The whole vault is loaded here, once, and nothing under /notes reads the
+ * database again.
  *
- * Next re-renders only what changed below a shared layout, so navigating from
- * one note to the next repaints the right-hand pane and leaves the tree alone.
- * Its scroll position, its expanded folders and its keyboard focus all survive
- * the navigation without a client-side cache, a store, or a single line of
- * persistence code.
+ * Next re-renders only what changed below a shared layout, so this survives
+ * every navigation inside the section — and because the payload carries the
+ * answer bodies with it, moving between notes has nothing left to fetch. The
+ * tree's scroll position, its expanded folders and its keyboard focus survive
+ * for the same reason they always did, without a client-side cache, a store, or
+ * a line of persistence code.
+ *
+ * The measurement behind the decision to ship all of it: 436 live rows and
+ * 247k characters of prose come to ~420 KB of JSON, once, against ~90ms per
+ * round trip to Neon and three or four of them per note opened the old way.
  */
 export default async function NotesLayout({ children }: { children: React.ReactNode }) {
-  const { tree, trashCount, vaultEmpty } = await loadTree();
+  const payload = await loadVault();
 
   return (
-    <div className="nt">
-      <NoteTree tree={tree} trashCount={trashCount} vaultEmpty={vaultEmpty} />
-      <div className="nt-pane">{children}</div>
-    </div>
+    <VaultProvider payload={payload}>
+      <div className="nt">
+        <NoteTree />
+        <NotePaneShell>{children}</NotePaneShell>
+      </div>
+    </VaultProvider>
   );
 }

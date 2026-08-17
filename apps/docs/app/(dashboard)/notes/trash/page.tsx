@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { prisma } from "db";
-import { isOutermostTrashRoot } from "@/lib/notes/load";
-import { untomb } from "@/lib/notes/paths";
+import { isOutermostTrashRoot, untomb } from "@/lib/notes/paths";
 import type { TrashRow } from "@/lib/notes/view-types";
 import { TrashList } from "../components/trash-list";
 
