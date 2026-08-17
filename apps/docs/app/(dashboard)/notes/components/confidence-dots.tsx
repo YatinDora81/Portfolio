@@ -1,9 +1,9 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
-import { setConfidence } from "@/lib/actions/notes";
+import { useState, useTransition } from "react";
 import { CONF_LABELS } from "@/lib/notes/query";
 import { cn } from "@/lib/utils";
+import { useRate } from "./vault-provider";
 
 /**
  * The confidence control on a question: a word and a row of dots that cycles.
@@ -19,22 +19,26 @@ import { cn } from "@/lib/utils";
  * announce what it currently reads before anyone commits to pressing it.
  */
 export function ConfidenceDots({ nodeId, value }: { nodeId: string; value: number }) {
+  const rate = useRate();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  // The action revalidates and the prop comes back holding the truth. Until it
-  // does, the dots follow the click instead of sitting still for a round trip —
-  // this control is usually pressed two or three times in a row.
-  const [shown, setShown] = useOptimistic(value);
 
+  // No local copy of the rating, optimistic or otherwise. `useRate` writes it
+  // into the vault's own ratings overlay, so the prop this reads is already the
+  // new value on the very next render — and so are the folder percentage, the
+  // child-row label and the `conf:` filter, from the same number. A refused write
+  // takes it back out again, which is the rollback the optimistic hook used to
+  // give us, for the whole screen instead of for this control.
+  const shown = value;
   const label = CONF_LABELS[shown] ?? CONF_LABELS[0];
 
   return (
     <span className="nt-conf">
-      {error ? (
-        <span className="nt-bad" role="alert">{error}</span>
-      ) : (
-        <span>{label}</span>
-      )}
+      <span>{label}</span>
+      {/* Beside the word rather than instead of it: `aria-label` below is built
+          from `label`, so replacing the visible text left the accessible name
+          announcing one thing and the screen saying another. */}
+      {error ? <span className="nt-bad" role="alert">{error}</span> : null}
       <button
         type="button"
         className={cn("nt-dots", shown <= 1 ? "lo" : shown === 2 ? "mid" : "hi")}
@@ -42,10 +46,8 @@ export function ConfidenceDots({ nodeId, value }: { nodeId: string; value: numbe
         aria-label={`Confidence: ${label}, click to change`}
         onClick={() =>
           start(async () => {
-            const next = (shown + 1) % CONF_LABELS.length;
-            setShown(next);
             setError(null);
-            const r = await setConfidence(nodeId, next);
+            const r = await rate(nodeId, (shown + 1) % CONF_LABELS.length);
             if (!r.ok) setError(r.error);
           })
         }

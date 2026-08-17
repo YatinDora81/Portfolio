@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma, Prisma } from "db";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import {
@@ -17,6 +17,7 @@ import {
   trashIn,
 } from "@/lib/notes/core";
 import { MAX_JSON_BYTES, parseImport, type ImportMode } from "@/lib/notes/import";
+import { VAULT_TAG } from "@/lib/notes/vault";
 
 /**
  * The private notes vault's write surface.
@@ -46,24 +47,84 @@ async function requireSession() {
 export type NodeResult = { ok: true; id: string; path: string } | { ok: false; error: string };
 export type VoidResult = { ok: true } | { ok: false; error: string };
 
-const touched = () => revalidatePath("/notes", "layout");
+/**
+ * Two invalidations, because they throw away different things and the section
+ * needs both.
+ *
+ * `revalidatePath("/notes", "layout")` drops the *render* — `"layout"` and not
+ * `"page"`, because the tree is rendered by the layout and a page-scoped call
+ * leaves every sidebar row stale. That matters for /notes/search, /notes/trash
+ * and /notes/revise, which still query Postgres directly.
+ *
+ * `updateTag(VAULT_TAG)` drops the same data by name rather than sideways, and
+ * that is why it stays: it is the route-independent handle, it goes on working
+ * the day `loadVault()` is called from somewhere with different implicit tags,
+ * and it is the line a reader can follow back to vault.ts.
+ *
+ * Both also set `pathWasRevalidated`, which is the load-bearing half. A server
+ * action posts without an `rsc` header, so the server has no router state to
+ * filter against and renders the whole tree from the root — this layout, this
+ * vault, in the action's own response. That response is the ONLY thing that
+ * refreshes the vault the browser is holding: a shallow navigation fetches
+ * nothing, and a real one reuses the shared layout. Without the flag the response
+ * carries no flight data at all and the router keeps the state it had, so a
+ * rename commits to Postgres and the sidebar goes on showing the old title until
+ * a reload.
+ *
+ * That also means `touched()` is only legal inside a server action, which is the
+ * only place it is called from.
+ *
+ * Every mutation in this file goes through `write()`, which calls this. That is
+ * the invariant keeping the cache honest; a write that skips it serves the user
+ * their own edit, missing.
+ */
+const touched = () => {
+  updateTag(VAULT_TAG);
+  revalidatePath("/notes", "layout");
+};
+
+/**
+ * A rating, and deliberately not the invalidation above.
+ *
+ * `touched()` makes an action carry a whole fresh render home — a root render, an
+ * uncached vault read and ~110 KB gzipped down the wire. That is right for a
+ * rename, which has to reach the sidebar, the breadcrumb and the folder overview
+ * at once. It is wrong for a rating: the revise deck fires one per card without
+ * waiting, so a sixty-card sitting would pay all of that sixty times and leave
+ * /notes/revise slower than it was before any of this.
+ *
+ * The profile'd form marks the entry stale without dragging a render along, and
+ * deliberately does not set `pathWasRevalidated` — which means, and this is the
+ * part worth writing down, the browser's copy of the vault does not update at
+ * all. Not on the next navigation either: a shallow move fetches nothing and a
+ * real one reuses the shared layout. So the client owns the correction instead,
+ * in the ratings overlay in vault-provider.tsx. Postgres is right immediately,
+ * the cached payload is right at the next structural write, and the screen is
+ * right in the frame the user clicked.
+ */
+const rated = () => revalidateTag(VAULT_TAG, "max");
+
 
 /** Runs `fn` in one transaction, and turns the two failure modes a component
  *  needs to tell apart — a refusal it should show, and a crash it should not
  *  paraphrase — into the same shape.
  *
- *  `opts` exists for exactly one caller. Prisma's 5-second interactive
- *  transaction budget is right for every write here that touches a handful of
- *  rows, and wrong for an import that may insert thousands; raising it globally
- *  would let an ordinary write hold a connection for two minutes before failing.
+ *  `timeout`/`maxWait` exist for exactly one caller. Prisma's 5-second
+ *  interactive transaction budget is right for every write here that touches a
+ *  handful of rows, and wrong for an import that may insert thousands; raising
+ *  it globally would let an ordinary write hold a connection for two minutes
+ *  before failing. `invalidate` exists for exactly one other — see `rated()`.
  */
 async function write<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
-  opts?: { timeout?: number; maxWait?: number },
+  opts?: { timeout?: number; maxWait?: number; invalidate?: () => void },
 ): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+  // Split rather than forwarded whole: `invalidate` is this file's own option and
+  // Prisma is handed only the two it knows about.
+  const { invalidate = touched, ...tx } = opts ?? {};
   try {
-    const value = await prisma.$transaction(fn, opts);
-    touched();
+    const value = await prisma.$transaction(fn, tx);
+    invalidate();
     return { ok: true, value };
   } catch (e) {
     if (e instanceof NoteError) return { ok: false, error: e.message };
@@ -263,10 +324,12 @@ export async function setConfidence(nodeId: string, value: number): Promise<Void
   await requireSession();
   const v = Math.max(0, Math.min(4, Math.round(value)));
   return voided(
-    await write((tx) =>
-      tx.noteAnswer
-        .update({ where: { nodeId }, data: { confidence: v, lastRevisedAt: new Date() } })
-        .then(() => undefined),
+    await write(
+      (tx) =>
+        tx.noteAnswer
+          .update({ where: { nodeId }, data: { confidence: v, lastRevisedAt: new Date() } })
+          .then(() => undefined),
+      { invalidate: rated },
     ),
   );
 }

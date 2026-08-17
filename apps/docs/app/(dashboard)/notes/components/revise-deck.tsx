@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { setConfidence } from "@/lib/actions/notes";
 import { renderMarkdown } from "@/lib/notes/markdown";
 import { CONF_LABELS } from "@/lib/notes/query";
 import type { ReviseCard } from "@/lib/notes/view-types";
+import { useRate } from "./vault-provider";
 
 /**
  * The revise deck: one question at a time, a veil over the answer, and four
@@ -40,22 +40,27 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
   const router = useRouter();
   /**
    * The deck is frozen at mount, and that is the load-bearing decision in this
-   * file. `setConfidence` revalidates /notes, so every rating pushes a freshly
-   * ordered queue down as new props — the card just rated leaves the front, and
-   * an index into the incoming array would land the user somewhere they have
-   * never been. The queue is a judgement made once, when the page loaded.
+   * file. An index into a queue that reorders underneath it would land the user
+   * on a card they have never seen. The queue is a judgement made once, when the
+   * page loaded.
    */
   const [deck, setDeck] = useState(cards);
   const [i, setI] = useState(0);
   const [shown, setShown] = useState(false);
   const [failed, setFailed] = useState<Failure[]>([]);
+  /** What this sitting said. The queue is re-ranked from it — see "Go again". */
+  const [given, setGiven] = useState<ReadonlyMap<string, number>>(new Map());
+  const record = useRate();
   const veil = useRef<HTMLButtonElement>(null);
   const revealed = useRef<HTMLDivElement>(null);
 
   const card = deck[i];
 
+  // Through the vault's own recorder, not `setConfidence` directly: a rating
+  // carries no re-render home, so this is what makes the folder percentages and
+  // the `conf:` filter agree with the sitting the moment it ends.
   const save = useCallback((c: { id: string; title: string }, value: number) => {
-    void setConfidence(c.id, value)
+    void record(c.id, value)
       .then((r) => {
         if (!r.ok) setFailed((f) => [...f, { id: c.id, title: c.title, value, error: `${r.error}.` }]);
       })
@@ -65,7 +70,7 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
           { id: c.id, title: c.title, value, error: "The rating never reached the server." },
         ]);
       });
-  }, []);
+  }, [record]);
 
   const rate = useCallback(
     (value: number) => {
@@ -77,6 +82,7 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
       // into a form.
       setI((n) => n + 1);
       setShown(false);
+      setGiven((g) => new Map(g).set(c.id, value));
       save(c, value);
     },
     [deck, i, save],
@@ -164,19 +170,34 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
       <div className="nt-blank">
         <div className="nt-blank-h">Queue clear</div>
         <p className="nt-blank-p">
-          {deck.length} card{deck.length === 1 ? "" : "s"} rated. The vault has already reordered
-          itself around what you just said, so the next queue will not be this one.
+          {deck.length} card{deck.length === 1 ? "" : "s"} rated. Going again deals the same cards
+          back in the order you just put them in — least confident first, so the ones you stumbled
+          on come round again first.
         </p>
         <div className="nt-blank-row">
-          {cards.length > 0 && (
+          {deck.length > 0 && (
             <button
               type="button"
               className="btn"
-              // The live prop is already current: every rating revalidated
-              // /notes and pushed a new queue down here, which is exactly the
-              // ranking the next sitting wants.
+              /**
+               * Re-ranked from what was just said, not refetched.
+               *
+               * This used to re-seed from the `cards` prop, which every rating
+               * refreshed — a rating no longer does, deliberately (see `rated()`
+               * in lib/actions/notes.ts), so dealing the prop again would open on
+               * cards the user has just called solid.
+               *
+               * The answer is already in the room: least confident first IS the
+               * order the ratings imply, and `sort` is stable, so cards rated the
+               * same keep the path order the server dealt them in.
+               */
               onClick={() => {
-                setDeck(cards);
+                setDeck((d) =>
+                  [...d].sort(
+                    (a, b) =>
+                      (given.get(a.id) ?? a.confidence) - (given.get(b.id) ?? b.confidence)
+                  )
+                );
                 setI(0);
                 setShown(false);
               }}
