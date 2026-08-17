@@ -168,30 +168,34 @@ export function NoteTree() {
   const parsed = useMemo(() => parseQuery(filter), [filter]);
 
   /**
-   * The half of the query language this box cannot honestly answer.
+   * The one term this box still cannot honestly answer.
    *
-   * The sidebar's query never selects an answer body, which is exactly why
-   * moving between notes costs one small query however large the vault gets. So
-   * `tag:redis` evaluated here would be run against an empty tag list and
-   * confidently report nothing — and a search that returns zero when the answer
-   * exists is what teaches someone that search is broken. These terms are
-   * lifted out of the local match, named under the box, and handed to
-   * /notes/search, which has the columns to answer them.
+   * It used to be six of them. The sidebar's query held titles and nothing else,
+   * so `tag:redis` ran against an empty tag list and confidently reported
+   * nothing — and a filter that returns zero when the note exists is what
+   * teaches someone that search is broken. Those terms were lifted out and
+   * handed to /notes/search, which had the columns.
+   *
+   * The payload now carries every body, tag and rating, so the box answers them
+   * itself, in the same frame as the keystroke. What is left is `is:trashed`:
+   * the tree holds live rows only, by construction, and matching zero of them is
+   * an honest answer that reads exactly like a broken one. That still belongs to
+   * the search page.
    */
   const deferred = useMemo(
     () => [
-      ...parsed.tags.map((t) => `tag:${t}`),
-      ...parsed.notTags.map((t) => `-tag:${t}`),
-      ...parsed.is.map((x) => `is:${x}`),
-      ...parsed.notIs.map((x) => `-is:${x}`),
-      ...parsed.conf.map((c) => `conf:${c.op === "=" ? "" : c.op}${c.v}`),
-      ...parsed.has.map((h) => `has:${h}`),
+      ...parsed.is.filter((x) => x === "trashed").map((x) => `is:${x}`),
+      ...parsed.notIs.filter((x) => x === "trashed").map((x) => `-is:${x}`),
     ],
     [parsed]
   );
 
   const local = useMemo<ParsedQuery>(
-    () => ({ ...parsed, tags: [], notTags: [], is: [], notIs: [], conf: [], has: [] }),
+    () => ({
+      ...parsed,
+      is: parsed.is.filter((x) => x !== "trashed"),
+      notIs: parsed.notIs.filter((x) => x !== "trashed"),
+    }),
     [parsed]
   );
 
@@ -212,10 +216,10 @@ export function NoteTree() {
                 title: n.title,
                 path: n.path,
                 deletedAt: null,
-                body: "",
-                tags: [],
-                confidence: 0,
-                lastRevisedAt: null,
+                body: n.answer?.body ?? "",
+                tags: n.answer?.tags ?? [],
+                confidence: n.answer?.confidence ?? 0,
+                lastRevisedAt: n.answer?.lastRevisedAt ?? null,
                 ancestorTitles: f.ancestorTitles,
               },
               local
