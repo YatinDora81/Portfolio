@@ -16,7 +16,7 @@ import {
   restoreIn,
   trashIn,
 } from "@/lib/notes/core";
-import { MAX_JSON_BYTES, parseImport, type ImportMode } from "@/lib/notes/import";
+import { MAX_JSON_BYTES, parseImport, type FolderMode, type ImportMode } from "@/lib/notes/import";
 import { VAULT_TAG } from "@/lib/notes/vault";
 
 /**
@@ -252,6 +252,9 @@ export async function importVault(
   destParentId: string | null,
   json: string,
   mode: ImportMode = "into",
+  /** Defaults to the behaviour this action always had, so a caller that predates
+   *  the choice keeps getting it. The dialog asks and passes an answer. */
+  folders: FolderMode = "create",
 ): Promise<NodeResult> {
   await requireSession();
 
@@ -260,6 +263,7 @@ export async function importVault(
   }
   if (typeof json !== "string") return { ok: false, error: "Paste the JSON text" };
   if (mode !== "into" && mode !== "restore") return { ok: false, error: "Unknown import mode" };
+  if (folders !== "merge" && folders !== "create") return { ok: false, error: "Unknown folder mode" };
   // Bytes, not characters. A cap read off `.length` is three times looser than
   // it looks the moment the payload is not ASCII.
   if (Buffer.byteLength(json, "utf8") > MAX_JSON_BYTES) {
@@ -281,7 +285,7 @@ export async function importVault(
     return { ok: false, error: "Restore needs a vault export, not a nested outline." };
   }
 
-  const r = await write((tx) => importIn(tx, destParentId, parsed.nodes, mode), {
+  const r = await write((tx) => importIn(tx, destParentId, parsed.nodes, mode, folders), {
     timeout: 120_000,
     maxWait: 10_000,
   });

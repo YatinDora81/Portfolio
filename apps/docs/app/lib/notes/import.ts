@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { VAULT_FORMAT, VAULT_VERSION } from "./export";
-import { normaliseTags, type NoteKind } from "./paths";
+import { normaliseTags, slugify, type NoteKind } from "./paths";
 import { CONF_NAME } from "./query";
 
 /**
@@ -67,6 +67,17 @@ export const MAX_JSON_BYTES = 4 * 1024 * 1024;
 export const MAX_DEPTH = 32;
 
 export type ImportMode = "into" | "restore";
+
+/**
+ * What an incoming folder does when the destination already holds one by that
+ * name: land inside it, or become a second folder beside it.
+ *
+ * `create` is what this importer always did. It is kept rather than replaced
+ * because it is the only honest answer for a file you want kept whole and
+ * separate — and because `uniqueSlug` already makes it work, it costs nothing
+ * to keep offering.
+ */
+export type FolderMode = "merge" | "create";
 export type Shape = "vault" | "nested";
 
 export const SHAPE_LABEL: Record<Shape, string> = {
@@ -376,6 +387,116 @@ export function levelOrder(nodes: VaultNode[]): VaultNode[][] {
 export function topoOrder(nodes: VaultNode[]): VaultNode[] {
   const s = structure(nodes);
   return [...s.levels.flat(), ...s.stranded];
+}
+
+/* ------------------------------------------------------------- the graft -- */
+
+/** One live row of the destination vault, as the graft needs to see it. */
+export interface LiveNode {
+  id: string;
+  parentId: string | null;
+  slug: string;
+  kind: NoteKind;
+  /** Unused by the plan below, and required anyway: `importIn` seeds each merged
+   *  folder's next sort number from it, so the two callers hand over the same
+   *  row rather than two different views of one. */
+  sortOrder: number;
+}
+
+export interface GraftPlan {
+  /** File node id → the existing folder it lands *inside of* rather than being
+   *  created as. Absent for every node that will be inserted. */
+  merged: Map<string, string>;
+  foldersReused: number;
+  foldersCreated: number;
+  questionsCreated: number;
+}
+
+/**
+ * Which of the file's folders already exist at the destination, and so should be
+ * grafted into rather than built again.
+ *
+ * The decision is here, in the pure half, because two places have to make it and
+ * they must never disagree: `importIn` writes it, and the dialog previews it in
+ * the browser before anything is written. They call this same function over the
+ * same live rows — the preview is not a description of the import, it IS the
+ * import's own plan, run early.
+ *
+ * Three rules, each of which is a decision rather than a detail:
+ *
+ * **Slug, not title.** The slug is already what a level is unique on, and
+ * `slugify` folds away case, spacing and punctuation — so "Dynamic Programming"
+ * lands in an existing "dynamic programming" instead of doubling it, which is
+ * the whole reason somebody reaches for this.
+ *
+ * **Folder onto folder only.** A question is never merged into: two notes that
+ * share a title are two notes, and treating them as one would mean deciding
+ * whose answer survives. The importer does not get to make that call, so a
+ * repeated question is created beside the old one and disambiguated by slug.
+ * A file folder meeting a live *question* of the same name likewise creates —
+ * refusing a four-hundred-note import over one name collision would be the
+ * wrong trade in the other direction.
+ *
+ * **Merging stops where the names stop matching.** A node can only merge if its
+ * parent did, so the graft follows the existing tree down as far as it goes and
+ * everything past that point is new. That falls out of `merged.has(parentId)`
+ * rather than being enforced: once an ancestor is created, nothing beneath it
+ * has anything live to collide with.
+ *
+ * `claimed` is the case worth naming: a file holding two sibling folders both
+ * called "Trees" cannot merge both into the one live "Trees" — the second would
+ * be trying to occupy a folder the first already took. The first merges, the
+ * second is created, and `uniqueSlug` gives it `trees-2`.
+ */
+export function planGraft(
+  nodes: VaultNode[],
+  destParentId: string | null,
+  live: LiveNode[],
+  folders: FolderMode,
+): GraftPlan {
+  const merged = new Map<string, string>();
+  let foldersReused = 0;
+  let foldersCreated = 0;
+  let questionsCreated = 0;
+
+  const kidsOf = new Map<string | null, LiveNode[]>();
+  if (folders === "merge") {
+    for (const n of live) {
+      const list = kidsOf.get(n.parentId);
+      if (list) list.push(n);
+      else kidsOf.set(n.parentId, [n]);
+    }
+  }
+
+  const claimed = new Set<string>();
+
+  for (const [depth, level] of levelOrder(nodes).entries()) {
+    for (const n of level) {
+      // The vault node this one lands under: the destination for a file root,
+      // and otherwise whatever its parent merged into. `undefined` means the
+      // parent was created, which is what ends the merge for this branch.
+      const host = depth === 0 ? destParentId : merged.get(n.parentId!);
+      const mergeable = folders === "merge" && n.kind === "FOLDER" && (depth === 0 || host !== undefined);
+
+      if (mergeable) {
+        const want = slugify(n.title);
+        const hit = (kidsOf.get(host ?? null) ?? []).find(
+          (k) => k.slug === want && k.kind === "FOLDER" && !claimed.has(k.id),
+        );
+        if (hit) {
+          merged.set(n.id, hit.id);
+          claimed.add(hit.id);
+          foldersReused++;
+          continue;
+        }
+      }
+
+      if (n.kind === "FOLDER") foldersCreated++;
+      else questionsCreated++;
+    }
+  }
+
+  return { merged, foldersReused, foldersCreated, questionsCreated };
 }
 
 /* ------------------------------------------------------------ validation -- */

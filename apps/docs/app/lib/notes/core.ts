@@ -1,6 +1,14 @@
 import { Prisma } from "db";
 import { slugify, uniqueSlug, moveError, normaliseTags, tombstone, untomb } from "./paths";
-import { levelOrder, vaultProblems, type ImportMode, type VaultNode } from "./import";
+import {
+  levelOrder,
+  planGraft,
+  vaultProblems,
+  type FolderMode,
+  type ImportMode,
+  type LiveNode,
+  type VaultNode,
+} from "./import";
 
 /**
  * Every write the notes vault makes, as a function of a transaction client.
@@ -464,7 +472,8 @@ export async function importIn(
   destParentId: string | null,
   nodes: VaultNode[],
   mode: ImportMode,
-): Promise<{ created: number; rootIds: string[] }> {
+  folders: FolderMode = "create",
+): Promise<{ created: number; reused: number; rootIds: string[] }> {
   const problems = vaultProblems(nodes);
   if (problems.length) throw new NoteError(problems[0]!);
 
@@ -488,26 +497,75 @@ export async function importIn(
   }
 
   const levels = levelOrder(nodes);
-  const idOf = new Map(nodes.map((n) => [n.id, mode === "restore" ? n.id : crypto.randomUUID()] as const));
 
-  // Slugs are allocated per parent against an in-memory list, seeded for the
-  // destination from ONE query. Pushing each result back is what stops two
-  // siblings both titled "DP" from both resolving to `dp` and the second dying
-  // on the path unique index — and a hand-written outline repeats names
-  // constantly, so this is the common case rather than an edge one.
-  // `liveSiblingSlugs(tx, null)` folds in RESERVED_ROOT_SLUGS, so a root folder
-  // titled "Export" lands on `export-2` without this function knowing why.
-  const taken = new Map<string | null, string[]>([[destParentId, await liveSiblingSlugs(tx, destParentId)]]);
+  // Merging reads the live tree, so it is asked for once rather than a level at
+  // a time: the graft can descend into any folder that matches, and finding out
+  // which those are one query per level would be a round trip per level of the
+  // file. The whole live vault is a few hundred narrow rows — the same bet
+  // lib/notes/vault.ts already makes, for the same reason.
+  // `restore` rebuilds a whole vault into an empty one, so there is nothing
+  // present for it to merge with and the flag is simply not its business.
+  const merging = folders === "merge" && mode === "into";
+  const live: LiveNode[] = merging
+    ? await tx.noteNode.findMany({
+        where: { deletedAt: null },
+        select: { id: true, parentId: true, slug: true, kind: true, sortOrder: true },
+      })
+    : [];
+
+  // The plan is made before a single row is written, by the same function the
+  // import dialog previews with. See planGraft in import.ts.
+  const plan = planGraft(nodes, destParentId, live, merging ? "merge" : "create");
+
+  const idOf = new Map(
+    nodes.map(
+      (n) =>
+        [n.id, mode === "restore" ? n.id : (plan.merged.get(n.id) ?? crypto.randomUUID())] as const,
+    ),
+  );
+
+  // Slugs are allocated per parent against an in-memory list. Pushing each
+  // result back is what stops two siblings both titled "DP" from both resolving
+  // to `dp` and the second dying on the path unique index — and a hand-written
+  // outline repeats names constantly, so this is the common case rather than an
+  // edge one.
+  const taken = new Map<string | null, string[]>();
   // One past the highest number in use, rather than the count. They are the same
   // on a level that has been reindexed and they are not on a level with a gap,
   // where counting would interleave the graft with what is already there.
-  const highest = await tx.noteNode.aggregate({
-    where: { parentId: destParentId, deletedAt: null },
-    _max: { sortOrder: true },
-  });
-  const nextOrder = new Map<string | null, number>([[destParentId, (highest._max.sortOrder ?? -1) + 1]]);
+  const nextOrder = new Map<string | null, number>();
 
+  if (merging) {
+    // Every level the graft might land on, seeded from the one read above. A
+    // merged folder is appended to, so it needs its own two numbers exactly as
+    // the destination does — without this, notes grafted into an existing folder
+    // start again at sortOrder 0 and interleave with what is already inside it.
+    const maxOrder = new Map<string | null, number>();
+    for (const r of live) {
+      const list = taken.get(r.parentId);
+      if (list) list.push(r.slug);
+      else taken.set(r.parentId, [r.slug]);
+      maxOrder.set(r.parentId, Math.max(maxOrder.get(r.parentId) ?? -1, r.sortOrder));
+    }
+    for (const [parentId, max] of maxOrder) nextOrder.set(parentId, max + 1);
+    // `liveSiblingSlugs` folds these in for us on the query path; the in-memory
+    // seed has to do it by hand, or a root folder titled "Export" would take a
+    // slug that shadows a real route.
+    taken.set(null, [...(taken.get(null) ?? []), ...RESERVED_ROOT_SLUGS]);
+  } else {
+    taken.set(destParentId, await liveSiblingSlugs(tx, destParentId));
+    const highest = await tx.noteNode.aggregate({
+      where: { parentId: destParentId, deletedAt: null },
+      _max: { sortOrder: true },
+    });
+    nextOrder.set(destParentId, (highest._max.sortOrder ?? -1) + 1);
+  }
+
+  // Where each of the file's roots ended up, whether it was built or grafted
+  // into. Both the path rebuild and the redirect afterwards read this, and a
+  // merged root has no new row for them to read instead.
   const rootIds: string[] = [];
+  let created = 0;
   const answers: Prisma.NoteAnswerCreateManyInput[] = [];
 
   for (const [depth, level] of levels.entries()) {
@@ -515,6 +573,14 @@ export async function importIn(
 
     for (const n of level) {
       const id = idOf.get(n.id)!;
+      // Already in the vault. `idOf` was pointed at the live folder before the
+      // loop began, so this level writes nothing and the next one lands its
+      // children inside it — and no slug or sort number is consumed here, which
+      // is what keeps a merged folder's existing contents where they are.
+      if (plan.merged.has(n.id)) {
+        if (depth === 0) rootIds.push(id);
+        continue;
+      }
       // Level 0 is the file's roots — whatever their parentId claims, the file
       // may not carry the parent it names, and the graft re-parents them here.
       const parentId = depth === 0 ? destParentId : idOf.get(n.parentId!)!;
@@ -552,7 +618,10 @@ export async function importIn(
       if (depth === 0) rootIds.push(id);
     }
 
-    await tx.noteNode.createMany({ data: rows });
+    // A level can be empty now: one whose every folder merged writes nothing,
+    // and createMany with no rows is a round trip to say so.
+    if (rows.length) await tx.noteNode.createMany({ data: rows });
+    created += rows.length;
   }
 
   if (answers.length) await tx.noteAnswer.createMany({ data: answers });
@@ -563,7 +632,7 @@ export async function importIn(
   await rebuildSubtrees(tx, rootIds);
   await reindex(tx, destParentId);
 
-  return { created: nodes.length, rootIds };
+  return { created, reused: plan.foldersReused, rootIds };
 }
 
 /** Re-exported so every write still reaches it through this module, while the

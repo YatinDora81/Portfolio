@@ -7,11 +7,14 @@ import {
   flattenNested,
   levelOrder,
   parseImport,
+  planGraft,
   summarise,
   topoOrder,
   vaultProblems,
+  type LiveNode,
   type VaultNode,
 } from "./import";
+import type { NoteKind } from "./paths";
 
 /**
  * The half of the importer that never touches a database: what a pasted file
@@ -419,5 +422,130 @@ describe("vaultProblems", () => {
     expect(vaultProblems(clean, 2)).toEqual([]);
     expect(vaultProblems(clean, 3)[0]).toMatch(/truncated/i);
     expect(vaultProblems([])[0]).toMatch(/no notes/i);
+  });
+});
+
+describe("planGraft", () => {
+  /** A live vault row. The slug is written out rather than run through
+   *  `slugify`, so a test notices `slugify` changing under it. */
+  const row = (
+    id: string,
+    parentId: string | null,
+    slug: string,
+    kind: NoteKind = "FOLDER",
+  ): LiveNode => ({ id, parentId, slug, kind, sortOrder: 0 });
+
+  test("the fixtures below carry real titles", () => {
+    // `flattenNested` writes `title: note.title` and does NOT apply the bare
+    // string shorthand — that lives in NestedNoteSchema. A fixture written
+    // `children: ["AVL rotations"]` therefore builds a question with NO title,
+    // and a test asserting "the name never matches" would pass for the wrong
+    // reason. Test files are excluded from tsc, so nothing else catches this.
+    expect(dsaTreesAvl().map((n) => n.title)).toEqual(["DSA", "Trees", "AVL rotations"]);
+  });
+
+  const dsaTreesAvl = () =>
+    flattenNested([{ title: "DSA", children: [{ title: "Trees", children: [{ title: "AVL rotations" }] }] }]);
+
+  test("follows the existing tree down as far as the names keep matching", () => {
+    const file = dsaTreesAvl();
+    const p = planGraft(file, null, [row("v-dsa", null, "dsa"), row("v-trees", "v-dsa", "trees")], "merge");
+
+    expect(p.foldersReused).toBe(2);
+    expect(p.foldersCreated).toBe(0);
+    expect(p.questionsCreated).toBe(1);
+    // Both folders point at the rows that already exist, so nothing is built
+    // twice and the note lands inside the folder the user already made.
+    expect(p.merged.get(file[0]!.id)).toBe("v-dsa");
+    expect(p.merged.get(file[1]!.id)).toBe("v-trees");
+    expect(p.merged.has(file[2]!.id)).toBe(false);
+  });
+
+  test("stops where the names stop, and builds the rest", () => {
+    const file = dsaTreesAvl();
+    const p = planGraft(file, null, [row("v-dsa", null, "dsa")], "merge");
+
+    expect(p.foldersReused).toBe(1);
+    expect(p.foldersCreated).toBe(1);
+    expect(p.questionsCreated).toBe(1);
+  });
+
+  test("a created folder ends the merge for everything beneath it", () => {
+    // "Trees" exists, but not under the destination — it hangs off another
+    // folder entirely. Once "DSA" is built new, nothing below it can match.
+    const file = dsaTreesAvl();
+    const p = planGraft(file, null, [row("v-other", null, "other"), row("v-trees", "v-other", "trees")], "merge");
+
+    expect(p.foldersReused).toBe(0);
+    expect(p.foldersCreated).toBe(2);
+  });
+
+  test("never merges a question, however exactly the name matches", () => {
+    const file = flattenNested([{ title: "DSA", children: [{ title: "AVL rotations" }] }]);
+    const live = [row("v-dsa", null, "dsa"), row("v-avl", "v-dsa", "avl-rotations", "QUESTION")];
+    const p = planGraft(file, null, live, "merge");
+
+    expect(p.foldersReused).toBe(1);
+    // A second note beside the first, rather than a decision about whose answer
+    // survives. `uniqueSlug` gives it `avl-rotations-2` at write time.
+    expect(p.questionsCreated).toBe(1);
+    expect(p.merged.has(file[1]!.id)).toBe(false);
+  });
+
+  test("will not graft a folder into a question wearing its name", () => {
+    const file = flattenNested([{ title: "DSA", children: [{ title: "x" }] }]);
+    const p = planGraft(file, null, [row("v-dsa", null, "dsa", "QUESTION")], "merge");
+
+    expect(p.foldersReused).toBe(0);
+    expect(p.foldersCreated).toBe(1);
+  });
+
+  test("two file folders of one name cannot both take the same live folder", () => {
+    const file = flattenNested([
+      { title: "DSA", children: [{ title: "a" }] },
+      { title: "DSA", children: [{ title: "b" }] },
+    ]);
+    const p = planGraft(file, null, [row("v-dsa", null, "dsa")], "merge");
+
+    expect(p.foldersReused).toBe(1);
+    expect(p.foldersCreated).toBe(1);
+  });
+
+  test("matches on the slug, so case and spacing do not double a folder", () => {
+    const file = flattenNested([{ title: "Dynamic  Programming", children: [{ title: "knapsack" }] }]);
+    const p = planGraft(file, null, [row("v-dp", null, "dynamic-programming")], "merge");
+
+    expect(p.foldersReused).toBe(1);
+  });
+
+  test("merges inside the destination, not wherever the name happens to appear", () => {
+    const file = flattenNested([{ title: "DSA", children: [{ title: "x" }] }]);
+    const live = [row("v-root-dsa", null, "dsa"), row("v-home", null, "home"), row("v-home-dsa", "v-home", "dsa")];
+    const p = planGraft(file, "v-home", live, "merge");
+
+    expect(p.foldersReused).toBe(1);
+    expect(p.merged.get(file[0]!.id)).toBe("v-home-dsa");
+  });
+
+  test("a question never lands in a folder that shares its name", () => {
+    // The other side of "folders only": here the live row IS a folder and the
+    // incoming one is a question with exactly its slug. `n.kind === "FOLDER"` is
+    // what has to refuse it, and a note is created beside the folder instead.
+    const file = flattenNested([{ title: "Trees" }]);
+    const p = planGraft(file, null, [row("v-trees", null, "trees")], "merge");
+
+    expect(p.foldersReused).toBe(0);
+    expect(p.questionsCreated).toBe(1);
+    expect(p.merged.size).toBe(0);
+  });
+
+  test("create mode is the old behaviour, and reuses nothing", () => {
+    const file = dsaTreesAvl();
+    const p = planGraft(file, null, [row("v-dsa", null, "dsa"), row("v-trees", "v-dsa", "trees")], "create");
+
+    expect(p.foldersReused).toBe(0);
+    expect(p.foldersCreated).toBe(2);
+    expect(p.questionsCreated).toBe(1);
+    expect(p.merged.size).toBe(0);
   });
 });
