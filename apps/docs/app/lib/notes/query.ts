@@ -60,6 +60,10 @@ export interface Matchable {
 /** The confidence scale. The index *is* the stored integer, so order is data. */
 export const CONF_LABELS = ["unrated", "again", "shaky", "good", "solid"] as const;
 
+/** The label for a stored confidence, clamped rather than trusted: the column is
+ *  an int and a row written around the app can hold anything. */
+export const confLabel = (c: number) => CONF_LABELS[Math.max(0, Math.min(4, c))]!;
+
 /** Derived, never typed twice — the parser and the UI cannot drift apart. */
 export const CONF_NAME: Record<string, number> = Object.fromEntries(
   CONF_LABELS.map((l, i) => [l, i] as const)

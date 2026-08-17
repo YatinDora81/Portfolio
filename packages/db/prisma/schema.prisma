@@ -383,8 +383,13 @@ model NoteNode {
   @@index([deletedAt])
 }
 
-/// Split from NoteNode so "load the whole tree" stays a narrow query — the
-/// sidebar renders hundreds of rows and never reads an answer body.
+/// Split from NoteNode, and the reason has changed rather than lapsed. It was
+/// "the sidebar renders hundreds of rows and never reads an answer body" — it
+/// does read them now, because carrying the bodies is what removes three round
+/// trips per note opened and makes the tree filter's tag:/conf:/has: operators
+/// honest. Two tables still earn their keep: they are two queries that can be in
+/// flight at once, which is exactly why readVault() joins them in memory instead
+/// of asking Prisma for a relation include.
 model NoteAnswer {
   nodeId String   @id
   node   NoteNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)

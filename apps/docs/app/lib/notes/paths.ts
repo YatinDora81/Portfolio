@@ -112,6 +112,20 @@ export function untomb(path: string): string {
 }
 
 /**
+ * Whether a trashed row is one somebody actually threw away, as opposed to one
+ * swept up by an ancestor being thrown away.
+ *
+ * Both are `trashRoot`, because trashing a folder never clears the flag on a
+ * note that was already in the trash inside it. What separates them is whose
+ * tombstone they are sitting under: `rebuildSubtree` absorbs a nested trash
+ * root into its nearest enclosing one, so only the outermost row is parked
+ * under its OWN id. Getting this wrong shows the same note twice in the trash
+ * and offers a Restore that pulls it out of a folder still in the trash.
+ */
+export const isOutermostTrashRoot = (r: { id: string; path: string }) =>
+  r.path.startsWith(`${TRASH_PREFIX}${r.id}/`);
+
+/**
  * Flat rows to a nested tree in one pass. The whole vault is one query and one
  * build; at this scale that beats any lazy scheme and removes a class of
  * loading-state bugs, so do not reach for a recursive CTE.
