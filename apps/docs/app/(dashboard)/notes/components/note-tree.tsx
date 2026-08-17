@@ -1069,9 +1069,14 @@ export function NoteTree() {
       </div>
 
       <div className="nt-foot">
+        {/* `prefetch={false}` for the same reason the tag pills carry it: /notes/trash
+            is dynamic and runs its query for real, so leaving it on speculates a
+            Postgres round trip on every single page load of the section for a room
+            most sittings never enter. */}
         <Link
           className="btn ghost"
           href={`${NOTES_ROOT}/trash`}
+          prefetch={false}
           aria-current={pathname === `${NOTES_ROOT}/trash` ? "page" : undefined}
         >
           <IconTrash size={14} />

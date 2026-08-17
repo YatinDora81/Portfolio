@@ -45,7 +45,13 @@ export function TagEditor({ nodeId, tags }: { nodeId: string; tags: string[] }) 
     <>
       {shown.map((t) => (
         <span className="nt-tag" key={t}>
-          <Link href={tagHref(t)} title={`Find every note tagged ${t}`}>{t}</Link>
+          {/* `prefetch={false}` because /notes/search is dynamic and runs its
+              query for real: left alone, every tag on a note fires a speculative
+              search against Postgres the moment the note is opened — five round
+              trips to answer a click nobody has made. Opening a note is supposed
+              to cost nothing now, and this was the only thing left that it did
+              cost. */}
+          <Link href={tagHref(t)} prefetch={false} title={`Find every note tagged ${t}`}>{t}</Link>
           <button
             type="button"
             className="nt-tag-x"
