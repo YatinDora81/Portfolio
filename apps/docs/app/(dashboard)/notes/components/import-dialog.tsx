@@ -10,8 +10,10 @@ import {
   SHAPE_LABEL,
   fileRoots,
   parseImport,
+  planGraft,
   summarise,
   topoOrder,
+  type FolderMode,
   type ImportMode,
   type Shape,
   type VaultNode,
@@ -19,7 +21,7 @@ import {
 import { buildTree, type TreeNode } from "@/lib/notes/paths";
 import { CONF_LABELS } from "@/lib/notes/query";
 import { hrefFor } from "@/lib/notes/view-types";
-import { useNoteNav } from "./vault-provider";
+import { useNoteNav, useVault } from "./vault-provider";
 
 /**
  * Paste a file, see exactly what it would build, then build it.
@@ -48,8 +50,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 /** What the undo sentence has to name: the things a graft leaves at the top,
  *  which is only "folders" when the file happens to be all folders. A pasted
  *  list of bare strings makes forty questions and no folder at all. */
-function rootNoun(nodes: VaultNode[]): string {
-  const roots = fileRoots(nodes);
+function rootNoun(roots: VaultNode[]): string {
   const folders = roots.filter((r) => r.kind === "FOLDER").length;
   if (folders === roots.length) return plural(roots.length, "folder");
   if (folders === 0) return plural(roots.length, "question");
@@ -222,9 +223,18 @@ export function ImportButton({
   variant?: "btn" | "pri" | "icon";
 }) {
   const go = useNoteNav();
+  // The live tree, already in the browser — so the preview below can say what
+  // the import will actually do without asking the server anything.
+  const { rows } = useVault();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [mode, setMode] = useState<ImportMode>("into");
+  /**
+   * Merging by default, because a duplicate folder is the surprising outcome.
+   * Somebody pasting an outline into a vault they are still building expects the
+   * notes to land in the folders they already made, not beside them.
+   */
+  const [folders, setFolders] = useState<FolderMode>("merge");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -254,6 +264,38 @@ export function ImportButton({
   // always errors, so it is disabled with the reason rather than hidden.
   const restorable = canRestore && preview?.ok === true && preview.shape === "vault";
   const effective: ImportMode = restorable && mode === "restore" ? "restore" : "into";
+  // Restore rebuilds an empty vault, so there is nothing there to merge with and
+  // the choice is not offered — but `mode` may still be holding an answer from
+  // before the file changed under it.
+  const effectiveFolders: FolderMode = effective === "into" ? folders : "create";
+
+  /**
+   * What the graft will actually do, decided by the function that will do it.
+   *
+   * Not an estimate of the import — it is the import's own plan, run early
+   * against the vault the tree beside it is drawn from. The counts cannot drift
+   * from the write, because there is only one place the rule lives.
+   */
+  const plan = useMemo(
+    () => (preview?.ok ? planGraft(preview.nodes, parentId, rows, effectiveFolders) : null),
+    [preview, parentId, rows, effectiveFolders],
+  );
+
+  /**
+   * The roots this import will actually make — which, merging, is not the file's
+   * roots.
+   *
+   * A merged root is a folder that was already here with the user's own notes
+   * inside it. Naming it as something the import "just made" turns the recovery
+   * sentence below into an instruction to trash forty notes nobody imported, and
+   * `trashIn` takes the whole subtree. Read off the plan for the same reason the
+   * counts are: the only description of an import that cannot be wrong is the
+   * one the import itself made.
+   */
+  const madeRoots = useMemo(
+    () => (preview?.ok && plan ? fileRoots(preview.nodes).filter((r) => !plan.merged.has(r.id)) : []),
+    [preview, plan],
+  );
 
   const close = () => {
     setOpen(false);
@@ -276,7 +318,7 @@ export function ImportButton({
   const run = () =>
     start(async () => {
       setError(null);
-      const r = await importVault(parentId, text, effective).catch(
+      const r = await importVault(parentId, text, effective, effectiveFolders).catch(
         () => ({ ok: false, error: "The import never reached the server" }) as const,
       );
       if (!r.ok) {
@@ -426,11 +468,69 @@ export function ImportButton({
           </div>
         ) : null}
 
+        {effective === "into" ? (
+          <div className="nt-imp-modes">
+            <label className="nt-imp-mode">
+              <input
+                type="radio"
+                name="nt-imp-folders"
+                checked={folders === "merge"}
+                onChange={() => setFolders("merge")}
+              />
+              <span>
+                <b>Use existing folders</b> — a folder already here by that name is opened and added to, as
+                far down as the names keep matching.
+              </span>
+            </label>
+            <label className="nt-imp-mode">
+              <input
+                type="radio"
+                name="nt-imp-folders"
+                checked={folders === "create"}
+                onChange={() => setFolders("create")}
+              />
+              <span>
+                <b>Always make new ones</b> — the file lands whole and separate, beside anything that shares
+                its name.
+              </span>
+            </label>
+          </div>
+        ) : null}
+
+        {/* The plan, not a description of it — see `plan` above. Worth showing
+            even when nothing merges, because "0 reused" is the answer to the
+            question the toggle just raised. */}
+        {plan && effective === "into" ? (
+          <p className="nt-hint">
+            {folders === "merge" ? (
+              <>
+                {plan.foldersReused} existing folder{plan.foldersReused === 1 ? "" : "s"} reused,{" "}
+                {plan.foldersCreated} new
+              </>
+            ) : (
+              <>
+                {plan.foldersCreated} folder{plan.foldersCreated === 1 ? "" : "s"} created
+              </>
+            )}
+            {" · "}
+            {plan.questionsCreated} note{plan.questionsCreated === 1 ? "" : "s"} added
+          </p>
+        ) : null}
+
         <p className="nt-imp-warn">
           <IconAlertTriangle size={14} stroke={1.7} />
           <span>
-            An import is not staged and there is no undo — if it is wrong, the way back is to trash the{" "}
-            {preview?.ok ? rootNoun(preview.nodes) : "notes"} it just made.
+            An import is not staged and there is no undo —{" "}
+            {!preview?.ok ? (
+              <>if it is wrong, the way back is to trash the notes it just made.</>
+            ) : madeRoots.length ? (
+              <>if it is wrong, the way back is to trash the {rootNoun(madeRoots)} it just made.</>
+            ) : (
+              <>
+                and every note in this file lands inside folders you already have, so there is nothing new at
+                the top to trash if it is wrong.
+              </>
+            )}
           </span>
         </p>
 
