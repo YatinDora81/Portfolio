@@ -5,6 +5,7 @@ import {
   folderStatsIn,
   folderViewIn,
   indexVault,
+  nextQuestionIn,
   parentTitleIn,
   questionViewIn,
   siblingsIn,
@@ -139,6 +140,48 @@ describe("siblingsIn", () => {
   test("a question at the vault root sees the other root questions", () => {
     const ix = indexVault(vault([question("/a"), question("/b"), folder("/c")]));
     expect(siblingsIn(ix, ix.byPath.get("/a")!).map((s) => s.title)).toEqual(["b"]);
+  });
+});
+
+describe("nextQuestionIn", () => {
+  const ix = indexVault(vault(DSA));
+  const at = (path: string) => nextQuestionIn(ix, ix.byPath.get(path)!);
+
+  // Reading order through DSA is bfs → dfs → dijkstra → dp: the sidebar's
+  // depth-first walk, questions only. Each hop below pins one kind of move the
+  // overscroll gesture makes, so a change to `buildTree`'s ordering — or to the
+  // walk — announces itself here rather than as a scroll that lands somewhere odd.
+
+  test("within a folder, next is simply the next sibling question", () => {
+    expect(at("/dsa/graphs/bfs")).toMatchObject({
+      title: "dfs",
+      href: "/notes/dsa/graphs/dfs",
+      sameFolder: true,
+    });
+  });
+
+  test("the last question in a folder descends into the next folder's first", () => {
+    // dfs is graphs' last direct question; the walk continues into /shortest.
+    expect(at("/dsa/graphs/dfs")).toMatchObject({
+      title: "dijkstra",
+      parentTitle: "shortest",
+      sameFolder: false,
+    });
+  });
+
+  test("a level that runs out climbs to the parent and carries on", () => {
+    // dijkstra ends /shortest AND ends /graphs; the walk climbs two levels to dp.
+    expect(at("/dsa/graphs/shortest/dijkstra")).toMatchObject({
+      title: "dp",
+      parentTitle: "dsa",
+      sameFolder: false,
+    });
+  });
+
+  test("the vault's last question has no next — an empty folder is not a stop", () => {
+    // /redis follows dp in the tree, but a folder with nothing in it is a place
+    // the gesture would strand you. The walk skips it and honestly ends.
+    expect(at("/dsa/dp")).toBeNull();
   });
 });
 

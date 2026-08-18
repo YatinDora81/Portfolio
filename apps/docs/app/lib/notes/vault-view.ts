@@ -176,6 +176,53 @@ export function siblingsIn(ix: VaultIndex, row: VaultRow): { id: string; title: 
     .map((s) => ({ id: s.id, title: s.title, href: hrefFor(s.path) }));
 }
 
+/** Where one scroll gesture past the end of an answer lands. */
+export interface NextQuestion {
+  id: string;
+  title: string;
+  href: string;
+  /** The folder the next question lives in — the strip names it when crossing. */
+  parentTitle: string;
+  /** False exactly when following it leaves the current folder. */
+  sameFolder: boolean;
+}
+
+/**
+ * The question after this one in reading order: the depth-first walk the
+ * sidebar draws, questions only. Crossing a folder boundary is deliberate —
+ * the last question in a folder continues into the next folder's first, and a
+ * level that runs out climbs to the parent and carries on — so one gesture can
+ * read the vault end to end. `null` only on the vault's final question, the one
+ * place "next" honestly has no answer.
+ *
+ * The walk is over `ix.tree` rather than the `kids` map so that ties, promoted
+ * orphans and every other ordering question stay answered in exactly one place:
+ * `buildTree`. At vault scale — hundreds of rows — flattening on demand is a
+ * fraction of a millisecond, which is cheaper than keeping a fifth index right.
+ */
+export function nextQuestionIn(ix: VaultIndex, row: VaultRow): NextQuestion | null {
+  const order: VaultRow[] = [];
+  const walk = (list: VaultItem[]) => {
+    for (const n of list) {
+      if (n.kind === "QUESTION") order.push(n);
+      if (n.children.length) walk(n.children);
+    }
+  };
+  walk(ix.tree);
+
+  const at = order.findIndex((q) => q.id === row.id);
+  const next = at === -1 ? undefined : order[at + 1];
+  if (!next) return null;
+
+  return {
+    id: next.id,
+    title: next.title,
+    href: hrefFor(next.path),
+    parentTitle: next.parentId ? (ix.byId.get(next.parentId)?.title ?? "the vault") : "the vault",
+    sameFolder: (next.parentId ?? ROOT_KEY) === (row.parentId ?? ROOT_KEY),
+  };
+}
+
 export function childRowsIn(ix: VaultIndex, row: VaultRow): ChildRow[] {
   return (ix.kids.get(row.id) ?? []).map((k) => ({
     id: k.id,

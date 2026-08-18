@@ -1,9 +1,11 @@
 import { Fragment } from "react";
 import { renderMarkdown } from "@/lib/notes/markdown";
+import type { NextQuestion } from "@/lib/notes/vault-view";
 import { NOTES_ROOT, type Crumb, type QuestionView } from "@/lib/notes/view-types";
 import { ConfidenceDots } from "./confidence-dots";
 import { EditorLoader } from "./editor-loader";
 import { NoteActions, RevealInTree } from "./note-actions";
+import { ScrollAdvance } from "./scroll-advance";
 import { TagEditor } from "./tag-editor";
 import { NoteLink } from "./vault-provider";
 
@@ -24,10 +26,12 @@ export function AnswerView({
   node,
   siblings,
   parentTitle,
+  next,
 }: {
   node: QuestionView;
   siblings: { id: string; title: string; href: string }[];
   parentTitle: string;
+  next: NextQuestion | null;
 }) {
   const { answer } = node;
   const parentHref = parentHrefOf(node.crumbs);
@@ -78,6 +82,12 @@ export function AnswerView({
           parentHref={parentHref}
           stamp={`${revisedStamp(answer.lastRevisedAt)} · ${node.path}`}
         />
+
+        {/* Last inside the editor gate, and both halves of that matter: last,
+            because "the bottom" has to mean below the sibling strip and the
+            action row; inside the gate, because opening the editor must unmount
+            the gesture along with the prose. */}
+        <ScrollAdvance next={next} />
       </EditorLoader>
     </article>
   );

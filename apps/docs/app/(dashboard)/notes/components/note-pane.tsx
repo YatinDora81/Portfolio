@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  folderViewIn, parentTitleIn, questionViewIn, siblingsIn, type VaultRow,
+  folderViewIn, nextQuestionIn, parentTitleIn, questionViewIn, siblingsIn, type VaultRow,
 } from "@/lib/notes/vault-view";
 import { hrefFor, isReservedNotePath, NOTES_ROOT, notePathOf } from "@/lib/notes/view-types";
 import { AnswerView } from "./answer-view";
@@ -106,6 +106,7 @@ function Question({ ix, row }: { ix: ReturnType<typeof useVault>; row: VaultRow 
       node={node}
       siblings={siblingsIn(ix, row)}
       parentTitle={parentTitleIn(node.crumbs)}
+      next={nextQuestionIn(ix, row)}
     />
   );
 }

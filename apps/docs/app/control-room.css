@@ -1894,6 +1894,22 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-in:focus, .nt-ta:focus { border-color: var(--c1); box-shadow: 0 0 0 3px var(--accS) }
 .nt-ta { font-family: var(--mono); font-size: 13px; line-height: 1.7; min-height: 240px; resize: vertical }
 .nt-hint { margin-top: 5px; font-family: var(--mono); font-size: 10px; color: var(--faint) }
+
+/* ---------- notes · scroll advance ----------
+   The strip under everything else: overscrolling at the bottom fills the bar
+   and follows `next`. Styled to the sibling strip's vocabulary — same border,
+   same mono label — so it reads as furniture, not a feature. */
+.nt-adv { margin-top: 26px; padding-top: 13px; border-top: 1px solid var(--line2) }
+.nt-adv-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 9px }
+.nt-adv-lb { flex: none; font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint) }
+.nt-adv-next {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12.5px; color: var(--dim); transition: color .14s
+}
+.nt-adv-next:hover { color: var(--accT) }
+.nt-adv-track { height: 3px; border-radius: 99px; background: var(--line2); overflow: hidden }
+.nt-adv-fill { width: 0%; height: 100%; border-radius: 99px; background: var(--c1) }
+.nt-adv-end { padding-bottom: 2px; text-align: center }
 .nt-dirty { font-family: var(--mono); font-size: 10px; color: var(--ambT); background: var(--amber-soft); border-radius: 5px; padding: 2px 7px }
 
 /* ---------- notes · folder overview ---------- */
