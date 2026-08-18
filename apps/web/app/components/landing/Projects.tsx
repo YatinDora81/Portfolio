@@ -1,11 +1,34 @@
 'use client';
 
+/**
+ * Projects — one section, two layouts, picked in the admin.
+ *
+ * v1 "the work ledger": a ruled list, spotlight by subtraction (hovering a row
+ *    dims its siblings), and the stack printed as one quiet mono line.
+ * v2 "the build log": each project logged under a keyline that names the host it
+ *    runs on, typed in as the entry scrolls up.
+ *
+ * Everything below the third project ships in the HTML either way — see the
+ * comment on MoreBuilds.
+ */
+
 import Image from 'next/image';
-import { useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react';
+import { useInView, useReducedMotion } from 'motion/react';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
 import { GithubIcon, ExternalLinkIcon } from '@repo/ui/icons/brand';
 import { skillIconMap } from '@repo/ui/icons/registry';
+
+type ProjectsVersion = 'v1' | 'v2';
 
 interface TechSkill {
   name: string;
@@ -23,6 +46,12 @@ interface ProjectData {
   images: string[];
 }
 
+/** Where a build actually runs, as v2's keyline prints it. */
+interface Endpoint {
+  domain: string;
+  status: 'live' | 'source';
+}
+
 /** `**Lead line** rest of the sentence` — the bold lead is the scan line. */
 function parseBullet(content: string) {
   const match = content.match(/^\*\*(.*?)\*\*\s?(.*)/s);
@@ -30,8 +59,55 @@ function parseBullet(content: string) {
   return { highlight: content, detail: '' };
 }
 
+/**
+ * Derived from the links rather than stored: a project's host is already implied
+ * by its live URL, and a second CMS field would only ever drift from it. Both
+ * URLs are free text in the admin, so neither parse may take the render down.
+ */
+function endpointOf(project: ProjectData): Endpoint | null {
+  // Parsing has to SUCCEED AND produce a web address. `new URL('localhost:3000')`
+  // throws nothing — it reads as the scheme `localhost:` with an empty host — so
+  // a truthy parse alone would print a blank domain beside a "live" dot and add
+  // one to the sign-off's tally.
+  const parse = (href: string | null) => {
+    if (!href) return null;
+    try {
+      const url = new URL(href);
+      const web = url.protocol === 'https:' || url.protocol === 'http:';
+      return web && url.hostname ? url : null;
+    } catch {
+      return null;
+    }
+  };
+  const live = parse(project.live);
+  if (live) return { domain: live.hostname.replace(/^www\./, ''), status: 'live' };
+  const repo = parse(project.github);
+  if (repo) return { domain: `github.com${repo.pathname.replace(/\/$/, '')}`, status: 'source' };
+  return null;
+}
+
 const FEATURED = 3;
 const FOLD_ID = 'pj-more-builds';
+
+/** Which rows a tap has stuck open. Hover and focus stay CSS-only. */
+function useOpenSet() {
+  const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set<number>());
+  const toggle = (index: number) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  return [open, toggle] as const;
+}
+
+// Touch: a tap anywhere on the row toggles it open. Desktop: CSS :hover does
+// it, keyboard: CSS :focus-within does it. Clicks on links always pass through.
+const tapToggle = (onToggle: () => void) => (e: ReactMouseEvent<HTMLElement>) => {
+  if ((e.target as Element).closest('a')) return;
+  onToggle();
+};
 
 function ArrowUpRight() {
   return (
@@ -42,88 +118,130 @@ function ArrowUpRight() {
   );
 }
 
-function ProjectRow({
+function Highlights({ bullets }: { bullets: string[] }) {
+  return (
+    <ul className="bullets rv-stagger">
+      {bullets.map((bullet, i) => {
+        const { highlight, detail } = parseBullet(bullet);
+        return (
+          <li key={i} style={{ '--i': i } as CSSProperties}>
+            <i />
+            <span><b>{highlight}</b> {detail}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/* The overflow projects used to mount only once `expanded` flipped, so half the
+   portfolio never reached the served HTML — it existed only inside the flight
+   payload, invisible to crawlers, to a reader with JS off and to find-in-page.
+   They ship in the markup unconditionally now and the fold hides them with CSS
+   instead. `inert` is what makes the collapsed state honest: a zero-height fold
+   still holds real links that Tab would land on with nothing visible under the
+   focus ring, and aria-expanded would be claiming otherwise. */
+function MoreBuilds({ expanded, children }: { expanded: boolean; children: ReactNode }) {
+  return (
+    <div className={`pj-fold${expanded ? ' open' : ''}`} id={FOLD_ID} inert={!expanded}>
+      <div>
+        <div className="pj-div mono">more builds</div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* the button stays mounted and toggles both ways — unmounting it on expand
+   dropped keyboard focus onto the body, and a control that vanishes can never
+   report the state it controls */
+function ShowMore({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`show-more pj-more${expanded ? ' open' : ''}`}
+      aria-expanded={expanded}
+      aria-controls={FOLD_ID}
+      onClick={onToggle}
+    >
+      {expanded ? 'Show Fewer Projects' : 'Show More Projects'}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
+    </button>
+  );
+}
+
+/* ── v1 — the work ledger ─────────────────────────────────────────────────── */
+
+function LedgerRow({
   project,
+  index,
   isOpen,
   onToggle,
 }: {
   project: ProjectData;
+  index: number;
   isOpen: boolean;
   onToggle: () => void;
 }) {
   const link = project.live ?? project.github;
-  const thumb = project.images[0];
-  const bullets = project.bullets.map(parseBullet);
-
-  // Touch: a tap anywhere on the row toggles it open. Desktop: CSS :hover does
-  // it, keyboard: CSS :focus-within does it. Clicks on links always pass through.
-  const handleClick = (e: ReactMouseEvent<HTMLElement>) => {
-    if ((e.target as Element).closest('a')) return;
-    onToggle();
-  };
+  const cover = project.images[0];
 
   return (
-    <article className={`pj-row expand${isOpen ? ' open' : ''}`} onClick={handleClick}>
-      <span className="pj-hint mono" aria-hidden="true">highlights</span>
+    <article className={`pj-row expand${isOpen ? ' open' : ''}`} onClick={tapToggle(onToggle)}>
+      <span className="pj-idx mono" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
 
-      {thumb && link ? (
-        <a className="pj-thumb" href={link} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true">
-          <Image src={thumb} alt="" width={176} height={110} sizes="(max-width: 600px) 230px, 176px" loading="lazy" />
+      {cover && link ? (
+        <a className="pj-media" href={link} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true">
+          <Image src={cover} alt="" width={300} height={188} sizes="(max-width: 720px) 420px, 300px" loading="lazy" />
         </a>
-      ) : thumb ? (
-        <span className="pj-thumb">
-          <Image src={thumb} alt="" width={176} height={110} sizes="(max-width: 600px) 230px, 176px" loading="lazy" />
-        </span>
       ) : (
-        <span className="pj-thumb" />
+        <span className="pj-media">
+          {cover && (
+            <Image src={cover} alt="" width={300} height={188} sizes="(max-width: 720px) 420px, 300px" loading="lazy" />
+          )}
+        </span>
       )}
 
       <div>
-        <div className="pj-title">
+        <div className="pj-head">
           {project.logoUrl && (
             <Image className="pl" src={project.logoUrl} alt="" aria-hidden width={20} height={20} loading="lazy" />
           )}
           {link ? (
-            <a href={link} target="_blank" rel="noopener noreferrer">
+            <a className="pj-title" href={link} target="_blank" rel="noopener noreferrer">
               {project.title}
               <ArrowUpRight />
             </a>
           ) : (
-            <span className="pj-name">{project.title}</span>
+            <span className="pj-title">{project.title}</span>
           )}
+          <span className="pj-hint mono" aria-hidden="true">highlights &#9656;</span>
         </div>
 
         <p className="pj-sum">{project.summary}</p>
 
         <div className="pj-x">
           <div className="pj-xin">
-            <ul className="bullets rv-stagger">
-              {bullets.map((bullet, i) => (
-                <li key={i} style={{ '--i': i } as CSSProperties}>
-                  <i />
-                  <span><b>{bullet.highlight}</b> {bullet.detail}</span>
-                </li>
-              ))}
-            </ul>
+            <Highlights bullets={project.bullets} />
           </div>
         </div>
 
-        <div className="pj-chips">
-          {project.technologies.map((tech) => {
-            const icon = skillIconMap[tech.iconKey] || skillIconMap[tech.name];
-            return (
-              <span key={tech.name} className="badge skill-inner-shadow">
-                {icon && <span className="bi">{icon}</span>}
-                {tech.name}
-              </span>
-            );
-          })}
-        </div>
+        {/* the version's signature: the stack as one line of prose, not pills */}
+        <p className="pj-stack mono">
+          {project.technologies.map((tech, i) => (
+            <Fragment key={tech.name}>
+              {i > 0 && <> <em>&middot;</em> </>}
+              {tech.name}
+            </Fragment>
+          ))}
+        </p>
 
         <div className="pj-links mono">
           {project.live && (
             <a href={project.live} target="_blank" rel="noopener noreferrer">
-              <ExternalLinkIcon className="" />live demo
+              <span className="pj-dot" aria-hidden="true" />live demo
             </a>
           )}
           {project.github && (
@@ -137,83 +255,281 @@ function ProjectRow({
   );
 }
 
-export default function Projects({ projects }: { projects: ProjectData[] }) {
+function ProjectsLedger({ projects }: { projects: ProjectData[] }) {
   const [expanded, setExpanded] = useState(false);
-  const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set<number>());
-
-  const toggle = (index: number) =>
-    setOpen((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
+  const [open, toggle] = useOpenSet();
 
   const featured = projects.slice(0, FEATURED);
   const rest = projects.slice(FEATURED);
 
+  const row = (project: ProjectData, index: number) => (
+    <LedgerRow
+      key={project.title}
+      project={project}
+      index={index}
+      isOpen={open.has(index)}
+      onToggle={() => toggle(index)}
+    />
+  );
+
   return (
-    <section id="projects">
+    <section id="projects" className="pj-v1">
       <Container className="mt-20 animate-fade-in-blur animate-delay-3">
         <SectionHeading subHeading="Work" heading="Projects" />
+        {projects.length > 0 && (
+          <p className="pj-note">
+            {projects.length} {projects.length === 1 ? 'thing' : 'things'} shipped end to end — hover
+            a row to spotlight it, tap or click for the highlights.
+          </p>
+        )}
 
-        <div className="pj-list">
-          {featured.map((project, i) => (
-            <ProjectRow
-              key={project.title}
-              project={project}
-              isOpen={open.has(i)}
-              onToggle={() => toggle(i)}
-            />
-          ))}
+        {/* The fold is a SIBLING of the ruled list, not a child of it: both close
+            themselves with a bottom hairline, and nesting them stacked the two
+            rules on top of each other the moment the fold opened. */}
+        <div className="pj-list">{featured.map(row)}</div>
 
-          {/* The overflow projects used to mount only once `expanded` flipped, so
-              half the portfolio never reached the served HTML — it existed only
-              inside the flight payload, invisible to crawlers, to a reader with
-              JS off and to find-in-page. They ship in the markup unconditionally
-              now and the fold hides them with CSS instead. `inert` is what makes
-              the collapsed state honest: a zero-height fold still holds real
-              links that Tab would land on with nothing visible under the focus
-              ring, and aria-expanded would be claiming otherwise. */}
-          {rest.length > 0 && (
-            <div
-              className={`pj-fold${expanded ? ' open' : ''}`}
-              id={FOLD_ID}
-              inert={!expanded}
-            >
-              <div>
-                <div className="pj-div mono">more builds</div>
-                {rest.map((project, i) => (
-                  <ProjectRow
-                    key={project.title}
-                    project={project}
-                    isOpen={open.has(FEATURED + i)}
-                    onToggle={() => toggle(FEATURED + i)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* the button stays mounted and toggles both ways — unmounting it on
-            expand dropped keyboard focus onto the body, and a control that
-            vanishes can never report the state it controls */}
         {rest.length > 0 && (
-          <button
-            type="button"
-            className={`show-more pj-more${expanded ? ' open' : ''}`}
-            aria-expanded={expanded}
-            aria-controls={FOLD_ID}
-            onClick={() => setExpanded((prev) => !prev)}
-          >
-            {expanded ? 'Show Fewer Projects' : 'Show More Projects'}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
+          <MoreBuilds expanded={expanded}>
+            <div className="pj-fold-list">
+              {rest.map((project, i) => row(project, FEATURED + i))}
+            </div>
+          </MoreBuilds>
+        )}
+
+        {rest.length > 0 && (
+          <ShowMore expanded={expanded} onToggle={() => setExpanded((prev) => !prev)} />
         )}
       </Container>
     </section>
+  );
+}
+
+/* ── v2 — the build log ───────────────────────────────────────────────────── */
+
+const TYPE_DELAY = 180;
+const TYPE_STEP = 16;
+const CARET_HOLD = 650;
+
+function LogEntry({
+  project,
+  endpoint,
+  index,
+  isOpen,
+  onToggle,
+  reduced,
+}: {
+  project: ProjectData;
+  endpoint: Endpoint | null;
+  index: number;
+  isOpen: boolean;
+  onToggle: () => void;
+  reduced: boolean;
+}) {
+  const ref = useRef<HTMLElement>(null);
+  const inView = useInView(ref, { once: true, margin: '0px 0px -6% 0px', amount: 0.05 });
+  const link = project.live ?? project.github;
+  const cover = project.images[0];
+  const domain = endpoint?.domain;
+
+  // null until the effect below starts typing, so the server sends — and a
+  // reader with JS off keeps — the whole domain. By the time it is blanked the
+  // entry has only just come into view behind its own reveal, so nothing flashes.
+  const [typed, setTyped] = useState<string | null>(null);
+  const [caret, setCaret] = useState(false);
+
+  useEffect(() => {
+    if (!domain || reduced || !inView) return;
+    let timer: ReturnType<typeof setTimeout>;
+    let k = 0;
+    const tick = () => {
+      setTyped(domain.slice(0, k));
+      if (k < domain.length) {
+        k += 1;
+        timer = setTimeout(tick, TYPE_STEP);
+      } else {
+        timer = setTimeout(() => setCaret(false), CARET_HOLD);
+      }
+    };
+    timer = setTimeout(() => {
+      setCaret(true);
+      tick();
+    }, TYPE_DELAY);
+    return () => clearTimeout(timer);
+  }, [domain, reduced, inView]);
+
+  // `inView` alone, deliberately: `useReducedMotion()` is null on the server and
+  // the real preference on the client's first render, so branching the rendered
+  // className on it is a hydration mismatch. The reduced-motion rescue is in the
+  // stylesheet, where it applies before first paint rather than after hydration.
+  const shown = inView;
+
+  return (
+    <article
+      ref={ref}
+      className={`pjb-entry${shown ? ' in' : ''}${isOpen ? ' open' : ''}`}
+      onClick={tapToggle(onToggle)}
+    >
+      <div className="pjb-dep mono">
+        <span className="pjb-n">{String(index + 1).padStart(2, '0')}</span>
+        {domain && <span className="pjb-d">{typed ?? domain}</span>}
+        {caret && <span className="pjb-caret" aria-hidden="true">&#9613;</span>}
+        <i style={{ '--fd': `${(index * 1.1).toFixed(1)}s` } as CSSProperties} aria-hidden="true" />
+        {endpoint && (
+          <span className="pjb-s">
+            {endpoint.status === 'live' && <span className="pj-dot" aria-hidden="true" />}
+            {endpoint.status}
+          </span>
+        )}
+      </div>
+
+      <div className="pjb-grid">
+        <div className="pjb-pad">
+          {/* The tab says the shot is of production, so it only appears where
+              there IS one. The preview never had to decide — all six of its
+              builds were live. */}
+          {endpoint?.status === 'live' && (
+            <span className="pjb-prod mono" aria-hidden="true">&#9650; prod</span>
+          )}
+          {cover && link ? (
+            <a className="pjb-thumb" href={link} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true">
+              <Image src={cover} alt="" width={280} height={175} sizes="(max-width: 600px) 230px, 280px" loading="lazy" />
+            </a>
+          ) : (
+            <span className="pjb-thumb">
+              {cover && (
+                <Image src={cover} alt="" width={280} height={175} sizes="(max-width: 600px) 230px, 280px" loading="lazy" />
+              )}
+            </span>
+          )}
+        </div>
+
+        <div>
+          <div className="pjb-title">
+            {project.logoUrl && (
+              <Image className="pl" src={project.logoUrl} alt="" aria-hidden width={20} height={20} loading="lazy" />
+            )}
+            {link ? (
+              <a href={link} target="_blank" rel="noopener noreferrer">
+                {project.title}
+                <ArrowUpRight />
+              </a>
+            ) : (
+              // `.pj-name` carries the title's type when there is no anchor to
+              // carry it — v1 gets this for free, since there `.pj-title` IS
+              // the anchor.
+              <span className="pj-name">{project.title}</span>
+            )}
+            <span className="pjb-hint mono" aria-hidden="true">highlights</span>
+          </div>
+
+          <p className="pjb-sum">{project.summary}</p>
+
+          <div className="pjb-x">
+            <div className="pjb-xin">
+              <Highlights bullets={project.bullets} />
+            </div>
+          </div>
+
+          <div className="pjb-chips">
+            {project.technologies.map((tech) => {
+              const icon = skillIconMap[tech.iconKey] || skillIconMap[tech.name];
+              return (
+                <span key={tech.name} className="badge skill-inner-shadow">
+                  {icon && <span className="bi">{icon}</span>}
+                  {tech.name}
+                </span>
+              );
+            })}
+          </div>
+
+          <div className="pjb-links mono">
+            {project.live && (
+              <a href={project.live} target="_blank" rel="noopener noreferrer">
+                <ExternalLinkIcon className="" />live demo
+              </a>
+            )}
+            {project.github && (
+              <a href={project.github} target="_blank" rel="noopener noreferrer">
+                <GithubIcon className="" />source
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ProjectsBuildLog({ projects }: { projects: ProjectData[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const [open, toggle] = useOpenSet();
+  // null on the server and the real preference after mount, so the typing never
+  // decides anything during render.
+  const reduced = useReducedMotion() ?? false;
+
+  const endpoints = projects.map(endpointOf);
+  const liveCount = endpoints.filter((e) => e?.status === 'live').length;
+  // The sign-off and the sub-line both count from the same derivation, so the
+  // copy can only claim what the links actually resolve to.
+  const allLive = projects.length > 0 && liveCount === projects.length;
+
+  const featured = projects.slice(0, FEATURED);
+  const rest = projects.slice(FEATURED);
+
+  const entry = (project: ProjectData, index: number) => (
+    <LogEntry
+      key={project.title}
+      project={project}
+      endpoint={endpoints[index] ?? null}
+      index={index}
+      isOpen={open.has(index)}
+      onToggle={() => toggle(index)}
+      reduced={reduced}
+    />
+  );
+
+  return (
+    <section id="projects" className="pj-v2">
+      <Container className="mt-20 animate-fade-in-blur animate-delay-3">
+        <SectionHeading subHeading="Work" heading="Projects" />
+        <p className="pj-note">
+          <span className="mono" aria-hidden="true">&#8982;</span>{' '}
+          {allLive && 'every build below is deployed & running — '}
+          tap or hover a build for the highlights
+        </p>
+
+        <div className="pjb-log">
+          {featured.map(entry)}
+
+          {rest.length > 0 && (
+            <MoreBuilds expanded={expanded}>
+              <div>{rest.map((project, i) => entry(project, FEATURED + i))}</div>
+            </MoreBuilds>
+          )}
+        </div>
+
+        {rest.length > 0 && (
+          <ShowMore expanded={expanded} onToggle={() => setExpanded((prev) => !prev)} />
+        )}
+
+        {projects.length > 0 && (
+          <p className="pjb-eol mono">end of build log &middot; {liveCount}/{projects.length} live</p>
+        )}
+      </Container>
+    </section>
+  );
+}
+
+export default function Projects({
+  version,
+  projects,
+}: {
+  version: ProjectsVersion;
+  projects: ProjectData[];
+}) {
+  return version === 'v1' ? (
+    <ProjectsLedger projects={projects} />
+  ) : (
+    <ProjectsBuildLog projects={projects} />
   );
 }

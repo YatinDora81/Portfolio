@@ -4,6 +4,9 @@ import { cdnUrl } from "./site";
 
 export type HeroVersion = "v1" | "v2";
 
+/** Which Projects layout is live: v1 the work ledger, v2 the build log. */
+export type ProjectsVersion = "v1" | "v2";
+
 /** Nap indicator the oneko cat shows when it sleeps. "off" means it never does. */
 export type CatNapStyle =
   | "tooltip" | "ring" | "halo" | "pixel" | "moon" | "ticks" | "random" | "off";
@@ -15,6 +18,7 @@ const CAT_NAP_STYLES: CatNapStyle[] = [
 export interface SiteConfig {
   name: string;
   heroVersion: HeroVersion;
+  projectsVersion: ProjectsVersion;
   tagline: string;
   intro: string;
   avatarUrl: string;
@@ -74,6 +78,9 @@ export const getSiteConfig = cache(async (): Promise<SiteConfig> => {
   return {
     name: map.get("name") ?? "",
     heroVersion,
+    // Same shape as the hero: a missing or unrecognised row is not worth
+    // throwing over, so an untouched database renders the build log.
+    projectsVersion: map.get("projectsVersion") === "v1" ? "v1" : "v2",
     tagline,
     intro,
     avatarUrl: cdnUrl(map.get("avatarUrl") ?? ""),

@@ -182,7 +182,7 @@ export default async function Home() {
             />
             <Skills skills={skills} />
             <Experience experiences={experiences} />
-            <Projects projects={projects} />
+            <Projects version={siteConfig.projectsVersion} projects={projects} />
             {blogs.length > 0 && <Blogs blogs={blogs} />}
             <ThoughtOfTheDay
               quote={thought.quote}

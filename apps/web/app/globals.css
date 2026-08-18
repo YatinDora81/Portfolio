@@ -1121,64 +1121,58 @@ body.cat-on .cw .dot { display: none; }
 .badge .bi svg { width: 100%; height: 100%; }
 
 /* ───────────────────────────────────────────────────────────────────────────
-   PROJECTS — compact hover-expand rows
+   PROJECTS — two layouts, one section. The admin panel picks which, and the
+   pick arrives as a class on the section root:
+     .pj-v1  "the work ledger" — hairline rows, mono index, active-line gutter
+     .pj-v2  "the build log"   — deployment records under a keyline header
+   Only one is ever mounted, so every rule is scoped by version except the
+   handful marked SHARED, which both layouts render.
    ─────────────────────────────────────────────────────────────────────────── */
-.pj-list{margin-top:1.25rem;display:flex;flex-direction:column}
-.pj-row{position:relative;display:grid;grid-template-columns:176px minmax(0,1fr);gap:1.15rem;align-items:start;padding:1.25rem 1rem;margin:0 -1rem;border-radius:.75rem;border:1px solid transparent;transition:background-color .25s,border-color .25s}
-@media(hover:hover){.pj-row:hover{background:var(--card);border-color:var(--border)}}
-@media(max-width:600px){.pj-row{grid-template-columns:1fr;gap:.85rem}.pj-thumb{max-width:230px}}
-.pj-thumb{display:block;border:1px solid var(--border);border-radius:.5rem;overflow:hidden;background:var(--muted);aspect-ratio:16/10;transition:border-color .25s,transform .25s}
-.pj-row:hover .pj-thumb{border-color:color-mix(in srgb,var(--foreground) 28%,transparent);transform:translateY(-2px)}
-.pj-thumb img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
-.pj-title{display:flex;align-items:center;gap:.5rem;min-width:0;flex-wrap:wrap}
-.pj-title .pl{height:20px;width:auto;max-width:40px;border-radius:4px;object-fit:contain;flex-shrink:0}
-/* `.pj-name` is the added no-link fallback — reference assumed live||github always exists */
-.pj-title a,.pj-title .pj-name{font-size:1.05rem;font-weight:700;letter-spacing:-.01em;display:inline-flex;align-items:center;gap:.4rem}
-.pj-title a svg{width:14px;height:14px;flex-shrink:0;color:var(--secondary-ink);transition:transform .22s,color .22s}
-.pj-row:hover .pj-title a svg{transform:translate(3px,-3px);color:var(--foreground)}
-.pj-sum{margin:.4rem 0 0;font-size:.875rem;line-height:1.65;color:var(--secondary-ink)}
-.pj-row .bullets{margin-top:.8rem;gap:.55rem;font-size:.83rem}
 
-/* hover-expand cards @ 525ms + staggered highlights */
-.pj-row.expand{cursor:pointer}
-.pj-hint{position:absolute;top:1.1rem;right:1rem;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--secondary-ink);opacity:0;transition:opacity .25s;pointer-events:none}
-@media(hover:hover){.pj-row:hover .pj-hint{opacity:.9}}
-.pj-row.open .pj-hint{opacity:0!important}
-.pj-x{display:grid;grid-template-rows:0fr;transition:grid-template-rows .525s cubic-bezier(.22,1,.36,1)}
-.pj-xin{overflow:hidden;min-height:0;opacity:0;transform:translateY(-4px);transition:opacity .37s ease,transform .37s ease}
-.pj-row.open .pj-x,.pj-row.expand:focus-within .pj-x{grid-template-rows:1fr}
-.pj-row.open .pj-xin,.pj-row.expand:focus-within .pj-xin{opacity:1;transform:none;transition-delay:.09s}
-@media(hover:hover){
-  .pj-row.expand:hover .pj-x{grid-template-rows:1fr}
-  .pj-row.expand:hover .pj-xin{opacity:1;transform:none;transition-delay:.09s}
-}
-/* stagger — bullets cascade in 120ms apart, starting after the box begins opening */
-.rv-stagger li{opacity:0;transform:translateY(6px);transition:opacity .4s ease,transform .4s ease}
-.pj-row.open .rv-stagger li,.pj-row.expand:focus-within .rv-stagger li{opacity:1;transform:none;transition-delay:calc(.09s + var(--i)*.12s)}
-@media(hover:hover){
-  .pj-row.expand:hover .rv-stagger li{opacity:1;transform:none;transition-delay:calc(.09s + var(--i)*.12s)}
-}
-.pj-chips{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.85rem}
-.pj-links{display:flex;gap:1.1rem;margin-top:.7rem}
-.pj-links a{display:inline-flex;align-items:center;gap:.4rem;font-size:.75rem;letter-spacing:.02em;color:var(--secondary-ink);transition:color .2s}
-.pj-links a:hover{color:var(--foreground)}
-.pj-links svg{width:13px;height:13px}
-.pj-chips .badge{font-size:.72rem;padding:2px 9px;gap:5px}
-.pj-chips .badge .bi{width:12px;height:12px}
-.pj-div{display:flex;align-items:center;gap:1rem;color:var(--secondary-ink);font-size:10px;letter-spacing:.25em;text-transform:uppercase;margin:1.5rem 0 .25rem}
-.pj-div::before,.pj-div::after{content:"";height:1px;background:var(--border);flex:1}
+/* ── SHARED: the sub-line under the heading ── */
+.pj-note{margin:.6rem 0 0;color:var(--secondary-ink)}
+/* v1's is a paragraph and takes a measure; v2's is a one-line cursor hint. */
+#projects.pj-v1 .pj-note{font-size:.875rem;line-height:1.6;max-width:52ch}
+#projects.pj-v2 .pj-note{margin-top:.7rem;font-size:.78rem}
+/* the ⌖ marker beside the sentence, a notch down so it reads as a glyph
+   rather than a character of the line */
+#projects.pj-v2 .pj-note .mono{font-size:.72rem}
 
-/* Rows 4..n stay in the DOM — they used to mount only on "show more", which
+/* ── SHARED: the live dot ──
+   `pjPing`, not `ping`: globals already carries heroPing / xpPing / ctPing /
+   ghlnPing — the same ring on a different clock, named per section. */
+.pj-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);position:relative;flex-shrink:0}
+.pj-dot::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:1px solid var(--ok);opacity:0;animation:pjPing 2.2s cubic-bezier(0,0,.2,1) infinite}
+@keyframes pjPing{0%{transform:scale(.6);opacity:.7}70%,100%{transform:scale(1.6);opacity:0}}
+
+/* ── SHARED: the "more builds" fold ──
+   Rows 4..n stay in the DOM — they used to mount only on "show more", which
    kept them out of the served markup. `min-height:0` because a flex item's
    automatic minimum size would floor the fold at its content height. */
 .pj-fold{display:grid;grid-template-rows:0fr;min-height:0;transition:grid-template-rows .525s cubic-bezier(.22,1,.36,1)}
-/* the clip box is padded back out to the bleed: `.pj-row` sits on a -1rem
-   horizontal margin, so a bare overflow:hidden would shear its hover card and
-   border off at both edges for the whole life of the row, not just mid-fold. */
-.pj-fold>div{overflow:hidden;min-height:0;padding:0 1rem;margin:0 -1rem}
+.pj-fold>div{overflow:hidden;min-height:0}
 .pj-fold.open{grid-template-rows:1fr}
 .pj-more svg{transition:transform .3s ease}
 .pj-more.open svg{transform:rotate(180deg)}
+/* v2's entries already carry 1.9rem of their own bottom padding, so the shared
+   2rem above the button lands as nearly 4rem of air. The preview cut it back. */
+#projects.pj-v2 .pj-more{margin-top:1.6rem}
+
+/* ── SHARED: the fold's label rule ──
+   v1 leads with the label and trails one rule, so the line reads as the
+   ledger continuing; v2 centres it between two, the way its own end line and
+   the contact dividers do. */
+.pj-div{display:flex;align-items:center;gap:1rem;font-family:var(--font-mono);color:var(--secondary-ink);font-size:10px;letter-spacing:.25em;text-transform:uppercase}
+.pj-div::after{content:"";height:1px;background:var(--border);flex:1}
+#projects.pj-v1 .pj-div{padding:1.5rem 0 .5rem}
+#projects.pj-v2 .pj-div{margin:.4rem 0 1.4rem}
+#projects.pj-v2 .pj-div::before{content:"";height:1px;background:var(--border);flex:1}
+
+/* ── SHARED: the highlight cascade ──
+   Parked state only. Which selector releases it is the version's business,
+   because the two hang the `open` class on different elements. */
+.rv-stagger li{opacity:0;transform:translateY(6px);transition:opacity .4s ease,transform .4s ease}
+
 @media(scripting:none){
   /* Only the dead control goes. The fold is NOT forced open here: `inert` is on
      the collapsed rows and no CSS lifts it, so serving them visible would paint
@@ -1186,6 +1180,220 @@ body.cat-on .cw .dot { display: none; }
      find-in-page. They are in the served HTML either way, which is what the
      crawler needed. */
   .pj-more{display:none !important}
+  /* v2's entries are parked at opacity:0 waiting on an observer that will never
+     run — without this the whole section reads as blank. */
+  #projects.pj-v2 .pjb-entry{opacity:1;filter:none;transform:none}
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   v1 — "the work ledger"
+   No hover card and no fill, ever. The structure is permanent hairlines plus
+   a mono index; the feedback lives inside the content — image zoom, underline
+   sweep, arrow slide, sibling dim, and a 2px active-line bar in the gutter.
+   ─────────────────────────────────────────────────────────────────────────── */
+#projects.pj-v1 .pj-list{margin-top:2.4rem;display:flex;flex-direction:column;border-bottom:1px solid var(--border)}
+/* The preview drew this on an 872px measure; `Container` is max-w-3xl, so the
+   real one is ~736px. The columns are re-cut to hold the preview's proportions
+   (media ~34%, prose ~52%) rather than its pixel values — carrying 300px across
+   would have spent the difference entirely out of the prose column. */
+#projects.pj-v1 .pj-row{position:relative;display:grid;grid-template-columns:3.4rem minmax(0,252px) minmax(0,1fr);gap:1.4rem;align-items:start;padding:2rem .25rem 2rem 1rem;border-top:1px solid var(--border);transition:opacity .35s ease}
+#projects.pj-v1 .pj-row.expand{cursor:pointer}
+
+/* the editor's active-line bar — the row's only chrome */
+#projects.pj-v1 .pj-row::before{content:"";position:absolute;left:0;top:1.9rem;bottom:1.9rem;width:2px;background:var(--foreground);transform:scaleY(0);transform-origin:top;transition:transform .5s cubic-bezier(.22,1,.36,1)}
+#projects.pj-v1 .pj-row.open::before,
+#projects.pj-v1 .pj-row.expand:focus-within::before{transform:scaleY(1)}
+@media(hover:hover){
+  #projects.pj-v1 .pj-row:hover::before{transform:scaleY(1)}
+  /* Spotlight by subtraction. Hung off the section rather than the list so the
+     dim carries into the fold instead of stopping at its edge. */
+  #projects.pj-v1:has(.pj-row:hover) .pj-row:not(:hover){opacity:.38}
+}
+/* the fold's rows close with the same hairline the list does */
+#projects.pj-v1 .pj-fold-list{border-bottom:1px solid var(--border)}
+
+/* index — ranked order, featured first */
+#projects.pj-v1 .pj-idx{font-family:var(--font-mono);font-size:.8rem;color:var(--secondary-ink);padding-top:.35rem;letter-spacing:.05em;transition:color .3s}
+#projects.pj-v1 .pj-row:hover .pj-idx,
+#projects.pj-v1 .pj-row.open .pj-idx{color:var(--foreground)}
+
+/* media — clipped zoom inside a hairline ring, no translate jump */
+#projects.pj-v1 .pj-media{position:relative;display:block;border-radius:.6rem;overflow:hidden;aspect-ratio:16/10;background:var(--muted)}
+#projects.pj-v1 .pj-media::after{content:"";position:absolute;inset:0;border:1px solid var(--border);border-radius:inherit;pointer-events:none;transition:border-color .35s}
+#projects.pj-v1 .pj-media img{display:block;width:100%;height:100%;object-fit:cover;object-position:top;filter:saturate(.9) brightness(.96);transition:transform .65s cubic-bezier(.25,.46,.45,.94),filter .5s ease}
+#projects.pj-v1 .pj-row:hover .pj-media img,
+#projects.pj-v1 .pj-row:focus-within .pj-media img{transform:scale(1.045);filter:none}
+#projects.pj-v1 .pj-row:hover .pj-media::after{border-color:color-mix(in srgb,var(--foreground) 26%,transparent)}
+
+/* header line — logo · title · hint */
+#projects.pj-v1 .pj-head{display:flex;align-items:center;gap:.55rem;min-width:0}
+#projects.pj-v1 .pj-head .pl{height:20px;width:auto;max-width:40px;border-radius:4px;object-fit:contain;flex-shrink:0}
+#projects.pj-v1 .pj-title{position:relative;display:inline-flex;align-items:center;gap:.45rem;font-size:1.3rem;font-weight:680;letter-spacing:-.02em;line-height:1.2}
+/* the sweep stops short of the arrow so the underline reads as the word's, not
+   the whole flex line's */
+#projects.pj-v1 .pj-title::after{content:"";position:absolute;left:0;right:1.35rem;bottom:-4px;height:1px;background:currentColor;transform:scaleX(0);transform-origin:left;transition:transform .45s cubic-bezier(.22,1,.36,1)}
+#projects.pj-v1 .pj-row:hover .pj-title::after,
+#projects.pj-v1 .pj-title:focus-visible::after{transform:scaleX(1)}
+#projects.pj-v1 .pj-title svg{width:15px;height:15px;flex-shrink:0;color:var(--secondary-ink);transition:transform .25s,color .25s}
+#projects.pj-v1 .pj-row:hover .pj-title svg{transform:translate(3px,-3px);color:var(--foreground)}
+
+#projects.pj-v1 .pj-hint{margin-left:auto;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--secondary-ink);opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+@media(hover:hover){#projects.pj-v1 .pj-row:hover .pj-hint{opacity:.9}}
+#projects.pj-v1 .pj-row.open .pj-hint{opacity:0!important}
+
+#projects.pj-v1 .pj-sum{margin:.55rem 0 0;font-size:.885rem;line-height:1.65;color:var(--secondary-ink);max-width:58ch}
+
+/* highlights — grid-rows 0fr→1fr @525ms, the site's canonical expand */
+#projects.pj-v1 .pj-x{display:grid;grid-template-rows:0fr;transition:grid-template-rows .525s cubic-bezier(.22,1,.36,1)}
+#projects.pj-v1 .pj-xin{overflow:hidden;min-height:0;opacity:0;transform:translateY(-4px);transition:opacity .37s ease,transform .37s ease}
+#projects.pj-v1 .pj-row.open .pj-x,
+#projects.pj-v1 .pj-row.expand:focus-within .pj-x{grid-template-rows:1fr}
+#projects.pj-v1 .pj-row.open .pj-xin,
+#projects.pj-v1 .pj-row.expand:focus-within .pj-xin{opacity:1;transform:none;transition-delay:.09s}
+@media(hover:hover){
+  #projects.pj-v1 .pj-row.expand:hover .pj-x{grid-template-rows:1fr}
+  #projects.pj-v1 .pj-row.expand:hover .pj-xin{opacity:1;transform:none;transition-delay:.09s}
+}
+
+/* `.bullets` is Experience's list too — every override here stays inside
+   `#projects` or the commit log picks up a mono `+` marker it never asked for. */
+#projects.pj-v1 .bullets{margin:.95rem 0 0;gap:.6rem;font-size:.835rem;line-height:1.66}
+#projects.pj-v1 .bullets li{display:grid;grid-template-columns:14px 1fr;gap:.5rem;color:var(--secondary-ink)}
+#projects.pj-v1 .bullets li i{margin:0;width:auto;height:auto;border-radius:0;background:none;font-style:normal;font-family:var(--font-mono);font-size:.75rem;padding-top:.1rem;color:var(--secondary-ink)}
+#projects.pj-v1 .bullets li i::before{content:"+"}
+#projects.pj-v1 .bullets b{color:var(--foreground);font-weight:620}
+/* 120ms apart, starting once the fold is already moving */
+#projects.pj-v1 .pj-row.open .rv-stagger li,
+#projects.pj-v1 .pj-row.expand:focus-within .rv-stagger li{opacity:1;transform:none;transition-delay:calc(.09s + var(--i)*.12s)}
+@media(hover:hover){
+  #projects.pj-v1 .pj-row.expand:hover .rv-stagger li{opacity:1;transform:none;transition-delay:calc(.09s + var(--i)*.12s)}
+}
+
+/* stack — one quiet mono line instead of a pile of pills */
+#projects.pj-v1 .pj-stack{margin:1rem 0 0;font-family:var(--font-mono);font-size:.72rem;letter-spacing:.03em;color:var(--secondary-ink);line-height:1.9}
+#projects.pj-v1 .pj-stack em{font-style:normal;opacity:.55;padding:0 .1rem}
+
+#projects.pj-v1 .pj-links{display:flex;gap:1.35rem;margin-top:.75rem;font-family:var(--font-mono);font-size:.75rem;letter-spacing:.02em}
+#projects.pj-v1 .pj-links a{display:inline-flex;align-items:center;gap:.45rem;color:var(--secondary-ink);transition:color .2s}
+#projects.pj-v1 .pj-links a:hover{color:var(--foreground)}
+#projects.pj-v1 .pj-links svg{width:13px;height:13px}
+
+/* 768px, not the preview's 860: below the container's own max-width the measure
+   starts shrinking with the viewport, and that is the point the media column has
+   to start giving ground. At 860 the container is still capped, so the step fired
+   while nothing had moved — and widened the prose column as the window narrowed. */
+@media(max-width:768px){
+  #projects.pj-v1 .pj-row{grid-template-columns:2.4rem minmax(0,208px) minmax(0,1fr);gap:1.1rem}
+}
+@media(max-width:720px){
+  /* one column: the index and the hover hint are both desktop affordances */
+  #projects.pj-v1 .pj-row{grid-template-columns:minmax(0,1fr);gap:1rem;padding-left:.9rem}
+  #projects.pj-v1 .pj-idx{display:none}
+  #projects.pj-v1 .pj-media{max-width:420px}
+  #projects.pj-v1 .pj-hint{display:none}
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   v2 — "the build log"
+   Each project is a deployment record. The keyline header
+   (number — domain ——— ● live) borrows the contact section's frequency-row
+   grammar; the badges, arrow slide, thumb lift and hover-expand highlights
+   are the site's own moves. No hover card, no fill.
+   ─────────────────────────────────────────────────────────────────────────── */
+#projects.pj-v2 .pjb-log{margin-top:2.1rem}
+
+/* the record header */
+#projects.pj-v2 .pjb-dep{display:flex;align-items:center;gap:.85rem;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.16em;color:var(--lab-dim);min-width:0}
+#projects.pj-v2 .pjb-n{flex-shrink:0;transition:color .25s}
+#projects.pj-v2 .pjb-d{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:52%;transition:color .25s}
+/* `pjbBlink`/`pjbFlow`: globals already defines a bare `blink` for the hero
+   caret, and `flow` is far too generic to leave unclaimed. */
+#projects.pj-v2 .pjb-caret{display:inline-block;width:.55em;animation:pjbBlink 1s steps(1) infinite}
+@keyframes pjbBlink{50%{opacity:0}}
+#projects.pj-v2 .pjb-dep i{flex:1;height:1px;background:var(--border);min-width:1.5rem;position:relative;overflow:hidden}
+/* the scan line — `--fd` staggers the records so the log breathes out of sync */
+#projects.pj-v2 .pjb-dep i::after{content:"";position:absolute;top:0;left:-28px;width:26px;height:1px;background:linear-gradient(90deg,transparent,var(--foreground),transparent);opacity:.55;animation:pjbFlow 6.5s linear infinite;animation-delay:var(--fd,0s)}
+@keyframes pjbFlow{from{left:-28px}to{left:100%}}
+/* Green is a claim, not a decoration: it means "this is running". Only the row
+   that earned the dot gets it — a repo-only entry reads `source` in the keyline's
+   own ink, or the status word says one thing and its colour says another. */
+#projects.pj-v2 .pjb-s{flex-shrink:0;display:inline-flex;align-items:center;gap:.45rem;color:var(--lab-dim)}
+#projects.pj-v2 .pjb-s:has(.pj-dot){color:var(--ok-ink)}
+
+#projects.pj-v2 .pjb-entry{padding:.95rem 0 1.9rem;cursor:pointer;position:relative;opacity:0;filter:blur(5px);transform:translateY(14px);transition:opacity .7s ease,filter .7s ease,transform .7s ease}
+#projects.pj-v2 .pjb-entry.in{opacity:1;filter:none;transform:none}
+#projects.pj-v2 .pjb-entry:hover .pjb-n,
+#projects.pj-v2 .pjb-entry:hover .pjb-d,
+#projects.pj-v2 .pjb-entry.open .pjb-n,
+#projects.pj-v2 .pjb-entry.open .pjb-d{color:var(--foreground)}
+
+#projects.pj-v2 .pjb-grid{margin-top:.95rem;display:grid;grid-template-columns:292px minmax(0,1fr);gap:1.35rem;align-items:start}
+
+/* media — the screenshot mounted on the site's dotgrid, zoom clipped inside */
+#projects.pj-v2 .pjb-pad{position:relative;padding:.6rem;border:1px solid var(--border);border-radius:.65rem;background-image:radial-gradient(var(--dotgrid) 1px,transparent 1px);background-size:12px 12px;transition:border-color .25s,transform .25s}
+#projects.pj-v2 .pjb-entry:hover .pjb-pad{border-color:color-mix(in srgb,var(--foreground) 26%,transparent);transform:translateY(-2px)}
+/* notched into the pad's border, so it paints the page ground behind itself */
+#projects.pj-v2 .pjb-prod{position:absolute;top:-.55rem;right:.7rem;padding:0 .4rem;background:var(--background);font-size:9px;letter-spacing:.16em;color:var(--secondary-ink);display:flex;align-items:center;gap:.3rem;transition:color .25s}
+#projects.pj-v2 .pjb-entry:hover .pjb-prod{color:var(--foreground)}
+#projects.pj-v2 .pjb-thumb{display:block;border-radius:.45rem;overflow:hidden;background:var(--muted);aspect-ratio:16/10}
+#projects.pj-v2 .pjb-thumb img{display:block;width:100%;height:100%;object-fit:cover;object-position:top;transition:transform .6s cubic-bezier(.25,.46,.45,.94)}
+#projects.pj-v2 .pjb-entry:hover .pjb-thumb img{transform:scale(1.05)}
+
+#projects.pj-v2 .pjb-title{display:flex;align-items:center;gap:.5rem;min-width:0;flex-wrap:wrap}
+#projects.pj-v2 .pjb-title .pl{height:20px;width:auto;max-width:40px;border-radius:4px;object-fit:contain;flex-shrink:0}
+#projects.pj-v2 .pjb-title a,
+#projects.pj-v2 .pjb-title .pj-name{font-size:1.22rem;font-weight:700;letter-spacing:-.01em;display:inline-flex;align-items:center;gap:.4rem}
+#projects.pj-v2 .pjb-title svg{width:14px;height:14px;flex-shrink:0;color:var(--secondary-ink);transition:transform .22s,color .22s}
+#projects.pj-v2 .pjb-entry:hover .pjb-title svg{transform:translate(3px,-3px);color:var(--foreground)}
+#projects.pj-v2 .pjb-hint{margin-left:auto;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--secondary-ink);opacity:0;transition:opacity .25s;pointer-events:none}
+@media(hover:hover){#projects.pj-v2 .pjb-entry:hover .pjb-hint{opacity:.9}}
+#projects.pj-v2 .pjb-entry.open .pjb-hint{opacity:0!important}
+
+#projects.pj-v2 .pjb-sum{margin:.4rem 0 0;font-size:.875rem;line-height:1.65;color:var(--secondary-ink)}
+
+#projects.pj-v2 .pjb-x{display:grid;grid-template-rows:0fr;transition:grid-template-rows .525s cubic-bezier(.22,1,.36,1)}
+#projects.pj-v2 .pjb-xin{overflow:hidden;min-height:0;opacity:0;transform:translateY(-4px);transition:opacity .37s ease,transform .37s ease}
+#projects.pj-v2 .pjb-entry.open .pjb-x,
+#projects.pj-v2 .pjb-entry:focus-within .pjb-x{grid-template-rows:1fr}
+#projects.pj-v2 .pjb-entry.open .pjb-xin,
+#projects.pj-v2 .pjb-entry:focus-within .pjb-xin{opacity:1;transform:none;transition-delay:.09s}
+@media(hover:hover){
+  #projects.pj-v2 .pjb-entry:hover .pjb-x{grid-template-rows:1fr}
+  #projects.pj-v2 .pjb-entry:hover .pjb-xin{opacity:1;transform:none;transition-delay:.09s}
+}
+
+/* scoped for the same reason v1's are — Experience shares `.bullets` */
+#projects.pj-v2 .bullets{margin:.8rem 0 0;gap:.55rem;font-size:.83rem;line-height:1.65}
+#projects.pj-v2 .bullets li{display:grid;grid-template-columns:13px 1fr;gap:.45rem;color:var(--secondary-ink)}
+#projects.pj-v2 .bullets li i{margin:0;width:auto;height:auto;border-radius:0;background:none;font-style:normal;font-family:var(--font-mono);font-size:.72rem;padding-top:.12rem}
+#projects.pj-v2 .bullets li i::before{content:"▸"}
+#projects.pj-v2 .bullets b{color:var(--foreground);font-weight:620}
+#projects.pj-v2 .pjb-entry.open .rv-stagger li,
+#projects.pj-v2 .pjb-entry:focus-within .rv-stagger li{opacity:1;transform:none;transition-delay:calc(.09s + var(--i)*.12s)}
+@media(hover:hover){
+  #projects.pj-v2 .pjb-entry:hover .rv-stagger li{opacity:1;transform:none;transition-delay:calc(.09s + var(--i)*.12s)}
+}
+
+/* the site's badge pills, at the compact size Experience uses */
+#projects.pj-v2 .pjb-chips{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.85rem}
+#projects.pj-v2 .pjb-chips .badge{font-size:.72rem;padding:2px 9px;gap:5px}
+#projects.pj-v2 .pjb-chips .badge .bi{width:12px;height:12px}
+
+#projects.pj-v2 .pjb-links{display:flex;gap:1.1rem;margin-top:.7rem;font-family:var(--font-mono);font-size:.75rem;letter-spacing:.02em}
+#projects.pj-v2 .pjb-links a{display:inline-flex;align-items:center;gap:.4rem;color:var(--secondary-ink);transition:color .2s}
+#projects.pj-v2 .pjb-links a:hover{color:var(--foreground)}
+#projects.pj-v2 .pjb-links svg{width:13px;height:13px}
+
+/* end line — the log signs off the way the contact section does */
+#projects.pj-v2 .pjb-eol{margin-top:2.6rem;display:flex;align-items:center;gap:1rem;font-family:var(--font-mono);font-size:10px;letter-spacing:.2em;color:var(--lab-dim)}
+#projects.pj-v2 .pjb-eol::before,
+#projects.pj-v2 .pjb-eol::after{content:"";height:1px;background:var(--border);flex:1}
+
+@media(max-width:600px){
+  #projects.pj-v2 .pjb-grid{grid-template-columns:1fr;gap:.85rem}
+  #projects.pj-v2 .pjb-thumb{max-width:230px}
+  #projects.pj-v2 .pjb-d{max-width:44%}
+  #projects.pj-v2 .pjb-hint{display:none}
 }
 
 /* shared: "Show More" button (Projects + Blogs) */
@@ -2098,7 +2306,9 @@ body.cat-on .cw .dot { display: none; }
   .soc .lbl,
   .badge,
   .pj-x,
-  .pj-xin { transition: none !important; }
+  .pj-xin,
+  .pjb-x,
+  .pjb-xin { transition: none !important; }
   /* useMagnetic never attaches under this preference, so this only catches a
      lean left mid-flight by a preference flipped while the pointer was down. */
   .btn { translate: none !important; }
@@ -2109,9 +2319,34 @@ body.cat-on .cw .dot { display: none; }
   }
 
   /* The "more builds" fold still opens — it carries content, not decoration —
-     it just arrives instead of travelling. */
+     it just arrives instead of travelling. Same for the highlights above. */
   .pj-fold,
   .pj-more svg { transition: none; }
+
+  /* Projects, either layout. v2's records are parked at opacity:0 until an
+     observer marks them `in`; park them at their natural state instead so the
+     scroll never has to earn them. */
+  #projects.pj-v2 .pjb-entry {
+    opacity: 1;
+    filter: none;
+    transform: none;
+    transition: none !important;
+  }
+
+  /* The loops: the scan line crossing each keyline, the domain's typing caret
+     and the live dot's ping ring. */
+  #projects.pj-v2 .pjb-dep i::after { display: none; }
+  #projects.pj-v2 .pjb-caret,
+  .pj-dot::after { animation: none !important; }
+
+  /* Hover choreography collapses to state: no zoom, no sibling dim, and the
+     gutter bar snaps in rather than wiping down the row. */
+  #projects.pj-v1 .pj-media img,
+  #projects.pj-v2 .pjb-thumb img { transform: none !important; transition: none !important; }
+  #projects.pj-v1 .pj-row,
+  #projects.pj-v1 .pj-row::before,
+  #projects.pj-v1 .pj-title::after { transition: none !important; }
+  #projects.pj-v1:has(.pj-row:hover) .pj-row:not(:hover) { opacity: 1; }
 
   /* Contact and thought both arrive already there. Every entrance in the two
      sections is `backwards`-filled off a keyframe rather than parked at
