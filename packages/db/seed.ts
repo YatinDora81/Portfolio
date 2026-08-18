@@ -797,6 +797,9 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
       // The cat's corner nap. "off" here would leave it draggable but sleepless.
       { key: "catNapStyle", value: "ticks" },
       { key: "catNapSeconds", value: "30" },
+      // Which projects layout ships. "v1" is the work ledger, anything else
+      // the build log — the reader coerces, so a stray value lands on v2.
+      { key: "projectsVersion", value: "v2" },
       { key: "copyrightName", value: "Yatin Dora" },
     ],
   });

@@ -204,6 +204,7 @@ The hero's own copy and the version it serves are **not** here — they are colu
 | `contactEmail` | Contact | Email address used in the mailto link of the contact form |
 | `availabilityStatus` | Hero, Contact | Status text (e.g. "Available for opportunities") — the hero pill and the contact availability card render the same string |
 | `availabilityDetail` | Contact | Detail text below status (e.g. "Open to freelance, full-time & collaborations") |
+| `projectsVersion` | Projects | Which layout the Projects section renders — `v1` the work ledger, `v2` the build log. Both layouts read the same [Project](#project) rows, so unlike the hero there is nothing to flip atomically with them. A missing or unrecognised value reads as `v2` |
 | `copyrightName` | Footer | Name in the copyright line (e.g. "Yatin Dora") |
 
 ```
