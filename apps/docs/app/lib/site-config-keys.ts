@@ -17,7 +17,7 @@
  * is missing there is silently dropped on save, so the two move together.
  */
 
-export type ConfigOwner = "hero" | "cat" | "contact" | "chrome";
+export type ConfigOwner = "hero" | "cat" | "contact" | "projects" | "chrome";
 
 /**
  * Which control draws the key. `napStyle` and `photoList` have no default
@@ -25,9 +25,15 @@ export type ConfigOwner = "hero" | "cat" | "contact" | "chrome";
  * `photoList`'s editor is a list, so both come in through ConfigCard's
  * `controls` override. Anything not overridden falls back to a text field, so
  * a key is always editable even before its bespoke control exists.
+ *
+ * The three of them plus `versionTiles` also declare a WIDTH: ConfigCard pairs
+ * short controls two to a row, and a card-wide control caught in that pairing
+ * renders at half the card. Adding a control here that needs the full measure
+ * means listing it in `fields()` alongside them.
  */
 export type ConfigControl =
-  | "text" | "mono" | "long" | "color" | "toggle" | "number" | "napStyle" | "photoList";
+  | "text" | "mono" | "long" | "color" | "toggle" | "number" | "napStyle" | "photoList"
+  | "versionTiles";
 
 export interface ConfigKeyDef {
   owner: ConfigOwner;
@@ -103,6 +109,12 @@ export const KEYS: Record<string, ConfigKeyDef> = {
     description: "The line beside the transmit button — what happens after someone writes to you.",
   },
 
+  // ── Projects ──
+  projectsVersion: {
+    owner: "projects", control: "versionTiles", label: "Layout",
+    description: "Which of the two layouts section 05 renders — v1's ranked ledger, or v2's build log. Every project row is shared between them.",
+  },
+
   // ── Cat ──
   catNapStyle: {
     owner: "cat", control: "napStyle", label: "Nap style",
@@ -140,7 +152,37 @@ export function isUnclaimed(key: string): boolean {
  * What the site serves when the row is missing, so a form reads what visitors
  * actually get rather than an empty box. Blank is a real value everywhere else.
  */
-export const DEFAULTS: Record<string, string> = { catNapStyle: "ticks", catNapSeconds: "30" };
+export const DEFAULTS: Record<string, string> = {
+  catNapStyle: "ticks",
+  catNapSeconds: "30",
+  projectsVersion: "v2",
+};
+
+export type ProjectsVersion = "v1" | "v2";
+
+/**
+ * The one coercion for `projectsVersion`, mirrored by the save action and by
+ * apps/web on read: anything that is not exactly "v1" is the v2 build log. A
+ * missing row, a legacy value and a hostile POST therefore all land on the same
+ * layout instead of on an empty section.
+ */
+export function toProjectsVersion(raw: string | null | undefined): ProjectsVersion {
+  return raw === "v1" ? "v1" : "v2";
+}
+
+/** The two layouts, described well enough to choose between without opening the site. */
+export const PROJECT_LAYOUTS: { value: ProjectsVersion; name: string; detail: string }[] = [
+  {
+    value: "v1",
+    name: "the ledger",
+    detail: "ranked index · hairline dividers · mono stack line · hovering one row dims the rest",
+  },
+  {
+    value: "v2",
+    name: "the build log",
+    detail: "deployment records · typed domains · prod-framed shots · badge pills · end-of-log line",
+  },
+];
 
 /** The range `updateSiteConfig` clamps to anyway — mirrored so the field agrees. */
 export const NUMBER_RANGE: Record<string, { min: number; max: number }> = {

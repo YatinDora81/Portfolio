@@ -25,6 +25,7 @@ const ALLOWED_KEYS = new Set([
   "heroDotPulse",
   "catNapStyle",
   "catNapSeconds",
+  "projectsVersion",
   "copyrightName",
   // Not in the form's registry, but real rows written by the links page.
   "heroPhotos",
@@ -59,6 +60,10 @@ function validate(key: string, value: string): string | null {
     const style = value.trim().toLowerCase();
     return CAT_NAP_STYLES.has(style) ? style : "ticks";
   }
+  // The whole Projects section is chosen by this one row, so an unknown string
+  // parked here is a section that renders neither layout. apps/web coerces the
+  // same way on read; both ends collapse to "v2" rather than trusting the row.
+  if (key === "projectsVersion") return value === "v1" ? "v1" : "v2";
   if (key === "catNapSeconds") {
     const secs = parseInt(value, 10);
     return String(Number.isFinite(secs) ? Math.min(300, Math.max(3, secs)) : 30);
@@ -109,7 +114,7 @@ export async function updateSiteConfig(entries: { key: string; value: string }[]
   // preview panes on several other admin pages, and the layout-wide revalidate
   // that used to cover them only fired because the form happened to post
   // `heroVersion` on every save — which it no longer holds.
-  for (const path of ["/site-config", "/hero", "/cat", "/contact-purposes"]) {
+  for (const path of ["/site-config", "/hero", "/cat", "/contact-purposes", "/projects"]) {
     revalidatePath(path);
   }
 }

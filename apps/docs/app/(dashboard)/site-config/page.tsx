@@ -22,6 +22,7 @@ const OWNERS: Record<Exclude<ConfigOwner, "chrome">, { label: string; href: stri
   hero: { label: "Hero", href: "/hero" },
   contact: { label: "Contact", href: "/contact-purposes" },
   cat: { label: "Cat", href: "/cat" },
+  projects: { label: "Projects", href: "/projects" },
 };
 
 export default async function SiteConfigPage() {

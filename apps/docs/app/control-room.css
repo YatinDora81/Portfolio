@@ -2219,3 +2219,37 @@ a.abt-l:hover .abt-go { color: var(--accT) }
    row taller than the nav rows beside it. */
 .pal-it .pal-w { display: block; margin-left: 0; margin-top: 3px; font-family: var(--ui); font-size: 11.5px;
   letter-spacing: 0; line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+
+/* ---------- projects · the layout choice ----------
+   Two tiles, and unlike the hero's `.hro-ver` tabs they are not a view filter:
+   Projects has no per-version content, so the tile you pick IS the row, pending
+   until the card below saves it. That is why these carry their own border
+   instead of bleeding to the card edge — they sit inside `.card-b`, in the field
+   flow, where every other control on this page is something you are editing. */
+.pvr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+.pvr {
+  display: flex; align-items: flex-start; gap: 12px; padding: 13px 14px; text-align: left;
+  background: var(--card); border: 1px solid var(--line2); border-radius: var(--r3);
+  transition: background .14s, border-color .14s
+}
+.pvr:hover { background: var(--bg1) }
+.pvr.on { background: var(--accS); border-color: var(--c1) }
+.pvr-k {
+  font-family: var(--mono); font-size: 22px; line-height: 1; letter-spacing: -.02em;
+  color: var(--faint); flex: none
+}
+.pvr.on .pvr-k { color: var(--accT) }
+.pvr-m { display: grid; gap: 3px; min-width: 0 }
+.pvr-n { font-size: 13px; font-weight: 600; color: var(--ink) }
+.pvr-st { font-size: 12px; color: var(--dim) }
+.pvr-st.live { color: var(--goodT); font-weight: 600 }
+.pvr-d {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .03em; line-height: 1.6; color: var(--faint)
+}
+/* --faint is 2.77:1 on a tint in light mode, the theme the app boots into — so
+   the detail line steps up the moment the tile gains a background. */
+.pvr:hover .pvr-d, .pvr.on .pvr-d { color: var(--dim) }
+.pvr .dot { margin-left: auto; flex: none; margin-top: 6px }
+/* The detail lines are the widest thing here; below this they stack rather than
+   wrap to four lines each. */
+@media (max-width: 760px) { .pvr-grid { grid-template-columns: 1fr } }

@@ -10,7 +10,10 @@ import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ColorField } from "@/components/ui/color-field";
 import { PhotoList } from "./photo-list";
-import { KEYS, NUMBER_RANGE, clampNumber, DOT_PRESETS, NAP_STYLES, type ConfigKeyDef } from "@/lib/site-config-keys";
+import {
+  KEYS, NUMBER_RANGE, clampNumber, DOT_PRESETS, NAP_STYLES, PROJECT_LAYOUTS,
+  type ConfigControl, type ConfigKeyDef,
+} from "@/lib/site-config-keys";
 import { updateSiteConfig } from "@/lib/actions/site-config";
 import { publishSite } from "@/lib/actions/publish";
 import {
@@ -232,6 +235,21 @@ export function ConfigCard({
             onChange={(e) => set(key, e.target.value)}
           />
         );
+      case "versionTiles":
+        // Same arrangement as `napStyle`: the tiles live on the Projects route
+        // and arrive through `controls`. This is the fallback that keeps the row
+        // editable wherever it is drawn without one, so the control and the key
+        // can never get separated.
+        return (
+          <Select
+            key={key}
+            label={def.label}
+            hint={def.description}
+            options={PROJECT_LAYOUTS.map((l) => ({ value: l.value, label: `${l.value} — ${l.name}` }))}
+            value={PROJECT_LAYOUTS.some((l) => l.value === value) ? value : PROJECT_LAYOUTS[0]!.value}
+            onChange={(e) => set(key, e.target.value)}
+          />
+        );
       default:
         return (
           <Input
@@ -248,6 +266,8 @@ export function ConfigCard({
   };
 
   /** Short fields pair into `.f-row`; long ones break the row and go full width. */
+  const FULL_WIDTH = new Set<ConfigControl>(["long", "napStyle", "photoList", "versionTiles"]);
+
   const fields = (keys: string[]) => {
     const out: React.ReactNode[] = [];
     let buf: string[] = [];
@@ -260,7 +280,7 @@ export function ConfigCard({
     };
     for (const key of keys) {
       const control = defs[key]?.control;
-      if (control === "long" || control === "napStyle" || control === "photoList") {
+      if (control && FULL_WIDTH.has(control)) {
         flush();
         out.push(field(key));
       } else buf.push(key);
