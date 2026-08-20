@@ -230,6 +230,22 @@
   background-clip: text;
 }
 
+/* ── Selection: visual mode ────────────────────────────────────────────
+   Inverse video, like a terminal. One rule covers both themes — the pair
+   flips with the vars. */
+::selection {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+/* Gradient-clipped type paints its fill from the background image, so a
+   selection over it renders nothing — re-assert the fill inside ::selection
+   or the name disappears the moment someone grabs it. */
+.title-gradient::selection {
+  background: var(--foreground);
+  -webkit-text-fill-color: var(--background);
+}
+
 /* Navbar cat toggle — playful paw */
 @keyframes pawWiggle {
   0%, 100% { transform: rotate(0deg) scale(1); }
