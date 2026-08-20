@@ -155,7 +155,7 @@ export default function Contact({
 
           <div className="ct-close rv" style={rise('.4s')}>
             <span>end of transmission</span>
-            <span className="coord">12.97°N 77.59°E · bengaluru</span>
+            <span className="coord">12.97°N 77.59°E · <span className="loc-city">Bengaluru</span></span>
           </div>
         </div>
       </Container>

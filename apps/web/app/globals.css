@@ -1943,11 +1943,14 @@ body.cat-on .cw .dot { display: none; }
   gap: 16px;
   flex-wrap: wrap;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: .16em;
   text-transform: uppercase;
   color: var(--lab-dim);
 }
+/* Same call as the hero location line: 10.5px of tracked-out grey mono was too
+   faint to read. The line steps up to the 12px floor, the coordinates keep the
+   quiet ink, and the city takes full foreground via .loc-city. */
 #contact .ct-close .coord { letter-spacing: .06em; text-transform: none; color: var(--lab-2); }
 
 /* Entrances. `backwards` fill with no resting `opacity: 0` is the whole no-JS
