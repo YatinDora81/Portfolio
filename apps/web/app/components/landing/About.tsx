@@ -408,7 +408,14 @@ function Terminal({
       ref={wrapRef}
       initial={reduceMotion ? false : 'hidden'}
       animate={inView || reduceMotion ? 'show' : 'hidden'}
-      onClick={() => inputRef.current?.focus()}
+      onClick={() => {
+        // A click is also the tail of a drag-select. Focusing the hidden input
+        // moves the selection into it, wiping the highlight the user just made
+        // over the printed output — so let a live selection win the click.
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed && sel.toString().trim()) return;
+        inputRef.current?.focus();
+      }}
       className="mt-4 cursor-text overflow-hidden rounded-2xl border border-border bg-card"
     >
       {/* title bar */}
