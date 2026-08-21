@@ -17,20 +17,38 @@ import {
 
 const MOBILE_MENU_ID = 'mobile-nav-menu';
 
+// `key` is what ties a link to its section's visibility, and it is a literal
+// union rather than a string so a rename here becomes a type error at the call
+// site instead of a silently-undefined lookup that hides the link forever.
 const allNavItems = [
-  { name: 'Skills', link: '#skills' },
-  { name: 'Experience', link: '#experience' },
-  { name: 'Projects', link: '#projects' },
-  { name: 'Blogs', link: '#blogs' },
-  { name: 'Contact', link: '#contact' },
-];
+  { key: 'skills', name: 'Skills', link: '#skills' },
+  { key: 'experience', name: 'Experience', link: '#experience' },
+  { key: 'projects', name: 'Projects', link: '#projects' },
+  { key: 'blogs', name: 'Blogs', link: '#blogs' },
+  { key: 'contact', name: 'Contact', link: '#contact' },
+] as const;
 
-export default function Navbar({ logo, hasBlogs }: { logo: string; hasBlogs: boolean }) {
+type NavSection = (typeof allNavItems)[number]['key'];
+
+interface NavbarProps {
+  logo: string;
+  /**
+   * Which sections the page actually rendered. Resolved once by the page — the
+   * feature flag AND, for blogs, whether there are any posts — because a link
+   * to a section that isn't there scrolls nowhere, which reads as a broken site
+   * rather than a hidden section.
+   */
+  sections: Record<NavSection, boolean>;
+}
+
+export default function Navbar({ logo, sections }: NavbarProps) {
   const { theme, toggleTheme } = useTheme();
   const { showCat, toggleCat } = useCat();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const navItems = hasBlogs ? allNavItems : allNavItems.filter(item => item.name !== 'Blogs');
+  // One filtered array, feeding both the desktop NavItems and the mobile menu
+  // below, so the two can never disagree about what exists.
+  const navItems = allNavItems.filter((item) => sections[item.key]);
 
   return (
     // <header>/<nav> rather than bare divs: the logo, the five section links and

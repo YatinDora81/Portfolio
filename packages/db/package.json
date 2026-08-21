@@ -10,11 +10,13 @@
   "private": true,
   "scripts": {
     "seed": "bun seed.ts",
-    "hero:v2": "bun scripts/install-hero-v2.ts"
+    "hero:v2": "bun scripts/install-hero-v2.ts",
+    "flags:seed": "bun scripts/seed-flags.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.8.0",
+    "@repo/shared": "*",
     "@repo/typescript-config": "*",
     "dotenv": "^17.3.1",
     "pg": "^8.20.0",

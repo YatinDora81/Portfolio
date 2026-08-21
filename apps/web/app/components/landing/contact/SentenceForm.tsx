@@ -23,12 +23,19 @@ import { useReducedMotion } from 'motion/react';
 import type { Purpose } from '../Contact';
 import type { ScopeHandle } from './Scope';
 
-interface SentenceFormProps {
+interface ComposerProps {
   purposes: Purpose[];
   contactEmail: string;
   /** The line beside the button — the CMS's availability detail when it has one. */
   note: string;
   scope: RefObject<ScopeHandle | null>;
+}
+
+interface SentenceFormProps extends ComposerProps {
+  /** The `contact.form` flag, resolved once on the page and threaded down. Off
+      means the section stays and the form goes — never a form that types
+      happily and then collects a 503. */
+  enabled: boolean;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -113,7 +120,34 @@ interface AckPart {
 /** What the receipt offers once it has finished typing. */
 type Tail = 'another' | 'mailto' | null;
 
-export default function SentenceForm({ purposes, contactEmail, note, scope }: SentenceFormProps) {
+/**
+ * What stands in the sentence's place while the switch is off. It borrows the
+ * form's own type — the same opening two words, the same receipt line under it
+ * — so the block reads as the section pausing rather than as an error state,
+ * and it hands the visitor the address instead of a dead field.
+ */
+function Paused({ contactEmail }: { contactEmail: string }) {
+  return (
+    <div className="sent-form">
+      <p className="sentence">
+        <b>Hey Yatin</b> &mdash; the form is off the air for a moment.{' '}
+        {contactEmail
+          ? 'The address just below still reaches me, and it lands in the same inbox.'
+          : 'The links just below still reach me.'}
+      </p>
+      <p className="ack">tx paused · rx open</p>
+    </div>
+  );
+}
+
+/** Guarding in a wrapper — the shape Carrier already uses in this folder — so
+    the composer's forty-odd hooks stay unconditional. */
+export default function SentenceForm({ enabled, ...props }: SentenceFormProps) {
+  if (!enabled) return <Paused contactEmail={props.contactEmail} />;
+  return <Composer {...props} />;
+}
+
+function Composer({ purposes, contactEmail, note, scope }: ComposerProps) {
   const reduced = useReducedMotion();
   const railId = useId();
   const capId = useId();
@@ -355,10 +389,23 @@ export default function SentenceForm({ purposes, contactEmail, note, scope }: Se
         // fetch RESOLVES on 4xx/5xx — the catch below never sees a rejected
         // message, so without this branch the send fails in total silence. The
         // fields keep everything that was written, and the receipt says so.
+        //
+        // The endpoint's own sentence wins when it sends one. A 503 from the
+        // paused kill switch reaches a visitor holding a cached page that still
+        // had the form, and "transmit again" is exactly the wrong advice there.
+        let said = '';
+        try {
+          const body: unknown = await res.json();
+          if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string') {
+            said = body.error.trim();
+          }
+        } catch {
+          // A non-JSON body — a proxy's own 502 page — falls to the line below.
+        }
         typeAck(
           [
             { text: 'err — ' },
-            { text: 'that didn’t land. nothing was lost — transmit again, or ' },
+            { text: said ? `${said} ` : 'that didn’t land. nothing was lost — transmit again, or ' },
           ],
           'mailto',
         );

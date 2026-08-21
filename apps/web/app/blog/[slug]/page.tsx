@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getBlogBySlug, getBlogs } from '@/lib/data';
+import { getFlags } from '@/lib/flags';
+import { FLAG_KEYS, flagValue } from '@repo/shared/flags';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
 import MotionProvider from '@/components/common/MotionProvider';
 import BackgroundLines from '@/components/common/BackgroundLines';
@@ -52,11 +54,21 @@ export default async function BlogPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [blog, allBlogs] = await Promise.all([getBlogBySlug(slug), getBlogs()]);
+  // This route is its own render, so it reads the flags itself rather than
+  // inheriting the home page's. That is one cached lookup, not a second query.
+  const [blog, allBlogs, flags] = await Promise.all([
+    getBlogBySlug(slug),
+    getBlogs(),
+    getFlags(),
+  ]);
 
   if (!blog) notFound();
 
   const moreBlogs = allBlogs.filter((b) => b.slug !== slug);
+  // With the section switched off there is no `#blogs` on the home page to land
+  // on. The way back still has to exist — a post is reachable by direct link —
+  // so it drops the dead fragment rather than the whole affordance.
+  const showBlogs = flagValue(flags, FLAG_KEYS.SECTION_BLOGS);
 
   return (
     <ThemeProvider>
@@ -69,7 +81,7 @@ export default async function BlogPage({
           {/* Back button */}
           <div className="fixed top-5 left-5 z-10">
             <Link
-              href="/#blogs"
+              href={showBlogs ? '/#blogs' : '/'}
               className="inline-flex items-center gap-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border px-3.5 py-1.5 text-xs font-medium text-secondary hover:text-foreground transition-colors"
             >
               <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>

@@ -26,6 +26,8 @@ import {
   getContactData,
   getSiteConfig,
 } from './lib/data';
+import { getFlags } from './lib/flags';
+import { FLAG_KEYS, flagValue } from '@repo/shared/flags';
 import { githubHandle, readGithubActivity } from './lib/github';
 import { SITE_URL, SITE_NAME, absoluteUrl } from './lib/site';
 
@@ -58,7 +60,7 @@ export default async function Home() {
   // First and alone: it resolves the live hero row, and `heroVersion` scopes
   // every hero query below it.
   const siteConfig = await getSiteConfig();
-  const [heroData, aboutData, skills, experiences, projects, blogs, quotes, contactData] =
+  const [heroData, aboutData, skills, experiences, projects, blogs, quotes, contactData, flags] =
     await Promise.all([
       getHeroData(siteConfig.heroVersion),
       getAboutData(),
@@ -68,7 +70,31 @@ export default async function Home() {
       getBlogs(),
       getQuotes(),
       getContactData(),
+      getFlags(),
     ]);
+
+  // Resolved once, here, and threaded down as plain booleans. Every consumer —
+  // the section itself, the nav link to it, the hero CTA that jumps to it —
+  // reads the same answer, which is the only way a hidden section and the links
+  // pointing at it can't disagree. A nav item that scrolls to nothing is worse
+  // than either state on its own.
+  const show = {
+    about: flagValue(flags, FLAG_KEYS.SECTION_ABOUT),
+    skills: flagValue(flags, FLAG_KEYS.SECTION_SKILLS),
+    experience: flagValue(flags, FLAG_KEYS.SECTION_EXPERIENCE),
+    projects: flagValue(flags, FLAG_KEYS.SECTION_PROJECTS),
+    // Two independent reasons to hide it, and both still count: the admin
+    // switched the section off, or there is simply nothing to list.
+    blogs: flagValue(flags, FLAG_KEYS.SECTION_BLOGS) && blogs.length > 0,
+    contact: flagValue(flags, FLAG_KEYS.SECTION_CONTACT),
+  };
+
+  // Deliberately not a member of `show`: nothing is hidden by it and no link
+  // points at it. The contact block, its address and its social links all stay
+  // exactly where they are — only the form inside stops accepting, which is
+  // what the admin's description of this switch promises. The endpoint refuses
+  // on the same flag, and that refusal is the enforcement; this is the courtesy.
+  const contactFormEnabled = flagValue(flags, FLAG_KEYS.CONTACT_FORM);
 
   // Company marks for the About terminal, reusing the logos already set on the
   // Experience rows so there's only one place in the CMS to maintain them.
@@ -155,7 +181,7 @@ export default async function Home() {
         <BackgroundLines />
         <div className="pointer-events-none fixed inset-0 z-[1] bg-background/50" />
         <div className="relative z-[2]">
-          <Navbar logo={siteConfig.navbarLogo} hasBlogs={blogs.length > 0} />
+          <Navbar logo={siteConfig.navbarLogo} sections={show} />
           <main>
             <Hero
               version={siteConfig.heroVersion}
@@ -172,18 +198,25 @@ export default async function Home() {
               availabilityStatus={siteConfig.availabilityStatus}
               dotColor={siteConfig.heroDotColor}
               dotPulse={siteConfig.heroDotPulse}
+              showAbout={show.about}
+              showSkills={show.skills}
+              showContact={show.contact}
             />
             <Bridge />
-            <About
-              paragraphs={aboutData.paragraphs}
-              education={aboutData.education}
-              resumeUrl={siteConfig.resumeUrl}
-              companyLogos={companyLogos}
-            />
-            <Skills skills={skills} />
-            <Experience experiences={experiences} />
-            <Projects version={siteConfig.projectsVersion} projects={projects} />
-            {blogs.length > 0 && <Blogs blogs={blogs} />}
+            {show.about && (
+              <About
+                paragraphs={aboutData.paragraphs}
+                education={aboutData.education}
+                resumeUrl={siteConfig.resumeUrl}
+                companyLogos={companyLogos}
+              />
+            )}
+            {show.skills && <Skills skills={skills} />}
+            {show.experience && <Experience experiences={experiences} />}
+            {show.projects && (
+              <Projects version={siteConfig.projectsVersion} projects={projects} />
+            )}
+            {show.blogs && <Blogs blogs={blogs} />}
             <ThoughtOfTheDay
               quote={thought.quote}
               date={thought.date}
@@ -191,15 +224,18 @@ export default async function Home() {
               day={thought.day}
               days={thought.days}
             />
-            <Contact
-              purposes={contactData.purposes}
-              socialLinks={contactData.socialLinks}
-              contactEmail={siteConfig.contactEmail}
-              availabilityStatus={siteConfig.availabilityStatus}
-              availabilityDetail={siteConfig.availabilityDetail}
-              resumeUrl={siteConfig.resumeUrl}
-              github={github}
-            />
+            {show.contact && (
+              <Contact
+                purposes={contactData.purposes}
+                socialLinks={contactData.socialLinks}
+                contactEmail={siteConfig.contactEmail}
+                availabilityStatus={siteConfig.availabilityStatus}
+                availabilityDetail={siteConfig.availabilityDetail}
+                resumeUrl={siteConfig.resumeUrl}
+                github={github}
+                formEnabled={contactFormEnabled}
+              />
+            )}
           </main>
           <Footer copyrightName={siteConfig.copyrightName} />
         </div>

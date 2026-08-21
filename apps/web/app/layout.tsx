@@ -3,6 +3,8 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { SITE_URL, SITE_NAME } from "./lib/site";
 import { getSiteConfig } from "./lib/data";
+import { getFlags } from "./lib/flags";
+import { FLAG_KEYS, flagValue } from "@repo/shared/flags";
 import OnekoCat from "./components/OnekoCat";
 import ClarityAnalytics from "./components/ClarityAnalytics";
 import UtmTrackerBeacon from "./components/UtmTrackerBeacon";
@@ -73,7 +75,18 @@ export default async function RootLayout({
   // The cat rides in the layout, so its nap settings have to be read here too.
   // `getSiteConfig` is memoised per request, so the home page reading it again
   // for everything else costs nothing.
-  const { catNapStyle, catNapSeconds } = await getSiteConfig();
+  //
+  // `getFlags` is the same bargain: the cat and the three analytics beacons all
+  // mount here, above every route, so their kill switches have to be resolved
+  // here. Both reads carry a 24h `revalidate`, matching the 24h the routes
+  // already declare — Next takes the MINIMUM lifetime across a render, so a
+  // shorter one on either would become the ISR window for the whole site.
+  const [{ catNapStyle, catNapSeconds }, flags] = await Promise.all([
+    getSiteConfig(),
+    getFlags(),
+  ]);
+  const analytics = flagValue(flags, FLAG_KEYS.ANALYTICS);
+  const easterEggs = flagValue(flags, FLAG_KEYS.EASTER_EGGS);
   return (
     <html
       lang="en"
@@ -102,10 +115,19 @@ export default async function RootLayout({
       </head>
       <body>
         {children}
-        <OnekoCat napStyle={catNapStyle} napSeconds={catNapSeconds} />
-        <VercelAnalytics />
-        <ClarityAnalytics />
-        <UtmTrackerBeacon />
+        {easterEggs && <OnekoCat napStyle={catNapStyle} napSeconds={catNapSeconds} />}
+        {/* All three are collection, so one switch governs all three: Vercel's
+            pageview beacon, the Clarity session recorder, and our own UTM POST.
+            The route behind that POST re-checks the flag itself — this only
+            stops us asking, and anyone can call the endpoint directly.
+
+            Gated one by one rather than wrapped in a fragment on purpose: a
+            fragment would add a level to <body>'s children and change the
+            flight payload even while every flag is on, and the whole point of a
+            kill switch is that the on state is untouched. */}
+        {analytics && <VercelAnalytics />}
+        {analytics && <ClarityAnalytics />}
+        {analytics && <UtmTrackerBeacon />}
       </body>
     </html>
   );

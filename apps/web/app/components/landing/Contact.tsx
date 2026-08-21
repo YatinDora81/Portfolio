@@ -39,6 +39,9 @@ interface ContactProps {
   availabilityDetail: string;
   resumeUrl: string;
   github: GithubActivity | null;
+  /** `contact.form`, resolved on the page. The section is never hidden by it —
+      only the form is, which is what the flag promises in the admin. */
+  formEnabled: boolean;
 }
 
 /** IST wall clock, and whether that hour is a plausible one to get a reply.
@@ -98,6 +101,7 @@ export default function Contact({
   availabilityDetail,
   resumeUrl,
   github,
+  formEnabled,
 }: ContactProps) {
   const reduced = useReducedMotion();
   const { time, awake } = useIstClock(!reduced);
@@ -133,11 +137,20 @@ export default function Contact({
           </div>
 
           <div className="rv" style={rise('.08s')}>
-            <Scope ref={scope} caption={availabilityStatus || 'type below — the line listens'} />
+            {/* The fallback caption has to know: "type below" over a paused
+                form points at a field that is not there. */}
+            <Scope
+              ref={scope}
+              caption={
+                availabilityStatus ||
+                (formEnabled ? 'type below — the line listens' : 'receiving only — transmit paused')
+              }
+            />
           </div>
 
           <div className="rv" style={rise('.16s')}>
             <SentenceForm
+              enabled={formEnabled}
               purposes={purposes}
               contactEmail={contactEmail}
               note={availabilityDetail || '↪ straight to my inbox · reply < 24h'}

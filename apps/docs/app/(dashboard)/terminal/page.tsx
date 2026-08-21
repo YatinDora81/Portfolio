@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "db";
 import { TERMINAL_COMMANDS, NOT_FOUND_OUTPUT } from "@repo/ui/terminal";
+import { FLAG_KEYS, flagValue, type FlagKey, type FlagMap } from "@repo/shared/flags";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardHead } from "@/components/ui/card";
 import { AboutSectionNav } from "../about/section-nav";
@@ -16,6 +17,13 @@ import {
  * Everything here is read from @repo/ui/terminal — the same list the portfolio
  * drives its behaviour from — so this page cannot describe a command that
  * doesn't exist, or claim the wrong focus behaviour.
+ *
+ * Existing and being *offered* are two different things, though, and this page
+ * is the one place an admin learns what the terminal answers to. About.tsx
+ * keeps a nav command only while `document.querySelector(c.target)` finds
+ * something, so the section flags decide which ones survive into `help`, `ls`
+ * and Tab-completion — hence the flag read below, beside the published-post
+ * count that has always been half of the same question.
  *
  * It is filed under About rather than under Site because that is where the
  * terminal lives on the page, and it shares About's `.abt-*` chrome (the same
@@ -33,6 +41,25 @@ const KIND_LABEL: Record<string, string> = {
   egg: "Undocumented · not in help, ls or Tab",
 };
 
+/**
+ * Which flag renders each nav command's target.
+ *
+ * Keyed by `target`, not by `cmd`, because the target is the thing the terminal
+ * actually looks for. `#education` is the odd one: it is a div *inside* the
+ * About block, so it has no flag of its own and goes with `section.about` — and
+ * so, for that matter, does the terminal itself. A target missing from this map
+ * is treated as present, matching `flagValue`'s fail-open: a command wrongly
+ * listed as available is a smaller lie than one wrongly listed as gone.
+ */
+const NAV_FLAG: Record<string, FlagKey> = {
+  "#skills": FLAG_KEYS.SECTION_SKILLS,
+  "#experience": FLAG_KEYS.SECTION_EXPERIENCE,
+  "#projects": FLAG_KEYS.SECTION_PROJECTS,
+  "#education": FLAG_KEYS.SECTION_ABOUT,
+  "#blogs": FLAG_KEYS.SECTION_BLOGS,
+  "#contact": FLAG_KEYS.SECTION_CONTACT,
+};
+
 const KEYS = [
   { k: "Enter", d: "Run the line." },
   { k: "Tab", d: "Accept the ghost suggestion; with nothing to complete, indent to the next 4-column stop." },
@@ -44,10 +71,28 @@ const KEYS = [
 
 export default async function TerminalPage() {
   // The terminal prints these, so it's worth seeing what it will actually say.
-  const [paragraphs, blogCount] = await Promise.all([
+  const [paragraphs, blogCount, flagRows] = await Promise.all([
     prisma.aboutParagraph.count(),
     prisma.blog.count({ where: { show: true } }),
+    prisma.featureFlag.findMany(),
   ]);
+
+  const flags: FlagMap = Object.fromEntries(flagRows.map((f) => [f.key, f.enabled]));
+  const aboutOff = !flagValue(flags, FLAG_KEYS.SECTION_ABOUT);
+
+  // One reason per nav command the terminal is not currently offering. The flag
+  // is checked before the post count on purpose: with `section.blogs` off,
+  // publishing a post brings nothing back, so the flag is the fix worth naming.
+  const notOnPage = new Map<string, string>();
+  for (const c of TERMINAL_COMMANDS) {
+    if (c.kind !== "nav" || !c.target) continue;
+    const flag = NAV_FLAG[c.target];
+    if (flag && !flagValue(flags, flag)) {
+      notOnPage.set(c.cmd, `${flag} is off, so ${c.target} is not on the page`);
+    } else if (c.target === "#blogs" && blogCount === 0) {
+      notOnPage.set(c.cmd, `no published posts, so ${c.target} is not on the page`);
+    }
+  }
 
   const byKind = (["nav", "info", "action", "egg"] as const).map((kind) => ({
     kind,
@@ -97,16 +142,39 @@ export default async function TerminalPage() {
         <span className="chip off">{hidden} undocumented</span>
         <span className="chip">{keepsFocus} keep the caret</span>
         <span className="chip">{paragraphs} paragraph{paragraphs === 1 ? "" : "s"} on whoami</span>
+        {notOnPage.size > 0 ? (
+          <span className="chip amb">{notOnPage.size} not on the page right now</span>
+        ) : null}
       </div>
 
-      {blogCount === 0 && (
+      {(aboutOff || notOnPage.size > 0) && (
         <div className="ico-warn">
           <IconAlertTriangle size={16} stroke={1.8} style={{ flex: "none", marginTop: 1 }} />
           <div>
-            <b>No published blog posts, so <code>blogs</code> is currently hidden</b>
-            The terminal drops nav commands whose section isn&rsquo;t on the page, so <code>blogs</code>
-            {" "}won&rsquo;t appear in <code>help</code>, <code>ls</code> or Tab-completion until a post is
-            published. That&rsquo;s deliberate — it beats advertising a command that can only error.
+            <b>
+              {aboutOff
+                ? "The About section is off, so this terminal is not on the site at all"
+                : `${notOnPage.size} command${notOnPage.size === 1 ? " is" : "s are"} currently hidden`}
+            </b>
+            {aboutOff ? (
+              <>
+                The shell is rendered inside the About block, so nothing on this page is reachable
+                by a visitor until <code>section.about</code> goes back on.{" "}
+              </>
+            ) : null}
+            The terminal keeps a nav command only while its section is actually on the page, so a
+            command below whose section is off won&rsquo;t appear in <code>help</code>,{" "}
+            <code>ls</code> or Tab-completion. That&rsquo;s deliberate — it beats advertising a
+            command that can only error.
+            {notOnPage.size > 0 ? (
+              <div style={{ marginTop: 7 }}>
+                {[...notOnPage].map(([cmd, why]) => (
+                  <div key={cmd} style={{ marginTop: 3 }}>
+                    <code>{cmd}</code> — {why}
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
       )}
@@ -151,6 +219,9 @@ export default async function TerminalPage() {
                               {c.aliases?.length ? (
                                 <div className="cmd-alias">also {c.aliases.join(", ")}</div>
                               ) : null}
+                              {notOnPage.has(c.cmd) ? (
+                                <span className="chip amb" style={{ marginTop: 6 }}>hidden</span>
+                              ) : null}
                             </td>
                             <td>
                               <span className={c.keepsFocus ? "chip on" : "chip"}>
@@ -161,6 +232,13 @@ export default async function TerminalPage() {
                             <td>
                               <div className="cmd-sum">{c.summary}</div>
                               <div className="cmd-out">{c.output}</div>
+                              {/* The reason, not just the state: "hidden" alone
+                                  sends an admin to the wrong page half the time. */}
+                              {notOnPage.has(c.cmd) ? (
+                                <div className="cmd-out" style={{ color: "var(--ambT)", marginTop: 4 }}>
+                                  not offered right now — {notOnPage.get(c.cmd)}
+                                </div>
+                              ) : null}
                             </td>
                           </tr>
                         ))}
@@ -246,7 +324,9 @@ export default async function TerminalPage() {
         <span>
           Source of truth: <code>packages/ui/src/terminal.ts</code>. The bio the shell prints and the
           education timeline below it are edited on{" "}
-          <Link href="/about" className="abt-foot-l">About</Link>.
+          <Link href="/about" className="abt-foot-l">About</Link>. Which sections are on the page —
+          and so which nav commands the terminal offers — is set on{" "}
+          <Link href="/flags" className="abt-foot-l">Feature flags</Link>.
         </span>
       </div>
     </div>

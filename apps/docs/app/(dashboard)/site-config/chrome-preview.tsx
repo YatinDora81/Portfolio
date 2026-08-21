@@ -9,22 +9,40 @@ import { DIM, FAINT, MONO } from "@/components/preview/frame";
 // here would permanently read zero while the form above is dirty.
 //
 // Mirrors apps/web/app/components/common/Navbar.tsx and Footer.tsx: the five
-// section links (Blogs only when a post is published), the paw and theme
-// toggles, the breathing ✦ divider, the mono copyright line, and the giant
-// name mark that the footer bleeds off the bottom of the page.
+// section links (each one only while its section is on the page — its feature
+// flag on, and for Blogs a published post as well), the paw and theme toggles,
+// the breathing ✦ divider, the mono copyright line, and the giant name mark
+// that the footer bleeds off the bottom of the page.
 
-const NAV_ITEMS = ["Skills", "Experience", "Projects", "Blogs", "Contact"];
+/** Same keys, same order, as Navbar's `allNavItems`. */
+const NAV_ITEMS = [
+  { key: "skills", name: "Skills" },
+  { key: "experience", name: "Experience" },
+  { key: "projects", name: "Projects" },
+  { key: "blogs", name: "Blogs" },
+  { key: "contact", name: "Contact" },
+] as const;
+
+export type NavSection = (typeof NAV_ITEMS)[number]["key"];
 
 function Unset({ children }: { children: string }) {
   return <em style={{ color: FAINT, fontWeight: 400, fontStyle: "italic" }}>{children}</em>;
 }
 
-export function ChromePreview({ logo, copyrightName, hasBlogs }: {
+export function ChromePreview({ logo, copyrightName, hasBlogs, sections }: {
   logo: string;
   copyrightName: string;
   hasBlogs: boolean;
+  /** The five section flags, as the database holds them right now. */
+  sections: Record<NavSection, boolean>;
 }) {
-  const items = hasBlogs ? NAV_ITEMS : NAV_ITEMS.filter(i => i !== "Blogs");
+  // Navbar.tsx filters its items against a `sections` map the homepage resolves
+  // as `flag && (key !== 'blogs' || posts > 0)`. Same rule, but kept in its two
+  // halves here, because the preview has to name WHICH half dropped a link —
+  // publishing a post cannot bring back a section someone switched off, and a
+  // switch cannot bring back a Blogs list with nothing in it.
+  const items = NAV_ITEMS.filter(i => sections[i.key] && (i.key !== "blogs" || hasBlogs));
+  const flaggedOff = NAV_ITEMS.filter(i => !sections[i.key]);
 
   // `(wordmark || copyrightName || 'PORTFOLIO').toUpperCase()` — Footer.tsx.
   const mark = (copyrightName.trim() || "PORTFOLIO").toUpperCase();
@@ -41,13 +59,23 @@ export function ChromePreview({ logo, copyrightName, hasBlogs }: {
           {logo.trim() || <Unset>no wordmark</Unset>}
         </span>
         <span className="chr-links" style={{ color: DIM }}>
-          {items.map(i => <span key={i}>{i}</span>)}
+          {items.map(i => <span key={i.key}>{i.name}</span>)}
         </span>
         <span className="chr-toggles" style={{ color: DIM }}>
           <span title="Paw toggle — shows or shoos the cat">&#128062;</span>
           <span title="Theme toggle">&#9789;</span>
         </span>
       </div>
+
+      {/* Two notes, never one. A link can be missing for a reason an admin
+          fixes on Feature flags or for a reason they fix in Blogs, and folding
+          them together would point at the wrong page half the time. */}
+      {flaggedOff.length > 0 && (
+        <p className="mt-2 text-[9px]" style={{ fontFamily: MONO, color: FAINT }}>
+          switched off on feature flags — the {flaggedOff.map(i => i.name).join(", ")}
+          {" "}{flaggedOff.length === 1 ? "link is" : "links are"} dropped
+        </p>
+      )}
 
       {!hasBlogs && (
         <p className="mt-2 text-[9px]" style={{ fontFamily: MONO, color: FAINT }}>

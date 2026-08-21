@@ -6,6 +6,7 @@
   "exports": {
     "./crypto": "./src/crypto.ts",
     "./dates": "./src/dates.ts",
+    "./flags": "./src/flags.ts",
     "./logger": "./src/logger.ts",
     "./result": "./src/result.ts",
     "./tags": "./src/tags.ts"

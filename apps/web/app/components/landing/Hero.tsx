@@ -40,6 +40,15 @@ interface HeroProps {
   totalSkills?: number;
   /** Optional extra photos for the name-hover peek deck. Defaults to [avatarUrl]. */
   photos?: string[];
+  /**
+   * Which of the sections this hero links *out* to actually rendered, resolved
+   * once by the page. Passed in rather than read here: the hero is a client
+   * component, and a flag read inside one is both a second database round trip
+   * and a dependency the hero has no business owning.
+   */
+  showAbout: boolean;
+  showSkills: boolean;
+  showContact: boolean;
 }
 
 /** v1 draws a fifth stroke that v2 drops. */
@@ -86,9 +95,11 @@ interface BodyProps {
   skills: { name: string; iconKey: string }[];
   resumeUrl: string;
   totalSkills?: number;
+  showSkills: boolean;
+  showContact: boolean;
 }
 
-function HeroBodyV1({ intro, tagline, skills, resumeUrl }: BodyProps) {
+function HeroBodyV1({ intro, tagline, skills, resumeUrl, showContact }: BodyProps) {
   return (
     <>
       <p className="intro animate-fade-in-blur animate-delay-3">
@@ -116,16 +127,26 @@ function HeroBodyV1({ intro, tagline, skills, resumeUrl }: BodyProps) {
           <ResumeIcon fifthLine />
           Resume / CV
         </MagneticLink>
-        <MagneticLink className="btn btn-solid" href="#contact">
-          Get in touch
-          <ArrowIcon />
-        </MagneticLink>
+        {showContact && (
+          <MagneticLink className="btn btn-solid" href="#contact">
+            Get in touch
+            <ArrowIcon />
+          </MagneticLink>
+        )}
       </div>
     </>
   );
 }
 
-function HeroBodyV2({ intro, tagline, skills, resumeUrl, totalSkills }: BodyProps) {
+function HeroBodyV2({
+  intro,
+  tagline,
+  skills,
+  resumeUrl,
+  totalSkills,
+  showSkills,
+  showContact,
+}: BodyProps) {
   const remaining = (totalSkills ?? 0) - skills.length;
 
   return (
@@ -140,7 +161,7 @@ function HeroBodyV2({ intro, tagline, skills, resumeUrl, totalSkills }: BodyProp
             {skill.name}
           </span>
         ))}
-        {remaining > 0 && (
+        {remaining > 0 && showSkills && (
           <a className="chip chip-more mono" href="#skills" aria-label={`+${remaining} more — see all skills`}>
             +{remaining} more ↓
           </a>
@@ -148,10 +169,12 @@ function HeroBodyV2({ intro, tagline, skills, resumeUrl, totalSkills }: BodyProp
       </div>
 
       <div className="actions animate-fade-in-blur animate-delay-5">
-        <MagneticLink className="btn btn-solid" href="#contact">
-          Get in touch
-          <ArrowIcon />
-        </MagneticLink>
+        {showContact && (
+          <MagneticLink className="btn btn-solid" href="#contact">
+            Get in touch
+            <ArrowIcon />
+          </MagneticLink>
+        )}
         <MagneticLink
           className="btn btn-ghost"
           href={resumeUrl}
@@ -239,6 +262,9 @@ export default function Hero({
   dotPulse = true,
   totalSkills,
   photos,
+  showAbout,
+  showSkills,
+  showContact,
 }: HeroProps) {
   const heroRef = useRef<HTMLElement>(null);
   const nameRef = useRef<HTMLHeadingElement>(null);
@@ -419,7 +445,14 @@ export default function Hero({
         </span>
 
         {version === 'v1' ? (
-          <HeroBodyV1 intro={intro} tagline={tagline} skills={skills} resumeUrl={resumeUrl} />
+          <HeroBodyV1
+            intro={intro}
+            tagline={tagline}
+            skills={skills}
+            resumeUrl={resumeUrl}
+            showSkills={showSkills}
+            showContact={showContact}
+          />
         ) : (
           <HeroBodyV2
             intro={intro}
@@ -427,6 +460,8 @@ export default function Hero({
             skills={skills}
             resumeUrl={resumeUrl}
             totalSkills={totalSkills}
+            showSkills={showSkills}
+            showContact={showContact}
           />
         )}
       </div>
@@ -447,17 +482,22 @@ export default function Hero({
         />
       )}
 
-      <a className="cue" href="#about" aria-label="Scroll down — more below">
-        <i>
-          <Paw />
-        </i>
-        <i>
-          <Paw />
-        </i>
-        <i>
-          <Paw />
-        </i>
-      </a>
+      {/* The cue exists to point at About. With About gone it would aim at an
+          anchor no element answers to, so it goes with it rather than becoming
+          three paw prints that do nothing. */}
+      {showAbout && (
+        <a className="cue" href="#about" aria-label="Scroll down — more below">
+          <i>
+            <Paw />
+          </i>
+          <i>
+            <Paw />
+          </i>
+          <i>
+            <Paw />
+          </i>
+        </a>
+      )}
     </section>
   );
 }

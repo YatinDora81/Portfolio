@@ -3,7 +3,7 @@ import {
   IconLayoutGrid, IconInbox, IconSparkles, IconUser, IconCpu, IconBriefcase,
   IconFolderCode, IconPencil, IconQuote, IconTag, IconSettings2, IconShieldCheck,
   IconSend, IconChartBar, IconPalette, IconTerminal2, IconHistory, IconPaw,
-  IconNotebook, IconRefreshDot,
+  IconNotebook, IconRefreshDot, IconToggleLeft,
 } from "@tabler/icons-react";
 
 export type NavIcon = ComponentType<{ size?: number; className?: string; stroke?: number }>;
@@ -101,6 +101,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // its detail action each check the session themselves.
       { href: "/history", label: "Change history", icon: IconHistory, eyebrow: "access control · audit" },
       { href: "/revalidation", label: "Revalidation", icon: IconRefreshDot, eyebrow: "operations · cache health" },
+      { href: "/flags", label: "Feature flags", icon: IconToggleLeft, eyebrow: "operations · kill switches" },
       { href: "/icons", label: "Icon library", icon: IconPalette, eyebrow: "reference · icon keys" },
     ],
   },

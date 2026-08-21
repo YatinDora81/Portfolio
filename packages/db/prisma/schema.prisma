@@ -505,3 +505,27 @@ enum RevalidationStatus {
   FAILED
   TIMEOUT
 }
+
+/// Section-level kill switches, flipped from the admin without a deploy.
+///
+/// The KEY is the primary key — no separate id. A flag is referenced from code
+/// by a stable string ("section.blogs"), so a surrogate id would be a second
+/// identity for the same thing and an invitation to end up with two rows
+/// claiming one key.
+///
+/// A missing row is NOT "off". Reads fail open through FLAG_DEFINITIONS in
+/// packages/shared/src/flags.ts: a deleted row, a failed query or a key nobody
+/// has seeded yet all resolve to the definition's default. Fail-closed here
+/// would mean one DB blip blanks the whole portfolio, which is a far worse
+/// outcome than a section that stays visible a little longer than intended.
+model FeatureFlag {
+  key         String   @id
+  label       String
+  description String?
+  enabled     Boolean  @default(true)
+  /// Why it was turned off, for the person who finds it off three weeks later.
+  note        String?
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}

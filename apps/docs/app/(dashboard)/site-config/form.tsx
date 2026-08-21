@@ -5,7 +5,7 @@ import { Card, CardHead } from "@/components/ui/card";
 import { ConfigCard, type ConfigGroup } from "@/components/config/config-card";
 import { Borrowed } from "@/components/shared/borrowed";
 import { PreviewFrame } from "@/components/preview";
-import { ChromePreview } from "./chrome-preview";
+import { ChromePreview, type NavSection } from "./chrome-preview";
 import type { ConfigKeyDef } from "@/lib/site-config-keys";
 import { IconAlertTriangle } from "@tabler/icons-react";
 
@@ -41,6 +41,7 @@ export function SiteChromeForm({
   values,
   moved,
   hasBlogs,
+  sections,
 }: {
   chromeKeys: string[];
   /** DB rows absent from the registry. Editable here so nothing is orphaned. */
@@ -48,6 +49,8 @@ export function SiteChromeForm({
   values: Record<string, string>;
   moved: MovedRow[];
   hasBlogs: boolean;
+  /** Passed straight through: the preview draws the navbar, so it owns the rule. */
+  sections: Record<NavSection, boolean>;
 }) {
   // The preview follows the fields as they are typed rather than after a save,
   // which is the only way "does this wordmark fit" is answerable here.
@@ -155,6 +158,7 @@ export function SiteChromeForm({
           logo={draft["navbarLogo"] ?? ""}
           copyrightName={draft["copyrightName"] ?? ""}
           hasBlogs={hasBlogs}
+          sections={sections}
         />
       </PreviewFrame>
     </>

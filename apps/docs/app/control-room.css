@@ -2304,3 +2304,49 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .rv-tile-k { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink); letter-spacing: -.01em }
 .rv-tile-s { font-size: 11px; line-height: 1.6; color: var(--faint); flex: 1 }
 @media (max-width: 700px) { .rv-grid { grid-template-columns: 1fr } }
+
+/* ---------- feature flags ----------
+   The banner, the error block and the green tick are revalidation's own
+   `.rv-*` classes, used verbatim: both pages report the same two facts — a
+   thing was attempted, and here is exactly what the server said — and a second
+   copy of those rules would only give them somewhere to drift apart. What
+   follows is the part a switchboard needs and a log does not. */
+.fl-blurb {
+  padding: 10px 16px; border-bottom: 1px solid var(--line2);
+  font-size: 11.5px; line-height: 1.65; color: var(--faint)
+}
+/* `.row` centres its children and clips `.row-t` to one line; a flag row is a
+   paragraph, a stamp, a text field and possibly a wrapped error, so it stacks
+   from the top and wraps. */
+.fl-row { align-items: flex-start; padding: 13px 14px }
+.fl-head { display: flex; align-items: center; flex-wrap: wrap; gap: 7px }
+.fl-name { font-size: 13.5px; font-weight: 500; color: var(--ink) }
+.fl-key { font-family: var(--mono); font-size: 10.5px; color: var(--faint); letter-spacing: -.01em }
+.fl-def { font-family: var(--mono); font-size: 10px; color: var(--faint) }
+.fl-desc { font-size: 11.5px; line-height: 1.6; color: var(--dim); margin-top: 4px; max-width: 76ch }
+.fl-meta { font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-top: 5px }
+.fl-noterow { display: flex; align-items: center; gap: 8px; margin-top: 9px; max-width: 60ch }
+.fl-note { font-size: 12px; padding: 6px 10px }
+.fl-out { margin-top: 9px }
+.fl-switch { display: flex; align-items: center; gap: 8px; flex: none; padding-top: 2px; color: var(--faint) }
+
+/* Amber, not red: the save worked. Red would send the admin back to re-toggle
+   a switch that is already in the database. The server's own words sit in the
+   mono line at the bottom, unclamped and selectable, for the same reason
+   `.rv-err` is — a half-printed message is the same dead end as none. */
+.fl-warn {
+  border: 1px solid color-mix(in srgb, var(--amber) 34%, transparent);
+  border-left: 3px solid var(--amber); border-radius: 8px; padding: 8px 10px;
+  background: var(--amber-soft); color: var(--dim); font-size: 11.5px; line-height: 1.6
+}
+.fl-warn b { display: flex; align-items: center; gap: 6px; color: var(--ambT); font-size: 12px; font-weight: 600; margin-bottom: 3px }
+.fl-warn code { font-family: var(--mono); font-size: 11px; color: var(--ambT) }
+.fl-warn span {
+  display: block; margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--ambT);
+  white-space: pre-wrap; overflow-wrap: anywhere; user-select: text
+}
+
+@media (max-width: 700px) {
+  .fl-noterow { flex-wrap: wrap }
+  .fl-note { min-width: 100% }
+}

@@ -1,4 +1,5 @@
 import { prisma } from "db";
+import { FLAG_KEYS, flagValue, type FlagMap } from "@repo/shared/flags";
 import { PageHeader } from "@/components/shared/page-header";
 import { SiteChromeForm } from "./form";
 import { KEYS, DEFAULTS, keysFor, isUnclaimed, type ConfigOwner } from "@/lib/site-config-keys";
@@ -26,12 +27,28 @@ const OWNERS: Record<Exclude<ConfigOwner, "chrome">, { label: string; href: stri
 };
 
 export default async function SiteConfigPage() {
-  const [configs, visibleBlogs] = await Promise.all([
+  const [configs, visibleBlogs, flagRows] = await Promise.all([
     prisma.siteConfig.findMany(),
     // The navbar drops its Blogs link when nothing is published, so the chrome
     // preview has to know — otherwise it draws a link the site does not.
     prisma.blog.count({ where: { show: true } }),
+    // And it drops any link whose section is switched off, for exactly the same
+    // reason. Read from the table rather than through a cached helper: this is
+    // a preview of what a visitor sees now, and a switch flipped a minute ago
+    // has to show up in it.
+    prisma.featureFlag.findMany(),
   ]);
+
+  const flags: FlagMap = Object.fromEntries(flagRows.map(f => [f.key, f.enabled]));
+  // `flagValue` fails open to the registry default, so an unseeded flag previews
+  // as on — which is what the site is actually serving.
+  const sections = {
+    skills: flagValue(flags, FLAG_KEYS.SECTION_SKILLS),
+    experience: flagValue(flags, FLAG_KEYS.SECTION_EXPERIENCE),
+    projects: flagValue(flags, FLAG_KEYS.SECTION_PROJECTS),
+    blogs: flagValue(flags, FLAG_KEYS.SECTION_BLOGS),
+    contact: flagValue(flags, FLAG_KEYS.SECTION_CONTACT),
+  };
 
   const configMap = Object.fromEntries(configs.map(c => [c.key, c.value]));
   const chromeKeys = keysFor("chrome");
@@ -68,6 +85,7 @@ export default async function SiteConfigPage() {
             };
           })}
         hasBlogs={visibleBlogs > 0}
+        sections={sections}
       />
     </div>
   );

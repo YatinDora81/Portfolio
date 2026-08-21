@@ -1,4 +1,6 @@
 import { prisma } from "db";
+import { FLAG_KEYS, flagValue } from "@repo/shared/flags";
+import { getFlags } from "@/lib/flags";
 
 interface UtmPayload {
   source?: string | null;
@@ -62,6 +64,19 @@ async function readCapped(request: Request, cap: number): Promise<string | null>
 }
 
 export async function POST(request: Request) {
+  // Ahead of readCapped, so the kill switch also stops us draining a body we
+  // have already decided to throw away. 200, not 503: the caller is a
+  // `keepalive` beacon that nobody awaits, and an error status here would put a
+  // red line in every visitor's console for a setting they cannot see. Same
+  // `{ skipped, reason }` shape the uninteresting hits below already answer
+  // with, so one client branch handles all of them.
+  if (!flagValue(await getFlags(), FLAG_KEYS.ANALYTICS)) {
+    return Response.json(
+      { skipped: true, reason: "Analytics collection is off" },
+      { status: 200 },
+    );
+  }
+
   const raw = await readCapped(request, 4096);
   if (raw === null) {
     return Response.json({ skipped: true, reason: "Payload too large" }, { status: 413 });

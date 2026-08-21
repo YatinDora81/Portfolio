@@ -100,7 +100,7 @@ Project.
 
 - [x] 01 foundations
 - [x] 02 revalidation
-- [ ] 03 feature flags
+- [x] 03 feature flags
 - [ ] 04 content status
 - [ ] 05 inbox
 - [ ] 06 analytics core
@@ -300,3 +300,130 @@ None. `REVALIDATE_SECRET` and `NEXT_PUBLIC_SITE_URL` are now read through `@repo
 ### Blockers for the next phase
 
 None.
+
+---
+
+## Phase 03 — feature flags
+
+**Maintenance mode was deliberately excluded** at the user's direction. No `apps/web/middleware.ts`,
+no Edge Config, no Upstash, no `/maintenance` page. Feature flags only.
+
+### Import paths this phase adds
+
+```ts
+import { FLAG_KEYS, FLAG_DEFINITIONS, flagValue, defaultFlagMap, type FlagMap } from "@repo/shared/flags";
+import { getFlags } from "@/lib/flags";              // apps/web — server-only, cached, FAILS OPEN
+import { setFlag } from "@/lib/actions/flags";       // apps/docs
+```
+
+Seed: `cd packages/db && bun run flags:seed` — idempotent, and `update` deliberately never
+names `enabled`.
+
+### Files created
+
+- `packages/shared/src/flags.ts` — the registry: 9 keys, labels, defaults, `flagValue` (fail-open)
+- `packages/db/scripts/seed-flags.ts` — additive seed, **separate from the destructive `seed.ts`**
+- `apps/web/app/lib/flags.ts` — `getFlags()`, `cache(unstable_cache(...))`, tag `flags`, 24h backstop
+- `apps/docs/app/lib/actions/flags.ts` — `setFlag()`
+- `apps/docs/app/(dashboard)/flags/{page,parts}.tsx` — the board
+- `packages/db/prisma/migrations/20260821140000_add_feature_flags/migration.sql`
+
+### Files modified
+
+Public: `page.tsx`, `layout.tsx`, `Navbar.tsx`, `Hero.tsx`, `Contact.tsx`,
+`contact/SentenceForm.tsx`, `blog/[slug]/page.tsx`, `blog/[slug]/not-found.tsx`,
+`api/contact/route.ts`, `api/track/utm/route.ts`, `package.json` (+`server-only`).
+Admin: `nav.ts`, `control-room.css`, `components/ui/switch.tsx` (+`ariaLabel`),
+`site-config/{page,form,chrome-preview}.tsx`, `terminal/page.tsx`.
+
+### Schema changes
+
+- `FeatureFlag`: `key` (PK), `label`, `description`, `enabled`, `note`, `updatedById`, timestamps
+- Migration: `add_feature_flags`
+
+### Idempotency audit
+
+- `seedFlags()` — **Pattern B**, upsert on the `key` primary key. **Verified by experiment:** set
+  `section.blogs` to off, re-ran the seed, confirmed it stayed off (`0 created, 9 refreshed`).
+- `setFlag()` — **Pattern A**, `updateMany({ where: { key } })`. Never `upsert`, never `create`:
+  the key arrives from a client component, and creating rows from client input lets unknown keys
+  pile up. `count === 0` is an error, not a silent create.
+
+### 🚨 Every one of the nine flags is wired to something real
+
+The first pass shipped `contact.form`, `analytics.enabled` and `easter-eggs.enabled` as
+switches with **zero consumers**, while the admin UI reported them live. A `contact.form`
+kill switch that does not stop submissions is worse than no kill switch — you flip it during
+a flood, get a green tick, and the flood continues. All three are now wired, and each was
+**verified at runtime, not by reading**:
+
+| Flag | Off → observed |
+|---|---|
+| `contact.form` | `POST /api/contact` → **503**; `ContactMessage` count **7 → 7**; section still renders, form replaced by a paused note pointing at the email address |
+| `analytics.enabled` | `POST /api/track/utm` → `{ skipped: true }` **200**; `UtmTracker` **1453 → 1453**; the three analytics mounts absent from the payload |
+| `easter-eggs.enabled` | oneko cat's props gone from the flight payload |
+| all on | `/` **byte-identical** to a `HEAD` build — 276084 = 276084, zero diff |
+
+The endpoint is the enforcement and the UI is a courtesy — a bot posts straight at the URL,
+and an ISR-cached page can still show the form for a moment after the flip.
+
+### Complete anchor audit — the failure mode of this phase
+
+Every reference to a gated section, gated:
+
+| Where | Gate |
+|---|---|
+| `Navbar.tsx` `allNavItems` | one filtered array feeding **both** desktop `NavItems` and `MobileNavMenu` — they cannot disagree |
+| `Hero.tsx` — `#contact` CTA in **both** hero bodies (v1 and v2 are separate code paths) | `SECTION_CONTACT` |
+| `Hero.tsx` — `#skills` "+N more" chip | `SECTION_SKILLS` |
+| `Hero.tsx` — `#about` scroll cue | `SECTION_ABOUT` |
+| `blog/[slug]/page.tsx` — `/#blogs` back-link | `SECTION_BLOGS` |
+| `blog/[slug]/not-found.tsx` — `/#blogs` back-link | `SECTION_BLOGS` **and** `blogs.length > 0` |
+| `site-config/chrome-preview.tsx` — the admin's navbar preview | the same rule the real navbar uses |
+| `terminal/page.tsx` — the terminal reference | per-command, with the reason named |
+
+**`not-found.tsx` needed both halves**, not just the flag: the homepage renders the section on
+`flag && blogs.length > 0`, and with every post unpublished — the live state today — `#blogs`
+does not exist even with the flag on. The one page whose job is recovery would have pointed at
+a fragment that is not there.
+
+**`About.tsx` was left alone deliberately.** Its terminal already filters commands by
+`document.querySelector(c.target)`, so a section that does not render drops out of `help`, `ls`
+and Tab-completion by itself. Verified by reading it, and confirmed in the rendered output.
+
+**No section `id` was renamed or wrapped.** `globals.css` binds `#skills`/`#experience`/
+`#projects`/`#blogs`/`#contact` to `content-visibility: auto` with hundreds of descendant rules,
+and `packages/ui/src/terminal.ts` targets the same ids. Gating means not rendering, never renaming.
+
+### Deviations and corrections
+
+| Doc / first pass | What shipped |
+|---|---|
+| Maintenance mode, Edge Config, middleware | **Excluded** — user's call |
+| `getFlags` with `revalidate: 3600` | **86400.** Measured: 3600 pulled `/` from `1d` to `1h` in the route table, because Next takes the minimum lifetime across a render. It would have re-run the homepage's ~10 queries and the GitHub poll 24× a day for nothing. |
+| `getFlags` bare `unstable_cache` | Wrapped in React `cache()` too — the layout and the page both read it, so a cold render raced two `findMany` queries. Same pairing `getSiteConfig` uses. |
+| `import "server-only"` "just works" | `server-only` was **not a dependency of `apps/web`** — it resolves from `packages/*` but not there, and `tsc` does not catch an unresolved side-effect import. Added it. |
+| `easter-eggs.enabled` covers "the cat, the About terminal, and other hidden interactions" | **Narrowed to the cat.** The About terminal renders the About bio itself — gating it would delete the section's only content, not hide an egg. `section.about` already covers that. |
+| "live in a few seconds" / "within seconds" | **"from the next visit onward".** `revalidateTag(tag, "max")` is stale-while-revalidate: the request that triggers the flush is still served the old entry. Measured — `400 503 503 503…` after a flip, not `503` immediately. |
+| `"Unknown flag."` for a key with no row | Its own message naming the actual remedy (`flags:seed`) — the page already tells the admin the key is right and the row is missing. |
+
+### Verification
+
+- [x] `prisma validate` · `prisma generate` · `tsc --noEmit` (0 errors) · `lint` · `build` (both apps)
+- [x] Route table unchanged: `/` `○` **1d**, `/blog/[slug]` `●`, `/sitemap.xml` `○` **1d**
+- [x] Fail-open proven three ways: thrown query, empty table, **and a deleted row** — deleting
+      `section.projects` left the section and its nav link rendering
+- [x] Seed cannot re-enable a disabled flag (run twice, checked)
+- [x] Flags-on build byte-identical to `HEAD`
+- [x] Each of the three system flags changes real behaviour (table above)
+- [x] End-to-end admin loop with no rebuild: flip → flush `flags` tag → behaviour changes in the
+      same running process
+
+### Env vars added
+
+None.
+
+### Blockers for the next phase
+
+None. Phase 06 will add `/api/collect`, which must read `FLAG_KEYS.ANALYTICS` the same way
+`/api/track/utm` now does.
