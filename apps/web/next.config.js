@@ -10,7 +10,7 @@ const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === 'tr
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["db", "@repo/ui"],
+  transpilePackages: ["db", "@repo/ui", "@repo/shared", "@repo/config"],
   // Next was inferring the workspace root from a stray lockfile in $HOME.
   // Pin it to the monorepo root so output-file tracing / asset resolution
   // are correct (silences the "inferred workspace root" build warning).

@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@microsoft/clarity": "^1.0.2",
+    "@repo/config": "*",
+    "@repo/shared": "*",
     "@repo/ui": "*",
     "@tabler/icons-react": "^3.40.0",
     "@tailwindcss/postcss": "^4.2.1",
@@ -24,7 +26,8 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwind-merge": "^3.5.0",
-    "tailwindcss": "^4.2.1"
+    "tailwindcss": "^4.2.1",
+    "zod": "^3.25.67"
   },
   "devDependencies": {
     "@next/bundle-analyzer": "^16.2.11",

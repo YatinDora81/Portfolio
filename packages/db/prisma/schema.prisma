@@ -427,3 +427,24 @@ enum AdminRole {
   ADMIN
   SUB_ADMIN
 }
+
+/// A named mutex in Postgres, for the work that must happen exactly once —
+/// rolling up a day, running retention — when the only scheduler available is
+/// whichever request happens to arrive first.
+///
+/// `expiresAt` is the whole design. A lock released only by its holder is a
+/// deadlock waiting for the first serverless invocation that dies mid-work and
+/// never reaches its `finally`; an expiry means the next caller steals it
+/// instead of the job stalling forever. Correctness comes from the atomicity of
+/// the conditional update in packages/db/src/lock.ts, not from this row.
+model JobLock {
+  key       String   @id
+  lockedAt  DateTime
+  /// Random per acquisition, so release can be guarded on "do I still hold
+  /// this" — a caller whose lock expired and was stolen must not release the
+  /// new holder's.
+  lockedBy  String
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}

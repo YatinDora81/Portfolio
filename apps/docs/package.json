@@ -13,6 +13,8 @@
     "about:copy": "bun scripts/update-about-copy.ts"
   },
   "dependencies": {
+    "@repo/config": "*",
+    "@repo/shared": "*",
     "@repo/ui": "*",
     "@supabase/supabase-js": "^2.106.2",
     "@tabler/icons-react": "^3.40.0",
