@@ -1,6 +1,32 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { prisma } from "db";
+import { tags } from "@repo/shared/tags";
 import { cdnUrl } from "./site";
+
+/**
+ * The backstop, not the mechanism. A publish in the admin flushes the matching
+ * tag and the next request re-reads immediately; this only bounds how long a
+ * flush that never arrived — a failed POST, a deploy that rotated the secret —
+ * can keep the site wrong. 24h matches the page-level `revalidate` the routes
+ * already carry, so nothing here shortens a route's ISR window.
+ */
+const CACHE_LIFETIME_SECONDS = 86400;
+
+/**
+ * `unstable_cache` persists its result as `JSON.stringify(...)` and hands back
+ * `JSON.parse(...)` on a hit, so a `Date` leaves as a Date on the miss that
+ * populated the entry and comes back an ISO *string* on every hit after it —
+ * while the declared type still says `Date`. Rehydrating at the boundary is
+ * what stops that type from lying: `app/sitemap.ts` passes `updatedAt` straight
+ * to `lastModified`, which Next calls `.toISOString()` on. `new Date(x)` is
+ * correct for both arms, so this holds whether the value was cached or fresh.
+ */
+function reviveBlogDates<T extends { publishedAt: Date; updatedAt: Date }>(
+  row: T,
+): Omit<T, "publishedAt" | "updatedAt"> & { publishedAt: Date; updatedAt: Date } {
+  return { ...row, publishedAt: new Date(row.publishedAt), updatedAt: new Date(row.updatedAt) };
+}
 
 export type HeroVersion = "v1" | "v2";
 
@@ -48,10 +74,7 @@ export interface SiteConfig {
  */
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
-// `cache`: the root layout reads this for the cat's nap settings and the home
-// page reads it again for everything else, so without memoising, one render of
-// `/` would run both queries twice.
-export const getSiteConfig = cache(async (): Promise<SiteConfig> => {
+async function readSiteConfig(): Promise<SiteConfig> {
   const [rows, content] = await Promise.all([
     prisma.siteConfig.findMany(),
     prisma.heroContent.findMany(),
@@ -105,7 +128,20 @@ export const getSiteConfig = cache(async (): Promise<SiteConfig> => {
     catNapSeconds,
     copyrightName: map.get("copyrightName") ?? "",
   };
+}
+
+const cachedSiteConfig = unstable_cache(readSiteConfig, ["site-config"], {
+  tags: [tags.siteConfig()],
+  revalidate: CACHE_LIFETIME_SECONDS,
 });
+
+// Both wrappers, and neither is redundant. `unstable_cache` persists the two
+// queries across requests and is what `revalidateTag("site-config")` can reach;
+// React's `cache` dedupes *within* one render, which is still needed because the
+// root layout reads this for the cat's nap settings and the home page reads it
+// again for everything else. Drop the memo and one render of `/` pays for two
+// lookups; drop the outer tag and a publish cannot flush this at all.
+export const getSiteConfig = cache(cachedSiteConfig);
 
 /** sortOrder is only meaningful within a version, so every query here is scoped. */
 export async function getHeroData(version: HeroVersion) {
@@ -186,7 +222,7 @@ export async function getExperiences() {
   }));
 }
 
-export async function getProjects() {
+async function readProjects() {
   const projects = await prisma.project.findMany({
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     include: {
@@ -206,7 +242,14 @@ export async function getProjects() {
   }));
 }
 
-export async function getBlogs() {
+// Only `projects`, not the per-project tag: this reads every project, so the id
+// of any one of them is not a handle on this entry.
+export const getProjects = unstable_cache(readProjects, ["projects"], {
+  tags: [tags.projectIndex()],
+  revalidate: CACHE_LIFETIME_SECONDS,
+});
+
+async function readBlogs() {
   const blogs = await prisma.blog.findMany({
     where: { show: true },
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
@@ -233,7 +276,16 @@ export async function getBlogs() {
   }));
 }
 
-export async function getBlogBySlug(slug: string) {
+const cachedBlogs = unstable_cache(readBlogs, ["blogs"], {
+  tags: [tags.blogIndex()],
+  revalidate: CACHE_LIFETIME_SECONDS,
+});
+
+export async function getBlogs() {
+  return (await cachedBlogs()).map(reviveBlogDates);
+}
+
+async function readBlogBySlug(slug: string) {
   const blog = await prisma.blog.findUnique({ where: { slug } });
   if (!blog || !blog.show) return null;
   return {
@@ -247,6 +299,22 @@ export async function getBlogBySlug(slug: string) {
     publishedAt: blog.publishedAt,
     updatedAt: blog.updatedAt,
   };
+}
+
+export async function getBlogBySlug(slug: string) {
+  // Built per call, not hoisted. `unstable_cache` fixes its tag list at
+  // construction and only the *key* varies with the arguments, so a module-level
+  // wrapper could carry `blogs` but never `blog:<slug>` — every post would share
+  // one tag, and editing one post would flush all of them or none. Constructing
+  // inside the wrapper is what makes the per-post tag possible. The cache key
+  // stays stable across calls: it is derived from the callback source plus
+  // `keyParts` plus the arguments, all of which are the same for a given slug.
+  const cached = unstable_cache(readBlogBySlug, ["blog-by-slug", slug], {
+    tags: [tags.blog(slug), tags.blogIndex()],
+    revalidate: CACHE_LIFETIME_SECONDS,
+  });
+  const blog = await cached(slug);
+  return blog === null ? null : reviveBlogDates(blog);
 }
 
 export async function getQuotes() {

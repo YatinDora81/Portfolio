@@ -20,7 +20,7 @@ are wrong about a lot of it. Where they disagree with this file, this file wins.
 | **`requireAdmin`** | **Does not exist.** Each action file has its own private `requireSession()`. See "Auth" below. |
 | Live revalidation | `apps/docs/app/lib/actions/publish.ts` → `publishSite()` |
 | Dead revalidation | `apps/docs/app/lib/revalidate.ts` — nothing imports it, and it **throws at module load** if `PORTFOLIO_URL` is unset. Do not import. |
-| Revalidate endpoint | `apps/web/app/api/revalidate/route.ts` — secret in the **JSON body**, not a header |
+| Revalidate endpoint | `apps/web/app/api/revalidate/route.ts` — accepts the secret in the `x-revalidate-secret` **header** (preferred) or the legacy **JSON body** `secret` field |
 | Public content reads | `apps/web/app/lib/data.ts` — the only file with landing-page Prisma reads |
 | UI package | `@repo/ui`, subpath exports, no barrel. `"./*": "./src/*.tsx"` cannot serve `.ts` — those need their own exports entry. |
 | Path alias, both apps | `"@/*": ["./app/*"]` — so `@/lib/session` is `apps/docs/app/lib/session.ts` |
@@ -99,7 +99,7 @@ Project.
 ## Phase log
 
 - [x] 01 foundations
-- [ ] 02 revalidation
+- [x] 02 revalidation
 - [ ] 03 feature flags
 - [ ] 04 content status
 - [ ] 05 inbox
@@ -185,6 +185,117 @@ visitor can see. Both are now applied; `migrate status` is clean.
 
 None. `NEXT_PUBLIC_SITE_URL` is now *validated* (with a default) but was already read
 in 23 places.
+
+### Blockers for the next phase
+
+None.
+
+---
+
+## Phase 02 — revalidation observability
+
+### Import paths this phase adds
+
+```ts
+import { tags, blogTags, projectTags, ALL_KNOWN_TAGS } from "@repo/shared/tags";
+import { revalidate, readHealth, readRecentLogs, readTagStates } from "@/lib/revalidation";  // apps/docs, server-only
+import { findStaleContent, type StaleItem } from "@/lib/stale";                              // apps/docs, server-only
+import { revalidateNow, revalidateWholeSite, revalidateBlog, revalidateAllStale } from "@/lib/actions/revalidation";
+```
+
+### Files created
+
+- `packages/shared/src/tags.ts` — the one place a tag string is built
+- `apps/docs/app/lib/revalidation.ts` — `revalidate()` (never throws) + the dashboard's read helpers
+- `apps/docs/app/lib/stale.ts` — `findStaleContent()`
+- `apps/docs/app/lib/actions/revalidation.ts` — four server actions
+- `apps/docs/app/(dashboard)/revalidation/{page,parts}.tsx` — the dashboard
+- `packages/db/prisma/migrations/20260821130000_add_revalidation_log/migration.sql`
+
+### Files modified
+
+- `apps/web/app/api/revalidate/route.ts` — header **or** body secret, `safeEqual`, zod, paths/tags branch
+- **`apps/web/app/lib/data.ts` — `getBlogs`, `getBlogBySlug`, `getProjects`, `getSiteConfig` wrapped in `unstable_cache` with real tags.** See the deviation below.
+- `apps/docs/app/lib/actions/publish.ts` — routed through `revalidate()`; signature and `recordPublish` unchanged
+- `apps/docs/app/lib/nav.ts`, `apps/docs/app/control-room.css` — one nav entry, page styles
+- `packages/db/src/index.ts` — re-export `RevalidationTrigger`, `RevalidationStatus`
+
+### Schema changes
+
+- `RevalidationLog`, `TagState`, enums `RevalidationTrigger`, `RevalidationStatus`
+- Migration: `add_revalidation_log`
+
+### Idempotency audit
+
+- `revalidate()` → `revalidationLog.create` — **append-only by design.** One row per attempt is the point; two attempts *should* be two rows.
+- `revalidate()` → `tagState.upsert` — **Pattern B**, upsert on the `tag` primary key. Re-running overwrites, never accumulates. The failure branch uses `{ increment: 1 }`, which is deliberate: consecutive failures are a count, not a state.
+- `publishSite()` — unchanged semantics; still one audit record per gesture.
+
+### 🚨 Deliberate deviation from the phase doc — tagging the public reads
+
+The doc says *"Do not change what gets revalidated yet... migrating the public app's fetches to tag-based caching is a separate concern."* **Following that literally produces a dashboard that lies**, and three independent reviewers caught it:
+
+`apps/web` carried **no cache tags at all**. So `revalidateTag("blogs")` matched nothing, returned 200, was recorded `SUCCESS`, and stamped `TagState.lastSuccessAt` — which is the value the stale detector reads. Pressing "Revalidate" would have *cleared the warning* about a page that was still stale. Meanwhile `publishSite()`, the only flush that actually worked, wrote no `TagState`, so every blog stayed listed as stale forever. The two halves were exactly inverted.
+
+So the four public reads are now genuinely tagged. Phase 03 requires this anyway — its `getFlags` is specified as `unstable_cache(..., { tags: ["flags"] })`.
+
+Proven end-to-end against a production build, **with a negative control**:
+
+```
+GET  /                          x-nextjs-cache: HIT
+POST /api/revalidate {"tags":["flags"]}      -> GET /  HIT    (correctly unaffected)
+POST /api/revalidate {"tags":["blogs"]}      -> GET /  STALE
+POST /api/revalidate {"tags":["site-config"]}-> GET /  STALE
+GET  /sitemap.xml               HIT -> flush "blogs" -> STALE
+```
+
+Real per-tag matching, not a blanket flush.
+
+### 🚨 `unstable_cache` does not preserve `Date`
+
+The highest-value find of the phase. `next/dist/server/web/spec-extension/unstable-cache.js` stores `JSON.stringify(result)` and returns `JSON.parse(...)` on a hit — so **the same function returns a `Date` on the cold call and a `string` on every warm one**, while `unstable_cache`'s `<T extends Callback>(cb: T) => T` signature keeps claiming `Date`.
+
+Measured in the real runtime:
+
+```
+call #1 (cold)  publishedAtIsDate: true   ctor: [object Date]
+call #2 (warm)  publishedAtIsDate: false  ctor: [object String]
+```
+
+`app/sitemap.ts` hands `updatedAt` straight to `lastModified`, and a future `.toISOString()` on it would have thrown on the warm path. Fixed by reviving explicitly at the boundary (`reviveBlogDates`) rather than shipping a type that lies. **Any later phase that caches a row with a `DateTime` column must do the same.**
+
+### Deviations from the phase doc
+
+| Doc | Reality |
+|---|---|
+| `apps/docs/app/api/admin/revalidate/route.ts` | `apps/docs/app/api` does not exist; the repo uses **server actions**. Built as actions in `lib/actions/revalidation.ts`, matching house style. |
+| `requireAdmin()` | Does not exist. Each action guards with `getSession()` first and returns `{ ok: false }` — a redirect is the wrong answer to a button waiting on a result. |
+| `findStaleContent` covers Blog **and** Project | **Blog only.** `Project` has no `updatedAt` and no `slug`, so there is nothing to compare against. Projects join the detector in whichever phase gives them an `updatedAt`. |
+| `tags.project(slug)` | `tags.project(id)` — Project has no unique string column. |
+| Stale detector reads `TagState` alone | Also floors on the newest whole-site `SUCCESS` log row. A layout flush provably re-rendered every blog route, so it covers every blog tag even though it names none. |
+| "Flush the site" = `paths: ["/"]` | That flushes **only the homepage** — bare `revalidatePath("/")` emits only `_N_T_/`, which no other route carries. `revalidateWholeSite()` sends nothing at all, so the route takes its `revalidatePath("/", "layout")` branch. |
+
+### Verification
+
+- [x] `prisma validate` · `prisma generate` · `tsc --noEmit` (0 errors) · `lint` · `build` (both apps)
+- [x] Route table unchanged: `/` `○`, `/blog/[slug]` `●`, `/sitemap.xml` `○`
+- [x] Legacy `{ secret }` body still returns `{ revalidated: true, now }` — 200; wrong secret 401; bad JSON 400; over-cap arrays 400
+- [x] Header secret works; an **empty** header beats a valid body secret (401) — header wins, as specified
+- [x] Tag flush reaches the page, with a negative control
+- [x] Stale detector returns **0** against live data (all 10 blogs are `show: false`, so none is publicly reachable)
+- [x] `publishSite` signature byte-identical; all 8 call sites unchanged; `lib/revalidate.ts` untouched and still unimported
+
+### Not yet verified (needs a browser)
+
+The dashboard's own rendering was verified via its RSC payload, not by eye. Manual steps 1–6 from the phase doc (clicking the buttons, breaking the secret to see a red error) are still worth doing once.
+
+### Env vars added
+
+None. `REVALIDATE_SECRET` and `NEXT_PUBLIC_SITE_URL` are now read through `@repo/config/env` instead of `process.env`.
+
+### Known, accepted
+
+`tags.flags()` is in `ALL_KNOWN_TAGS` and gets a button, but nothing caches under it until Phase 03 creates `getFlags`. Flushing it is a no-op **that the negative control above actually relies on**. Phase 03 makes it real.
 
 ### Blockers for the next phase
 

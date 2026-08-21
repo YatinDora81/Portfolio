@@ -448,3 +448,60 @@ model JobLock {
 
   @@index([expiresAt])
 }
+
+/// One row per revalidation attempt, successful or not.
+///
+/// The failure this exists to end: the admin's Publish button fired a fetch at
+/// the public app and threw the answer away, so a wrong secret, an unreachable
+/// origin and a genuine flush were the same silent non-event. The site simply
+/// stayed stale and nothing anywhere said so.
+///
+/// `actorId` is deliberately a plain String and NOT a relation. Admin accounts
+/// are hard-deleted; a foreign key would either block the delete or cascade away
+/// exactly the history this table exists to keep.
+model RevalidationLog {
+  id         String              @id @default(uuid())
+  paths      String[]
+  tags       String[]
+  trigger    RevalidationTrigger
+  entityType String?
+  entityId   String?
+  actorId    String?
+  status     RevalidationStatus
+  httpStatus Int?
+  durationMs Int
+  error      String?
+  createdAt  DateTime            @default(now())
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([entityType, entityId])
+}
+
+/// Last successful revalidation per tag — the right-hand side of the staleness
+/// comparison. A content row's `updatedAt` newer than its tag's `lastSuccessAt`
+/// means the edit was saved but never reached the public app.
+model TagState {
+  tag              String   @id
+  lastSuccessAt    DateTime
+  lastAttemptAt    DateTime
+  consecutiveFails Int      @default(0)
+}
+
+/// Which gesture asked for the flush. A Prisma enum rather than the TEXT+CHECK
+/// that AuditEvent.action uses, because this set is closed: it already names
+/// every caller the build introduces, so the ALTER TYPE inside a migration
+/// transaction that TEXT+CHECK was avoiding is not on the table.
+enum RevalidationTrigger {
+  MANUAL
+  CONTENT_SAVE
+  SCHEDULED_PUBLISH
+  FLAG_CHANGE
+  SYSTEM
+}
+
+enum RevalidationStatus {
+  SUCCESS
+  FAILED
+  TIMEOUT
+}

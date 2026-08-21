@@ -7,7 +7,8 @@
     "./crypto": "./src/crypto.ts",
     "./dates": "./src/dates.ts",
     "./logger": "./src/logger.ts",
-    "./result": "./src/result.ts"
+    "./result": "./src/result.ts",
+    "./tags": "./src/tags.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
