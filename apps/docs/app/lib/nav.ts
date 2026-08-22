@@ -3,7 +3,7 @@ import {
   IconLayoutGrid, IconInbox, IconSparkles, IconUser, IconCpu, IconBriefcase,
   IconFolderCode, IconPencil, IconQuote, IconTag, IconSettings2, IconShieldCheck,
   IconSend, IconChartBar, IconPalette, IconTerminal2, IconHistory, IconPaw,
-  IconNotebook, IconRefreshDot, IconToggleLeft, IconPhoto,
+  IconNotebook, IconRefreshDot, IconToggleLeft, IconPhoto, IconLink,
 } from "@tabler/icons-react";
 
 export type NavIcon = ComponentType<{ size?: number; className?: string; stroke?: number }>;
@@ -70,6 +70,8 @@ export const NAV_GROUPS: NavGroup[] = [
         keywords: "questions answers revision interview prep folders dsa tags vault search" },
       { href: "/refer-emails", label: "Refer emails", icon: IconSend, eyebrow: "outreach · campaign sheet" },
       { href: "/tracker", label: "Tracker", icon: IconChartBar, eyebrow: "outreach · attribution" },
+      { href: "/tracked-links", label: "Tracked links", icon: IconLink, eyebrow: "outreach · short links",
+        keywords: "short link shortener qr code slug redirect clicks campaign channel resume utm" },
     ],
   },
   {

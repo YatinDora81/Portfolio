@@ -98,7 +98,7 @@ Project.
 
 ## Resume here
 
-**Next: Phases 07 (dwell) and 08 (link registry), then 09 (rollup).** Phases 01-06 and 10 are committed and green
+**Next: Phase 09 — rollup & retention. It is the last one.** Phases 01-08 and 10 are committed and green
 (`check-types`, `lint`, `build` all pass; `prisma migrate status` clean).
 
 Before starting 05, re-read the "Deviations" table above. The ones that bite Phase 05:
@@ -140,8 +140,8 @@ Standing decisions from the user this session:
 - [x] 04 content status
 - [x] 05 inbox
 - [x] 06 analytics core
-- [ ] 07 dwell time
-- [ ] 08 link registry
+- [x] 07 dwell time
+- [x] 08 link registry
 - [ ] 09 rollup
 - [x] 10 media manager
 
@@ -745,3 +745,69 @@ components are not coupled by an invisible ordering dependency.
 - `/media` was not smoke-tested in a browser: it needs an admin login and local dev points
   at production. `createImageBitmap` on AVIF varies by browser; the code falls back to
   uploading without dimensions if the decode throws.
+
+---
+
+## Phase 07 — section dwell, and Phase 08 — tracked links
+
+No schema change for either: `AnalyticsEvent` already carried `SECTION_DWELL`/`section`/
+`durationMs`, and `TrackedLink`/`LinkClick` were migrated earlier.
+
+### 🚨 The repeat-click test — the one that silently destroys this feature
+
+Verified against a production build with a real browser UA:
+
+```
+click 1..5   HTTP/1.1 302 Found   cache-control: no-store, max-age=0
+             location: /?ref=zzrvw27#projects
+clickCount   5  ->  10            (a 301 would have shown 1 — the browser caches it
+                                   and the 2nd..10th click never reach the server)
+Slackbot     302 served, clickCount stayed 10 — NOT 11
+unknown slug 302 to /, not a 404
+click rows   store no IP
+```
+
+Bot filtering matters most here: paste a link into LinkedIn or Slack and their unfurlers
+hit it instantly, so without it every link shows clicks before a human sees one.
+
+### Dwell — the three corrections, all present
+
+| Correction | Implementation |
+|---|---|
+| **Tab blur** | `visibilitychange → hidden` banks every running timer and flushes. On `visible` it does **not** touch the timers — it disconnects and re-observes, so the browser's own hit-test decides who resumes and a section scrolled past while hidden stays parked. Without this, a lunch break records as twenty minutes of engagement. |
+| **`pagehide`, not `beforeunload`** | Mobile Safari skips `beforeunload`, which would lose exactly the visitors most likely to bounce. Guarded by a `flushed` ref. |
+| **Floor 300ms, cap 300000ms** | Below the floor is a scroll-through, not attention; the cap stops a tab left open on a second monitor skewing everything. Sub-floor time stays *banked*, so 250ms + 200ms correctly reports 450ms. |
+
+`rootMargin: '-40% 0px -40% 0px', threshold: 0` — a **centre band**, not a percentage.
+A `threshold: 0.5` would record zero forever for any section taller than the viewport.
+
+All seven section ids verified present in the DOM. `#about` is a `Container` div, not a
+`<section>`, and `education` is a div inside it — the hook observes the id-bearing element
+itself, which is also what `content-visibility: auto` requires (documented in `Contact.tsx`).
+
+One batched request with every section as a separate event, sent with `sendBeacon`,
+attribution replayed from sessionStorage. Send/opt-out/attribution were factored into
+`apps/web/app/lib/analytics-beacon.ts` and shared with the pageview path rather than duplicated.
+
+### Link registry decisions
+
+- Slug alphabet excludes `0/O` and `1/l/I` — these get read off screens and scanned from QR codes. `crypto.getRandomValues` with rejection sampling (no modulo bias); 20,000 slugs generated, zero collisions.
+- **Channel is a dropdown of `CHANNELS`**, never free text — the taxonomy becomes a constraint instead of a naming convention you are supposed to remember at 1am.
+- Links are **deactivated, never deleted** — a dead link in a submitted application must redirect home, not 404.
+- `safeDestination` passes 20/20 hostile cases: `//evil.com`, `/\evil.com`, `\\evil.com`, `https:/\/\evil.com`, `yatindora.in.evil.com`, `javascript:`, `data:`, `user:pw@yatindora.in`. **Rejected at redirect time as well as at write time**, so a row that predates the check cannot become an open redirect.
+- Unique clicks are labelled per-day only. The salt rotates daily, so cross-day dedup is impossible by construction and claiming it would be a lie.
+- `apps/docs/app/lib/actions/links.ts` and `(dashboard)/links/` already existed for **social** links and were left untouched; the registry lives at `tracked-links`.
+
+### Verification
+
+- [x] `tsc --noEmit` (0 errors) · `lint` · `build` (both apps)
+- [x] Route table unchanged: `/` `○` **1d**, `/blog/[slug]` `●`, `/sitemap.xml` `○` **1d**; `/r/[slug]` is `ƒ`
+- [x] Repeat-click table above
+- [x] Live DB restored: **0 rows in every analytics and link table**; UTM 1454, messages 7, blogs 10, projects 6, flags 9
+
+### Known gap
+
+`resolveAttribution` rung 1 returns channel `"resume"` for *any* `linkSlug`, so a LinkedIn
+tracked link still lands in the `resume` channel on the session. `TrackedLink`/`LinkClick`
+carry the honest channel; only the session label is coarse. Worth a Phase 06 edit later —
+pass the link's real channel through rather than assuming resume.

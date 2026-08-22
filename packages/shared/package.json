@@ -13,6 +13,7 @@
     "./preview-token": "./src/preview-token.ts",
     "./request-facts": "./src/request-facts.ts",
     "./result": "./src/result.ts",
+    "./slug": "./src/slug.ts",
     "./spam": "./src/spam.ts",
     "./tags": "./src/tags.ts",
     "./turnstile": "./src/turnstile.ts"

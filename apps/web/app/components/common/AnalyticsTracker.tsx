@@ -2,9 +2,15 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
+import {
+  ATTR_KEY,
+  optedOut,
+  readAttribution,
+  sendEvents,
+  type Attribution,
+} from '@/lib/analytics-beacon';
+import { useSectionDwell } from '@/hooks/use-section-dwell';
 
-const ENDPOINT = '/api/collect';
-const ATTR_KEY = 'attr';
 const CAMPAIGN_PARAMS = [
   'utm_source',
   'utm_medium',
@@ -13,34 +19,6 @@ const CAMPAIGN_PARAMS = [
   'utm_content',
   'ref',
 ];
-
-type Attribution = {
-  utm?: { source?: string; medium?: string; campaign?: string };
-  linkSlug?: string;
-  referrer: string | null;
-  landingPath: string;
-};
-
-function optedOut(): boolean {
-  const nav: Navigator & { globalPrivacyControl?: boolean } = navigator;
-  return nav.doNotTrack === '1' || nav.globalPrivacyControl === true;
-}
-
-function readStored(): Attribution | null {
-  try {
-    const raw = window.sessionStorage.getItem(ATTR_KEY);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return null;
-    const candidate = parsed as Partial<Attribution>;
-    // A truncated entry would fail the endpoint's schema and silently drop the
-    // pageview; re-capturing from the current URL is the better failure.
-    if (typeof candidate.landingPath !== 'string') return null;
-    return candidate as Attribution;
-  } catch {
-    return null;
-  }
-}
 
 // Strip the campaign tags whether or not this visit captured them, so a URL
 // copied out of the address bar mid-session cannot carry someone else's source.
@@ -68,7 +46,7 @@ function cleanUrl(url: URL): void {
  */
 function loadAttribution(): Attribution {
   const url = new URL(window.location.href);
-  const stored = readStored();
+  const stored = readAttribution();
   if (stored) {
     cleanUrl(url);
     return stored;
@@ -103,46 +81,18 @@ function loadAttribution(): Attribution {
   return attribution;
 }
 
-function send(path: string, attribution: Attribution): void {
-  const body = JSON.stringify({
-    events: [{ type: 'PAGEVIEW', path }],
-    referrer: attribution.referrer,
-    utm: attribution.utm,
-    linkSlug: attribution.linkSlug,
-    landingPath: attribution.landingPath,
-  });
-
-  // 🚨 sendBeacon survives the unload that cancels a plain fetch — without it the
-  // bounced visits, the ones worth measuring most, are the ones that go missing.
-  try {
-    if (
-      typeof navigator.sendBeacon === 'function' &&
-      navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }))
-    ) {
-      return;
-    }
-  } catch {
-    // Fall through to fetch.
-  }
-
-  void fetch(ENDPOINT, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body,
-    keepalive: true,
-  }).catch(() => undefined);
-}
-
 export default function AnalyticsTracker() {
   const pathname = usePathname();
   const lastSent = useRef<string | null>(null);
+
+  useSectionDwell(!optedOut());
 
   useEffect(() => {
     if (optedOut()) return;
     // Strict Mode runs this twice on mount, and dev points at the live database.
     if (lastSent.current === pathname) return;
     lastSent.current = pathname;
-    send(pathname, loadAttribution());
+    sendEvents([{ type: 'PAGEVIEW', path: pathname }], loadAttribution());
   }, [pathname]);
 
   return null;
