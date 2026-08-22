@@ -2564,3 +2564,145 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 @media (max-width: 1080px) {
   .msg-listcard, .msg-panecard { max-height: none }
 }
+
+/* ── Media library ──────────────────────────────────────────────────────────
+   Uploads never touch this app: the browser signs, PUTs straight to R2, then
+   registers the row. The queue below the drop zone is that middle state made
+   visible — bytes in the bucket with no row yet, held there by the alt field.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.md-upcard { margin-bottom: 14px }
+.md-up-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px }
+.md-up-lb {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--faint)
+}
+.md-up-folder { width: 168px }
+.md-up-hint { font-family: var(--mono); font-size: 10.5px; color: var(--faint) }
+
+.md-drop {
+  display: flex; flex-direction: column; align-items: center; gap: 7px; width: 100%;
+  padding: 26px 20px; text-align: center; border: 1px dashed var(--line); border-radius: var(--r3);
+  background: var(--bg1); color: var(--faint); transition: border-color .15s, background .15s
+}
+.md-drop:hover, .md-drop.over { border-color: var(--c1); background: var(--accS) }
+.md-drop.over { border-style: solid }
+.md-drop.off { border-style: solid; border-color: var(--line2); background: var(--bad-soft); cursor: default }
+.md-drop i { color: var(--dim) }
+.md-drop.off i { color: var(--bad) }
+.md-drop b { font-size: 13.5px; font-weight: 600; color: var(--dim) }
+.md-drop span { font-size: 12px; max-width: 52ch; line-height: 1.6 }
+
+.md-q { display: flex; flex-direction: column; gap: 9px; margin-top: 12px }
+.md-q-row {
+  display: flex; gap: 11px; padding: 10px 12px; border: 1px solid var(--line2);
+  border-radius: var(--r2); background: var(--card)
+}
+.md-q-row.bad { border-left: 3px solid var(--bad); background: var(--bad-soft) }
+.md-q-thumb {
+  width: 52px; height: 52px; flex: none; object-fit: cover; border-radius: var(--r1);
+  border: 1px solid var(--line2); background: var(--bg2)
+}
+.md-q-main { flex: 1; min-width: 0 }
+.md-q-top { display: flex; align-items: center; gap: 9px }
+.md-q-top .sp { flex: 1 }
+.md-q-name { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.md-q-meta { font-family: var(--mono); font-size: 10px; color: var(--faint); flex: none }
+.md-q-phase { font-family: var(--mono); font-size: 10px; color: var(--accT); flex: none }
+.md-q-phase.bad { color: var(--bad) }
+.md-q-track { height: 3px; border-radius: 99px; background: var(--bg3); margin-top: 8px; overflow: hidden }
+.md-q-fill { height: 100%; border-radius: 99px; background: var(--c1); transition: width .18s linear }
+.md-q-err { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--bad); margin-top: 7px }
+.md-q-alt { display: flex; align-items: center; gap: 8px; margin-top: 9px }
+.md-q-alt .in { flex: 1 }
+.md-q-note { font-size: 11.5px; color: var(--faint); margin-top: 6px; line-height: 1.6 }
+
+.md-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 11px 12px; border-bottom: 1px solid var(--line2) }
+.md-bar .sp { flex: 1 }
+.md-tabs { display: flex; gap: 6px; flex-wrap: wrap }
+.md-search {
+  display: flex; align-items: center; gap: 7px; padding: 6px 10px; min-width: 236px;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--card); color: var(--faint)
+}
+.md-search:focus-within { border-color: var(--c1); box-shadow: 0 0 0 3px var(--accS) }
+.md-search input { flex: 1; min-width: 0; border: none; outline: none; background: none; font-size: 12.5px; color: var(--ink) }
+
+.md-note {
+  display: flex; align-items: flex-start; gap: 9px; padding: 11px 14px;
+  border-bottom: 1px solid var(--line2); background: var(--amber-soft);
+  color: var(--ambT); font-size: 12px; line-height: 1.65
+}
+.md-note svg { flex: none; margin-top: 2px }
+
+.md-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); gap: 12px; padding: 14px }
+.md-cell {
+  display: flex; flex-direction: column; text-align: left; overflow: hidden;
+  border: 1px solid var(--line2); border-radius: var(--r3); background: var(--card);
+  transition: border-color .16s, transform .16s, box-shadow .16s
+}
+.md-cell:hover { border-color: var(--c1); transform: translateY(-2px); box-shadow: 0 14px 28px -18px rgba(23, 30, 48, .28) }
+.md-thumb {
+  display: block; height: 128px; background-color: var(--bg2); border-bottom: 1px solid var(--line2);
+  background-position: center
+}
+.md-thumb img { width: 100%; height: 100%; object-fit: cover; display: block }
+.md-cell-b { display: block; padding: 10px 11px 11px }
+.md-name { display: block; font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.md-meta { display: block; font-family: var(--mono); font-size: 9.5px; color: var(--faint); margin-top: 3px }
+/* Two lines of the description, because the whole point of the audit is that
+   the words are readable without opening anything. */
+.md-alt {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 11.5px; line-height: 1.5; color: var(--dim); margin-top: 6px; min-height: 34px
+}
+.md-flags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px }
+.md-flags .chip { font-size: 9px; padding: 2px 7px }
+
+.md-audit { align-items: flex-start; gap: 12px }
+.md-audit-thumb {
+  width: 54px; height: 54px; flex: none; object-fit: cover; border-radius: var(--r1);
+  border: 1px solid var(--line2); background: var(--bg2)
+}
+.md-audit-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap }
+.md-audit-edit { display: flex; align-items: center; gap: 8px; margin-top: 8px }
+.md-audit-edit .in { flex: 1 }
+.md-audit .rv-err { margin-top: 8px }
+
+.md-det { display: flex; flex-direction: column; gap: 14px }
+.md-det-img {
+  display: grid; place-items: center; padding: 12px; border: 1px solid var(--line2);
+  border-radius: var(--r2); background: var(--bg1)
+}
+.md-det-img img { max-width: 100%; max-height: 260px; border-radius: var(--r1) }
+.md-det-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 10px }
+.md-det-facts dt {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--faint)
+}
+.md-det-facts dd { font-family: var(--mono); font-size: 12px; color: var(--ink); margin-top: 4px }
+.md-det-path {
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 11px;
+  border: 1px solid var(--line2); border-radius: var(--r2); background: var(--bg1)
+}
+.md-det-path code {
+  flex: 1; min-width: 0; font-family: var(--mono); font-size: 11.5px; color: var(--dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap
+}
+.md-det-k {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--faint); margin-bottom: 6px
+}
+.md-det-none { font-size: 12px; line-height: 1.65; color: var(--ambT) }
+.md-det-list { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--dim) }
+.md-det-danger {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 11px 13px;
+  border: 1px solid var(--line2); border-left: 3px solid var(--bad); border-radius: var(--r2);
+  background: var(--bad-soft)
+}
+.md-det-danger span { flex: 1; min-width: 200px; font-size: 12px; line-height: 1.6; color: var(--dim) }
+.md-det-saved { margin-right: auto; display: flex; align-items: center; gap: 6px }
+
+@media (max-width: 720px) {
+  .md-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 10px }
+  .md-search { min-width: 0; width: 100% }
+}

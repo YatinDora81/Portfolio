@@ -98,7 +98,7 @@ Project.
 
 ## Resume here
 
-**Next: Phase 06 — analytics core.** Phases 01-05 are committed and green
+**Next: Phases 07 (dwell) and 08 (link registry), then 09 (rollup).** Phases 01-06 and 10 are committed and green
 (`check-types`, `lint`, `build` all pass; `prisma migrate status` clean).
 
 Before starting 05, re-read the "Deviations" table above. The ones that bite Phase 05:
@@ -139,11 +139,11 @@ Standing decisions from the user this session:
 - [x] 03 feature flags
 - [x] 04 content status
 - [x] 05 inbox
-- [ ] 06 analytics core
+- [x] 06 analytics core
 - [ ] 07 dwell time
 - [ ] 08 link registry
 - [ ] 09 rollup
-- [ ] 10 media manager
+- [x] 10 media manager
 
 ---
 
@@ -643,3 +643,105 @@ Wired into both apps (`transpilePackages`, deps, root tsconfig references) exact
 - An unauthenticated click on an emailed deep link loses the `?id=` through the login
   redirect (middleware drops the query string). Fixing it needs a `?next=` round trip
   with same-origin validation.
+
+---
+
+## Phase 06 — analytics core, and Phase 10 — media manager
+
+Built together because they share nothing. All migrations for 05-10 were applied in one
+pass earlier, so neither phase wrote a migration.
+
+### New workspace package
+
+`@repo/storage` — lazy S3/R2 client. **Nothing is constructed at module scope**, so the
+admin still boots with no credentials.
+
+### The two things Phase 06 exists to get right — both verified at runtime
+
+**1. Attribution is written once, on session creation.** Test: POST an event with
+`utm_source=linkedin`, then POST a second event from the same visitor with no UTM.
+
+```
+sessions: 1              (MUST be 1 — two would mean a new session per event)
+channel:  linkedin       (MUST survive the second event)
+pageviews: 2
+```
+
+If this had failed, every traffic number in the dashboard would be meaningless.
+
+**2. No PII is stored.**
+
+```
+row contains "203.0.113" (the IP):  false
+row contains "Mozilla":             false
+row contains "AppleWebKit":         false
+device stored as:  desktop / Chrome / macOS      — families, no versions
+visitorHash: 32 hex chars, salted with randomBytes(32), salt deleted after 48h
+```
+
+Also verified: Slackbot → 204 and no row; `sec-purpose: prefetch` → 204 and no row;
+malformed JSON and an empty events array → **204, never 500**. The endpoint returns 204 on
+every path including a thrown error, so an analytics bug can never break the page.
+
+### 🔴 The critical regression this phase nearly shipped
+
+`AnalyticsTracker` mounted **before** `UtmTrackerBeacon` in the root layout, and its mount
+effect stripped `utm_*` from the URL with `history.replaceState`. Sibling mount effects
+flush synchronously, so the beacon then read a URL that had already been rewritten, hit its
+`if (!source || !medium || !campaign) return` guard, and **never POSTed again**. Both are
+gated on the same `analytics` flag, which is on, so this was live, not theoretical — the
+`/tracker` page and its 1454 rows would have silently stopped recording.
+
+Fixed by deferring the strip to a macrotask rather than by reordering the JSX, so the two
+components are not coupled by an invisible ordering dependency.
+
+### Other defects found and fixed
+
+| Defect | Fix |
+|---|---|
+| The bot regex `bot(?![a-z0-9_])` classified every **CUBOT** handset (a real Android brand) as a crawler and dropped those visitors. A leading `\b` was not an option — it would have killed Googlebot/Slackbot/LinkedInBot. | `(?<!cu)bot(?![a-z0-9_])` |
+| An own-host referrer with no `sec-fetch-site` header logged an internal navigation as `unknown-shared`. | Folded into the internal-nav check → `direct` |
+| `utm_medium=social` sat above the referrer rung, so `social` + a LinkedIn referrer resolved to `other`. | Rung removed |
+| The collect route was written against **guessed** signatures: `computeSessionHash(visitorHash, salt)` passed the salt where a `Date` belongs, so every hash would have derived from a `NaN` bucket — **one shared session for the entire site, forever**. The nested `utm` object was also ignored, so every campaign would have resolved to `direct`. | Corrected against the real exports |
+| `KEY=""` copied from `.env.example` fails a bare `.optional()`, and a failed env parse **throws at boot** — so documenting the R2 vars as blank would have taken the whole admin down. | `blankIsUnset()` wrapper |
+| NFKD normalisation split accented filenames mid-word (`señor` → `sen-or`). | Combining marks dropped |
+| `packages/storage` missing from the root tsconfig references | Added |
+| `storageStatus` was an unused but live server action | Deleted |
+
+### Phase 10 decisions
+
+- **SVG dropped from the allowlist.** An SVG is a document that can carry `<script>`, and
+  served inline from an image host it runs on that host's origin. The extension is derived
+  from the *approved MIME type*, never the filename, so `evil.svg` uploaded as `image/png`
+  becomes `.png`.
+- **Alt text has four gates**: NOT NULL column, zod `.min(3)`, disabled Save in the upload
+  queue, disabled Save in the detail dialog.
+- **`completeUpload` HEADs the object first** and refuses if the bytes never landed — a
+  presigned PUT carries no content-length-range condition, so the HEAD is the only place
+  real size can be read. Upserts on `key`, so a retry is idempotent.
+- **Orphans are flagged, never auto-deleted.** The scan reads project logos/images, blog
+  covers *and markdown bodies*, experience logos and every `SiteConfig` value — and still
+  cannot see every reference, which is exactly why it does not delete.
+- Storage key sanitisation fuzzed over 17 hostile filenames × 8 folders × 5 MIME types,
+  0 failures. `../../../etc/passwd` → `passwd`; `shell.php.png` → `shell-php`.
+
+### Verification
+
+- [x] `tsc --noEmit` (0 errors) · `lint` · `build` (both apps) — **with no R2 credentials set**
+- [x] Route table unchanged: `/` `○` **1d**, `/blog/[slug]` `●`, `/sitemap.xml` `○` **1d**.
+      Mounting a client tracker in the root layout did not make anything dynamic.
+- [x] Attribution + PII tests above
+- [x] 25/25 attribution ladder cases, all 11 channels, including the `lnkd.in` and `t.co` shorteners
+- [x] Live DB restored to baseline: **0 analytics rows**, UTM 1454, messages 7, blogs 10, projects 6, flags 9
+
+### Known gaps
+
+- One reviewer (attribution/privacy) died mid-run when the machine slept. Those checks were
+  re-run by hand instead; results above.
+- `/api/collect` flushes with `revalidateTag` in-process rather than through the admin's
+  `revalidate()`, so a scheduled post that goes live off public traffic writes no
+  `RevalidationLog` row. Not a regression — the pre-existing admin-load fallback did not log
+  either — and `revalidate()` lives in `apps/docs`, which `apps/web` cannot reach.
+- `/media` was not smoke-tested in a browser: it needs an admin login and local dev points
+  at production. `createImageBitmap` on AVIF varies by browser; the code falls back to
+  uploading without dimensions if the decode throws.

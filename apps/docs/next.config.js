@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["db", "@repo/ui", "@repo/shared", "@repo/config", "@repo/email"],
+  transpilePackages: ["db", "@repo/ui", "@repo/shared", "@repo/storage", "@repo/config", "@repo/email"],
   experimental: {
     serverActions: {
       // Next buffers an action's body BEFORE the action runs and answers 413 by

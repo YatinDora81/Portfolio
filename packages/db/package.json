@@ -4,6 +4,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./analytics-salt": "./src/analytics-salt.ts",
     "./lock": "./src/lock.ts",
     "./publish-due": "./src/publish-due.ts",
     "./rate-limit": "./src/rate-limit.ts",

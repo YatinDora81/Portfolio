@@ -5,6 +5,7 @@ import { SITE_URL, SITE_NAME } from "./lib/site";
 import { getSiteConfig } from "./lib/data";
 import { getFlags } from "./lib/flags";
 import { FLAG_KEYS, flagValue } from "@repo/shared/flags";
+import AnalyticsTracker from "./components/common/AnalyticsTracker";
 import OnekoCat from "./components/OnekoCat";
 import ClarityAnalytics from "./components/ClarityAnalytics";
 import UtmTrackerBeacon from "./components/UtmTrackerBeacon";
@@ -110,6 +111,7 @@ export default async function RootLayout({
       <body>
         {children}
         {easterEggs && <OnekoCat napStyle={catNapStyle} napSeconds={catNapSeconds} />}
+        {analytics && <AnalyticsTracker />}
         {analytics && <VercelAnalytics />}
         {analytics && <ClarityAnalytics />}
         {analytics && <UtmTrackerBeacon />}

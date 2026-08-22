@@ -16,6 +16,7 @@
     "@repo/config": "*",
     "@repo/email": "*",
     "@repo/shared": "*",
+    "@repo/storage": "*",
     "@repo/ui": "*",
     "@supabase/supabase-js": "^2.106.2",
     "@tabler/icons-react": "^3.40.0",
