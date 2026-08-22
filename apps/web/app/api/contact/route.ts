@@ -51,17 +51,6 @@ async function readCapped(request: Request, cap: number): Promise<string | null>
 }
 
 export async function POST(request: Request) {
-  /**
-   * The kill switch is enforced HERE, and here is the only place it counts. The
-   * homepage also drops the form when this flag is off, but that is a courtesy
-   * to a visitor: a spam flood posts straight at this URL and never renders a
-   * page at all. It also covers the window where an ISR-cached homepage still
-   * shows the form after the flag was flipped.
-   *
-   * Ahead of readCapped on purpose — there is no point streaming, decoding and
-   * validating a body that cannot be stored either way. The message is written
-   * to be shown: the form types the server's own words into its receipt.
-   */
   if (!flagValue(await getFlags(), FLAG_KEYS.CONTACT_FORM)) {
     return Response.json(
       { error: "The contact form is paused right now. Email works." },

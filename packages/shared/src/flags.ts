@@ -1,11 +1,3 @@
-/**
- * The flag registry — every kill switch the site has, declared once.
- *
- * Client-safe: a flag's identity and its default are plain data, and the
- * homepage passes the resolved map down into client components that need it.
- * Reading the database is a separate concern and lives in apps/web/app/lib/flags.ts.
- */
-
 export const FLAG_KEYS = {
   SECTION_ABOUT: "section.about",
   SECTION_SKILLS: "section.skills",
@@ -25,7 +17,6 @@ export type FlagDefinition = {
   label: string;
   description: string;
   defaultEnabled: boolean;
-  /** Which group the admin lists it under. */
   group: "Sections" | "System";
 };
 
@@ -104,24 +95,13 @@ const DEFAULT_BY_KEY = new Map<string, boolean>(
 
 export type FlagMap = Record<string, boolean>;
 
-/**
- * Resolve one flag, falling back to its declared default.
- *
- * **Fail-open is the whole point, and it is deliberate.** An absent key here
- * means one of: the row was deleted, the seed has not run, the DB read failed,
- * or someone added a flag to the registry and has not migrated yet. Every one
- * of those is a reason to keep showing the section. The alternative — treating
- * "I don't know" as "off" — turns a transient database blip into a blank
- * portfolio, which is a far worse failure than a section staying up a little
- * longer than someone intended.
- */
+// Fails open: a missing row or a failed read must not blank out the section.
 export function flagValue(map: FlagMap, key: FlagKey): boolean {
   const stored = map[key];
   if (typeof stored === "boolean") return stored;
   return DEFAULT_BY_KEY.get(key) ?? true;
 }
 
-/** Every flag at its declared default — the shape a failed read returns. */
 export function defaultFlagMap(): FlagMap {
   return Object.fromEntries(FLAG_DEFINITIONS.map((d) => [d.key, d.defaultEnabled]));
 }

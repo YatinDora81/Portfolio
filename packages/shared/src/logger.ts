@@ -14,15 +14,7 @@ function log(level: Level, scope: string, msg: string, meta?: unknown): void {
   else console.log(out);
 }
 
-/**
- * One JSON object per line, so a log drain can index the fields instead of
- * regex-ing prose.
- *
- * Never pass a secret, a token, a raw IP, a full user-agent string or a message
- * body as `meta`. Logs outlive the request and are readable by anyone with
- * dashboard access; the analytics design in particular spends real effort never
- * writing an IP to disk, and one careless log line would undo it.
- */
+// Never pass a secret, token, raw IP, user-agent or message body as `meta`.
 export const logger = {
   info: (scope: string, msg: string, meta?: unknown) => log("info", scope, msg, meta),
   warn: (scope: string, msg: string, meta?: unknown) => log("warn", scope, msg, meta),

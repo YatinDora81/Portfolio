@@ -19,10 +19,6 @@ import { cn } from "@/lib/utils";
 import { ProjectGrid } from "./grid";
 import { ProjectsSections } from "./sections";
 
-/**
- * Overdue is a comparison against the clock, so a cached render would answer it
- * from whenever the cache was filled — the one state in which this page misleads.
- */
 export const dynamic = "force-dynamic";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/$/, "");
@@ -49,13 +45,7 @@ export default async function ProjectsPage({ searchParams }: {
 
   const now = new Date();
 
-  /**
-   * Both halves of the public filter, not just the status. A project's
-   * `publishedAt` is nullable, and PUBLISHED with a null one fails
-   * `publishedAt <= now` — the project is on nobody's screen. `db/visibility`
-   * is the authority; this is the same predicate applied to rows already in
-   * hand, and it must not drift from it.
-   */
+  // Both halves of the public filter — must not drift from `publicContentWhere` in db/visibility.
   const isLive = (p: { status: ContentStatus; publishedAt: Date | null }) =>
     p.status === "PUBLISHED" && p.publishedAt !== null && p.publishedAt <= now;
 
@@ -66,8 +56,7 @@ export default async function ProjectsPage({ searchParams }: {
   const overdue = projects.filter(
     (p) => p.status === "SCHEDULED" && p.publishAt !== null && p.publishAt <= now
   );
-  // PUBLISHED with no stamp at all: the one way a project can read as live in
-  // here and be absent from the site.
+  // PUBLISHED with no stamp reads as live in here but is absent from the site.
   const unstamped = projects.filter((p) => p.status === "PUBLISHED" && p.publishedAt === null);
 
   const rows = active === null ? projects : projects.filter((p) => p.status === active);
@@ -212,8 +201,6 @@ export default async function ProjectsPage({ searchParams }: {
                         <RowActions
                           kind="project"
                           id={p.id}
-                          // No slug, no detail page: a draft project is
-                          // previewed by looking at the homepage in draft mode.
                           slug={null}
                           title={p.title}
                           status={p.status}
@@ -224,9 +211,6 @@ export default async function ProjectsPage({ searchParams }: {
                       <div className="row-acts lc-row-acts">
                         <StatusBadge status={p.status} />
                         {liveNow && (
-                          // Section 05, not a detail page: there is no
-                          // /projects/<slug> to open, so the anchor on the
-                          // homepage is the closest thing to "see it live".
                           <a
                             className="ibtn"
                             href={`${SITE}/#projects`}
@@ -270,11 +254,8 @@ export default async function ProjectsPage({ searchParams }: {
           </Card>
         )}
 
-        {/* Deliberately every project, whatever the tab above is filtered to.
-            `reorderProjects` rewrites sortOrder from the order of the ids it is
-            handed, so dragging inside a filtered subset would collapse the
-            running order of everything left out. Order is a property of the
-            whole list, and the grid has to show the whole list to edit it. */}
+        {/* Every project, whatever the tab is filtered to: `reorderProjects` rewrites
+            sortOrder from the order of the ids it is handed. */}
         <div className="wk-in s1" style={{ marginTop: projects.length > 0 ? 14 : 0 }}>
           {projects.length > 0 && active !== null && (
             <div className="lc-note lc-note-b">

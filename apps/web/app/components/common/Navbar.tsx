@@ -17,9 +17,7 @@ import {
 
 const MOBILE_MENU_ID = 'mobile-nav-menu';
 
-// `key` is what ties a link to its section's visibility, and it is a literal
-// union rather than a string so a rename here becomes a type error at the call
-// site instead of a silently-undefined lookup that hides the link forever.
+// `as const` keeps `key` a literal union, so renaming one is a type error at the call site.
 const allNavItems = [
   { key: 'skills', name: 'Skills', link: '#skills' },
   { key: 'experience', name: 'Experience', link: '#experience' },
@@ -32,12 +30,7 @@ type NavSection = (typeof allNavItems)[number]['key'];
 
 interface NavbarProps {
   logo: string;
-  /**
-   * Which sections the page actually rendered. Resolved once by the page — the
-   * feature flag AND, for blogs, whether there are any posts — because a link
-   * to a section that isn't there scrolls nowhere, which reads as a broken site
-   * rather than a hidden section.
-   */
+  /** Which sections the page actually rendered — a link to a missing section scrolls nowhere. */
   sections: Record<NavSection, boolean>;
 }
 
@@ -46,8 +39,6 @@ export default function Navbar({ logo, sections }: NavbarProps) {
   const { showCat, toggleCat } = useCat();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // One filtered array, feeding both the desktop NavItems and the mobile menu
-  // below, so the two can never disagree about what exists.
   const navItems = allNavItems.filter((item) => sections[item.key]);
 
   return (

@@ -49,7 +49,6 @@ export function SiteChromeForm({
   values: Record<string, string>;
   moved: MovedRow[];
   hasBlogs: boolean;
-  /** Passed straight through: the preview draws the navbar, so it owns the rule. */
   sections: Record<NavSection, boolean>;
 }) {
   // The preview follows the fields as they are typed rather than after a save,

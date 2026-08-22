@@ -12,11 +12,6 @@ export default async function BlogOpengraphImage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  // Public, no preview argument. An OG image URL is fetched by crawlers and
-  // link unfurlers that carry no cookies, so honouring draft mode here could
-  // never help a previewer — and the image is cached and re-shared by third
-  // parties, which is the last place an unpublished title should end up. A
-  // draft falls back to 'Blog', which is the correct amount to say about it.
   const blog = await getBlogBySlug(slug);
   const title = blog?.title ?? 'Blog';
 

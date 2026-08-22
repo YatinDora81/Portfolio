@@ -7,15 +7,7 @@ import { getBlogs } from '@/lib/data';
 import { FLAG_KEYS, flagValue } from '@repo/shared/flags';
 
 export default async function BlogNotFound() {
-  // Async so this can read the flags: a not-found page takes no props, so there
-  // is no page above it to pass them down. Same cached lookups the post uses.
-  //
-  // Both halves of the homepage's own condition have to be repeated here, not
-  // just the flag: `page.tsx` renders the section on
-  // `flag && blogs.length > 0`, so with every post unpublished — which is the
-  // live state today — `#blogs` does not exist even with the flag on. Checking
-  // the flag alone would point the one page whose entire job is recovery at a
-  // fragment that isn't there.
+  // Mirrors the homepage condition exactly — the `#blogs` anchor only exists when both halves hold.
   const [flags, blogs] = await Promise.all([getFlags(), getBlogs()]);
   const showBlogs = flagValue(flags, FLAG_KEYS.SECTION_BLOGS) && blogs.length > 0;
 

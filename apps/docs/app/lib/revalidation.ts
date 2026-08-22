@@ -10,17 +10,6 @@ import type {
 import { env } from "@repo/config/env";
 import { logger } from "@repo/shared/logger";
 
-/**
- * Every revalidation the admin app asks for goes through here, and every one of
- * them leaves a row behind.
- *
- * The failure this replaces: `publishSite` fired a fetch at the public app and
- * threw the answer away. A wrong secret, an unreachable origin and a genuine
- * flush were the same silent non-event, so "the site is stale" had no evidence
- * anywhere and no way to tell which of the three had happened.
- */
-
-/** Re-exported under the bare model name so a page can type its props without reaching into `db`'s generated `*Model` names. */
 export type RevalidationLog = RevalidationLogModel;
 export type TagState = TagStateModel;
 
@@ -40,24 +29,11 @@ export type RevalidateOpts = {
   actorId?: string;
 };
 
-/** Beyond this the public app is not going to answer, and the admin's save is being held hostage waiting. */
 const TIMEOUT_MS = 8000;
 
-/** Enough of the body to name the failure, short enough that a 500 HTML page does not become the log row. */
 const ERROR_BODY_CHARS = 300;
 
-/**
- * Ask the public app to flush, then record what happened.
- *
- * THE CRITICAL PROPERTY: this never throws. Callers invoke it *after* a content
- * save has already committed, so an exception escaping here would propagate out
- * of the server action and be reported to the admin as a failed save — a save
- * that is, in fact, already in the database. The admin would then re-submit and
- * the row would be written twice. Every path below therefore returns a
- * `RevalidateResult`; the fetch is wrapped, and the logging block that follows
- * is wrapped separately, because a database hiccup writing the *log* must not
- * undo a save either.
- */
+/** Never throws: callers invoke this after the content save has already committed, so an escaping error would report a committed save as a failure. */
 export async function revalidate(opts: RevalidateOpts): Promise<RevalidateResult> {
   const paths = opts.paths ?? [];
   const tags = opts.tags ?? [];
@@ -83,16 +59,10 @@ export async function revalidate(opts: RevalidateOpts): Promise<RevalidateResult
     httpStatus = res.status;
     if (!res.ok) {
       status = "FAILED";
-      // Read the body before slicing: the public route answers 401 with a JSON
-      // `{ error }`, and that sentence is the entire difference between "wrong
-      // secret" and "route is broken".
       error = `HTTP ${res.status}: ${(await res.text()).slice(0, ERROR_BODY_CHARS)}`;
     }
   } catch (e) {
-    // `AbortSignal.timeout` rejects with a DOMException named "TimeoutError";
-    // an externally aborted request gives "AbortError". Both mean "we never got
-    // an answer", which is a different operational problem from a 500 — the
-    // site may well have flushed and simply not told us in time.
+    // `AbortSignal.timeout` rejects with a DOMException named "TimeoutError"; an externally aborted request gives "AbortError".
     const name = e instanceof Error ? e.name : "";
     const timedOut = name === "TimeoutError" || name === "AbortError";
     status = timedOut ? "TIMEOUT" : "FAILED";
@@ -123,9 +93,6 @@ export async function revalidate(opts: RevalidateOpts): Promise<RevalidateResult
       },
     });
 
-    // Pattern B: upsert keyed on `tag`, the model's primary key. Re-running the
-    // same revalidation converges on one row per tag instead of appending, so
-    // the staleness comparison in stale.ts always reads a single current answer.
     for (const tag of tags) {
       if (status === "SUCCESS") {
         await prisma.tagState.upsert({
@@ -136,10 +103,7 @@ export async function revalidate(opts: RevalidateOpts): Promise<RevalidateResult
       } else {
         await prisma.tagState.upsert({
           where: { tag },
-          // The epoch, not `now`, on first failure: `lastSuccessAt` is the
-          // right-hand side of every staleness comparison, and seeding it with
-          // the current time would mark a tag that has never once succeeded as
-          // freshly up to date.
+          // The epoch, not `now`: seeding `lastSuccessAt` with the current time would mark a tag that has never once succeeded as fresh.
           create: { tag, lastSuccessAt: new Date(0), lastAttemptAt: now, consecutiveFails: 1 },
           update: { lastAttemptAt: now, consecutiveFails: { increment: 1 } },
         });
@@ -162,12 +126,11 @@ export type RevalidationHealth = {
   success: number;
   failed: number;
   timeout: number;
-  /** 0..1. Defined as 1 when nothing was attempted — an empty window is not a broken one. */
+  /** 0..1, and 1 when nothing was attempted. */
   successRate: number;
   p95DurationMs: number;
 };
 
-/** Aggregate outcomes over the last `sinceDays` days. The query lives here, not in the page, so the dashboard and any future alert read the same numbers. */
 export async function readHealth(sinceDays = 7): Promise<RevalidationHealth> {
   const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
 
@@ -195,8 +158,7 @@ export async function readHealth(sinceDays = 7): Promise<RevalidationHealth> {
   const total = success + failed + timeout;
 
   const n = durations.length;
-  // `noUncheckedIndexedAccess` makes the indexed read `{ durationMs } | undefined`
-  // even after the clamp, so the `?? 0` is the compiler's price, not a real branch.
+  // `noUncheckedIndexedAccess` types the indexed read as possibly undefined even after the clamp, hence the `?? 0`.
   const idx = Math.min(Math.max(Math.ceil(0.95 * n) - 1, 0), n - 1);
   const p95DurationMs = n === 0 ? 0 : (durations[idx]?.durationMs ?? 0);
 
@@ -210,7 +172,6 @@ export async function readHealth(sinceDays = 7): Promise<RevalidationHealth> {
   };
 }
 
-/** Newest first — the order the dashboard's table wants, and the order that makes "did my last publish land?" the top row. */
 export async function readRecentLogs(limit = 100): Promise<RevalidationLog[]> {
   return prisma.revalidationLog.findMany({
     orderBy: { createdAt: "desc" },

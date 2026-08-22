@@ -19,7 +19,7 @@ interface BlogData {
   id: string; slug: string; title: string; description: string;
   content: string; image: string; imageOrientation: string; color: string;
   status: ContentStatus;
-  /** The stored UTC instant as ISO, or null. Converted to the IST picker below. */
+  /** Stored UTC instant as ISO, or null. */
   publishAtIso: string | null;
 }
 
@@ -27,13 +27,7 @@ export function BlogForm({ blog }: { blog?: BlogData }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<ContentStatus>(blog?.status ?? "DRAFT");
-  /**
-   * UTC out of the database, IST into the picker — the reverse of what the
-   * action does on save. Computed in the initialiser rather than an effect so
-   * the field is right in the first paint, and computed with
-   * `utcToIstInput` rather than any `toLocale*` call so the server's HTML and
-   * the browser's hydration produce the same attribute.
-   */
+  // `utcToIstInput`, not `toLocale*`, so the server's HTML and hydration produce the same attribute.
   const [publishAtIst, setPublishAtIst] = useState(
     blog?.publishAtIso ? utcToIstInput(new Date(blog.publishAtIso)) : ""
   );
@@ -50,8 +44,7 @@ export function BlogForm({ blog }: { blog?: BlogData }) {
   const handleSubmit = (formData: FormData) => {
     const publish = wantPublish.current;
 
-    // Checked here so an impossible schedule costs no round trip; the action
-    // checks it again, because this copy can be skipped and that one cannot.
+    // The action checks this again, because this copy can be skipped.
     const problem = scheduleProblem(status, publishAtIst);
     if (problem) {
       setSaveError(problem);
@@ -71,19 +64,13 @@ export function BlogForm({ blog }: { blog?: BlogData }) {
         if (publish) {
           const pub = await publishSite();
           if (!pub.ok) {
-            // Decision 5: the post is saved. A publish that fails is a separate,
-            // retryable failure — it never undoes the write, so hold the page and
-            // name the reason rather than navigating away in silence.
+            // The write already landed; a failed publish never undoes it.
             setPubError(pub.error ?? "Could not reach the site.");
             return;
           }
         }
         router.push("/blogs");
       } catch (e) {
-        // A rejection is the transport under the action, most realistically an
-        // expired session bouncing the POST to /login. Without this the throw
-        // would escape the transition, reach no error boundary, and leave both
-        // buttons disabled for good with nothing on screen to explain it.
         setSaveError(transportError(e));
       } finally {
         setBusy(null);
@@ -178,10 +165,6 @@ export function BlogForm({ blog }: { blog?: BlogData }) {
               error={saveError}
             />
 
-            {/* Said out loud rather than left as a silent swap. Anyone who has
-                used this form before will go looking for the switch, and "it
-                moved" is a much shorter conversation than "where did my
-                visibility control go". */}
             <div className="lc-note lc-after-field">
               This replaces the old <b>Show on portfolio</b> switch. That switch wrote a boolean
               the site has stopped reading — the column is still in the database so the lifecycle

@@ -18,19 +18,11 @@ import { RunDueButton } from "@/components/lifecycle/run-due-button";
 import { IST_ZONE, STATUS_LABEL, isContentStatus, istLabel } from "@/lib/lifecycle";
 import { cn, cdnUrl } from "@/lib/utils";
 
-/**
- * Every judgement on this page is made against the clock: whether a scheduled
- * post is overdue, whether a published one has reached its own date. A cached
- * render would answer both from whenever the cache was filled, which is exactly
- * the state in which this page is worse than nothing.
- */
 export const dynamic = "force-dynamic";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/$/, "");
 
-// The zone is named so SSR and hydration emit identical characters — same rule
-// as the revalidation page. Date only: `publishedAt` is the editorial date the
-// article prints, and it has never carried a meaningful time of day.
+// Zone named so SSR and hydration emit identical characters.
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   timeZone: IST_ZONE, day: "2-digit", month: "short", year: "numeric",
 });
@@ -52,13 +44,7 @@ export default async function BlogsPage({ searchParams }: {
 
   const now = new Date();
 
-  /**
-   * "Live" is both halves of the public filter, not just the status: a post
-   * marked PUBLISHED but dated next Tuesday fails `publishedAt <= now` and is
-   * not on the site. The authority is `publicContentWhere` in db/visibility —
-   * this is the same predicate applied to rows already in hand rather than a
-   * second query, and it must not drift from it.
-   */
+  // Both halves of the public filter — must not drift from `publicContentWhere` in db/visibility.
   const isLive = (b: { status: ContentStatus; publishedAt: Date }) =>
     b.status === "PUBLISHED" && b.publishedAt <= now;
 
@@ -66,17 +52,10 @@ export default async function BlogsPage({ searchParams }: {
   const counts: Record<ContentStatus, number> = { DRAFT: 0, SCHEDULED: 0, PUBLISHED: 0, ARCHIVED: 0 };
   for (const b of blogs) counts[b.status] += 1;
 
-  /**
-   * A row that is still SCHEDULED after its own time has passed means nothing
-   * has run the schedule. Worth calling out by name — the alternative is an
-   * admin watching a post that says "Scheduled" and quietly assuming it went
-   * out.
-   */
   const overdue = blogs.filter(
     (b) => b.status === "SCHEDULED" && b.publishAt !== null && b.publishAt <= now
   );
 
-  // Published, but dated ahead — the other way a post can look live and not be.
   const postdated = blogs.filter((b) => b.status === "PUBLISHED" && b.publishedAt > now);
 
   const rows = active === null ? blogs : blogs.filter((b) => b.status === active);
@@ -202,15 +181,7 @@ export default async function BlogsPage({ searchParams }: {
               const isOverdue = b.status === "SCHEDULED" && b.publishAt !== null && b.publishAt <= now;
 
               return (
-                // The whole row used to carry `.dimmed` when it was not live,
-                // which with every post a draft meant the entire list sat at
-                // 45% — including the overdue warnings and the buttons that
-                // answer them. The badge says the status now; only the cover
-                // art fades, and only an archived row mutes its title.
                 <div key={b.id} className={cn("row", "lc-row", b.status === "ARCHIVED" && "lc-arch")}>
-                  {/* The card art the section leads with — a post with no
-                      image draws a flat colour block on the site, and that
-                      is worth seeing before it ships. */}
                   {b.image ? (
                     <span
                       className={cn("blg-thumb", !liveNow && "dimmed")}
@@ -285,9 +256,7 @@ export default async function BlogsPage({ searchParams }: {
         )}
       </Card>
 
-      {/* The pane is the public site's answer, so it follows the public filter
-          rather than the tab above — a draft selected upstairs must not appear
-          down here as if it had shipped. */}
+      {/* Follows the public filter, not the tab above. */}
       <PreviewFrame label={`Blogs Preview — the ${live.length} a visitor can see`}>
         <BlogsPreview
           blogs={live.map(b => ({

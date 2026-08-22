@@ -25,9 +25,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
         skillIds: project.skills.map(s => s.id),
         bullets: project.bullets.map(b => ({ id: b.id, content: b.content, sortOrder: b.sortOrder })),
         status: project.status,
-        // Serialised here rather than handed over as a `Date`: the form is a
-        // client component, and an ISO string is the one representation that
-        // survives the boundary unchanged in both directions.
+        // ISO string, not a Date — the form is a client component.
         publishAtIso: project.publishAt?.toISOString() ?? null,
       }}
       allSkills={allSkills.map(s => ({ id: s.id, name: s.name }))}

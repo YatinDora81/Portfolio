@@ -10,14 +10,7 @@ import {
   IconAlertTriangle, IconCircleCheck, IconEye, IconRefresh, IconRocket,
 } from "@tabler/icons-react";
 
-/**
- * What a row knows about the last thing it was asked to do.
- *
- * `stale` is the arm that earns the shape, exactly as on the flags page: the
- * status moved and the cache flush did not, so the badge beside it is telling
- * the truth about the database and a lie about what visitors are seeing.
- * Folding it into "done" would hide the only fact worth reporting.
- */
+// `stale` = the status moved but the flush did not.
 type Outcome =
   | { kind: "done" }
   | { kind: "stale"; error: string }
@@ -29,16 +22,11 @@ export type LifecycleKind = "blog" | "project";
 export function RowActions({ kind, id, slug, title, status, previewBlocked }: {
   kind: LifecycleKind;
   id: string;
-  /** A blog's slug; null for a project, which has neither slug nor detail page. */
+  /** Null for a project, which has no detail page. */
   slug: string | null;
   title: string;
   status: ContentStatus;
-  /**
-   * Why preview links cannot be minted at all right now, or null when they can.
-   * Resolved once on the server per page load rather than discovered by a
-   * click: a button that is disabled and says why is a working button, and one
-   * that errors after every press is a broken one.
-   */
+  /** Why preview links cannot be minted right now, or null when they can. */
   previewBlocked: string | null;
 }) {
   const [busy, setBusy] = useState<"publish" | "preview" | null>(null);
@@ -49,15 +37,7 @@ export function RowActions({ kind, id, slug, title, status, previewBlocked }: {
   const canPreview = status === "DRAFT" || status === "SCHEDULED";
   if (!canPublishNow && !canPreview) return null;
 
-  /**
-   * Every call below is wrapped, and every one clears `busy` in `finally`.
-   *
-   * The action reports its own refusals as `{ ok: false }`, so a *rejection* is
-   * the transport underneath one — most realistically an expired session
-   * redirecting the action POST to /login. A throw inside a transition reaches
-   * no error boundary, so without the catch the row would sit disabled forever,
-   * mid-action, with nothing on screen to say why.
-   */
+  // Must be caught: a throw inside a transition reaches no error boundary.
   const publishNow = () => {
     setBusy("publish");
     setOutcome(null);
@@ -87,17 +67,14 @@ export function RowActions({ kind, id, slug, title, status, previewBlocked }: {
     start(async () => {
       try {
         const res = await createPreviewLink(
-          // A project has no slug and no detail page, so its preview is the
-          // homepage in draft mode — the only surface a draft project appears on.
+          // A project has no detail page, so its preview is the homepage in draft mode.
           kind === "blog" && slug ? { type: "Blog", slug } : { type: "Home" }
         );
         if (!res.ok || !res.url) {
           setOutcome({ kind: "failed", error: res.error ?? "No preview link was returned." });
           return;
         }
-        // The await above has already broken the user-gesture chain, so some
-        // browsers will refuse this. The link is kept on screen either way,
-        // which is the difference between a blocked popup and a dead button.
+        // The await broke the user-gesture chain, so this may be blocked; the link stays on screen.
         window.open(res.url, "_blank", "noopener,noreferrer");
         setOutcome({ kind: "link", url: res.url });
       } catch (e) {

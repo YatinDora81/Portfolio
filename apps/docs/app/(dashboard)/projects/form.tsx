@@ -22,7 +22,7 @@ interface ProjectData {
   github: string | null; live: string | null; logoUrl: string | null; images: string[];
   skillIds: string[]; bullets: Bullet[];
   status: ContentStatus;
-  /** The stored UTC instant as ISO, or null. Converted to the IST picker below. */
+  /** Stored UTC instant as ISO, or null. */
   publishAtIso: string | null;
 }
 
@@ -43,12 +43,7 @@ export function ProjectForm({ project, allSkills }: {
   const [selectedSkills, setSelectedSkills] = useState<string[]>(project?.skillIds || []);
   const [bullets, setBullets] = useState<Bullet[]>(project?.bullets || [{ content: "", sortOrder: 0 }]);
   const [status, setStatus] = useState<ContentStatus>(project?.status ?? "DRAFT");
-  /**
-   * UTC out of the database, IST into the picker — the reverse of what the
-   * action does on save, and done with `utcToIstInput` rather than any
-   * `toLocale*` call so the server's HTML and the browser's hydration produce
-   * the same attribute.
-   */
+  // `utcToIstInput`, not `toLocale*`, so the server's HTML and hydration produce the same attribute.
   const [publishAtIst, setPublishAtIst] = useState(
     project?.publishAtIso ? utcToIstInput(new Date(project.publishAtIso)) : ""
   );
@@ -65,8 +60,7 @@ export function ProjectForm({ project, allSkills }: {
     e.preventDefault();
     const publish = wantPublish.current;
 
-    // Checked here so an impossible schedule costs no round trip; the action
-    // checks it again, because this copy can be skipped and that one cannot.
+    // The action checks this again, because this copy can be skipped.
     const problem = scheduleProblem(status, publishAtIst);
     if (problem) {
       setSaveError(problem);
@@ -84,8 +78,7 @@ export function ProjectForm({ project, allSkills }: {
       skillIds: selectedSkills,
       bullets: bullets.map((b, i) => ({ ...b, sortOrder: i })),
       status,
-      // The IST wall clock, not an instant. Converting it is the action's job,
-      // in one place, for both models — see lib/lifecycle.ts.
+      // The IST wall clock, not an instant — the action converts it.
       publishAtIst: publishAtIst || null,
     };
     startTransition(async () => {
@@ -99,19 +92,13 @@ export function ProjectForm({ project, allSkills }: {
         if (publish) {
           const pub = await publishSite();
           if (!pub.ok) {
-            // Decision 5: the project is saved. A publish that fails is a separate,
-            // retryable failure — it never undoes the write, so hold the page and
-            // name the reason rather than navigating away in silence.
+            // The write already landed; a failed publish never undoes it.
             setPubError(pub.error ?? "Could not reach the site.");
             return;
           }
         }
         router.push("/projects");
       } catch (err) {
-        // A rejection is the transport under the action, most realistically an
-        // expired session bouncing the POST to /login. Without this the throw
-        // would escape the transition, reach no error boundary, and leave both
-        // buttons disabled for good with nothing on screen to explain it.
         setSaveError(transportError(err));
       } finally {
         setBusy(null);
@@ -326,8 +313,6 @@ export function ProjectForm({ project, allSkills }: {
           error={saveError}
         />
 
-        {/* Worth saying, because it changes what Create means on this form: a
-            project used to be public the instant it was inserted. */}
         <div className="lc-note lc-after-field">
           Projects had no visibility control at all before this — every row reached visitors from
           the moment it was created. A new project now starts as a draft, and stays one until you

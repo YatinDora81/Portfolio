@@ -21,36 +21,18 @@ export interface FlagRow {
   note: string | null;
   /** False when the registry declares this flag but no database row holds it. */
   present: boolean;
-  /** Pre-formatted IST — see the note in page.tsx on why this is not a Date. */
+  /** Pre-formatted IST, not a Date. */
   changedAt: string | null;
   changedBy: string | null;
 }
 
-/**
- * What a row knows about its last save.
- *
- * `stale` is the arm that justifies the shape: the write landed and the flush
- * did not, so the switch on screen is telling the truth about the database and
- * a lie about what visitors are seeing. Folding it into either "saved" or
- * "failed" loses the only fact worth reporting, and it carries the server's own
- * words rather than a friendlier sentence for the same reason the revalidation
- * page does — a paraphrased error is a dead end.
- */
+// `stale` = the write landed but the flush did not.
 type Outcome =
   | { kind: "saved" }
   | { kind: "stale"; error: string }
   | { kind: "failed"; error: string };
 
-/**
- * `setFlag` reports its own failures as `{ ok: false }`, so a *rejection* is the
- * transport underneath one: the network gone, or — the case this page will
- * actually meet — an expired session redirecting the action POST to /login.
- *
- * Caught at every call site, because a throw inside a client transition reaches
- * no error boundary: `busy` would never clear and the row's switch would sit
- * disabled with no message, mid-flip, showing a position nothing ever saved.
- * The same bug was found and fixed on the revalidation page last phase.
- */
+// Must be caught at every call site: a throw inside a transition reaches no error boundary.
 function transportError(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "The server could not be reached.";
 }
@@ -76,12 +58,10 @@ function Result({ outcome }: { outcome: Outcome }) {
   return <div className="rv-err fl-out">{outcome.error}</div>;
 }
 
-/** The line under the description: who moved this switch, and when. */
 function lastChanged(row: FlagRow, justSavedBy: string | null): string {
   if (justSavedBy !== null) return `just now · by ${justSavedBy}`;
   if (!row.present) return "never saved — this flag has no row yet";
-  // A row with no author is one the seed created and nobody has touched since,
-  // which is a different fact from "an admin set it and we lost their name".
+  // No author means the seed created it and nobody has touched it since.
   const who = row.changedBy ?? "the seed";
   return `last changed ${row.changedAt} · by ${who}`;
 }
@@ -97,19 +77,7 @@ function FlagCard({ row, actor }: { row: FlagRow; actor: string }) {
 
   const dirty = note.trim() !== savedNote;
 
-  /**
-   * `next` is applied to the switch before the round trip and rolled back if the
-   * server refuses. The note draft is deliberately *not* rolled back: it is text
-   * the admin is still typing, and throwing it away to undo a failed toggle
-   * would punish them for the server's problem.
-   *
-   * The whole row is re-rendered from local state rather than from a
-   * `router.refresh()`. Refreshing would race the optimistic value — the props
-   * arriving mid-flight would flip the switch back under the reader's hand —
-   * and the action already calls `revalidatePath("/flags")`, so the next visit
-   * is accurate. The cost is that the "last changed" line is written here
-   * instead of read from the server, which is what `justSavedBy` is.
-   */
+  // Optimistic, and deliberately no router.refresh(): arriving props would race the switch mid-flight.
   const save = (next: boolean, nextNote: string | undefined) => {
     const previous = enabled;
     setEnabled(next);
@@ -190,9 +158,7 @@ function FlagCard({ row, actor }: { row: FlagRow; actor: string }) {
 
       <div className="fl-switch">
         {busy ? <IconRefresh size={13} className="spin" /> : null}
-        {/* The toggle sends no note at all, so a half-typed draft in the box
-            cannot be committed by flipping a switch — `setFlag` leaves the
-            column alone when `note` is omitted. */}
+        {/* No note passed, so a half-typed draft cannot be committed by flipping the switch. */}
         <Switch
           checked={enabled}
           disabled={busy}
@@ -204,7 +170,7 @@ function FlagCard({ row, actor }: { row: FlagRow; actor: string }) {
   );
 }
 
-/** Declared order, not alphabetical: layout first, then the things a visitor never sees. */
+// Declared order, not alphabetical.
 const GROUPS: FlagDefinition["group"][] = ["Sections", "System"];
 
 const GROUP_BLURB: Record<FlagDefinition["group"], string> = {

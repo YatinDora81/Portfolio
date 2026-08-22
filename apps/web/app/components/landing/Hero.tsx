@@ -40,12 +40,7 @@ interface HeroProps {
   totalSkills?: number;
   /** Optional extra photos for the name-hover peek deck. Defaults to [avatarUrl]. */
   photos?: string[];
-  /**
-   * Which of the sections this hero links *out* to actually rendered, resolved
-   * once by the page. Passed in rather than read here: the hero is a client
-   * component, and a flag read inside one is both a second database round trip
-   * and a dependency the hero has no business owning.
-   */
+  /** Whether the sections this hero links out to actually rendered. */
   showAbout: boolean;
   showSkills: boolean;
   showContact: boolean;
@@ -482,9 +477,6 @@ export default function Hero({
         />
       )}
 
-      {/* The cue exists to point at About. With About gone it would aim at an
-          anchor no element answers to, so it goes with it rather than becoming
-          three paw prints that do nothing. */}
       {showAbout && (
         <a className="cue" href="#about" aria-label="Scroll down — more below">
           <i>

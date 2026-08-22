@@ -32,9 +32,6 @@ interface ComposerProps {
 }
 
 interface SentenceFormProps extends ComposerProps {
-  /** The `contact.form` flag, resolved once on the page and threaded down. Off
-      means the section stays and the form goes — never a form that types
-      happily and then collects a 503. */
   enabled: boolean;
 }
 
@@ -120,12 +117,6 @@ interface AckPart {
 /** What the receipt offers once it has finished typing. */
 type Tail = 'another' | 'mailto' | null;
 
-/**
- * What stands in the sentence's place while the switch is off. It borrows the
- * form's own type — the same opening two words, the same receipt line under it
- * — so the block reads as the section pausing rather than as an error state,
- * and it hands the visitor the address instead of a dead field.
- */
 function Paused({ contactEmail }: { contactEmail: string }) {
   return (
     <div className="sent-form">
@@ -140,8 +131,7 @@ function Paused({ contactEmail }: { contactEmail: string }) {
   );
 }
 
-/** Guarding in a wrapper — the shape Carrier already uses in this folder — so
-    the composer's forty-odd hooks stay unconditional. */
+/** Guarded in a wrapper so the composer's hooks stay unconditional. */
 export default function SentenceForm({ enabled, ...props }: SentenceFormProps) {
   if (!enabled) return <Paused contactEmail={props.contactEmail} />;
   return <Composer {...props} />;
@@ -389,10 +379,6 @@ function Composer({ purposes, contactEmail, note, scope }: ComposerProps) {
         // fetch RESOLVES on 4xx/5xx — the catch below never sees a rejected
         // message, so without this branch the send fails in total silence. The
         // fields keep everything that was written, and the receipt says so.
-        //
-        // The endpoint's own sentence wins when it sends one. A 503 from the
-        // paused kill switch reaches a visitor holding a cached page that still
-        // had the form, and "transmit again" is exactly the wrong advice there.
         let said = '';
         try {
           const body: unknown = await res.json();

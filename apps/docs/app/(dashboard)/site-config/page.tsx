@@ -32,16 +32,12 @@ export default async function SiteConfigPage() {
     // The navbar drops its Blogs link when nothing is published, so the chrome
     // preview has to know — otherwise it draws a link the site does not.
     prisma.blog.count({ where: { show: true } }),
-    // And it drops any link whose section is switched off, for exactly the same
-    // reason. Read from the table rather than through a cached helper: this is
-    // a preview of what a visitor sees now, and a switch flipped a minute ago
-    // has to show up in it.
+    // Read from the table, not a cached helper: a switch flipped a minute ago has to show up.
     prisma.featureFlag.findMany(),
   ]);
 
   const flags: FlagMap = Object.fromEntries(flagRows.map(f => [f.key, f.enabled]));
-  // `flagValue` fails open to the registry default, so an unseeded flag previews
-  // as on — which is what the site is actually serving.
+  // `flagValue` fails open to the registry default, which is what the site serves.
   const sections = {
     skills: flagValue(flags, FLAG_KEYS.SECTION_SKILLS),
     experience: flagValue(flags, FLAG_KEYS.SECTION_EXPERIENCE),

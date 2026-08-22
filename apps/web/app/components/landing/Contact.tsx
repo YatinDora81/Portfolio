@@ -39,8 +39,6 @@ interface ContactProps {
   availabilityDetail: string;
   resumeUrl: string;
   github: GithubActivity | null;
-  /** `contact.form`, resolved on the page. The section is never hidden by it —
-      only the form is, which is what the flag promises in the admin. */
   formEnabled: boolean;
 }
 
@@ -137,8 +135,6 @@ export default function Contact({
           </div>
 
           <div className="rv" style={rise('.08s')}>
-            {/* The fallback caption has to know: "type below" over a paused
-                form points at a field that is not there. */}
             <Scope
               ref={scope}
               caption={

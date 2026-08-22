@@ -29,12 +29,7 @@ interface ProjectData {
   images: string[];
   skillIds: string[];
   bullets: { id?: string; content: string; sortOrder: number }[];
-  /**
-   * The lifecycle, unparsed. A bare `string` and not `ContentStatus` on
-   * purpose: this crosses the network as a server-action argument, so the type
-   * is a hint on one side and nothing at all on the other. `resolveLifecycle`
-   * is what actually decides.
-   */
+  /** Unparsed on purpose: a server-action argument's type is unenforced on the wire, so `resolveLifecycle` is what decides. */
   status: string;
   /** "YYYY-MM-DDTHH:mm" in IST, or null. Never an instant — see lib/lifecycle.ts. */
   publishAtIst: string | null;
@@ -61,10 +56,7 @@ export async function createProject(data: ProjectData): Promise<Saved> {
       sortOrder: count,
       status: lifecycle.status,
       publishAt: lifecycle.publishAt,
-      // A project's `publishedAt` is nullable, and half of "a visitor may see
-      // this" is `publishedAt <= now`. PUBLISHED with a null one satisfies
-      // neither half: the project would vanish from the site with nothing
-      // logged and no error anywhere. Stamped on the way in instead.
+      // PUBLISHED needs a `publishedAt`: the public filter is `publishedAt <= now`, so a null one would hide the project.
       publishedAt: lifecycle.status === "PUBLISHED" ? new Date() : null,
       skills: { connect: data.skillIds.map((id) => ({ id })) },
       bullets: {
@@ -96,11 +88,7 @@ export async function updateProject(id: string, data: ProjectData): Promise<Save
         images: data.images.filter(Boolean),
         status: lifecycle.status,
         publishAt: lifecycle.publishAt,
-        // Stamped only on the FIRST publish — see createProject for why a
-        // PUBLISHED project needs one at all. Re-saving an already-published
-        // project must not re-date it, and moving one to DRAFT or ARCHIVED
-        // keeps the original date so publishing it again restores it rather
-        // than inventing a new one.
+        // First publish only: re-saving must not re-date it, and DRAFT or ARCHIVED keeps the original date.
         ...(lifecycle.status === "PUBLISHED" && current?.publishedAt == null
           ? { publishedAt: new Date() }
           : {}),

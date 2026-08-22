@@ -18,13 +18,6 @@ import {
  * drives its behaviour from — so this page cannot describe a command that
  * doesn't exist, or claim the wrong focus behaviour.
  *
- * Existing and being *offered* are two different things, though, and this page
- * is the one place an admin learns what the terminal answers to. About.tsx
- * keeps a nav command only while `document.querySelector(c.target)` finds
- * something, so the section flags decide which ones survive into `help`, `ls`
- * and Tab-completion — hence the flag read below, beside the published-post
- * count that has always been half of the same question.
- *
  * It is filed under About rather than under Site because that is where the
  * terminal lives on the page, and it shares About's `.abt-*` chrome (the same
  * section nav, the same numbered block rules) so the two routes read as one
@@ -41,16 +34,7 @@ const KIND_LABEL: Record<string, string> = {
   egg: "Undocumented · not in help, ls or Tab",
 };
 
-/**
- * Which flag renders each nav command's target.
- *
- * Keyed by `target`, not by `cmd`, because the target is the thing the terminal
- * actually looks for. `#education` is the odd one: it is a div *inside* the
- * About block, so it has no flag of its own and goes with `section.about` — and
- * so, for that matter, does the terminal itself. A target missing from this map
- * is treated as present, matching `flagValue`'s fail-open: a command wrongly
- * listed as available is a smaller lie than one wrongly listed as gone.
- */
+// Keyed by `target`, not `cmd`; a target missing here is treated as present, matching flagValue's fail-open.
 const NAV_FLAG: Record<string, FlagKey> = {
   "#skills": FLAG_KEYS.SECTION_SKILLS,
   "#experience": FLAG_KEYS.SECTION_EXPERIENCE,
@@ -80,9 +64,7 @@ export default async function TerminalPage() {
   const flags: FlagMap = Object.fromEntries(flagRows.map((f) => [f.key, f.enabled]));
   const aboutOff = !flagValue(flags, FLAG_KEYS.SECTION_ABOUT);
 
-  // One reason per nav command the terminal is not currently offering. The flag
-  // is checked before the post count on purpose: with `section.blogs` off,
-  // publishing a post brings nothing back, so the flag is the fix worth naming.
+  // The flag is checked before the post count: with `section.blogs` off, publishing brings nothing back.
   const notOnPage = new Map<string, string>();
   for (const c of TERMINAL_COMMANDS) {
     if (c.kind !== "nav" || !c.target) continue;
@@ -232,8 +214,6 @@ export default async function TerminalPage() {
                             <td>
                               <div className="cmd-sum">{c.summary}</div>
                               <div className="cmd-out">{c.output}</div>
-                              {/* The reason, not just the state: "hidden" alone
-                                  sends an admin to the wrong page half the time. */}
                               {notOnPage.has(c.cmd) ? (
                                 <div className="cmd-out" style={{ color: "var(--ambT)", marginTop: 4 }}>
                                   not offered right now — {notOnPage.get(c.cmd)}

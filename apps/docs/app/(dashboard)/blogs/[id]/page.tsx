@@ -13,9 +13,7 @@ export default async function EditBlogPage({ params }: { params: Promise<{ id: s
       content: blog.content, image: blog.image, imageOrientation: blog.imageOrientation,
       color: blog.color,
       status: blog.status,
-      // Serialised here rather than handed over as a `Date`: the form is a
-      // client component, and an ISO string is the one representation that
-      // survives the boundary unchanged in both directions.
+      // ISO string, not a Date — the form is a client component.
       publishAtIso: blog.publishAt?.toISOString() ?? null,
     }} />
   );

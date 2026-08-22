@@ -125,10 +125,7 @@ model Project {
   title     String
   summary   String
   github    String?
-  /// The live DEMO URL. Not a visibility flag — `status` is. (HeroContent.live
-  /// is a third, unrelated meaning: a nullable "live" sentinel.) Three columns
-  /// in this schema are spelled `live` and none of them mean the same thing,
-  /// which is exactly why the lifecycle column below is not called that.
+  /// The demo URL, not a visibility flag — `status` is.
   live      String?
   logoUrl   String?
   sortOrder Int
@@ -139,9 +136,6 @@ model Project {
   status      ContentStatus   @default(DRAFT)
   publishAt   DateTime?
   publishedAt DateTime?
-  /// Added with the lifecycle, not before it: without an edit timestamp there
-  /// is nothing for the stale detector to compare a project against, so
-  /// projects could not join it.
   updatedAt   DateTime        @updatedAt
 
   @@index([status, publishAt])
@@ -166,21 +160,13 @@ model Blog {
   imageOrientation ImageOrientation @default(LANDSCAPE)
   color            String
   sortOrder        Int
-  /// The date the post claims, and what the article and its OpenGraph card
-  /// print. It predates the lifecycle below and is NOT the same question as
-  /// "is this live" — `status` answers that. Kept because a post's date is
-  /// editorial, and because rewriting it from a status transition would move
-  /// the date on every already-published post.
+  /// The editorial date the article prints, not a visibility flag — `status` is.
   publishedAt      DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
-  /// Superseded by `status`, deliberately still here. Dropping it in the same
-  /// change that stopped reading it would leave no way back if the lifecycle
-  /// turned out to hide something it should not have. Drop it once production
-  /// has run a week on `status` alone.
+  /// Superseded by `status`; kept as the rollback path until it can be dropped.
   show             Boolean          @default(true)
 
   status           ContentStatus  @default(DRAFT)
-  /// When a SCHEDULED post becomes PUBLISHED. UTC, like everything stored here.
   publishAt        DateTime?
 
   @@index([status, publishAt])
@@ -459,37 +445,18 @@ enum AdminRole {
   SUB_ADMIN
 }
 
-/// A named mutex in Postgres, for the work that must happen exactly once —
-/// rolling up a day, running retention — when the only scheduler available is
-/// whichever request happens to arrive first.
-///
-/// `expiresAt` is the whole design. A lock released only by its holder is a
-/// deadlock waiting for the first serverless invocation that dies mid-work and
-/// never reaches its `finally`; an expiry means the next caller steals it
-/// instead of the job stalling forever. Correctness comes from the atomicity of
-/// the conditional update in packages/db/src/lock.ts, not from this row.
+/// A named mutex in Postgres. `expiresAt` lets the next caller steal a lock whose holder died mid-work.
 model JobLock {
   key       String   @id
   lockedAt  DateTime
-  /// Random per acquisition, so release can be guarded on "do I still hold
-  /// this" — a caller whose lock expired and was stolen must not release the
-  /// new holder's.
+  /// Random per acquisition, so release can be guarded on "do I still hold this".
   lockedBy  String
   expiresAt DateTime
 
   @@index([expiresAt])
 }
 
-/// One row per revalidation attempt, successful or not.
-///
-/// The failure this exists to end: the admin's Publish button fired a fetch at
-/// the public app and threw the answer away, so a wrong secret, an unreachable
-/// origin and a genuine flush were the same silent non-event. The site simply
-/// stayed stale and nothing anywhere said so.
-///
-/// `actorId` is deliberately a plain String and NOT a relation. Admin accounts
-/// are hard-deleted; a foreign key would either block the delete or cascade away
-/// exactly the history this table exists to keep.
+/// One row per revalidation attempt. `actorId` is a plain String, not a relation, because admin accounts are hard-deleted.
 model RevalidationLog {
   id         String              @id @default(uuid())
   paths      String[]
@@ -509,9 +476,7 @@ model RevalidationLog {
   @@index([entityType, entityId])
 }
 
-/// Last successful revalidation per tag — the right-hand side of the staleness
-/// comparison. A content row's `updatedAt` newer than its tag's `lastSuccessAt`
-/// means the edit was saved but never reached the public app.
+/// Last successful revalidation per tag; a content row newer than its tag's `lastSuccessAt` never reached the public app.
 model TagState {
   tag              String   @id
   lastSuccessAt    DateTime
@@ -519,10 +484,6 @@ model TagState {
   consecutiveFails Int      @default(0)
 }
 
-/// Which gesture asked for the flush. A Prisma enum rather than the TEXT+CHECK
-/// that AuditEvent.action uses, because this set is closed: it already names
-/// every caller the build introduces, so the ALTER TYPE inside a migration
-/// transaction that TEXT+CHECK was avoiding is not on the table.
 enum RevalidationTrigger {
   MANUAL
   CONTENT_SAVE
@@ -537,24 +498,12 @@ enum RevalidationStatus {
   TIMEOUT
 }
 
-/// Section-level kill switches, flipped from the admin without a deploy.
-///
-/// The KEY is the primary key — no separate id. A flag is referenced from code
-/// by a stable string ("section.blogs"), so a surrogate id would be a second
-/// identity for the same thing and an invitation to end up with two rows
-/// claiming one key.
-///
-/// A missing row is NOT "off". Reads fail open through FLAG_DEFINITIONS in
-/// packages/shared/src/flags.ts: a deleted row, a failed query or a key nobody
-/// has seeded yet all resolve to the definition's default. Fail-closed here
-/// would mean one DB blip blanks the whole portfolio, which is a far worse
-/// outcome than a section that stays visible a little longer than intended.
+/// Section-level kill switches. A missing row is not "off" — reads fail open to the FLAG_DEFINITIONS default.
 model FeatureFlag {
   key         String   @id
   label       String
   description String?
   enabled     Boolean  @default(true)
-  /// Why it was turned off, for the person who finds it off three weeks later.
   note        String?
   updatedById String?
   updatedAt   DateTime @updatedAt
@@ -562,16 +511,7 @@ model FeatureFlag {
 }
 
 
-/// The publishing lifecycle, replacing a boolean that could only say yes or no.
-///
-/// DRAFT is the default, and that direction matters: a row that arrives without
-/// an explicit status — a seed, a bulk import, a future migration — must be
-/// invisible until someone says otherwise. The boolean it replaces defaulted to
-/// `true`, which is the opposite bet.
-///
-/// ARCHIVED is not DRAFT. Both are hidden from visitors, but a draft is on its
-/// way somewhere and an archived post has been retired, and preview shows the
-/// first while deliberately not resurrecting the second.
+/// DRAFT is the default, so a row inserted without an explicit status is invisible.
 enum ContentStatus {
   DRAFT
   SCHEDULED

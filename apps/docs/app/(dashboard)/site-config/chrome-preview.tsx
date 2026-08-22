@@ -9,10 +9,9 @@ import { DIM, FAINT, MONO } from "@/components/preview/frame";
 // here would permanently read zero while the form above is dirty.
 //
 // Mirrors apps/web/app/components/common/Navbar.tsx and Footer.tsx: the five
-// section links (each one only while its section is on the page — its feature
-// flag on, and for Blogs a published post as well), the paw and theme toggles,
-// the breathing ✦ divider, the mono copyright line, and the giant name mark
-// that the footer bleeds off the bottom of the page.
+// section links (Blogs only when a post is published), the paw and theme
+// toggles, the breathing ✦ divider, the mono copyright line, and the giant
+// name mark that the footer bleeds off the bottom of the page.
 
 /** Same keys, same order, as Navbar's `allNavItems`. */
 const NAV_ITEMS = [
@@ -33,14 +32,9 @@ export function ChromePreview({ logo, copyrightName, hasBlogs, sections }: {
   logo: string;
   copyrightName: string;
   hasBlogs: boolean;
-  /** The five section flags, as the database holds them right now. */
   sections: Record<NavSection, boolean>;
 }) {
-  // Navbar.tsx filters its items against a `sections` map the homepage resolves
-  // as `flag && (key !== 'blogs' || posts > 0)`. Same rule, but kept in its two
-  // halves here, because the preview has to name WHICH half dropped a link —
-  // publishing a post cannot bring back a section someone switched off, and a
-  // switch cannot bring back a Blogs list with nothing in it.
+  // Navbar.tsx's rule, kept in its two halves so the preview can name which half dropped a link.
   const items = NAV_ITEMS.filter(i => sections[i.key] && (i.key !== "blogs" || hasBlogs));
   const flaggedOff = NAV_ITEMS.filter(i => !sections[i.key]);
 
@@ -67,9 +61,6 @@ export function ChromePreview({ logo, copyrightName, hasBlogs, sections }: {
         </span>
       </div>
 
-      {/* Two notes, never one. A link can be missing for a reason an admin
-          fixes on Feature flags or for a reason they fix in Blogs, and folding
-          them together would point at the wrong page half the time. */}
       {flaggedOff.length > 0 && (
         <p className="mt-2 text-[9px]" style={{ fontFamily: MONO, color: FAINT }}>
           switched off on feature flags — the {flaggedOff.map(i => i.name).join(", ")}

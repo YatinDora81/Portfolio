@@ -61,17 +61,7 @@ export default async function Home() {
   // First and alone: it resolves the live hero row, and `heroVersion` scopes
   // every hero query below it.
   const siteConfig = await getSiteConfig();
-  // The one input that widens the two content queries below past PUBLISHED, and
-  // it is a signed cookie — never a query parameter, so it cannot be linked to.
-  //
-  // Reading `.isEnabled` does not opt this route out of static generation: only
-  // `draftMode().enable()`/`.disable()` register dynamic usage, and during a
-  // prerender there is no provider at all, so this is `false` at build time and
-  // `/` keeps its 1d static entry. A real preview request carries the bypass
-  // cookie, which skips that cached HTML and re-renders here with it `true`.
-  //
-  // This is also the only reason drafts are safe below: a project detail page
-  // does not exist, so the homepage is where a draft project is previewed.
+  // Reading `.isEnabled` keeps the route static — only `enable()`/`.disable()` register dynamic usage.
   const { isEnabled: isPreview } = await draftMode();
   const [heroData, aboutData, skills, experiences, projects, blogs, quotes, contactData, flags] =
     await Promise.all([
@@ -86,27 +76,17 @@ export default async function Home() {
       getFlags(),
     ]);
 
-  // Resolved once, here, and threaded down as plain booleans. Every consumer —
-  // the section itself, the nav link to it, the hero CTA that jumps to it —
-  // reads the same answer, which is the only way a hidden section and the links
-  // pointing at it can't disagree. A nav item that scrolls to nothing is worse
-  // than either state on its own.
+  // Resolved once and threaded down, so a section and the links pointing at it cannot disagree.
   const show = {
     about: flagValue(flags, FLAG_KEYS.SECTION_ABOUT),
     skills: flagValue(flags, FLAG_KEYS.SECTION_SKILLS),
     experience: flagValue(flags, FLAG_KEYS.SECTION_EXPERIENCE),
     projects: flagValue(flags, FLAG_KEYS.SECTION_PROJECTS),
-    // Two independent reasons to hide it, and both still count: the admin
-    // switched the section off, or there is simply nothing to list.
     blogs: flagValue(flags, FLAG_KEYS.SECTION_BLOGS) && blogs.length > 0,
     contact: flagValue(flags, FLAG_KEYS.SECTION_CONTACT),
   };
 
-  // Deliberately not a member of `show`: nothing is hidden by it and no link
-  // points at it. The contact block, its address and its social links all stay
-  // exactly where they are — only the form inside stops accepting, which is
-  // what the admin's description of this switch promises. The endpoint refuses
-  // on the same flag, and that refusal is the enforcement; this is the courtesy.
+  // Hides only the form, not the section — the POST endpoint re-checks this flag and is the actual enforcement.
   const contactFormEnabled = flagValue(flags, FLAG_KEYS.CONTACT_FORM);
 
   // Company marks for the About terminal, reusing the logos already set on the

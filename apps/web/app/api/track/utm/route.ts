@@ -64,12 +64,7 @@ async function readCapped(request: Request, cap: number): Promise<string | null>
 }
 
 export async function POST(request: Request) {
-  // Ahead of readCapped, so the kill switch also stops us draining a body we
-  // have already decided to throw away. 200, not 503: the caller is a
-  // `keepalive` beacon that nobody awaits, and an error status here would put a
-  // red line in every visitor's console for a setting they cannot see. Same
-  // `{ skipped, reason }` shape the uninteresting hits below already answer
-  // with, so one client branch handles all of them.
+  // 200, not 503: the caller is a fire-and-forget `keepalive` beacon, and an error would log in every visitor's console.
   if (!flagValue(await getFlags(), FLAG_KEYS.ANALYTICS)) {
     return Response.json(
       { skipped: true, reason: "Analytics collection is off" },

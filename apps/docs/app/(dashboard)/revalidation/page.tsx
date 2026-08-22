@@ -8,27 +8,14 @@ import { findStaleContent } from "@/lib/stale";
 import { IconActivity, IconAlertTriangle, IconClockPause, IconGauge, IconChecks } from "@tabler/icons-react";
 import { ManualControls, RecentLog, StaleContent } from "./parts";
 
-// Every number here is a live count of something that just happened. A cached
-// render would show the health summary from *before* the failure it exists to
-// warn about — the one state in which this page is worse than nothing.
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const HEALTH_DAYS = 7;
 const LOG_CAP = 100;
-
-/** Below this, the summary turns red rather than merely reporting a number. */
 const HEALTHY_RATE = 0.95;
 
-/**
- * The DB stores UTC; the only person reading this page reads IST. The formatting
- * happens HERE, on the server, with the zone named explicitly — a
- * `toLocaleString()` inside the client components would use the server's zone
- * during SSR and the browser's on hydration, which is precisely the text
- * mismatch React tears the tree down over. Naming the zone makes both passes
- * emit the same characters, so no "format after mount" dance is needed and
- * nothing flashes.
- */
+// Formatted server-side with the zone named, so SSR and hydration emit the same text.
 const IST = "Asia/Kolkata";
 const stampFmt = new Intl.DateTimeFormat("en-GB", {
   timeZone: IST, day: "2-digit", month: "short", hourCycle: "h23",
@@ -53,9 +40,7 @@ export default async function RevalidationPage() {
     readTagStates(),
   ]);
 
-  // One query over the distinct ids actually present, not a join: `actorId` is a
-  // plain String precisely so hard-deleting an admin cannot take the log with
-  // it, which means some ids here resolve to nobody. Those render as the raw id.
+  // `actorId` is a plain String, not a relation, so some ids resolve to nobody.
   const actorIds = [...new Set(logs.map((l) => l.actorId).filter((id): id is string => id !== null))];
   const admins = actorIds.length > 0
     ? await prisma.adminUser.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
@@ -64,14 +49,10 @@ export default async function RevalidationPage() {
   for (const a of admins) actors[a.id] = a.name;
 
   const stateByTag = new Map(tagStates.map((s) => [s.tag, s]));
-  // The buttons come from ALL_KNOWN_TAGS, never from the TagState rows: a tag
-  // that has never been flushed has no row, and that is exactly the tag whose
-  // button you most need.
+  // Driven by ALL_KNOWN_TAGS, not TagState: a never-flushed tag has no row.
   const tagRows = ALL_KNOWN_TAGS.map((tag) => {
     const s = stateByTag.get(tag);
-    // A tag whose first attempt failed is seeded with the epoch, deliberately,
-    // so the staleness comparison treats it as never fresh. Printing that date
-    // would tell the reader this tag was flushed in 1970; it means "not once".
+    // A failed first attempt seeds the epoch, so > 0 means "succeeded at least once".
     const succeeded = s !== undefined && s.lastSuccessAt.getTime() > 0;
     return {
       tag,

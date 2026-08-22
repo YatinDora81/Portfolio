@@ -24,12 +24,6 @@ async function requireSession() {
 
 type Saved = { ok: boolean; error?: string };
 
-/**
- * Both writers read the lifecycle through `resolveLifecycle`, which refuses a
- * status it does not recognise rather than defaulting to one — the fix for the
- * `show: formData.get("show") === "true"` trap these two lines used to be. The
- * reasoning lives in lib/lifecycle.ts, next to the check itself.
- */
 const readLifecycle = (formData: FormData) =>
   resolveLifecycle(formData.get("status"), formData.get("publishAtIst"));
 
@@ -50,14 +44,9 @@ export async function createBlog(formData: FormData): Promise<Saved> {
       image: formData.get("image") as string,
       imageOrientation: (formData.get("imageOrientation") as "LANDSCAPE" | "PORTRAIT" | "SQUARE") || "LANDSCAPE",
       color: formData.get("color") as string,
-      // `show` is deliberately absent. The column still exists so the lifecycle
-      // can be rolled back, and it keeps its `true` default, but nothing reads
-      // it any more — `status` is the whole answer to "is this live".
+      // `show` is deliberately absent: `status` replaces it, and the column stays only so the lifecycle can be rolled back.
       status: lifecycle.status,
       publishAt: lifecycle.publishAt,
-      // `publishedAt` is not written either. It is the editorial date the
-      // article prints, it predates the lifecycle, and its `now()` default is
-      // already the right answer for something written today.
       sortOrder: count,
     },
   });
@@ -83,9 +72,7 @@ export async function updateBlog(id: string, formData: FormData): Promise<Saved>
       color: formData.get("color") as string,
       status: lifecycle.status,
       publishAt: lifecycle.publishAt,
-      // Neither `show` nor `publishedAt` is touched — see createBlog. Rewriting
-      // `publishedAt` from a status change would move the printed date on every
-      // post that has already been published once.
+      // `publishedAt` is deliberately untouched: it is the printed editorial date, not a lifecycle stamp.
     },
   });
   revalidatePath("/blogs");

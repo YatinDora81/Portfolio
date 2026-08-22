@@ -12,32 +12,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await getSession();
   if (!session) redirect("/login");
 
-  /**
-   * The scheduled-publish tick. There is no cron in this project, so publishing
-   * happens on requests that are already being served — and this layout is the
-   * widest net the admin app has: it wraps every dashboard route, so opening the
-   * inbox or the projects list ticks the queue, not just landing on /dashboard.
-   * Putting it in dashboard/page.tsx instead would mean a post scheduled for
-   * Tuesday waits until someone happens to visit that one page, which is the
-   * page an admin opens least once they know their way around.
-   *
-   * It sits after the session check deliberately: an unauthenticated hit
-   * redirects before this line and buys no database work.
-   *
-   * `after()` so the tick never delays a byte of the page — it runs once the
-   * response is done. The try/catch is not defensive habit: an unhandled throw
-   * inside `after()` takes down the whole invocation, which would turn a dropped
-   * database connection during a publish into a dashboard that will not load at
-   * all. And no `after()` nested inside this one; `maybePublishDue` does its own
-   * work inline.
-   *
-   * Cheap by construction — `maybePublishDue` keeps a module-scope memo and
-   * usually returns without touching the database at all.
-   *
-   * TODO(phase-06): `/api/collect` becomes the primary trigger, fired by public
-   * page views rather than admin visits. This stays as the fallback for a site
-   * with no traffic on the day something is due.
-   */
+  // The scheduled-publish tick. An unhandled throw inside `after()` takes down the
+  // whole invocation, so the try/catch is required, not defensive.
+  // TODO(phase-06): `/api/collect` becomes the primary trigger, fired by public
+  // page views rather than admin visits. This stays as the fallback for a site
+  // with no traffic on the day something is due.
   after(async () => {
     try {
       const published = await maybePublishDue();

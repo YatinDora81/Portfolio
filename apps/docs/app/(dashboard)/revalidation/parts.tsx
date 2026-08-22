@@ -12,7 +12,6 @@ import {
   IconCircleCheck, IconRefresh, IconRefreshDot, IconWorldUpload, IconChecks, IconTimeline,
 } from "@tabler/icons-react";
 
-/** The shape every one of the three server actions answers with. */
 interface ActionResult {
   ok: boolean;
   durationMs: number;
@@ -20,24 +19,12 @@ interface ActionResult {
   error?: string;
 }
 
-/**
- * What a button knows about its last run. The failure arm carries the server's
- * own words and nothing else.
- *
- * Paraphrasing the error — "something went wrong", a toast that fades, a
- * truncated first line — is the exact failure mode this whole phase exists to
- * end: a flush that silently did nothing looked identical to one that worked,
- * so the site served stale pages for as long as nobody happened to check. The
- * text stays on screen, verbatim and selectable, until the next run replaces it.
- */
 type Outcome =
   | { ok: true; durationMs: number }
   | { ok: false; error: string };
 
 function outcomeOf(res: ActionResult): Outcome {
   if (res.ok) return { ok: true, durationMs: res.durationMs };
-  // A failure with no message still owes the reader something falsifiable, so
-  // the status code stands in rather than an empty red box.
   if (res.error) return { ok: false, error: res.error };
   return {
     ok: false,
@@ -58,29 +45,11 @@ function Result({ outcome }: { outcome: Outcome }) {
   return <div className="rv-err">{outcome.error}</div>;
 }
 
-/**
- * Every action here reports its own failures as `{ ok: false }`, so a *rejection*
- * is the transport underneath one: the network gone, or — the case this page
- * will actually meet — an expired session redirecting the action POST to /login,
- * exactly as `staging-provider.tsx` documents around its `publishSite` call.
- *
- * It has to be caught at every call site, because a throw inside a client
- * transition reaches no error boundary: the busy flag would never clear, and
- * since every control is gated on it, one expired session would leave the whole
- * page dead — no spinner, no error, nothing but a reload to get out of. On the
- * one page whose entire purpose is that a flush which did nothing must never
- * look like one that worked, that is the worst available ending.
- */
+// Must be caught at every call site: a throw inside a transition reaches no error boundary.
 function transportError(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "The server could not be reached.";
 }
 
-/**
- * idle → in-flight → result, keyed so a grid of buttons each hold their own
- * outcome. One `useTransition` for all of them; `busy` names which key owns it,
- * which is also what disables the rest — two flushes racing each other produce
- * two log rows nobody can tell apart.
- */
 function useRunner() {
   const [busy, setBusy] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, Outcome>>({});
@@ -94,8 +63,6 @@ function useRunner() {
         setResults((prev) => ({ ...prev, [key]: outcome }));
         if (outcome.ok) onSuccess?.();
       } catch (e) {
-        // Rendered by the same <Result>, in the same slot, as a failure the
-        // action returned: to the reader "it did not flush" is one fact, not two.
         setResults((prev) => ({ ...prev, [key]: { ok: false, error: transportError(e) } }));
       } finally {
         setBusy(null);
@@ -113,21 +80,15 @@ export interface StaleRow {
   type: string;
   slug: string;
   title: string;
-  /** Pre-formatted IST — see the note in page.tsx on why this is not a Date. */
+  /** Pre-formatted IST, not a Date. */
   editedAt: string;
   revalidatedAt: string | null;
 }
 
-/**
- * `revalidateAllStale` reports `ok: false` the moment a single item fails, so
- * "not ok" and "nothing happened" are different states and must render
- * differently. Counts are therefore kept alongside `error` rather than in a
- * mutually exclusive union — a run that flushed nine of ten still flushed nine.
- */
 interface BulkResult {
   attempted: number;
   failed: number;
-  /** Still stale after this run: the batch is capped, so one click rarely finishes the queue. */
+  /** Still stale after this run — the batch is capped. */
   remaining: number;
   error: string | null;
 }
@@ -150,14 +111,9 @@ export function StaleContent({ items }: { items: StaleRow[] }) {
           remaining: res.remaining,
           error: res.error ?? null,
         });
-        // Refreshed on a partial run too: the items that did land have to leave
-        // this list, or the next click retries work that is already done. Only a
-        // top-level error means the list on screen is still accurate.
+        // Refresh on a partial run too; only a top-level error leaves the list accurate.
         if (res.error === undefined) router.refresh();
       } catch (e) {
-        // See `transportError`. Nothing is claimed about what landed, because a
-        // rejection mid-batch genuinely does not know: the counts stay at zero
-        // and the list below is left exactly as it was for the retry.
         setBulk({ attempted: 0, failed: 0, remaining: 0, error: transportError(e) });
       } finally {
         setBulkBusy(false);
@@ -188,8 +144,6 @@ export function StaleContent({ items }: { items: StaleRow[] }) {
           {bulk.error !== null ? (
             <div className="rv-err">{bulk.error}</div>
           ) : bulk.failed > 0 ? (
-            // A partial run carries no per-item message of its own — the log at
-            // the bottom of the page is where each failure's error actually is.
             <div className="rv-err">
               {bulk.failed} of {bulk.attempted} did not land. Each one wrote its own error to the
               log below.
@@ -201,10 +155,6 @@ export function StaleContent({ items }: { items: StaleRow[] }) {
             </div>
           )}
           {bulk.error === null && bulk.remaining > 0 ? (
-            // The run is capped, so a batch that emptied its share ends in the
-            // same green tick as one that emptied the queue. Without this line
-            // the two are indistinguishable and the reader walks away from a
-            // still-stale site believing it is clean.
             <div className="f-hint" style={{ marginTop: 7 }}>
               {bulk.remaining} still to go — run it again.
             </div>
@@ -260,12 +210,12 @@ export function StaleContent({ items }: { items: StaleRow[] }) {
 
 export interface TagRow {
   tag: string;
-  /** Pre-formatted IST, or null when this tag has never been flushed. */
+  /** Pre-formatted IST, or null if never flushed. */
   lastSuccessAt: string | null;
   fails: number;
 }
 
-/** Not a tag — the whole-site flush, kept apart so its key cannot collide with one. */
+// Not a tag — kept distinct so its key cannot collide with one.
 const SITE_KEY = "whole-site";
 
 export function ManualControls({ tags }: { tags: TagRow[] }) {
@@ -331,7 +281,7 @@ export function ManualControls({ tags }: { tags: TagRow[] }) {
 
 export interface LogRow {
   id: string;
-  /** Pre-formatted IST — see the note in page.tsx. */
+  /** Pre-formatted IST, not a Date. */
   at: string;
   trigger: string;
   paths: string[];
@@ -358,11 +308,7 @@ const STATUS_CHIP: Record<string, string> = {
   TIMEOUT: "chip amb",
 };
 
-/**
- * `null` is a flush nothing human asked for — a scheduled publish, a content
- * save by the system. An id that resolves to nobody is an admin deleted since;
- * the raw id is still a true answer and beats crashing the page.
- */
+// null = no human actor; an id that resolves to nobody is an admin deleted since.
 function actorLabel(id: string | null, actors: Record<string, string>): string {
   if (id === null) return "—";
   return actors[id] ?? id;
@@ -371,7 +317,6 @@ function actorLabel(id: string | null, actors: Record<string, string>): string {
 export function RecentLog({ rows, actors, capped }: {
   rows: LogRow[];
   actors: Record<string, string>;
-  /** The query hit its cap, so older attempts exist but are not shown. */
   capped: boolean;
 }) {
   const [filter, setFilter] = useState<StatusFilter>("ALL");
@@ -394,8 +339,6 @@ export function RecentLog({ rows, actors, capped }: {
       <Card flush className="rv-card">
         <CardHead title="Recent attempts" count={rows.length} />
 
-        {/* Chips rather than a dropdown: the failure count is the number you came
-            here for, and a <select> hides it behind a click. */}
         <div className="filters">
           {FILTERS.map((f) => (
             <button

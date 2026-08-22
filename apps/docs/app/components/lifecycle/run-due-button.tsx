@@ -7,15 +7,6 @@ import { runDuePublish } from "@/lib/actions/publishing";
 import { transportError } from "@/lib/lifecycle";
 import { IconRefresh, IconPlayerPlay } from "@tabler/icons-react";
 
-/**
- * Runs the due queue on demand, from the overdue warning that made it relevant.
- *
- * The warning already says a page load would have done this. The button exists
- * because "reload and see" is a worse instruction than a control that reports
- * what happened: it skips the "we checked recently" memo the background trigger
- * respects, and it says how many rows moved instead of leaving the admin to
- * count badges.
- */
 export function RunDueButton() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -37,13 +28,8 @@ export function RunDueButton() {
             ? "Nothing was due. If a row above still says Scheduled, its time has not actually arrived."
             : `Published ${res.published} item${res.published === 1 ? "" : "s"}.`
         );
-        // The banner and every badge on the page are now stale by definition —
-        // this action is the thing that changed them.
         router.refresh();
       } catch (e) {
-        // An expired session redirects the action POST to /login, which arrives
-        // here as a rejection. Without the catch the button would stay disabled
-        // with nothing to explain it.
         setSaid(transportError(e));
       } finally {
         setBusy(false);
