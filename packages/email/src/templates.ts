@@ -16,10 +16,6 @@ const SITE_NAME = "Yatin Dora";
 
 export type RenderedEmail = { subject: string; html: string; text: string };
 
-/**
- * Structural on purpose: a Prisma `ContactMessage` is assignable as-is, and the
- * contact route can also render before the row exists.
- */
 export type NotificationMessage = {
   id?: string | null;
   name: string;
@@ -34,11 +30,6 @@ export type NotificationMessage = {
 
 type Badge = { text: string; fg: string; border: string };
 
-/**
- * Read off the filing line rather than fixed numbers, so retuning `scoreSpam`
- * cannot leave every non-zero score painted red. `high` means at or over the
- * threshold — the score that would have filed this message as spam.
- */
 function spamBadge(score: number): Badge {
   if (score <= 0) return { text: `${score} · clean`, fg: "#4ade80", border: "#14532d" };
   if (score <= SPAM_THRESHOLD / 3) {
@@ -134,7 +125,6 @@ ${button}`,
   return { subject, html, text: `${textLines.filter((l) => l !== null).join("\n")}\n` };
 }
 
-/** `body` is plain text written by the owner — it is escaped, never rendered as markup. */
 export type ReplyInput = { body: string; recipientName?: string | null };
 
 export function renderReplyEmail(input: ReplyInput): { html: string; text: string } {

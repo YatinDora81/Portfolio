@@ -33,8 +33,6 @@ async function getDashboardData() {
   ] = await Promise.all([
     prisma.contactMessage.count({ where: { status: "UNREAD" } }),
     prisma.contactMessage.count(),
-    // Spam and archived rows are excluded: this list links into the Inbox tab,
-    // which does not list them, so anything else here is a dead end.
     prisma.contactMessage.findMany({
       where: { status: { in: ["UNREAD", "READ", "REPLIED"] } },
       orderBy: { createdAt: "desc" },

@@ -105,8 +105,7 @@ export function MessageDetail({ message, replies, templates, defaultSubject, spa
 
   const opened = useRef(false);
 
-  // Mark read on open, including a cold load straight from the notification's
-  // "Open in admin" link. The action itself is guarded on UNREAD.
+  // Marks read on open, including a cold load straight from the notification link.
   useEffect(() => {
     if (message.status !== "UNREAD" || opened.current) return;
     opened.current = true;

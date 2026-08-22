@@ -63,12 +63,7 @@ async function readCapped(request: Request, cap: number): Promise<string | null>
   );
 }
 
-/**
- * Only headers Vercel writes itself. `cf-connecting-ip` is deliberately absent:
- * there is no Cloudflare proxy in front of this deployment, so nothing strips an
- * inbound one and a caller could hand-pick its own rate-limit bucket by rotating
- * it. `x-forwarded-for` is a list, and on Vercel the entry it writes is first.
- */
+// Platform-written headers only: nothing strips an inbound `cf-connecting-ip`, so trusting it would let a caller pick its own rate-limit bucket.
 function clientIp(headers: Headers): string | null {
   const direct = headers.get("x-real-ip")?.trim();
   if (direct) return direct;
@@ -76,11 +71,7 @@ function clientIp(headers: Headers): string | null {
   return first || null;
 }
 
-/**
- * Coarse buckets, because that is all an inbox needs to know and all that can be
- * stored without turning a device into a fingerprint. The order is the whole
- * trick: every Chromium UA also says "Safari", and Edge says both.
- */
+// Order matters: every Chromium UA also says "Safari", and Edge says both.
 function coarseUa(ua: string): { deviceType: string | null; browser: string | null } {
   const s = ua.toLowerCase();
   if (!s) return { deviceType: null, browser: null };
@@ -107,8 +98,6 @@ function coarseUa(ua: string): { deviceType: string | null; browser: string | nu
 }
 
 function countryOf(headers: Headers): string | null {
-  // Only the platform-written header. An inbound cf-* header is attacker-controlled
-  // here for the same reason cf-connecting-ip was: nothing strips it.
   const raw = headers.get("x-vercel-ip-country") ?? "";
   return /^[A-Za-z]{2}$/.test(raw) ? raw.toUpperCase() : null;
 }
@@ -140,16 +129,10 @@ export async function POST(request: Request) {
   const message = str(b.message);
   const purpose = str(b.purpose);
 
-  // Hashed the moment it is read and never held in a variable that outlives this
-  // line: the raw address is not stored, not logged, and not sent anywhere.
+  // Hashed on the next line and never held past it: the raw address is not stored, not logged, not sent anywhere.
   const ip = clientIp(request.headers);
   const ipKey = ip ? sha256(`contact:${ip}`).slice(0, 32) : null;
 
-  // Every request that reaches here spends quota. An oversized or unparseable body
-  // returns earlier and is free —
-  // otherwise garbage is free and only well-formed floods are counted. With no
-  // IP at all there is nothing to count: a shared bucket would spend one
-  // stranger's quota on another and 429 the sixth visitor of the hour.
   const { allowed, count } = ipKey
     ? await checkRateLimit(`contact:${ipKey}`, RATE_LIMIT, RATE_WINDOW_MS)
     : { allowed: true, count: 0 };
@@ -212,11 +195,8 @@ export async function POST(request: Request) {
         email,
         purpose: safePurpose,
         message,
-        // Filed, never refused. A false positive is one click to recover from
-        // the inbox; a rejected lead is gone.
         status: verdict.isSpam ? MessageStatus.SPAM : MessageStatus.UNREAD,
-        // The legacy column still drives the "waiting on a reply" badge, and
-        // nothing in the Spam tab can clear it. Only UNREAD is unread.
+        // The legacy `read` column drives the unread badge, which only UNREAD may light up.
         read: verdict.isSpam,
         spamScore: verdict.score,
         spamReasons: verdict.reasons,
@@ -229,9 +209,6 @@ export async function POST(request: Request) {
     });
 
     if (!verdict.isSpam) {
-      // Outside the response: nobody watching a receipt type should be waiting
-      // on an SMTP handshake. Nothing in here may throw — `after` runs with the
-      // response already sent, so a rejection is a log line and nothing else.
       after(async () => {
         try {
           const to = env.NOTIFY_EMAIL_TO ?? env.SMTP_EMAIL;
@@ -249,8 +226,6 @@ export async function POST(request: Request) {
             spamReasons: verdict.reasons,
           });
 
-          // `replyTo` is the visitor: hitting Reply on the notification has to
-          // reach them, not bounce back into this same inbox.
           const sent = await sendEmail({ to, subject, html, text, replyTo: email });
           if (!sent.ok) {
             logger.error("contact", "notification send failed", {
@@ -259,7 +234,6 @@ export async function POST(request: Request) {
             });
             return;
           }
-          // The thread anchor: a reply from the admin sets In-Reply-To to this.
           if (sent.messageId) {
             await prisma.contactMessage.update({
               where: { id: created.id },
@@ -274,8 +248,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Byte-identical for a flagged message. Telling a bot its submission scored
-    // as spam is handing it the feedback loop it needs to tune past the scorer.
+    // A flagged message gets this same response; anything else is a feedback loop for tuning past the scorer.
     return Response.json({ success: true });
   } catch {
     return Response.json({ error: "Failed to send message" }, { status: 500 });

@@ -10,8 +10,7 @@ import type { ChannelsView, DayPoint, SectionRow } from "@/lib/analytics-read";
 const COLORS = ["var(--ch1)", "var(--ch2)", "var(--ch3)", "var(--ch4)"];
 const colorAt = (i: number) => COLORS[i] ?? "var(--dim)";
 
-/** dataKeys index into the row object, so a channel literally named "day" would
- *  shadow the x-axis key. Keying by position is unique by construction. */
+/** Keyed by position: a channel literally named "day" would shadow the x-axis dataKey. */
 const slot = (i: number) => `s_${i}`;
 
 const AXIS = {
@@ -23,8 +22,6 @@ const AXIS = {
 function ms(value: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${Math.round(value)}ms`;
 }
-
-/* ------------------------------------------------------------------- traffic */
 
 export function TrafficChart({ timeline }: { timeline: DayPoint[] }) {
   const rows = timeline.map((d) => ({
@@ -64,8 +61,7 @@ export function TrafficChart({ timeline }: { timeline: DayPoint[] }) {
           <XAxis dataKey="day" interval="equidistantPreserveStart" minTickGap={14} tickMargin={8} {...AXIS} />
           <YAxis width={38} tickCount={5} allowDecimals={false} {...AXIS} />
           <Tooltip content={Tip} cursor={{ stroke: "var(--tickc)", strokeWidth: 1, strokeDasharray: "3 3" }} />
-          {/* connectNulls stays off: an unsummarized day is a hole in the record and
-              bridging it would draw a straight line where there is no measurement. */}
+          {/* connectNulls off: an unsummarized day is a hole, not a straight line. */}
           <Area
             type="monotone" dataKey="visits" name="visits" connectNulls={false}
             stroke={colorAt(0)} strokeWidth={1.8} strokeLinecap="round"
@@ -92,8 +88,6 @@ export function TrafficLegend() {
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ channels */
 
 export function ChannelChart({ channels }: { channels: ChannelsView }) {
   const rows = channels.labels.map((day, i) => {
@@ -154,12 +148,9 @@ export function ChannelLegend({ channels }: { channels: ChannelsView }) {
   );
 }
 
-/* --------------------------------------------------------------- section bars */
-
 type Metric = "dwell" | "density";
 
-/** Median dwell and attention ratio, as bars in page order. Two measures of different
- *  scale never share an axis, so they are two charts behind one switch, never two y-axes. */
+/** Two scales never share an axis, so these are two charts behind one switch. */
 export function SectionBars({ rows, metric }: { rows: SectionRow[]; metric: Metric }) {
   const data = rows.map((r) => ({
     section: r.label,

@@ -75,8 +75,7 @@ export async function createTrackedLink(input: {
     };
   }
 
-  // 🚨 Never check-then-insert: two saves a millisecond apart would both find the
-  // slug free. The unique index decides, and a loser draws again.
+  // Insert-and-retry rather than check-then-insert: the unique index decides the race.
   for (let attempt = 1; attempt <= SLUG_ATTEMPTS; attempt++) {
     const slug = generateSlug();
     try {

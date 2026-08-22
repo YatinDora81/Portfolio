@@ -236,8 +236,6 @@ export default async function TrackedLinkDetail({ params }: { params: Promise<{ 
             <IconUsers size={11} /> unique today
           </div>
           <div className="stat-v">{todayVisitors.length}</div>
-          {/* 🚨 The salt is redrawn nightly, so the same person is a different hash
-              tomorrow. There is no honest cross-day unique figure to show. */}
           <div className="stat-m">
             <i>today only</i> — not comparable with any other day
           </div>

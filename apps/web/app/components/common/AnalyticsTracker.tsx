@@ -20,8 +20,6 @@ const CAMPAIGN_PARAMS = [
   'ref',
 ];
 
-// Strip the campaign tags whether or not this visit captured them, so a URL
-// copied out of the address bar mid-session cannot carry someone else's source.
 function cleanUrl(url: URL): void {
   let stripped = false;
   for (const key of CAMPAIGN_PARAMS) {
@@ -31,19 +29,12 @@ function cleanUrl(url: URL): void {
     }
   }
   if (!stripped) return;
-  // Deferred to a macrotask: UtmTrackerBeacon reads these same params from
-  // window.location in its own mount effect, and sibling effects all flush
-  // synchronously before the first timeout. Stripping inline raced it and left
-  // the beacon reading a URL this component had already rewritten.
+  // Deferred to a macrotask so sibling mount effects still read the untouched URL.
   const next = `${url.pathname}${url.search}${url.hash}`;
   window.setTimeout(() => window.history.replaceState(null, '', next), 0);
 }
 
-/**
- * Captured once per tab and replayed from sessionStorage on every later send.
- * 🚨 Re-reading `document.referrer` after a client-side navigation returns this
- * site, which would rewrite every visitor's source as an internal referral.
- */
+// Captured once per tab: after a client-side navigation `document.referrer` is this site.
 function loadAttribution(): Attribution {
   const url = new URL(window.location.href);
   const stored = readAttribution();

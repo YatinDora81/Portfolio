@@ -29,9 +29,7 @@ const WHERE: Record<TabKey, Prisma.ContactMessageWhereInput> = {
   spam: { status: "SPAM" },
 };
 
-// A notification email links with only `?id=`, so the tab has to come from the
-// message: defaulting to Inbox opens a replied or archived message beside a
-// list that does not contain it.
+// A notification links with only `?id=`, so the tab has to come from the message's status.
 const STATUS_TAB: Record<MessageStatus, TabKey> = {
   UNREAD: "inbox",
   READ: "inbox",
@@ -92,7 +90,6 @@ export default async function MessagesPage({
   const [grouped, starredCount, rows, selected, templates] = await Promise.all([
     prisma.contactMessage.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.contactMessage.count({ where: { starred: true } }),
-    // The take is the point: this page used to serialise the whole table.
     prisma.contactMessage.findMany({
       where: WHERE[tab],
       orderBy: { createdAt: "desc" },
@@ -134,8 +131,7 @@ export default async function MessagesPage({
 
   const vars = { name: selected?.name ?? "", purpose: selected?.purpose ?? "" };
 
-  // Substituted here rather than in the composer: the browser gets finished
-  // text, and the server re-applies it on send for anything typed by hand.
+  // Substituted server-side; the server re-applies it on send for anything typed by hand.
   const composerTemplates = templates.map((t) => ({
     id: t.id,
     name: t.name,

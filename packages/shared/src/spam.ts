@@ -1,7 +1,7 @@
 export const SPAM_THRESHOLD = 60;
 export const MIN_ELAPSED_MS = 3_000;
 
-// Deliberately below SPAM_THRESHOLD minus the largest other single signal.
+// Low enough that our own defenses failing to run cannot convict on their own.
 export const UNMEASURED_POINTS = 30;
 export const MAX_SUBMISSIONS_PER_HOUR = 3;
 
@@ -55,11 +55,7 @@ const URL_PATTERN = /\b(?:https?:\/\/|www\.)\S+/gi;
 const LATIN_NAME = /^[A-Za-z\s'’.-]+$/;
 const VOWEL = /[aeiouy]/i;
 
-/**
- * `"ok"` verified · `"failed"` Cloudflare actively rejected the token ·
- * `"missing"` the widget is deployed yet nothing was submitted · `"unknown"`
- * Turnstile is off, unreachable, or misconfigured, so there is no signal.
- */
+/** `"missing"`: the widget is deployed yet nothing was submitted. `"unknown"`: no signal at all. */
 export type TurnstileState = "ok" | "failed" | "missing" | "unknown";
 
 export type SpamInput = {
@@ -67,7 +63,7 @@ export type SpamInput = {
   email: string;
   body: string;
   honeypot?: string;
-  /** `null` = the timing token was missing or forged. `"unconfigured"` = no secret, so no signal. */
+  /** `null` = sent but forged or expired; `"unconfigured"` = no secret; `"absent"` = no field sent. */
   elapsedMs: number | null | "unconfigured" | "absent";
   /** `"unknown"` is never held against the sender. */
   turnstile: TurnstileState;
@@ -97,11 +93,6 @@ function isVowelless(name: string): boolean {
   return name.length > 4 && LATIN_NAME.test(name) && !VOWEL.test(name);
 }
 
-/**
- * Scores, never rejects. The caller stores every submission; anything at or over
- * the threshold lands as `SPAM` with no notification and stays fully recoverable
- * from the admin inbox, so a false positive costs a click rather than a lead.
- */
 export function scoreSpam(input: SpamInput): SpamVerdict {
   const reasons: string[] = [];
   let score = 0;
@@ -123,10 +114,7 @@ export function scoreSpam(input: SpamInput): SpamVerdict {
     add(40, "submitted-too-fast");
   }
 
-  // "The widget never answered" and "the token fetch never landed" are the same
-  // fact — a blocker, a proxy or a slow CDN — reported twice. They are capped as
-  // one signal rather than summed, so our own defenses failing to run can never
-  // add up to convicting a visitor who did nothing wrong.
+  // Capped as one signal rather than summed: our own defenses failing to run must not convict a visitor.
   const unmeasured =
     (input.turnstile === "missing" ? 1 : 0) + (input.elapsedMs === "absent" ? 1 : 0);
   if (unmeasured > 0) {

@@ -43,14 +43,9 @@ const bodySchema = z.object({
 
 type Body = z.infer<typeof bodySchema>;
 
-/** Every exit is this. A visitor must never see, or be slowed by, an analytics failure. */
 const noContent = () => new Response(null, { status: 204 });
 
-/**
- * Streams with a hard ceiling rather than trusting `content-length`, which is
- * absent on a chunked request — a caller could otherwise hand `JSON.parse` a body
- * of any size on an endpoint that takes no credentials at all.
- */
+// `content-length` is absent on a chunked request, so the stream itself has to be capped.
 async function readCapped(request: Request, cap: number): Promise<string | null> {
   if (Number(request.headers.get("content-length") ?? 0) > cap) return null;
 
@@ -86,7 +81,6 @@ export async function POST(request: Request) {
 
     const userAgent = request.headers.get("user-agent") ?? "";
     if (isBot(userAgent)) return noContent();
-    // A speculative fetch is the browser guessing, not a visit.
     if (request.headers.get("sec-purpose")?.includes("prefetch")) return noContent();
 
     const raw = await readCapped(request, MAX_BODY_BYTES);
@@ -107,7 +101,6 @@ export async function POST(request: Request) {
     const visitorHash = computeVisitorHash(salt, extractIp(request.headers) ?? "unknown", userAgent);
     const sessionHash = computeSessionHash(visitorHash);
 
-    // Fails open, which is right: a limiter outage must not blind the analytics.
     const { allowed } = await checkRateLimit(`collect:${visitorHash}`, RATE_LIMIT, RATE_WINDOW_MS);
     if (!allowed) return noContent();
 
@@ -142,11 +135,6 @@ export async function POST(request: Request) {
       }),
     ]);
 
-    // Public traffic is the scheduler: the rollup runs here, not only when an admin
-    // opens the dashboard. Retention refuses to prune days nothing has summarised, so
-    // a site with traffic and no admin visits would otherwise grow without bound.
-    // Both calls are idempotent, self-limiting and locked, so concurrent beacons
-    // cost one extra read each rather than duplicated work.
     after(async () => {
       try {
         const published = await maybePublishDue();
@@ -189,11 +177,7 @@ type SessionInput = {
   body: Body;
 };
 
-/**
- * 🚨 Attribution is written here, on creation, and nowhere else. Re-resolving it
- * on an existing session would rewrite every visitor's source to whichever
- * internal page they clicked next, and every campaign would read as direct.
- */
+// Attribution is written once, on creation: re-resolving it would rewrite the source to the last internal click.
 async function getOrCreateSession(input: SessionInput): Promise<{ id: string } | null> {
   const { sessionHash, visitorHash, userAgent, headers, body } = input;
 
@@ -210,10 +194,7 @@ async function getOrCreateSession(input: SessionInput): Promise<{ id: string } |
     utmCampaign: body.utm?.campaign,
     referrer: body.referrer,
     userAgent,
-    // 🚨 `secFetchSite` is deliberately not passed. This is a beacon, not the
-    // navigation: `sec-fetch-site` on *this* request always reads "same-origin",
-    // which would mark every visit an internal nav and collapse `unknown-shared`
-    // into `direct`. Absent, the resolver falls through to the landing-path rung.
+    // No `secFetchSite`: on a beacon it always reads "same-origin", which would collapse every channel to direct.
     landingPath: body.landingPath,
     ownHost: headers.get("host") ?? SITE_URL,
   });
@@ -242,7 +223,6 @@ async function getOrCreateSession(input: SessionInput): Promise<{ id: string } |
       select: { id: true },
     });
   } catch (e) {
-    // Two events of the same visit landing at once: the loser reads the winner's row.
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return prisma.analyticsSession.findUnique({
         where: { sessionHash },

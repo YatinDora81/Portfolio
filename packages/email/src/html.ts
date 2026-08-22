@@ -18,8 +18,6 @@ const ENTITIES: Record<string, string> = {
   "'": "&#39;",
 };
 
-// Every value that reaches email HTML goes through this — name, purpose and the
-// message body are typed by the public, and a mail client renders markup.
 export function escapeHtml(value: string | null | undefined): string {
   if (value === null || value === undefined) return "";
   return value.replace(/[&<>"']/g, (c) => ENTITIES[c] ?? c);
@@ -34,8 +32,6 @@ export function oneLine(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-// An href is the one place a bad value can still execute, so a link is emitted
-// only when the value survives this.
 export function safeUrl(value: string | null | undefined): string | null {
   if (!value) return null;
   try {

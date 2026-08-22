@@ -5,11 +5,7 @@ export interface TemplateVars {
 
 export const TEMPLATE_TOKENS = ["{{name}}", "{{purpose}}"] as const;
 
-/**
- * Substitutes into *text*, never into HTML. The outgoing body is escaped later,
- * by `renderReplyEmail`, and that ordering is what makes a sender-supplied name
- * safe — substituting into rendered HTML would put it past the escape.
- */
+/** Substitutes into text, never HTML: `renderReplyEmail` escapes afterwards. */
 export function applyVars(text: string, vars: TemplateVars): string {
   return text.replace(/\{\{\s*(name|purpose)\s*\}\}/g, (_match, key: string) =>
     key === "name" ? vars.name : vars.purpose

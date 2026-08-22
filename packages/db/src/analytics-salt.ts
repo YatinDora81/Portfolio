@@ -27,11 +27,8 @@ async function readSalt(dateKey: string): Promise<string | null> {
   return row?.salt ?? null;
 }
 
-/**
- * Never log this, never send it to a client, never derive it from the date: IPv4 is
- * ~4 billion addresses, so the salt is the only thing standing between a stored hash
- * and the IP it was made from.
- */
+// Never log it, never send it to a client, and never derive it from the date —
+// a predictable salt makes every hash brute-forceable back to an IP.
 export async function getDailySalt(now = new Date()): Promise<string> {
   const dateKey = toDateKey(now);
 

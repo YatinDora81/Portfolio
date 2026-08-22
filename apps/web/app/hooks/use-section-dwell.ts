@@ -18,9 +18,7 @@ export function useSectionDwell(enabled: boolean): void {
   useEffect(() => {
     if (!enabled || optedOut()) return;
 
-    // 🚨 Observe the `<section>` itself, never a child: these ids carry
-    // content-visibility:auto, and a container skipping its contents suppresses
-    // IntersectionObserver for everything beneath it.
+    // Observe the `<section>` itself: content-visibility:auto suppresses IntersectionObserver for its children.
     const targets: HTMLElement[] = [];
     for (const id of SECTIONS) {
       const el = document.getElementById(id);
@@ -41,8 +39,6 @@ export function useSectionDwell(enabled: boolean): void {
       }
     };
 
-    // Banked time is consumed on send, so the visibility flush and the pagehide
-    // flush cannot report the same milliseconds twice.
     const flush = () => {
       bank();
       const events: CollectEvent[] = [];
@@ -78,8 +74,7 @@ export function useSectionDwell(enabled: boolean): void {
           }
         }
       },
-      // 🚨 A centre band, not a percentage threshold: a section taller than the
-      // viewport never occupies 50% of it and would record zero forever.
+      // A centre band, not a percentage threshold: a section taller than the viewport never hits one.
       { rootMargin: '-40% 0px -40% 0px', threshold: 0 }
     );
 
@@ -93,15 +88,12 @@ export function useSectionDwell(enabled: boolean): void {
         flush();
         return;
       }
-      // Re-observing re-fires only for what is genuinely on screen now. Blindly
-      // restarting the parked timers would resume sections the visitor scrolled
-      // past while the tab was hidden.
+      // Re-observing re-fires only for what is on screen now; restarting the parked timers would not.
       observer.disconnect();
       observeAll();
     };
 
-    // pagehide, not beforeunload: mobile Safari skips beforeunload, which would
-    // lose exactly the visitors most likely to bounce.
+    // pagehide, not beforeunload: mobile Safari skips beforeunload.
     const onPageHide = () => {
       if (flushed.current) return;
       flushed.current = true;

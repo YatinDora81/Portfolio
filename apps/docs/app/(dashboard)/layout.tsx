@@ -14,9 +14,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   // The scheduled-publish tick. An unhandled throw inside `after()` takes down the
   // whole invocation, so the try/catch is required, not defensive.
-  // TODO(phase-06): `/api/collect` becomes the primary trigger, fired by public
-  // page views rather than admin visits. This stays as the fallback for a site
-  // with no traffic on the day something is due.
+  // The fallback: /api/collect is the primary trigger now, so this only matters
+  // on a day with no public traffic at all.
   after(async () => {
     try {
       const published = await maybePublishDue();
@@ -32,8 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   });
 
   const [unread, jar] = await Promise.all([
-    // Drives the Inbox badge in the sidebar. Counts the enum, not the legacy
-    // `read` boolean, so an archived or spam-filed message stops nagging.
+    // Drives the Inbox badge in the sidebar.
     prisma.contactMessage.count({ where: { status: "UNREAD" } }),
     cookies(),
   ]);

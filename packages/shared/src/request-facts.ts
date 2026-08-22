@@ -12,11 +12,7 @@ export type Device = {
   os: string | null;
 };
 
-/**
- * Platform-written headers only. `cf-connecting-ip` is deliberately absent: there is no
- * Cloudflare proxy in front of this deployment, so nothing strips an inbound one and a
- * caller could pick its own visitor hash by rotating it.
- */
+/** Platform-written headers only: no Cloudflare proxy here, so an inbound `cf-connecting-ip` is spoofable. */
 export function extractIp(h: Headers): string | null {
   const direct = h.get("x-real-ip")?.trim();
   if (direct) return direct;
@@ -52,10 +48,8 @@ function decodeCity(raw: string | null): string | null {
 const TABLET_RE = /ipad|tablet|kindle|silk|playbook|android(?!.*mobi)/;
 const MOBILE_RE = /mobi|iphone|ipod|blackberry|windows phone|opera mini/;
 
-/**
- * Families only, never versions or build strings: a full user-agent is close to a
- * fingerprint, "mobile / Safari / iOS" is not. The raw string is read here and stored nowhere.
- */
+/** Families only, never versions: a full user-agent is close to a fingerprint. */
+// Families only, no versions. The raw string is read here and stored nowhere.
 export function parseDevice(ua: string): Device {
   const s = ua.toLowerCase();
 
@@ -92,9 +86,7 @@ function osOf(s: string): string | null {
   return null;
 }
 
-// `bot` is bounded on both sides — trailing so "bots"/"botanical" miss, and past a literal
-// "cu" because CUBOT ships Android handsets and those are people. LinkedInApp, Twitter and
-// Instagram stay out of this list entirely: they are in-app browsers, and attribution needs them.
+// `bot` is bounded on both sides and past a literal "cu" (CUBOT ships handsets); in-app browsers stay out, attribution needs them.
 const BOT_RE = new RegExp(
   [
     "(?<!cu)bot(?![a-z0-9_])",

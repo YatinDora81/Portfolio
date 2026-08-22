@@ -11,11 +11,7 @@ export type DeviceKey = (typeof DEVICES)[number];
 export type Split = "all" | DeviceKey;
 export const SPLITS: readonly Split[] = ["all", ...DEVICES];
 
-/**
- * Page order, and the heights the attention ratio divides by. The heights are
- * approximate and were measured once, on a 1440×900 desktop viewport — they are a
- * denominator for ranking sections against each other, not a layout source of truth.
- */
+/** Page order, plus approximate section heights used as the attention denominator. */
 export const SECTION_CONFIG = [
   { id: "hero", label: "Hero", heightPx: 860 },
   { id: "about", label: "About", heightPx: 1480 },
@@ -26,14 +22,11 @@ export const SECTION_CONFIG = [
   { id: "contact", label: "Contact", heightPx: 1320 },
 ] as const;
 
-/** The dimensions `db/rollup` writes. `dimensionsSeen` prints what is actually in the
- *  table, so a writer that renames one shows up as an unread dimension, not as zeroes. */
 const DIM_TOTAL = "total";
 const DIM_CHANNEL = "channel";
 const DIM_SECTION = "section";
 
-/** Plotted channels. A fifth would have to be a cycled hue or a gray, and gray fails
- *  CVD separation against `--ch4`; the rest are complete in the table instead. */
+/** The ramp runs out here: a fifth channel colour cannot stay CVD-distinct. */
 const CHANNEL_SLOTS = 4;
 
 const TODAY_SESSION_CAP = 20_000;
@@ -225,8 +218,7 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
       where: { type: EventType.PAGEVIEW, createdAt: { gte: todayStart } },
     }),
     prisma.analyticsEvent.findMany({
-      // Bounded to sessions that also started today, so the dwell numerator and the
-      // session denominator below cover exactly the same visits.
+      // Bounded to sessions started today, so numerator and denominator cover the same visits.
       where: {
         type: EventType.SECTION_DWELL,
         createdAt: { gte: todayStart },
@@ -235,12 +227,8 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
       select: { sessionId: true, section: true, durationMs: true },
       take: TODAY_EVENT_CAP,
     }),
-    // 🚨 The device split cannot come from DailyStat: the rollup summarises sections and
-    // devices as separate dimensions, never crossed, so no stored row knows how mobile
-    // read the projects section. These two go to the raw events instead, which means the
-    // split only sees as far back as event retention — said plainly in the UI.
-    // The inner GROUP BY is the same per-visit fold the today branch does in TypeScript
-    // below: one flush is not one visit, so the percentile has to run over summed visits.
+    // DailyStat never crosses section with device, so the split reads raw events instead.
+    // The inner GROUP BY folds flushes into visits before the percentile runs.
     prisma.$queryRaw<RawSection[]>`
       SELECT t.device                                            AS device,
              t.section                                           AS section,
@@ -280,8 +268,6 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
     ]),
   ]);
 
-  /* ------------------------------------------------------- history, from DailyStat */
-
   const inWindow = new Set(dayKeys);
   const overallByDay = new Map<string, { pageviews: number; sessions: number; uniques: number }>();
   const channelByDay = new Map<string, Map<string, number>>();
@@ -304,8 +290,6 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
     }
   }
 
-  /* ------------------------------------------------------------- today, from raw */
-
   const uniquesToday = new Set(todaySessions.map((s) => s.visitorHash)).size;
   const sessionsToday = todaySessions.length;
 
@@ -314,8 +298,7 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
     todayChannels.set(s.channel, (todayChannels.get(s.channel) ?? 0) + 1);
   }
 
-  // One visit's dwell on one section, not one flush of it: the tab-blur flush and the
-  // pagehide flush are two rows describing the same stretch of attention.
+  // Folds flushes into visits: tab-blur and pagehide are two rows for one stretch of attention.
   const perVisit = new Map<string, { section: string; ms: number }>();
   for (const e of todayDwell) {
     if (!e.section) continue;
@@ -331,8 +314,6 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
     if (list) list.push(visit.ms);
     else todayBySection.set(visit.section, [visit.ms]);
   }
-
-  /* ---------------------------------------------------------------- the timeline */
 
   const timeline: DayPoint[] = dayKeys.map((key) => {
     if (key === todayKey) {
@@ -365,8 +346,6 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
     peakUniques = { day: dayLabel(todayKey), uniques: uniquesToday };
   }
 
-  /* ------------------------------------------------------------------- channels */
-
   const channelTotals = new Map<string, number>();
   for (const perDay of channelByDay.values()) {
     for (const [channel, n] of perDay) channelTotals.set(channel, (channelTotals.get(channel) ?? 0) + n);
@@ -396,8 +375,6 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
     hidden: Math.max(0, totals.length - plotted.length),
   };
 
-  /* --------------------------------------------------- sections: all, then devices */
-
   const allRows = SECTION_CONFIG.map((cfg) => {
     let reached = 0;
     let denominator = 0;
@@ -417,8 +394,7 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
         reached += row.reached;
         if (row.medianMs > 0) medians.push({ value: row.medianMs, weight: Math.max(1, row.reached) });
       }
-      // A summarized day with reach but no total row still has a floor: the widest
-      // section reached. Without it the percentage would divide by less than it counts.
+      // A day with reach but no total row still floors the denominator at its widest section.
       const floor = perSection ? Math.max(0, ...[...perSection.values()].map((s) => s.reached)) : 0;
       denominator += Math.max(overallByDay.get(key)?.sessions ?? 0, floor);
     }
@@ -458,8 +434,6 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
 
   const hasSectionData = {} as Record<Split, boolean>;
   for (const split of SPLITS) hasSectionData[split] = sectionRows[split].some((r) => r.reached > 0);
-
-  /* --------------------------------------------------------------- status & rows */
 
   const latestKey = latest._max.date ? toDateKey(latest._max.date) : null;
   const yesterday = new Date(todayStart.getTime() - 86_400_000);

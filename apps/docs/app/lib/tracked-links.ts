@@ -8,11 +8,7 @@ export function shortUrl(slug: string): string {
   return `${SITE}/r/${slug}`;
 }
 
-/**
- * The same link spelled out, for the places a shortener looks like phishing.
- * `ref` is what /api/collect reads, so both forms tie back to the same row —
- * but only the short one passes through /r and increments the click count.
- */
+/** Long form of the same link; only the short /r form increments the click count. */
 export function fullUrl(link: {
   destination: string;
   slug: string;

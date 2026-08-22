@@ -14,7 +14,6 @@ export type SendEmailOptions = {
   subject: string;
   html: string;
   text: string;
-  /** Set this to the sender's address on a notification, so Reply reaches them and not yourself. */
   replyTo?: string;
   inReplyTo?: string;
   references?: string | string[];
@@ -28,15 +27,10 @@ function getTransporter(user: string, pass: string): Transporter<SMTPTransport.S
   return transporter;
 }
 
-// A display name lands inside a quoted header; a quote or newline in one would end it early.
 function headerSafeName(value: string): string {
   return value.replace(/["\\\r\n]/g, "").trim() || DEFAULT_FROM_NAME;
 }
 
-/**
- * Never throws. A dead mailbox must not take down the write that preceded it,
- * so every failure comes back as `{ ok: false, error }` for the caller to record.
- */
 export async function sendEmail(opts: SendEmailOptions): Promise<SendResult> {
   const user = env.SMTP_EMAIL;
   const pass = env.SMTP_PASSWORD;

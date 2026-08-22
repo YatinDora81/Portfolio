@@ -29,14 +29,12 @@ async function requireSession() {
   return session;
 }
 
-// The legacy boolean is a mirror of the enum until it is dropped: everything
-// except UNREAD counts as read.
+// The legacy `read` boolean mirrors the enum until it is dropped.
 const readFor = (status: MessageStatus) => status !== "UNREAD";
 
 export async function markMessageRead(id: string): Promise<MessageResult> {
   await requireSession();
-  // Guarded on UNREAD, and `updateMany` because `update` has no `where` past the
-  // id: opening a REPLIED message must not walk its status backwards to READ.
+  // Guarded on UNREAD via `updateMany`: opening a REPLIED message must not walk it back to READ.
   await prisma.contactMessage.updateMany({
     where: { id, status: "UNREAD" },
     data: { status: "READ", read: true, readAt: new Date() },
@@ -92,9 +90,7 @@ export async function bulkUpdateMessages(input: {
 
   if (action === "inbox") {
     const filed = { id: { in: ids }, status: { in: ["ARCHIVED", "SPAM"] as MessageStatus[] } };
-    // Two passes because `updateMany` carries one `data` for the whole set: a
-    // message answered before it was filed has to come back as REPLIED, or the
-    // Replied tab drops it and it reads as merely read forever after.
+    // Two passes because `updateMany` carries one `data`: an answered message returns as REPLIED.
     const replied = await prisma.contactMessage.updateMany({
       where: { ...filed, repliedAt: { not: null } },
       data: { status: "REPLIED", read: true },
@@ -109,9 +105,7 @@ export async function bulkUpdateMessages(input: {
 
   const next: MessageStatus = action === "archive" ? "ARCHIVED" : action === "spam" ? "SPAM" : "READ";
 
-  // "read" only ever lifts UNREAD. Archive and spam are deliberately allowed to
-  // take a REPLIED row — `repliedAt` is what the restore above reads back, so
-  // filing an answered message away is no longer a one-way door.
+  // "read" only lifts UNREAD; archive and spam may take a REPLIED row, since `repliedAt` survives.
   const where =
     action === "read"
       ? { id: { in: ids }, status: "UNREAD" as MessageStatus }
@@ -143,11 +137,7 @@ const ReplyInput = z.object({
   templateId: z.string().min(1).optional(),
 });
 
-/**
- * Send-only. The visitor's answer arrives in Gmail, not here, so nothing in this
- * app ever reads a thread back — the MessageReply row is the whole local record
- * of what went out, and it is written whether or not the send landed.
- */
+/** Send-only: the MessageReply row is the whole local record, written even when the send fails. */
 export async function sendMessageReply(input: {
   messageId: string;
   subject: string;
@@ -173,8 +163,7 @@ export async function sendMessageReply(input: {
 
   const { html, text } = renderReplyEmail({ body, recipientName: message.name });
 
-  // Threading against the notification, which is the copy sitting in Gmail —
-  // without it the reply starts a second thread beside the message it answers.
+  // Threads onto the notification copy in Gmail; without it the reply starts a second thread.
   const thread = message.notificationMessageId
     ? { inReplyTo: message.notificationMessageId, references: message.notificationMessageId }
     : {};
@@ -196,8 +185,6 @@ export async function sendMessageReply(input: {
     },
   });
 
-  // 🚨 Only a landed send is a reply. Flipping this on a failure is how an inbox
-  // starts lying about which people are still waiting to hear back.
   if (sent.ok) {
     await prisma.contactMessage.update({
       where: { id: message.id },

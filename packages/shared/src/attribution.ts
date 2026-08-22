@@ -14,8 +14,7 @@ export const CHANNELS = [
 
 export type Channel = (typeof CHANNELS)[number];
 
-// The shorteners are load-bearing: without `lnkd.in` and `t.co` every link posted on
-// LinkedIn or X arrives as its own phantom channel.
+// Without `lnkd.in` and `t.co`, every link posted on LinkedIn or X arrives as its own channel.
 const HOST_CHANNELS: Record<string, Channel> = {
   "linkedin.com": "linkedin",
   "m.linkedin.com": "linkedin",
@@ -115,8 +114,7 @@ export function normalizeHost(referrer: string | null | undefined): string | nul
   return host.startsWith("www.") ? host.slice(4) : host;
 }
 
-// Walks the labels so `gist.github.com` and `m.facebook.com` resolve without an entry
-// each, stopping before the bare TLD.
+// Walks the labels so `gist.github.com` resolves without an entry of its own, stopping before the TLD.
 function channelForHost(host: string | null): Channel | null {
   if (!host) return null;
 
@@ -130,8 +128,7 @@ function channelForHost(host: string | null): Channel | null {
   return null;
 }
 
-// The in-app browsers that strip the referrer. Meta has no channel of its own, but
-// "other" is still a truthful referral where "direct" would be a lie.
+// In-app browsers strip the referrer; Meta has no channel of its own, but "other" beats a false "direct".
 function inAppChannel(userAgent: string | null | undefined): Channel | null {
   const ua = userAgent?.trim();
   if (!ua) return null;
@@ -151,11 +148,7 @@ function bounded(value: string | null | undefined): string | null {
   return trimmed || null;
 }
 
-/**
- * First hit wins. The last three rungs are what keep this honest: a cross-site hit whose
- * referrer was stripped, and a shared deep link, are both real referrals that would
- * otherwise pile into "direct" and hide half the traffic.
- */
+/** First match wins; the last rungs catch referrals that would otherwise pile into "direct". */
 export function resolveAttribution(input: AttributionInput): Attribution {
   const raw = {
     rawSource: bounded(input.utmSource),

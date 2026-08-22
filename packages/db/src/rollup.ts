@@ -9,12 +9,10 @@ const TOTAL_KEY = "—";
 const UNKNOWN_KEY = "unknown";
 const OTHER_KEY = "(other)";
 
-/** `path` and `referrer` are keyed on unauthenticated input and DailyStat is never
- *  pruned, so the tail is folded into one row rather than stored key by key. */
+// Keys come from unauthenticated input and DailyStat is never pruned, so the tail folds into one row.
 const KEY_CAP = 200;
 
-/** Rows per INSERT. Nine bound values a row, so ~4500 parameters — well inside what
- *  Postgres accepts, and one round trip instead of five hundred. */
+// Rows per INSERT: nine bound values a row, so ~4500 parameters — inside what Postgres accepts.
 const WRITE_CHUNK = 500;
 
 /** Gone two months, a load summarises five days and renders; the rest converge over the next few. */
@@ -34,8 +32,6 @@ export type StatRow = {
 };
 
 // These column names are the only identifiers ever handed to `Prisma.raw`.
-// `cap` is null where the range is bounded by something other than a visitor: a
-// resolved channel, an ISO country, one of three device types.
 const GROUPED = [
   { dimension: "channel", column: "channel", skipNull: false, cap: null },
   { dimension: "country", column: "country", skipNull: false, cap: null },
@@ -51,9 +47,7 @@ type SectionRow = { key: string | null; median: unknown; avg: unknown; reached: 
 
 const INT4_MAX = 2147483647;
 
-// Clamped because every target column is INTEGER: one visit whose summed dwell
-// outruns int4 made the whole day's insert fail, and a day that can never be
-// summarised pins the retention floor and blocks pruning forever.
+// Clamped because every target column is INTEGER: one dwell sum past int4 fails the whole day's insert.
 function toInt(value: unknown): number {
   if (value === null || value === undefined) return 0;
   const n = Number(value);
@@ -78,8 +72,7 @@ async function computeDay(
   dayStart: Date,
   dayEnd: Date,
 ): Promise<{ rows: StatRow[]; events: number }> {
-  // Cast in SQL rather than trusting a driver to serialise a Date against a
-  // `timestamp(3)` column: the ISO string is UTC wall-clock either way.
+  // Cast in SQL rather than trusting the driver to serialise a Date against `timestamp(3)`.
   const from = dayStart.toISOString();
   const to = dayEnd.toISOString();
 
@@ -112,8 +105,7 @@ async function computeDay(
   for (const { dimension, column, skipNull, cap } of GROUPED) {
     const col = Prisma.raw(`s."${column}"`);
 
-    // Re-aggregating against the top-N list rather than summing a tail keeps
-    // `uniques` a real distinct count in the `(other)` row.
+    // Re-aggregating against the top-N keeps `uniques` a real distinct count in the `(other)` row.
     const top =
       cap === null
         ? Prisma.empty
@@ -189,12 +181,7 @@ async function computeDay(
     rows.push({ ...blank("path", row.key ?? UNKNOWN_KEY), pageviews: toInt(row.pageviews) });
   }
 
-  // 🚨 The median, not the mean. Dwell is heavily right-skewed — one visitor who
-  // left a tab open for an hour moves an average and does not move this.
-  // 🚨 And the median of visits, not of flushes: the client sends one row per flush
-  // and zeroes its banked total, so a tab-hide and the pagehide that follows are two
-  // rows describing one stretch of attention. Summing per session first keeps the
-  // percentile and `reached` in the same unit — both are per visit.
+  // Median, not mean, and per visit, not per flush: the client sends a row per flush, so sum per session first.
   const sections = await prisma.$queryRaw<SectionRow[]>`
     SELECT t."section"                                          AS key,
            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY t.ms)    AS median,
@@ -225,17 +212,10 @@ async function computeDay(
   return { rows, events };
 }
 
-/**
- * 🚨 Every write is an upsert on `@@unique([date, dimension, key])`. A `create`
- * here would double every number each time the re-summarise button was pressed.
- * One statement per chunk, not one per row: 400 upserts is 400 round trips inside
- * one transaction, which runs past Postgres' 5s transaction timeout on a remote
- * database and fails the whole day — on exactly the days worth summarising.
- */
+// Upsert, not create: re-summarising must not double every number. One statement per chunk keeps the transaction inside Postgres' 5s timeout.
 function writes(dayStart: Date, rows: StatRow[]): Prisma.PrismaPromise<number>[] {
-  // Last wins, as the upsert-per-row did: `unknown` from a NULL and a literal
-  // "unknown" would otherwise hit the same conflict target twice in one statement.
-  const unique = new Map(rows.map((row) => [`${row.dimension} ${row.key}`, row]));
+  // Last wins: `unknown` from a NULL and a literal "unknown" would hit the conflict target twice in one statement.
+  const unique = new Map(rows.map((row) => [`${row.dimension}\u0000${row.key}`, row]));
   const deduped = [...unique.values()];
   const date = dayStart.toISOString();
 
@@ -282,9 +262,7 @@ export async function rollupDay(date: Date, triggeredBy: string): Promise<Rollup
   try {
     const { rows, events } = await computeDay(dayStart, dayEnd);
 
-    // Raw events expire at 90 days but summaries never do, so a day whose events
-    // are gone must not be re-summarised down to zeroes. A day that genuinely had
-    // no traffic still gets its zero row, or catch-up would retry it forever.
+    // Events expire but summaries do not, so a day whose events are gone must not be re-summarised to zeroes.
     if (events === 0) {
       const existing = await prisma.dailyStat.findUnique({
         where: { date_dimension_key: { date: dayStart, dimension: "total", key: TOTAL_KEY } },

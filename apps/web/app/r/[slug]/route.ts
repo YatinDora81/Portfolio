@@ -8,11 +8,7 @@ import { isValidSlug, safeDestination } from "@repo/shared/slug";
 
 export const dynamic = "force-dynamic";
 
-/**
- * 🚨 302 and `no-store`, never 301. A permanent redirect is cached by the browser
- * for good, so the second, third and tenth click never reach this server — a link
- * someone opened ten times would show exactly one.
- */
+// 302, never 301: a cached permanent redirect never reaches this server again, so only the first click counts.
 function bounce(target: string, base: string): Response {
   return new Response(null, {
     status: 302,
@@ -34,8 +30,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       where: { slug },
       select: { id: true, destination: true, active: true },
     });
-    // Home, not a 404: the mistyped or retired link is already sitting in
-    // someone's inbox on a submitted application, and it has to land somewhere.
     if (!link || !link.active) return bounce("/", base);
 
     const destination = safeDestination(link.destination);
@@ -50,8 +44,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
 
     const userAgent = request.headers.get("user-agent") ?? "";
     const prefetching = request.headers.get("sec-purpose")?.includes("prefetch") ?? false;
-    // 🚨 Paste a link into LinkedIn or Slack and their unfurlers fetch it at once,
-    // so without this every link shows clicks before a human has seen it.
+    // Slack and LinkedIn unfurlers fetch a pasted link at once, which would count as a click.
     if (!isBot(userAgent) && !prefetching) {
       const facts = readFacts(request.headers, userAgent);
       after(() => recordClick(link.id, facts));
@@ -86,7 +79,6 @@ function readFacts(headers: Headers, userAgent: string): ClickFacts {
   };
 }
 
-/** Never awaited by the redirect: nobody waits on a write to see where they are going. */
 async function recordClick(linkId: string, facts: ClickFacts): Promise<void> {
   try {
     const salt = await getDailySalt();

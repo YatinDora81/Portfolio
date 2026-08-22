@@ -6,22 +6,14 @@ import type { TurnstileState } from "./spam";
 const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const TIMEOUT_MS = 5_000;
 
-// Cloudflare says "not verified" for a bad secret exactly as it does for a bad
-// token. A mistyped secret key is our fault, so those come back "unknown".
+// Cloudflare reports a bad secret exactly as it does a bad token; a mistyped secret is our fault.
 const OUR_FAULT = new Set(["missing-input-secret", "invalid-input-secret", "bad-request"]);
 
-/**
- * `"unknown"` means "we cannot say" — no secret configured, Cloudflare down,
- * slow or answering nonsense. It must never cost a visitor anything: an outage
- * at Cloudflare is not evidence of a bot.
- */
 export async function verifyTurnstile(token: string | null, ip?: string): Promise<TurnstileState> {
   const secret = env.TURNSTILE_SECRET_KEY;
   if (!secret) return "unknown";
 
-  // The widget only renders when the site key is set, and the two keys are
-  // independent. Without one there was never a token to submit, so a missing
-  // token is our deployment gap rather than anything the sender did.
+  // No site key means the widget never rendered, so a missing token is our gap, not the sender's.
   if (!token) return env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? "missing" : "unknown";
 
   try {

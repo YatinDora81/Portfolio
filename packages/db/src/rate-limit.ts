@@ -4,11 +4,7 @@ import { prisma } from "./index";
 
 const DAY_MS = 86_400_000;
 
-/**
- * Fixed-window counter. Every failure path returns `allowed: true` — a limiter
- * that turns a Postgres hiccup into a closed contact form is worse than one
- * that occasionally lets a bot through.
- */
+/** Fixed-window counter. Every failure path returns `allowed: true` rather than closing the form. */
 export async function checkRateLimit(
   key: string,
   limit: number,
@@ -24,9 +20,7 @@ export async function checkRateLimit(
     });
 
     if (bucket.windowAt.getTime() !== windowAt.getTime()) {
-      // Guarded on the *old* windowAt: if a concurrent caller already rolled the
-      // window over, this matches nothing and we increment their fresh count
-      // instead of resetting it back to zero.
+      // Guarded on the *old* windowAt: a concurrent roll-over matches nothing rather than resetting its count.
       await prisma.rateLimitBucket.updateMany({
         where: { key, windowAt: bucket.windowAt },
         data: { count: 0, windowAt },

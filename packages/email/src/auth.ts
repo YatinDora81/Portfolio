@@ -4,7 +4,6 @@ import { sendEmail } from "./send";
 
 const FROM_NAME = "Portfolio Admin";
 
-/** Throws on failure — a caller that reports "check your inbox" must not do so when nothing was sent. */
 async function send(to: string, subject: string, html: string, text: string): Promise<void> {
   const result = await sendEmail({ to, subject, html, text, fromName: FROM_NAME });
   if (!result.ok) throw new Error(result.error ?? "Failed to send email");

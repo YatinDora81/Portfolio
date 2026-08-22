@@ -38,8 +38,7 @@ interface Bound {
 
 let bound: Bound | null = null;
 
-// Lazy, never at module scope: this file is imported by a page that must still
-// render in an environment with no R2 credentials at all.
+// Lazy, never at module scope: a page importing this must still render with no R2 credentials.
 function connect(): Bound | null {
   if (bound) return bound;
 
@@ -72,11 +71,7 @@ function reason(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "R2 refused the request.";
 }
 
-/**
- * With no CDN_BASE_URL this returns a root-relative path, which is what the rest
- * of this database already stores and what `cdnUrl()` resolves against
- * NEXT_PUBLIC_CDN_URL at render. Setting it pins an absolute origin instead.
- */
+// With no CDN_BASE_URL this stays root-relative, which is what `cdnUrl()` resolves at render.
 export function publicUrlFor(key: string): string {
   const base = env.CDN_BASE_URL?.replace(/\/$/, "");
   return base ? `${base}/${key}` : `/${key}`;
@@ -90,11 +85,7 @@ export interface SignedUpload {
   maxBytes: number;
 }
 
-/**
- * A presigned PUT has no content-length-range condition, so `maxBytes` is only
- * the ceiling the caller must already have checked the declared size against —
- * `headObject` is what verifies the size that actually landed.
- */
+// A presigned PUT carries no content-length-range: `maxBytes` is advisory, `headObject` verifies.
 export async function createUploadUrl(
   key: string,
   contentType: string,
@@ -130,7 +121,6 @@ export async function headObject(key: string): Promise<Result<ObjectHead>> {
     );
     return ok({ bytes: res.ContentLength ?? 0, contentType: res.ContentType ?? null });
   } catch (e) {
-    // "The client lied" and "the connection broke" are different problems upstream.
     const name = e instanceof Error ? e.name : "";
     if (name === "NotFound" || name === "NoSuchKey") {
       return err<ObjectHead>("No object exists at that key.", "NOT_FOUND");

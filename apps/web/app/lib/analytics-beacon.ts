@@ -30,8 +30,6 @@ export function readAttribution(): Attribution | null {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== 'object' || parsed === null) return null;
     const candidate = parsed as Partial<Attribution>;
-    // A truncated entry would fail the endpoint's schema and silently drop the
-    // event; re-capturing from the current URL is the better failure.
     if (typeof candidate.landingPath !== 'string') return null;
     return candidate as Attribution;
   } catch {
@@ -48,8 +46,7 @@ export function sendEvents(events: CollectEvent[], attribution: Attribution): vo
     landingPath: attribution.landingPath,
   });
 
-  // 🚨 sendBeacon survives the unload that cancels a plain fetch — without it the
-  // bounced visits, the ones worth measuring most, are the ones that go missing.
+  // sendBeacon survives the unload that cancels a plain fetch.
   try {
     if (
       typeof navigator.sendBeacon === 'function' &&

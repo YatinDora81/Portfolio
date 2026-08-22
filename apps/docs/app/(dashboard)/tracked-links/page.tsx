@@ -100,9 +100,6 @@ export default async function TrackedLinksPage() {
             <IconUsers size={11} /> unique today
           </div>
           <div className="stat-v">{todayVisitors.length}</div>
-          {/* 🚨 Never call this "unique visitors": the hashing salt is dropped and
-              redrawn every night, so the same person tomorrow is a different hash
-              by construction and no figure here can span two days. */}
           <div className="stat-m">
             <i>today only</i> — the salt rotates at midnight, so this cannot be added up across days
           </div>

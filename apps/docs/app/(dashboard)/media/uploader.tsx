@@ -42,16 +42,12 @@ interface Item {
 
 let seq = 0;
 
-// A throw inside an event handler reaches no error boundary, so every await here
-// is wrapped and every failure becomes a line on the row it belongs to.
+// A throw inside an event handler reaches no error boundary, so every await here is wrapped.
 function transportError(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "The server could not be reached.";
 }
 
-/**
- * Natural size and the blur placeholder, both from one decode. Computed here so
- * nothing has to be measured or downsampled at render time.
- */
+/** Natural size and the blur placeholder from one decode, so nothing is measured at render. */
 async function describe(
   file: File,
 ): Promise<{ width: number; height: number; blurDataUrl?: string }> {
@@ -143,8 +139,7 @@ export function Uploader({
         blurDataUrl = shape.blurDataUrl;
         patch(item.uid, shape);
       } catch {
-        // A format this browser cannot decode still uploads; it just arrives
-        // without dimensions or a placeholder.
+        // A format this browser cannot decode still uploads, just without dimensions.
       }
 
       patch(item.uid, { phase: "signing" });
@@ -247,8 +242,7 @@ export function Uploader({
         try {
           await discardUpload({ key: item.key });
         } catch {
-          // The row was never written, so the worst case is bytes nothing points
-          // at — reported by the orphan view, not worth blocking the dismissal.
+          // Worst case is orphaned bytes, which the orphan view reports.
         }
       }
       drop(item.uid);
@@ -371,8 +365,7 @@ function QueueRow({
 
   return (
     <div className={`md-q-row${bad ? " bad" : ""}`}>
-      {/* Decorative — the filename beside it names the file, and the field below
-          is where the real alt text goes. */}
+      {/* Decorative: the filename beside it names the file. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className="md-q-thumb" src={item.preview} alt="" />
 

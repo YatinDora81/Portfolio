@@ -18,14 +18,7 @@ export function signFormTimestamp(ts: number = Date.now()): string | null {
   return `${ts}.${sign(ts, secret)}`;
 }
 
-/**
- * Elapsed ms since signing; `"unconfigured"` when there is no secret;
- * `"absent"` when the caller never sent a field at all; `null` for a token that
- * was sent and is malformed, forged, expired or future-dated. Those are four
- * different facts and the scorer prices them differently — nobody is flagged
- * for the server's own missing config, or for a token fetch their browser
- * blocked. Lines up with `SpamInput["elapsedMs"]`.
- */
+/** Four facts the scorer prices differently: elapsed ms, no secret, nothing sent, or sent and invalid. */
 export function verifyFormTimestamp(
   token: string | null | undefined,
 ): number | null | "unconfigured" | "absent" {

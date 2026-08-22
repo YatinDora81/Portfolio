@@ -192,24 +192,21 @@ model ContactMessage {
   email     String
   purpose   String?
   message   String
-  // Superseded by `status`, kept for rollback. Still the source of the sidebar badge until that moves.
+  // Superseded by `status`, kept for rollback and still driving the sidebar badge.
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 
   status  MessageStatus @default(UNREAD)
   starred Boolean       @default(false)
 
-  // Scored, never rejected: a false positive on a real message is unrecoverable.
   spamScore   Int      @default(0)
   spamReasons String[] @default([])
 
-  // Coarse categories only — the raw IP and full user-agent are deliberately never stored.
   country    String?
   deviceType String?
   browser    String?
   referrer   String?
 
-  // RFC Message-ID of the notification sent to the owner; a reply threads against it.
   notificationMessageId String?
 
   readAt    DateTime?
@@ -236,7 +233,6 @@ model MessageReply {
   sentAt   DateTime @default(now())
 
   outboundMessageId String?
-  // A failed send is recorded rather than thrown away, so "I replied" can never be a guess.
   deliveryOk        Boolean @default(false)
   deliveryError     String?
 
@@ -253,8 +249,7 @@ model ReplyTemplate {
   updatedAt DateTime @updatedAt
 }
 
-/// Fixed-window rate limit. Postgres rather than Redis — there is no Redis here,
-/// and the counter only has to be approximately right.
+/// Fixed-window rate limit, in Postgres because there is no Redis here.
 model RateLimitBucket {
   key      String   @id
   count    Int      @default(0)
@@ -594,8 +589,7 @@ enum ContentStatus {
   ARCHIVED
 }
 
-/// Rotating daily salt for visitor hashing. Old salts are DELETED, which is what
-/// makes yesterday's hashes mathematically unlinkable to today's.
+/// Daily salt for visitor hashing; old salts are deleted, which is what makes old hashes unlinkable.
 model AnalyticsSalt {
   dateKey   String   @id
   salt      String
@@ -607,8 +601,7 @@ model AnalyticsSession {
   sessionHash String @unique
   visitorHash String
 
-  // Attribution is written ONCE, on session creation, and never updated — otherwise
-  // internal clicks dilute every source.
+  // Written once, on session creation, never updated: an internal click must not overwrite the source.
   channel      String
   rawSource    String?
   rawMedium    String?
@@ -617,7 +610,7 @@ model AnalyticsSession {
   landingPath  String
   linkSlug     String?
 
-  // Coarse categories only. The IP and full user-agent are never stored.
+  // Coarse categories only; the IP and full user-agent are never stored.
   country    String?
   region     String?
   city       String?
@@ -636,7 +629,6 @@ model AnalyticsSession {
   @@index([visitorHash, startedAt])
 }
 
-/// Carries no attribution of its own — that lives on the session.
 model AnalyticsEvent {
   id        Int              @id @default(autoincrement())
   sessionId String
@@ -676,8 +668,7 @@ model TrackedLink {
   clickCount  Int       @default(0)
   lastClickAt DateTime?
 
-  // Deactivated, never deleted: a dead link in a submitted application should
-  // redirect home rather than 404.
+  // Deactivated, never deleted: a link already sent out has to keep resolving.
   active      Boolean  @default(true)
   createdById String?
   createdAt   DateTime @default(now())
@@ -719,7 +710,7 @@ model DailyStat {
 
   computedAt DateTime @default(now())
 
-  // This is what makes the re-summarize button safe to press twice.
+  // Every rollup write upserts on this, so re-running a day is idempotent.
   @@unique([date, dimension, key])
   @@index([date])
   @@index([dimension, date])
@@ -756,7 +747,6 @@ model MediaAsset {
   height      Int?
   blurDataUrl String?
 
-  // Non-nullable with no default: the layer no seed script or bulk import can bypass.
   altText String
   folder  String @default("uploads")
 

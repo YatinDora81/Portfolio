@@ -34,8 +34,7 @@ export default async function AnalyticsPage({
 
   const days = parseWindow((await searchParams).days);
 
-  // Public traffic is the scheduler everywhere else; an admin opening this page is the
-  // fallback for a day nobody visited. A rollup failure must not take the page with it.
+  // Opening the page is the fallback scheduler; a rollup failure must not take the page with it.
   let caughtUp = { processed: 0, remaining: 0, error: null as string | null };
   try {
     const res = await catchUpRollups();
@@ -47,8 +46,7 @@ export default async function AnalyticsPage({
 
   const view = await readAnalytics(days);
 
-  // Deliberately only the four analytics tables: RateLimitBucket fills up from the contact
-  // form too, and a non-empty one would hide this banner while analytics is still silent.
+  // Only the analytics tables: RateLimitBucket also fills from the contact form.
   const analyticsTables = new Set(["AnalyticsSession", "AnalyticsEvent", "DailyStat", "RollupRun"]);
   const rowsAnywhere = view.counts.some((c) => analyticsTables.has(c.table) && c.rows > 0);
   const hasTraffic = view.visits > 0 || view.sessions > 0;
@@ -58,8 +56,7 @@ export default async function AnalyticsPage({
   const nextUnsummarized = view.summarizedThroughKey
     ? toDateKey(new Date(new Date(`${view.summarizedThroughKey}T00:00:00.000Z`).getTime() + DAY_MS))
     : view.fromKey;
-  // With nothing collected, the window start is a date the rollup has no reason to visit;
-  // pre-filling it would aim the button at a fortnight of empty days.
+  // With nothing collected, pre-filling the window start would aim at a fortnight of empty days.
   const suggestedFrom =
     !rowsAnywhere || nextUnsummarized > yesterdayKey ? yesterdayKey : nextUnsummarized;
 
@@ -101,7 +98,6 @@ export default async function AnalyticsPage({
         suggestedTo={yesterdayKey}
       />
 
-      {/* ---------------------------------------------------------------- overview */}
 
       <div className="stat-grid">
         <div className="stat">
@@ -157,7 +153,6 @@ export default async function AnalyticsPage({
         )}
       </Card>
 
-      {/* ---------------------------------------------------------------- channels */}
 
       <Card flush className="rv-card">
         <CardHead
@@ -200,7 +195,6 @@ export default async function AnalyticsPage({
         ) : null}
       </Card>
 
-      {/* --------------------------------------------- funnel · dwell · attention */}
 
       <div className="an-note">
         <IconDeviceMobile size={13} stroke={1.6} />
@@ -211,7 +205,6 @@ export default async function AnalyticsPage({
 
       <SectionPanels sections={view.sections} hasData={view.hasSectionData} windowDays={days} />
 
-      {/* ------------------------------------------------------------ rows & runs */}
 
       <Card flush className="rv-card">
         <CardHead title="Raw rows" count={view.counts.length} />

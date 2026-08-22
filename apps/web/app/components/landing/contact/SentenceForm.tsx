@@ -55,14 +55,11 @@ const PH_NAME = 'your name';
 const PH_EMAIL = 'you@company.com';
 const PH_MSG = 'here’s what’s on my mind…';
 
-/** Mirrored from HONEYPOT_FIELD/FORM_TOKEN_FIELD in @repo/shared/spam rather than
-    imported: that module is the scorer, and importing it here would ship the
-    heuristics and the disposable-domain list to every visitor. */
+// Mirrored from @repo/shared/spam, not imported: that module is the scorer, and it would ship to every visitor.
 const HONEYPOT_FIELD = 'company_website';
 const FORM_TOKEN_FIELD = 'form_token';
 
-/** NOT display:none — a bot worth defending against skips fields it can tell are
-    unrendered, and fills the ones that are merely somewhere else. */
+// Off-screen, not display:none — a bot skips fields it can tell are unrendered.
 const HONEYPOT: CSSProperties = { position: 'absolute', left: '-9999px', top: 0 };
 
 const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
@@ -193,8 +190,6 @@ function Composer({
   /** Bumped on a successful send — the fields are cleared through state, so the
       blanks can only be re-measured on the commit after it. */
   const [sends, setSends] = useState(0);
-  /** Fetched per visit rather than rendered into the page: `/` is prerendered
-      for a day, and a token signed at build outlives the verifier's window. */
   const [formToken, setFormToken] = useState<string | null>(null);
 
   const formRef = useRef<HTMLFormElement>(null);
@@ -207,7 +202,6 @@ function Composer({
   const pkRef = useRef<HTMLButtonElement>(null);
   const ackRef = useRef<HTMLSpanElement>(null);
   const typing = useRef<number | null>(null);
-  // Uncontrolled: state would re-render the sentence for a field no human types into.
   const hpRef = useRef<HTMLInputElement>(null);
 
   const refit = useCallback(() => {
@@ -254,8 +248,6 @@ function Composer({
     if (sends) refit();
   }, [sends, refit]);
 
-  // Nothing waits on this: the form is usable from first paint, and a token
-  // that never arrives is simply left out of the payload.
   useEffect(() => {
     const ac = new AbortController();
     (async () => {
@@ -267,15 +259,13 @@ function Composer({
           setFormToken(body.token);
         }
       } catch {
-        // Offline, aborted, or a proxy's error page — the visitor is not charged for it.
+        // No token; the form still submits without one.
       }
     })();
     return () => ac.abort();
   }, []);
 
-  // Loaded on the client and only with a site key, so an unconfigured
-  // deployment never reaches for a third-party script at all. The tag is left
-  // in place on unmount — the widget it rendered would not survive removing it.
+  // No cleanup: removing the tag would take the widget it rendered with it.
   useEffect(() => {
     if (!turnstileSiteKey || document.querySelector(`script[src="${TURNSTILE_SRC}"]`)) return;
     const s = document.createElement('script');
@@ -407,14 +397,12 @@ function Composer({
       email: email.trim(),
       purpose,
       message: message.trim(),
-      // Turnstile's implicit render drops its answer into a hidden input inside
-      // the widget, so it is read off the DOM rather than held in state.
+      // Turnstile's implicit render puts its answer in a hidden input, not in any state we hold.
       turnstileToken:
         formRef.current?.querySelector<HTMLInputElement>('[name="cf-turnstile-response"]')?.value ??
         '',
       [HONEYPOT_FIELD]: hpRef.current?.value ?? '',
-      // Omitted, not empty, when the fetch has not landed — an empty string is a
-      // token the server cannot verify.
+      // Omitted, not empty: an empty string is a token the server cannot verify.
       ...(formToken ? { [FORM_TOKEN_FIELD]: formToken } : {}),
     };
 
@@ -430,9 +418,7 @@ function Composer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      // The server answered, so it may have spent the challenge — on a 400 as
-      // much as on a 200. A Turnstile answer is single-use, and re-posting the
-      // spent one would score the retry as a failed challenge.
+      // A Turnstile answer is single-use, and the server may have spent it on a 400 as much as a 200.
       const widget = formRef.current?.querySelector('.cf-turnstile');
       if (widget) window.turnstile?.reset(widget);
       await settle();
@@ -511,9 +497,6 @@ function Composer({
       <p className="sentence">
         <b>Hey Yatin</b> &mdash; I&rsquo;m{' '}
         <span className="blank" ref={bNameRef}>
-          {/* A real label, hidden rather than absent: the sentence is what a
-              sighted visitor reads as the label, but it is prose, not markup a
-              screen reader or an autofill heuristic can tie to the field. */}
           <label htmlFor={nameId} className="sr-only">
             Your name
           </label>

@@ -79,8 +79,7 @@ export function MediaLibrary({
   const [q, setQ] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [uploadFolder, setUploadFolder] = useState("uploads");
-  // Snapshotted when the audit tab is opened. Without it a row leaves the list
-  // the instant its alt text is saved, so the fix never shows a result.
+  // Snapshotted so a row does not leave the audit list the instant its alt text is saved.
   const [auditIds, setAuditIds] = useState<ReadonlySet<string>>(new Set());
 
   const folders = useMemo(

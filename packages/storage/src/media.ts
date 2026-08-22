@@ -1,11 +1,6 @@
-/**
- * The upload contract, shared by the browser and the server. No `server-only`
- * and no Node imports on purpose: the drop zone pre-validates against these
- * exact rules and the server re-checks against the same ones.
- */
+// Imported by the browser too: no `server-only` and no Node imports here.
 
-// SVG is deliberately absent — it is a document that can carry <script>, and
-// served inline from an image host it runs on that host's origin.
+// SVG is deliberately absent — it can carry <script> and would run on the image host's origin.
 export const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
@@ -16,7 +11,6 @@ export const ALLOWED_IMAGE_TYPES = [
 
 export type AllowedImageType = (typeof ALLOWED_IMAGE_TYPES)[number];
 
-// Derived from the approved type, never from the filename.
 const EXTENSIONS: Record<AllowedImageType, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -37,8 +31,7 @@ export function extensionFor(mimeType: AllowedImageType): string {
   return EXTENSIONS[mimeType];
 }
 
-// NFKD splits an accent off its letter; dropping the mark keeps "señor" one word
-// instead of letting the combining character become a separator.
+// NFKD then dropping marks keeps "señor" one word instead of splitting on the combining character.
 function slug(raw: string, max: number): string {
   return raw
     .normalize("NFKD")
@@ -50,7 +43,6 @@ function slug(raw: string, max: number): string {
     .replace(/-+$/g, "");
 }
 
-/** One lowercase path segment — no slashes and no dots, so no traversal. */
 export function sanitizeFolder(raw: string | undefined): string {
   const cleaned = slug(raw ?? "", 32);
   return cleaned === "" ? DEFAULT_FOLDER : cleaned;
@@ -71,8 +63,7 @@ export function buildStorageKey(
   return `${sanitizeFolder(folder)}/${Date.now()}-${random}-${sanitizeFilename(filename)}.${extensionFor(mimeType)}`;
 }
 
-// A key arriving from the browser is user input; matched against the shape
-// `buildStorageKey` produces, it cannot name an object this server never made.
+// A browser-supplied key must match the shape `buildStorageKey` produces, or it names a foreign object.
 export const STORAGE_KEY_RE =
   /^[a-z0-9][a-z0-9-]{0,31}\/\d{13}-[a-f0-9]{6,32}-[a-z0-9][a-z0-9-]{0,63}\.(?:jpg|png|webp|avif|gif)$/;
 
@@ -90,7 +81,6 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
 }
 
-// Words a screen reader user already knows, because the element is an image.
 const PLACEHOLDER_ALT = new Set([
   "a", "an", "the", "alt", "alt text", "image", "images", "img", "photo", "photos",
   "picture", "pic", "screenshot", "screen shot", "screengrab", "logo", "icon",
@@ -118,7 +108,6 @@ export const ALT_ISSUE_LABEL: Record<AltIssue, string> = {
   short: "very short",
 };
 
-/** A `MediaAsset` row with its date already a string. */
 export interface MediaAssetDto {
   id: string;
   key: string;

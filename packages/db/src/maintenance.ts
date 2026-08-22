@@ -30,8 +30,7 @@ const TASKS: readonly Task[] = [
   { key: "rollup-run-prune", intervalMs: 24 * HOUR_MS, run: pruneRollupRuns },
 ];
 
-// There is no scheduler: these ride a request already being served, inside
-// `after()`, where an unhandled rejection takes down the whole invocation.
+// No scheduler: these ride a served request inside `after()`, where an unhandled rejection kills the invocation.
 export async function runPeriodicMaintenance(now = new Date()): Promise<void> {
   for (const task of TASKS) {
     try {
@@ -47,8 +46,7 @@ export async function runPeriodicMaintenance(now = new Date()): Promise<void> {
   }
 }
 
-// The `lastRunAt` in the WHERE clause is the one just read, so of two concurrent
-// callers exactly one update matches and exactly one task runs.
+// The `lastRunAt` in the WHERE is the one just read, so exactly one of two concurrent callers claims the task.
 async function claim(key: string, intervalMs: number, now: Date): Promise<boolean> {
   const state = await prisma.maintenanceState.findUnique({
     where: { key },
@@ -99,13 +97,7 @@ async function deleteBatched(build: () => Prisma.Sql): Promise<number> {
   return total;
 }
 
-/**
- * The floor retention can never cross: the earliest day no `total` row covers.
- * Catch-up works newest-first, so a fresh row for yesterday says nothing about a gap
- * last month. The newest summarised day is not a second bound — taking the older of
- * the two only pinned the floor a day early on a history with no gaps left.
- * Null when nothing has been summarised at all.
- */
+// The floor retention can never cross: the earliest day no `total` row covers, null if nothing is summarised.
 async function summarisedThrough(now: Date): Promise<Date | null> {
   const anySummary = await prisma.dailyStat.findFirst({
     where: { dimension: "total" },
@@ -133,9 +125,7 @@ async function summarisedThrough(now: Date): Promise<Date | null> {
   return gap ?? utcDayStart(now);
 }
 
-// 🚨 `DailyStat` is never touched: raw events expire, summaries are the permanent
-// history. Events piling up past 90 days is recoverable; a deleted unsummarised
-// day is not, so this waits on the roll-up rather than racing it.
+// `DailyStat` is never touched, and this waits on the roll-up: a deleted unsummarised day is unrecoverable.
 async function pruneAnalytics(now: Date): Promise<string> {
   const floor = await summarisedThrough(now);
   if (!floor) return "skipped: nothing summarised yet";
@@ -156,8 +146,7 @@ async function pruneAnalytics(now: Date): Promise<string> {
     `,
   );
 
-  // The NOT EXISTS is over the whole event table, so this needs the batch cap even
-  // more than the delete above it.
+  // The NOT EXISTS scans the whole event table, so the batch cap matters even more here.
   const sessions = await deleteBatched(
     () => Prisma.sql`
       DELETE FROM "AnalyticsSession"
@@ -192,8 +181,7 @@ async function pruneRevalidationLog(now: Date): Promise<string> {
   return `rows ${deleted}`;
 }
 
-// A day that fails writes a RollupRun row on every attempt, and public traffic
-// retries it, so the error path is the one that grows fastest.
+// A failing day writes a RollupRun row on every retry, so the error path grows fastest.
 async function pruneRollupRuns(now: Date): Promise<string> {
   const cutoff = new Date(now.getTime() - ROLLUP_RUN_RETENTION_DAYS * DAY_MS);
   const { count } = await prisma.rollupRun.deleteMany({ where: { createdAt: { lt: cutoff } } });

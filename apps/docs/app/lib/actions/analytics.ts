@@ -7,9 +7,7 @@ import { eachUtcDay, toDateKey, utcYesterday } from "@repo/shared/dates";
 import { logger } from "@repo/shared/logger";
 import { getSession } from "@/lib/session";
 
-/** A day is a lock, seven raw queries, an upsert transaction and a run log — ~0.4s
- *  against near-empty days. Both bounds exist so the request ends before the platform
- *  ends it, and what is left comes back as a number rather than a truncated write. */
+// Both bounds keep the request inside the platform timeout; the rest comes back as `remaining`.
 const MAX_RANGE_DAYS = 14;
 const BUDGET_MS = 8_000;
 
@@ -23,7 +21,6 @@ export interface ResummarizeDay {
 export interface ResummarizeResult {
   ok: boolean;
   results: ResummarizeDay[];
-  /** Days inside the requested range this run did not reach. Press again. */
   remaining: number;
   error?: string;
 }
@@ -50,8 +47,6 @@ const RangeInput = z
   .object({ from: DAY, to: DAY })
   .refine(({ from, to }) => from <= to, { message: "The range ends before it starts." });
 
-// Catch-up only fills gaps, so a day summarised from bad data is never corrected on
-// its own. Safe to press twice because every write underneath is an upsert.
 export async function resummarize(input: { from: string; to: string }): Promise<ResummarizeResult> {
   const session = await getSession();
   if (!session) return { ok: false, results: [], remaining: 0, error: "Not signed in." };
@@ -66,8 +61,7 @@ export async function resummarize(input: { from: string; to: string }): Promise<
     };
   }
 
-  // Today is still being written to. Summarising it would stamp a partial day that
-  // the automatic catch-up then skips forever.
+  // Clamped to yesterday: today is still being written, and a partial day is never redone.
   const yesterday = utcYesterday();
   const { from } = parsed.data;
   const to = parsed.data.to > yesterday ? yesterday : parsed.data.to;
@@ -80,8 +74,7 @@ export async function resummarize(input: { from: string; to: string }): Promise<
     };
   }
 
-  // Oldest first, so repeated presses walk the newest summarised day forward and the
-  // range the page suggests next starts where this one stopped.
+  // Oldest first, so repeated presses resume where the last one stopped.
   const days = eachUtcDay(from, to);
   const began = Date.now();
 

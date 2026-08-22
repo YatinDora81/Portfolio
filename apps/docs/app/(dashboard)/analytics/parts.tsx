@@ -24,9 +24,7 @@ const PRESET_STYLE: React.CSSProperties = { padding: "5px 10px", fontSize: 12 };
 
 const DAY_MS = 86_400_000;
 
-/** Mirrors `MAX_RANGE_DAYS` in `@/lib/actions/analytics`. It cannot be imported: a
- *  `"use server"` module may only export async functions. The `remaining` the action
- *  returns is the authority; this number only keeps the picker from offering more. */
+/** Mirrors `MAX_RANGE_DAYS`; a `"use server"` module may only export async functions. */
 const MAX_RUN_DAYS = 14;
 
 const dayTime = (key: string) => Date.parse(`${key}T00:00:00.000Z`);
@@ -75,8 +73,6 @@ function Result({ outcome }: { outcome: Outcome }) {
   return <div className="rv-err">{outcome.text}</div>;
 }
 
-/* ----------------------------------------------------------------- 1. status */
-
 export interface StatusProps {
   summarizedThrough: string | null;
   daysBehind: number;
@@ -92,8 +88,7 @@ export interface StatusProps {
 export function SummaryStatus(props: StatusProps) {
   const router = useRouter();
   const [from, setFrom] = useState(props.suggestedFrom);
-  // The suggestion starts at the oldest unsummarized day, so a range wider than one press
-  // is trimmed at the far end: pressing repeatedly then walks forward instead of backwards.
+  // Trimmed at the far end, so repeated presses walk forward rather than backwards.
   const [to, setTo] = useState(() =>
     clampKey(props.suggestedTo, null, shiftDay(props.suggestedFrom, MAX_RUN_DAYS - 1)),
   );
@@ -104,8 +99,7 @@ export function SummaryStatus(props: StatusProps) {
   const behind = props.summarizedThrough === null || props.daysBehind > 0;
   const span = rangeDays(from, to);
 
-  // Each box drags the other along rather than going red: every range the picker can
-  // reach is one the action accepts whole — inside the cap, and never past yesterday.
+  // Each box drags the other rather than going red, so every reachable range is an accepted one.
   const pickFrom = (next: string) => {
     const capped = clampKey(next, null, props.suggestedTo);
     setFrom(capped);
@@ -159,8 +153,7 @@ export function SummaryStatus(props: StatusProps) {
         };
       }
 
-      // Otherwise "run it again" would replay the same days: the boxes are the request,
-      // and the server has no memory of where the last press stopped.
+      // The boxes are the request, so without this "run it again" replays the same days.
       const last = res.results[attempted - 1];
       const resume = res.remaining > 0 && last ? shiftDay(last.date, 1) : null;
       if (resume !== null) setFrom(resume);
@@ -292,8 +285,6 @@ export function SummaryStatus(props: StatusProps) {
   );
 }
 
-/* ----------------------------------------------------------------- 2. window */
-
 export function WindowPicker({ days, options }: { days: number; options: readonly number[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -323,8 +314,6 @@ export function WindowPicker({ days, options }: { days: number; options: readonl
     </div>
   );
 }
-
-/* -------------------------------------------------- 3. funnel, dwell, density */
 
 export interface SectionPanelsProps {
   sections: Record<Split, SectionRow[]>;
@@ -359,22 +348,18 @@ function SplitSwitch({
   );
 }
 
-/** One switch drives the funnel, the dwell chart and the attention ratio together — three
- *  views of the same visits, and three separate toggles could be left disagreeing. */
+/** One switch drives funnel, dwell and attention: three views of the same visits. */
 export function SectionPanels({ sections, hasData, windowDays }: SectionPanelsProps) {
   const [split, setSplit] = useState<Split>("all");
   const rows = sections[split];
-  // Reach and dwell fail apart: a section can be reached by visits that all flushed 0ms,
-  // which is a funnel with a row and a bar chart with nothing to plot.
+  // Reach and dwell fail apart: visits that all flushed 0ms leave the funnel a row and the chart nothing.
   const hasDwell = rows.some((r) => r.medianMs !== null);
   const anyData = SPLIT_ORDER.some((s) => hasData[s]);
   const arrival = rows[rows.length - 1]?.reachPct ?? null;
 
   const switchEl = <SplitSwitch split={split} setSplit={setSplit} hasData={hasData} anyData={anyData} />;
 
-  // The rollup stores sections and devices as separate dimensions and never crosses them,
-  // so a per-device funnel has to be read from the raw events. Saying which source a
-  // number came from is the difference between a caveat and a wrong number.
+  // The rollup never crosses sections with devices, so a per-device funnel comes from raw events.
   const source =
     split === "all" ? (
       <>Completed days from the daily rollup, today from the raw tables.</>
@@ -491,10 +476,7 @@ function Funnel({ rows, split, anyData }: { rows: SectionRow[]; split: Split; an
   );
 }
 
-/* ---------------------------------------------------------- 4. attention table */
-
-/** The chart above ranks; this puts the two inputs next to the ratio, so a surprising
- *  bar can be blamed on the dwell or on the height without leaving the card. */
+/** Puts both inputs beside the ratio, so a surprising bar can be blamed without leaving the card. */
 function AttentionTable({ rows }: { rows: SectionRow[] }) {
   const order = [...rows]
     .filter((r) => r.msPer100px !== null)
