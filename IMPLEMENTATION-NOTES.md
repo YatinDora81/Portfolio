@@ -893,3 +893,75 @@ taken.
 `path`, `country` and `referrer` rows are written daily and read by nothing yet — the
 dashboard surfaces `total`, `channel` and `section`. They are cheap and the data is there
 when a view wants it.
+
+---
+
+## Final acceptance pass
+
+Five suites, ~65 checks from the phase specs' own manual-verification sections, run against
+a production build on the live database. **Zero hard failures.** Gates re-run cold:
+`check-types` 7/7, `lint` 7/7, `build` 2/2, all exit 0.
+
+| Phase | Verdict |
+|---|---|
+| 01 foundations | PARTIAL — lock proven under real contention; crypto/dates exercised transitively |
+| 02 revalidation | PASS |
+| 03 feature flags | PASS |
+| 04 content lifecycle + preview | PASS |
+| 05 inbox / spam / email | PASS |
+| 06 analytics core | PASS |
+| 07 section dwell | PARTIAL — every code property verified, but no real dwell ever measured (needs a browser) |
+| 08 tracked links | PASS |
+| 09 rollup & retention | PASS |
+| 10 media | PARTIAL — everything guarding upload proven; the R2 round-trip has never run (no credentials) |
+
+### The headline results
+
+```
+draft leak      10/10 drafts 404 on page AND api · 0 titles on / · 0 sitemap entries
+                forged __prerender_bypass cookie → still 404
+                all 3 draft OG images byte-identical (md5 7f6a6e87…) — no per-title render
+                a REAL preview session renders the draft and leaves no trace in any public cache
+repeat clicks   5 clicks → clickCount 5 · 302 + no-store · bot click does not increment
+rollup ×4       identical SHA-256 all four runs
+retention       held at all three stages; DailyStat never deleted
+attribution     one session across two events, still linkedin, 2 pageviews
+no PII          no IP, no Mozilla, no AppleWebKit anywhere in a session row
+open redirect   37/37 hostile destinations rejected
+collect         10/10 malformed payloads → 204, never 500
+```
+
+### Fixed after the pass
+
+- **Turning off `analytics.enabled` also stalled scheduled publishing.** The flag gate
+  returned before the `after()` block that runs `maybePublishDue`, `catchUpRollups` and
+  `runPeriodicMaintenance`. With no cron and nobody logged into the admin, a scheduled post
+  could sit past its time indefinitely. The post-response work is now registered before
+  every early return — it rides this route because it is the busiest one, it is not analytics.
+  No suite caught this; each tested one half.
+- **`flushed.current` was never reset**, so a bfcache restore silently lost all later dwell
+  in that tab. Now latched only when the page is really going away, with a `pageshow` reset.
+- The `contact.form` description now says a cached read means one more submission can land
+  after the flip — `revalidateTag` on `unstable_cache` is stale-while-revalidate.
+- Reaped 11 orphaned `next start` processes left holding Neon connections by test agents.
+
+### Known, not fixed
+
+| | |
+|---|---|
+| `unknown-referred` is unreachable in production | `secFetchSite` is deliberately not forwarded to `resolveAttribution` — a beacon always reads same-origin. Correct, but one ladder rung can never fire live. |
+| `SiteConfig.heroVersion` is a dead row that currently lies | It says `v1`; `HeroContent.live` says v2; the site serves v2. Pre-existing, not from this build. |
+| `replyTemplate.findMany` has no `take` | Harmless while the table is empty. |
+| Spam headroom | Blocked defenses + 3 URLs = 55/60. Adding an all-caps name reaches 70. Unreachable until Turnstile is configured, but a trap for that day. |
+| The blog-404 `#blogs` test is non-discriminating | `getBlogs()` returns [] because all 10 posts are DRAFT, so the assertion passes either way. Needs one published post to be meaningful. |
+| `NODE_ENV` undocumented in `.env.example`; 11 documented vars bypass the schema via raw `process.env` | All pre-date this build. |
+
+### Never run — needs a browser or credentials
+
+- The **R2 upload round-trip** and the `/media` UI — no credentials exist. First production
+  upload will be the first-ever execution of presigned PUT → HEAD → upsert.
+- **All interactive dwell** — `IntersectionObserver`, `visibilitychange`, `pagehide`,
+  `sendBeacon` have no headless equivalent. The largest untested surface in the build.
+- **A real email send** — SMTP credentials are live and were deliberately not exercised.
+- The admin **Preview button** (link generation); the receiving half was fully tested.
+- The **mobile nav menu**, which renders links only after a tap.

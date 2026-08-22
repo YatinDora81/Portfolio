@@ -68,7 +68,7 @@ export const FLAG_DEFINITIONS: FlagDefinition[] = [
     key: FLAG_KEYS.CONTACT_FORM,
     label: "Contact form submissions",
     description:
-      "Kill switch for a spam flood. The section stays visible; the form itself stops accepting.",
+      "Kill switch for a spam flood. The section stays visible; the form itself stops accepting. Reads are cached, so one more submission can land after you flip it.",
     defaultEnabled: true,
     group: "System",
   },

@@ -94,18 +94,30 @@ export function useSectionDwell(enabled: boolean): void {
     };
 
     // pagehide, not beforeunload: mobile Safari skips beforeunload.
-    const onPageHide = () => {
+    const onPageHide = (event: PageTransitionEvent) => {
       if (flushed.current) return;
-      flushed.current = true;
+      // Only latch when the page is really going away. A bfcache-persisted page
+      // comes back without remounting, so latching here would silently drop
+      // every later flush in that tab.
+      if (event.persisted !== true) flushed.current = true;
       flush();
+    };
+
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      flushed.current = false;
+      observer.disconnect();
+      observeAll();
     };
 
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('pageshow', onPageShow);
 
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('pageshow', onPageShow);
       observer.disconnect();
       flush();
     };

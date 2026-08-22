@@ -75,8 +75,42 @@ async function readCapped(request: Request, cap: number): Promise<string | null>
   return new TextDecoder().decode(merged);
 }
 
+// Scheduled publishing and retention only ride this route because it is the
+// busiest one; they are not analytics. Registered before every early return, or
+// switching analytics off would also stop publishing posts.
+function schedulePostResponseWork(): void {
+  after(async () => {
+    try {
+      const published = await maybePublishDue();
+      for (const item of published) {
+        const itemTags =
+          item.type === "Blog"
+            ? item.slug
+              ? blogTags(item.slug)
+              : [tags.blogIndex()]
+            : projectTags(item.id);
+        for (const tag of itemTags) revalidateTag(tag, "max");
+      }
+      if (published.length > 0) {
+        logger.info("collect", "published scheduled content", {
+          count: published.length,
+          items: published.map((p) => `${p.type}:${p.id}`),
+        });
+      }
+      // Before maintenance, so retention sees the floor this pass just moved.
+      await catchUpRollups();
+      await runPeriodicMaintenance();
+    } catch (e) {
+      // An unhandled throw in `after` takes down the whole invocation.
+      logger.error("collect", "post-response work failed", { err: String(e) });
+    }
+  });
+}
+
 export async function POST(request: Request) {
   try {
+    schedulePostResponseWork();
+
     if (!flagValue(await getFlags(), FLAG_KEYS.ANALYTICS)) return noContent();
 
     const userAgent = request.headers.get("user-agent") ?? "";
@@ -134,33 +168,6 @@ export async function POST(request: Request) {
         },
       }),
     ]);
-
-    after(async () => {
-      try {
-        const published = await maybePublishDue();
-        for (const item of published) {
-          const itemTags =
-            item.type === "Blog"
-              ? item.slug
-                ? blogTags(item.slug)
-                : [tags.blogIndex()]
-              : projectTags(item.id);
-          for (const tag of itemTags) revalidateTag(tag, "max");
-        }
-        if (published.length > 0) {
-          logger.info("collect", "published scheduled content", {
-            count: published.length,
-            items: published.map((p) => `${p.type}:${p.id}`),
-          });
-        }
-        // Before maintenance, so retention sees the floor this pass just moved.
-        await catchUpRollups();
-        await runPeriodicMaintenance();
-      } catch (e) {
-        // An unhandled throw in `after` takes down the whole invocation.
-        logger.error("collect", "post-response work failed", { err: String(e) });
-      }
-    });
 
     return noContent();
   } catch (e) {
