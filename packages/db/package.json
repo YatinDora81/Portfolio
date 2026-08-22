@@ -6,6 +6,7 @@
     ".": "./src/index.ts",
     "./lock": "./src/lock.ts",
     "./publish-due": "./src/publish-due.ts",
+    "./rate-limit": "./src/rate-limit.ts",
     "./visibility": "./src/visibility.ts"
   },
   "type": "module",

@@ -32,8 +32,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   });
 
   const [unread, jar] = await Promise.all([
-    // Drives the Inbox badge in the sidebar.
-    prisma.contactMessage.count({ where: { read: false } }),
+    // Drives the Inbox badge in the sidebar. Counts the enum, not the legacy
+    // `read` boolean, so an archived or spam-filed message stops nagging.
+    prisma.contactMessage.count({ where: { status: "UNREAD" } }),
     cookies(),
   ]);
 

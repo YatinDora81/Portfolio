@@ -20,6 +20,13 @@ const serverSchema = z.object({
   // Both apps, same value. Must stay a different secret from `JWT_SECRET`, or a
   // 30-minute preview link is a 7-day admin credential.
   PREVIEW_SECRET: z.string().min(32).optional(),
+
+  // Contact form defenses. Each absent means that one defense is off, never that the form breaks.
+  CONTACT_FORM_HMAC_SECRET: z.string().min(32).optional(),
+  TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().min(1).optional(),
+  NOTIFY_EMAIL_TO: z.string().email().optional(),
+  ADMIN_BASE_URL: z.string().url().optional(),
 });
 
 const parsed = serverSchema.safeParse(process.env);

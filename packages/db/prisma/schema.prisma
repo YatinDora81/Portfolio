@@ -192,8 +192,83 @@ model ContactMessage {
   email     String
   purpose   String?
   message   String
+  // Superseded by `status`, kept for rollback. Still the source of the sidebar badge until that moves.
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  status  MessageStatus @default(UNREAD)
+  starred Boolean       @default(false)
+
+  // Scored, never rejected: a false positive on a real message is unrecoverable.
+  spamScore   Int      @default(0)
+  spamReasons String[] @default([])
+
+  // Coarse categories only — the raw IP and full user-agent are deliberately never stored.
+  country    String?
+  deviceType String?
+  browser    String?
+  referrer   String?
+
+  // RFC Message-ID of the notification sent to the owner; a reply threads against it.
+  notificationMessageId String?
+
+  readAt    DateTime?
+  repliedAt DateTime?
+  updatedAt DateTime  @default(now()) @updatedAt
+
+  replies MessageReply[]
+
+  @@index([status, createdAt])
+  @@index([starred, createdAt])
+  @@index([createdAt])
+}
+
+model MessageReply {
+  id        String         @id @default(uuid())
+  messageId String
+  message   ContactMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  subject  String
+  bodyHtml String
+  bodyText String
+
+  sentById String?
+  sentAt   DateTime @default(now())
+
+  outboundMessageId String?
+  // A failed send is recorded rather than thrown away, so "I replied" can never be a guess.
+  deliveryOk        Boolean @default(false)
+  deliveryError     String?
+
+  @@index([messageId, sentAt])
+}
+
+model ReplyTemplate {
+  id        String   @id @default(uuid())
+  name      String
+  subject   String
+  bodyHtml  String
+  useCount  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Fixed-window rate limit. Postgres rather than Redis — there is no Redis here,
+/// and the counter only has to be approximately right.
+model RateLimitBucket {
+  key      String   @id
+  count    Int      @default(0)
+  windowAt DateTime
+
+  @@index([windowAt])
+}
+
+enum MessageStatus {
+  UNREAD
+  READ
+  REPLIED
+  ARCHIVED
+  SPAM
 }
 
 /// Latest snapshot scalars for one GitHub account, feeding the contact section's
@@ -517,4 +592,178 @@ enum ContentStatus {
   SCHEDULED
   PUBLISHED
   ARCHIVED
+}
+
+/// Rotating daily salt for visitor hashing. Old salts are DELETED, which is what
+/// makes yesterday's hashes mathematically unlinkable to today's.
+model AnalyticsSalt {
+  dateKey   String   @id
+  salt      String
+  createdAt DateTime @default(now())
+}
+
+model AnalyticsSession {
+  id          String @id @default(uuid())
+  sessionHash String @unique
+  visitorHash String
+
+  // Attribution is written ONCE, on session creation, and never updated — otherwise
+  // internal clicks dilute every source.
+  channel      String
+  rawSource    String?
+  rawMedium    String?
+  rawCampaign  String?
+  referrerHost String?
+  landingPath  String
+  linkSlug     String?
+
+  // Coarse categories only. The IP and full user-agent are never stored.
+  country    String?
+  region     String?
+  city       String?
+  deviceType String?
+  browser    String?
+  os         String?
+
+  startedAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  pageviews  Int      @default(0)
+
+  events AnalyticsEvent[]
+
+  @@index([startedAt])
+  @@index([channel, startedAt])
+  @@index([visitorHash, startedAt])
+}
+
+/// Carries no attribution of its own — that lives on the session.
+model AnalyticsEvent {
+  id        Int              @id @default(autoincrement())
+  sessionId String
+  session   AnalyticsSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  type       EventType
+  path       String
+  section    String?
+  label      String?
+  durationMs Int?
+  meta       Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([type, createdAt])
+  @@index([sessionId])
+  @@index([section, createdAt])
+}
+
+enum EventType {
+  PAGEVIEW
+  SECTION_DWELL
+  CLICK
+  RESUME_OPEN
+  OUTBOUND
+}
+
+model TrackedLink {
+  id          String  @id @default(uuid())
+  slug        String  @unique
+  label       String
+  channel     String
+  campaign    String?
+  destination String
+  notes       String?
+
+  clickCount  Int       @default(0)
+  lastClickAt DateTime?
+
+  // Deactivated, never deleted: a dead link in a submitted application should
+  // redirect home rather than 404.
+  active      Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clicks LinkClick[]
+
+  @@index([channel, createdAt])
+  @@index([active, createdAt])
+}
+
+model LinkClick {
+  id     Int         @id @default(autoincrement())
+  linkId String
+  link   TrackedLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  visitorHash  String?
+  country      String?
+  deviceType   String?
+  referrerHost String?
+  createdAt    DateTime @default(now())
+
+  @@index([linkId, createdAt])
+  @@index([createdAt])
+}
+
+model DailyStat {
+  id        String   @id @default(uuid())
+  date      DateTime @db.Date
+  dimension String
+  key       String
+
+  pageviews     Int @default(0)
+  uniques       Int @default(0)
+  sessions      Int @default(0)
+  avgDurationMs Int @default(0)
+  medianMs      Int @default(0)
+  reachedCount  Int @default(0)
+
+  computedAt DateTime @default(now())
+
+  // This is what makes the re-summarize button safe to press twice.
+  @@unique([date, dimension, key])
+  @@index([date])
+  @@index([dimension, date])
+}
+
+model RollupRun {
+  id          String   @id @default(uuid())
+  date        DateTime @db.Date
+  status      String
+  rowsWritten Int      @default(0)
+  durationMs  Int      @default(0)
+  error       String?
+  triggeredBy String
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+  @@index([createdAt])
+}
+
+model MaintenanceState {
+  key        String   @id
+  lastRunAt  DateTime
+  lastResult String?
+}
+
+model MediaAsset {
+  id          String  @id @default(uuid())
+  key         String  @unique
+  url         String
+  filename    String
+  mimeType    String
+  bytes       Int
+  width       Int?
+  height      Int?
+  blurDataUrl String?
+
+  // Non-nullable with no default: the layer no seed script or bulk import can bypass.
+  altText String
+  folder  String @default("uploads")
+
+  uploadedById String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([folder, createdAt])
+  @@index([createdAt])
 }

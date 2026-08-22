@@ -40,6 +40,7 @@ interface ContactProps {
   resumeUrl: string;
   github: GithubActivity | null;
   formEnabled: boolean;
+  turnstileSiteKey: string | null;
 }
 
 /** IST wall clock, and whether that hour is a plausible one to get a reply.
@@ -100,6 +101,7 @@ export default function Contact({
   resumeUrl,
   github,
   formEnabled,
+  turnstileSiteKey,
 }: ContactProps) {
   const reduced = useReducedMotion();
   const { time, awake } = useIstClock(!reduced);
@@ -151,6 +153,7 @@ export default function Contact({
               contactEmail={contactEmail}
               note={availabilityDetail || '↪ straight to my inbox · reply < 24h'}
               scope={scope}
+              turnstileSiteKey={turnstileSiteKey}
             />
           </div>
 

@@ -1,220 +1,251 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { MessageStatus } from "db";
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
-import { DeleteButton } from "@/components/shared/delete-button";
-import { markMessageRead, markMessageUnread, deleteMessage } from "@/lib/actions/messages";
+import { transportError } from "@/lib/lifecycle";
+import { bulkUpdateMessages, setMessageStarred, type BulkAction } from "@/lib/actions/messages";
+import { TAB_LABEL, avatarStyle, initials, type TabKey } from "./shared";
 import {
-  IconArrowLeft,
-  IconCornerUpLeft,
-  IconInboxOff,
-  IconMail,
-  IconMailOpened,
+  IconAlertTriangle, IconArchive, IconInbox, IconInboxOff, IconMailOpened,
+  IconShieldCheck, IconStar, IconStarFilled, IconX,
 } from "@tabler/icons-react";
 
-interface Message {
+export interface MessageRow {
   id: string;
   name: string;
   email: string;
   purpose: string | null;
-  message: string;
-  read: boolean;
-  createdAt: string;
+  snippet: string;
+  /** Pre-formatted on the server — a clock read in the browser would not match SSR. */
+  when: string;
+  status: MessageStatus;
+  starred: boolean;
+  spamScore: number;
 }
 
-function timeAgo(dateStr: string) {
-  const now = Date.now();
-  const date = new Date(dateStr).getTime();
-  const diff = now - date;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString();
+const EMPTY: Record<TabKey, { title: string; note: string }> = {
+  inbox: {
+    title: "Nothing waiting",
+    note: "Anything sent through the site’s contact form shows up here.",
+  },
+  starred: {
+    title: "Nothing starred",
+    note: "Star a message and it stays one click away, whatever its status becomes.",
+  },
+  replied: {
+    title: "No replies sent yet",
+    note: "A message moves here once a reply has actually left the mail server.",
+  },
+  archived: {
+    title: "Nothing archived",
+    note: "Archiving keeps a message without keeping it in front of you.",
+  },
+  spam: {
+    title: "No spam",
+    note: "Flagged messages land here rather than being refused, so a false positive is one click from the inbox.",
+  },
+};
+
+const BULK_FOR: Record<TabKey, BulkAction[]> = {
+  inbox: ["read", "archive", "spam"],
+  starred: ["read", "archive", "spam"],
+  replied: ["archive", "spam"],
+  archived: ["inbox", "spam"],
+  spam: ["inbox", "archive"],
+};
+
+const BULK_ICON: Record<BulkAction, typeof IconArchive> = {
+  read: IconMailOpened,
+  archive: IconArchive,
+  spam: IconAlertTriangle,
+  inbox: IconInbox,
+};
+
+function bulkLabel(action: BulkAction, tab: TabKey): string {
+  if (action === "read") return "Mark read";
+  if (action === "archive") return "Archive";
+  if (action === "spam") return "Mark spam";
+  return tab === "spam" ? "Not spam" : "Move to inbox";
 }
 
-/** Two letters for the `.mava` tile — first + last word of the sender's name. */
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-  return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
-}
+export function MessageList({ rows, tab, selectedId }: {
+  rows: MessageRow[];
+  tab: TabKey;
+  selectedId: string | null;
+}) {
+  const router = useRouter();
+  const [picked, setPicked] = useState<string[]>([]);
+  const [stars, setStars] = useState<Record<string, boolean>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [, start] = useTransition();
 
-/**
- * Stable hue per sender so the same person always gets the same avatar colour.
- * `.mava` ships no background of its own — dark mode just desaturates whatever
- * we set here — so the pair is computed rather than pulled from a token.
- */
-function avatarStyle(name: string): React.CSSProperties {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
-  return { background: `hsl(${h} 64% 88%)`, color: `hsl(${h} 58% 27%)` };
-}
+  const isPicked = (id: string) => picked.includes(id);
+  const starOf = (row: MessageRow) => stars[row.id] ?? row.starred;
 
-function replyHref(msg: Message) {
-  return `mailto:${msg.email}?subject=Re: ${msg.purpose ? `[${msg.purpose}] ` : ""}Contact from ${msg.name}`;
-}
+  const toggle = (id: string) =>
+    setPicked((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
 
-export function MessagesList({ messages }: { messages: Message[] }) {
-  const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const allPicked = rows.length > 0 && picked.length === rows.length;
 
-  const unreadCount = messages.filter(m => !m.read).length;
-  const readCount = messages.length - unreadCount;
-
-  const filtered = messages.filter(m => {
-    if (filter === "unread") return !m.read;
-    if (filter === "read") return m.read;
-    return true;
-  });
-
-  const selected = messages.find(m => m.id === selectedId) ?? null;
-
-  const openMessage = async (msg: Message) => {
-    setSelectedId(msg.id);
-    if (!msg.read) await markMessageRead(msg.id);
+  const runBulk = (action: BulkAction) => {
+    setBusy(action);
+    setError(null);
+    start(async () => {
+      try {
+        const res = await bulkUpdateMessages({ ids: picked, action });
+        if (!res.ok) {
+          setError(res.error ?? "Nothing was changed.");
+          return;
+        }
+        setPicked([]);
+        router.refresh();
+      } catch (e) {
+        setError(transportError(e));
+      } finally {
+        setBusy(null);
+      }
+    });
   };
 
-  const filters: { key: typeof filter; label: string; n: number }[] = [
-    { key: "all", label: "All", n: messages.length },
-    { key: "unread", label: "Unread", n: unreadCount },
-    { key: "read", label: "Read", n: readCount },
-  ];
+  const toggleStar = (row: MessageRow) => {
+    const next = !starOf(row);
+    setStars((prev) => ({ ...prev, [row.id]: next }));
+    setBusy(`star:${row.id}`);
+    setError(null);
+    start(async () => {
+      try {
+        const res = await setMessageStarred(row.id, next);
+        if (!res.ok) {
+          setStars((prev) => ({ ...prev, [row.id]: !next }));
+          setError(res.error);
+          return;
+        }
+        router.refresh();
+      } catch (e) {
+        setStars((prev) => ({ ...prev, [row.id]: !next }));
+        setError(transportError(e));
+      } finally {
+        setBusy(null);
+      }
+    });
+  };
+
+  const hrefFor = (id: string) => `/messages?tab=${tab}&id=${encodeURIComponent(id)}`;
 
   return (
-    <div className={cn("inbox", selected && "reading")}>
-      {/* ---------- left: the list ---------- */}
-      <Card flush className="msg-listcard">
-        <div className="filters">
-          {filters.map(f => (
+    <>
+      <div className="msg-bar">
+        {rows.length > 0 ? (
+          <label className="msg-all">
+            <input
+              type="checkbox"
+              checked={allPicked}
+              onChange={() => setPicked(allPicked ? [] : rows.map((r) => r.id))}
+              aria-label={`Select every message shown in ${TAB_LABEL[tab]}`}
+            />
+            {picked.length > 0 ? `${picked.length} selected` : `${rows.length} shown`}
+          </label>
+        ) : (
+          <span className="msg-all">{TAB_LABEL[tab]}</span>
+        )}
+
+        {picked.length > 0 ? (
+          <div className="msg-bulk">
+            {BULK_FOR[tab].map((action) => {
+              const Icon = action === "inbox" && tab === "spam" ? IconShieldCheck : BULK_ICON[action];
+              return (
+                <button
+                  key={action}
+                  type="button"
+                  className="btn"
+                  disabled={busy !== null}
+                  onClick={() => runBulk(action)}
+                >
+                  <Icon size={13} stroke={1.6} /> {bulkLabel(action, tab)}
+                </button>
+              );
+            })}
             <button
-              key={f.key}
               type="button"
-              className={cn("filt", filter === f.key && "on")}
-              onClick={() => setFilter(f.key)}
+              className="ibtn"
+              aria-label="Clear the selection"
+              title="Clear selection"
+              onClick={() => setPicked([])}
             >
-              {f.label} {f.n}
+              <IconX size={14} stroke={1.6} />
             </button>
+          </div>
+        ) : null}
+      </div>
+
+      {error ? <div className="rv-err msg-err">{error}</div> : null}
+
+      {rows.length === 0 ? (
+        <div className="empty">
+          <div className="empty-ic">
+            <IconInboxOff size={18} stroke={1.5} />
+          </div>
+          <b>{EMPTY[tab].title}</b>
+          <span>{EMPTY[tab].note}</span>
+        </div>
+      ) : (
+        <div className="msg-list">
+          {rows.map((row) => (
+            <div
+              key={row.id}
+              className={cn("msg-it", selectedId === row.id && "sel", isPicked(row.id) && "picked")}
+            >
+              <label className="msg-ck">
+                <input
+                  type="checkbox"
+                  checked={isPicked(row.id)}
+                  onChange={() => toggle(row.id)}
+                  aria-label={`Select the message from ${row.name}`}
+                />
+              </label>
+
+              <Link className="msg-open" href={hrefFor(row.id)}>
+                <span className={row.status === "UNREAD" ? "msg-unread" : "msg-read"} />
+                <span className="mava" style={avatarStyle(row.name)}>{initials(row.name)}</span>
+                <span className="msg-main">
+                  <span className="msg-who">
+                    <span className="truncate">{row.name}</span>
+                    <span className="msg-when">{row.when}</span>
+                  </span>
+                  <span className="msg-from">{row.email}</span>
+                  <span className="msg-prev">{row.snippet}</span>
+                  {row.purpose || row.spamScore > 0 ? (
+                    <span className="msg-tags">
+                      {row.purpose ? <span className="msg-pill">{row.purpose}</span> : null}
+                      {row.spamScore > 0 ? (
+                        <span className="chip amb msg-spam">
+                          <IconAlertTriangle size={10} stroke={1.8} /> spam {row.spamScore}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
+                </span>
+              </Link>
+
+              <button
+                type="button"
+                className={cn("ibtn msg-star", starOf(row) && "amber")}
+                disabled={busy === `star:${row.id}`}
+                aria-pressed={starOf(row)}
+                aria-label={starOf(row) ? `Unstar the message from ${row.name}` : `Star the message from ${row.name}`}
+                title={starOf(row) ? "Starred" : "Star"}
+                onClick={() => toggleStar(row)}
+              >
+                {starOf(row) ? <IconStarFilled size={14} /> : <IconStar size={14} stroke={1.6} />}
+              </button>
+            </div>
           ))}
         </div>
-
-        {filtered.length === 0 ? (
-          <div className="empty">
-            <div className="empty-ic">
-              <IconInboxOff size={18} stroke={1.5} />
-            </div>
-            <b>
-              {filter === "unread"
-                ? "No unread messages"
-                : filter === "read"
-                  ? "Nothing read yet"
-                  : "No messages yet"}
-            </b>
-            <span>
-              {filter === "all"
-                ? "Anything sent through the site's contact form shows up here."
-                : "Try the All filter to see the rest of the inbox."}
-            </span>
-          </div>
-        ) : (
-          <div className="msg-list">
-            {filtered.map(msg => (
-              <button
-                key={msg.id}
-                type="button"
-                className={cn("msg-it", selectedId === msg.id && "sel")}
-                onClick={() => openMessage(msg)}
-              >
-                <span className={msg.read ? "msg-read" : "msg-unread"} />
-                <span className="mava" style={avatarStyle(msg.name)}>
-                  {initials(msg.name)}
-                </span>
-                <span className="flex-1 min-w-0 block">
-                  <span className="msg-who">
-                    <span className="truncate">{msg.name}</span>
-                    <span className="msg-when">{timeAgo(msg.createdAt)}</span>
-                  </span>
-                  <span className="msg-prev">{msg.message}</span>
-                  {msg.purpose && <span className="msg-pill block">{msg.purpose}</span>}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* ---------- right: the reading pane ---------- */}
-      <Card flush className="msg-panecard">
-        {selected ? (
-          <>
-            <div className="card-h">
-              <button
-                type="button"
-                className="ibtn"
-                onClick={() => setSelectedId(null)}
-                aria-label="Back to the message list"
-                title="Back to list"
-              >
-                <IconArrowLeft size={15} stroke={1.5} />
-              </button>
-              <span className="mava" style={avatarStyle(selected.name)}>
-                {initials(selected.name)}
-              </span>
-              <div className="min-w-0">
-                <div className="card-t truncate">{selected.name}</div>
-                <div className="card-n truncate">
-                  {selected.email} · {new Date(selected.createdAt).toLocaleString()}
-                </div>
-              </div>
-              <div className="sp" />
-              {selected.purpose && <span className="chip">{selected.purpose}</span>}
-              <a className="btn pri" href={replyHref(selected)}>
-                <IconCornerUpLeft size={13} stroke={1.5} /> Reply
-              </a>
-              <button
-                type="button"
-                className="ibtn"
-                title="Mark unread"
-                aria-label="Mark unread"
-                onClick={async () => {
-                  await markMessageUnread(selected.id);
-                  setSelectedId(null);
-                }}
-              >
-                <IconMail size={15} stroke={1.5} />
-              </button>
-              <DeleteButton
-                label={`message from "${selected.name}"`}
-                sub="This deletes the message permanently. There's no undo here."
-                onDelete={async () => {
-                  await deleteMessage(selected.id);
-                  setSelectedId(null);
-                }}
-              />
-            </div>
-            <div className="card-b">
-              <div className="msg-body">{selected.message}</div>
-            </div>
-          </>
-        ) : (
-          <div className="empty">
-            <div className="empty-ic">
-              <IconMailOpened size={18} stroke={1.5} />
-            </div>
-            <b>{messages.length === 0 ? "Inbox zero" : "Nothing open"}</b>
-            <span>
-              {messages.length === 0
-                ? "No one has written in yet. New contact-form messages land here."
-                : "Pick a message on the left to read it in full and reply."}
-            </span>
-          </div>
-        )}
-      </Card>
-    </div>
+      )}
+    </>
   );
 }

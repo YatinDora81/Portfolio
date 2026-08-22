@@ -1,18 +1,52 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
-  "globalEnv": ["DATABASE_URL", "REVALIDATE_SECRET", "JWT_SECRET", "PREVIEW_SECRET", "SMTP_EMAIL", "SMTP_PASSWORD", "PORTFOLIO_URL", "NODE_ENV", "GOOGLE_SHEET_ID", "GOOGLE_SHEET_TAB", "GOOGLE_CLIENT_EMAIL", "GOOGLE_PRIVATE_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "TRACKING_ENABLED", "ANALYZE", "NEXT_PUBLIC_SITE_URL"],
+  "globalEnv": [
+    "DATABASE_URL",
+    "REVALIDATE_SECRET",
+    "JWT_SECRET",
+    "PREVIEW_SECRET",
+    "SMTP_EMAIL",
+    "SMTP_PASSWORD",
+    "PORTFOLIO_URL",
+    "NODE_ENV",
+    "GOOGLE_SHEET_ID",
+    "GOOGLE_SHEET_TAB",
+    "GOOGLE_CLIENT_EMAIL",
+    "GOOGLE_PRIVATE_KEY",
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "TRACKING_ENABLED",
+    "ANALYZE",
+    "NEXT_PUBLIC_SITE_URL",
+    "CONTACT_FORM_HMAC_SECRET",
+    "TURNSTILE_SECRET_KEY",
+    "NOTIFY_EMAIL_TO",
+    "ADMIN_BASE_URL"
+  ],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*"
+      ],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**"
+      ]
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": [
+        "^lint"
+      ]
     },
     "check-types": {
-      "dependsOn": ["^check-types"]
+      "dependsOn": [
+        "^check-types"
+      ]
     },
     "dev": {
       "cache": false,

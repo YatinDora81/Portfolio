@@ -14,6 +14,7 @@
   "dependencies": {
     "@microsoft/clarity": "^1.0.2",
     "@repo/config": "*",
+    "@repo/email": "*",
     "@repo/shared": "*",
     "@repo/ui": "*",
     "@tabler/icons-react": "^3.40.0",

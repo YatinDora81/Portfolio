@@ -2446,3 +2446,121 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 /* The footnote that belongs to the status block above it, not to the field
    below — it closes `.lc-field`'s own bottom gap rather than adding a second. */
 .lc-after-field { margin-top: -10px; margin-bottom: 18px }
+
+/* ---------- inbox: tabs, bulk bar, reading pane, composer ----------
+   The list row stopped being one button when it grew a checkbox and a star, so
+   `.msg-it` hands its padding to the `<a>` inside it and the two controls sit
+   outside the link rather than nested in it. */
+.msg-tabs { border: 1px solid var(--line2); border-radius: var(--r3); background: var(--card); margin-bottom: 14px }
+.msg-tabs .filt { display: inline-flex; align-items: center; gap: 6px; text-decoration: none }
+.msg-tabs .filt b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--dim) }
+.msg-tabs .filt.on b { color: var(--accT) }
+/* An empty tab stays visible and clickable: "no spam" is an answer. */
+.msg-tabs .filt.msg-tab-0 b { color: var(--faint) }
+
+.msg-bar {
+  display: flex; align-items: center; gap: 8px; min-height: 42px;
+  padding: 7px 12px; border-bottom: 1px solid var(--line2)
+}
+.msg-all {
+  display: flex; align-items: center; gap: 8px; font-family: var(--mono);
+  font-size: 10px; letter-spacing: .06em; color: var(--faint); text-transform: uppercase
+}
+.msg-bulk { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap }
+.msg-bulk .btn { font-size: 11.5px; padding: 4px 9px }
+.msg-ck input, .msg-all input { accent-color: var(--c1); width: 14px; height: 14px; cursor: pointer }
+
+.msg-err { margin: 10px 12px 0 }
+
+.msg-it { padding: 0; align-items: flex-start; gap: 0 }
+.msg-it.picked { background: var(--accS) }
+.msg-ck { display: flex; align-items: center; padding: 14px 4px 0 12px; align-self: flex-start }
+.msg-open { display: flex; gap: 10px; flex: 1; min-width: 0; padding: 12px 4px 12px 6px }
+.msg-main { flex: 1; min-width: 0 }
+.msg-from { display: block; font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 2px }
+.msg-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px }
+.msg-tags .msg-pill { margin-top: 0 }
+.msg-spam { display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; padding: 1px 7px }
+.msg-star { align-self: flex-start; margin: 9px 8px 0 0 }
+.msg-more {
+  display: block; padding: 11px; text-align: center; border-top: 1px solid var(--line2);
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; color: var(--faint)
+}
+.msg-more:hover { color: var(--accT); background: var(--bg1) }
+
+/* Both columns scroll inside themselves, so the page keeps one scrollbar and the
+   tab strip stays put while a long thread is read. */
+.msg-listcard, .msg-panecard { display: flex; flex-direction: column; max-height: calc(100dvh - 262px) }
+.msg-list { max-height: none; flex: 1 }
+.msg-head { flex: none }
+.msg-pane { flex: 1; overflow-y: auto }
+
+.msg-spam-panel {
+  padding: 11px 13px; margin-bottom: 14px; border-radius: var(--r2);
+  border: 1px solid color-mix(in srgb, var(--amber) 32%, transparent);
+  border-left: 3px solid var(--amber); background: var(--amber-soft)
+}
+.msg-spam-panel.bad {
+  border-color: color-mix(in srgb, var(--bad) 32%, transparent);
+  border-left-color: var(--bad); background: var(--bad-soft)
+}
+.msg-spam-panel b {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: 12.5px; font-weight: 600; color: var(--ambT)
+}
+.msg-spam-panel.bad b { color: var(--bad) }
+.msg-spam-th { font-weight: 400; font-size: 11.5px; color: var(--dim) }
+.msg-reasons { margin: 7px 0 0; padding-left: 17px; font-size: 12px; line-height: 1.7; color: var(--dim) }
+.msg-reasons li::marker { color: var(--faint) }
+.msg-reasons-none { margin: 6px 0 0; font-size: 12px; color: var(--faint) }
+
+.msg-meta {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 14px;
+  padding: 12px 13px; margin-bottom: 14px; border: 1px solid var(--line2);
+  border-radius: var(--r2); background: var(--bg1)
+}
+.msg-meta-it { min-width: 0 }
+.msg-meta-k {
+  display: flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 9px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--faint)
+}
+.msg-meta-v { display: block; font-size: 12px; color: var(--dim); margin-top: 3px; overflow-wrap: anywhere }
+
+.msg-composer { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line2) }
+.msg-composer-h {
+  display: flex; align-items: center; gap: 7px; margin-bottom: 12px;
+  font-family: var(--disp); font-weight: 600; font-size: 13px; color: var(--ink)
+}
+.msg-composer-h .sp, .msg-reply-h .sp { flex: 1 }
+.msg-thread { font-family: var(--mono); font-size: 9.5px; font-weight: 400; color: var(--faint); text-align: right }
+.msg-send { display: flex; align-items: center; gap: 12px; flex-wrap: wrap }
+
+.msg-history { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line2) }
+.msg-history-h {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--faint); margin-bottom: 10px
+}
+.msg-reply { padding: 11px 13px; border: 1px solid var(--line2); border-radius: var(--r2); background: var(--bg1) }
+.msg-reply + .msg-reply { margin-top: 8px }
+/* A failed send is kept and shown, not swept up — it is the only record that a
+   reply was attempted at all. */
+.msg-reply.failed { border-left: 3px solid var(--bad); background: var(--bad-soft) }
+.msg-reply-h { display: flex; align-items: center; gap: 8px; font-size: 12.5px }
+.msg-reply-at { font-family: var(--mono); font-size: 9.5px; color: var(--faint); flex: none }
+.msg-reply-b { white-space: pre-wrap; font-size: 12.5px; line-height: 1.65; color: var(--dim); margin-top: 8px }
+.msg-reply .msg-err { margin: 8px 0 0 }
+
+.msg-tpl-card { margin-top: 14px }
+.msg-tpl-blurb { padding: 12px 16px 0; font-size: 12px; line-height: 1.65; color: var(--faint); max-width: 82ch }
+.msg-tpl-err { margin: 10px 16px 0 }
+.msg-tpl-form { padding: 14px 16px 4px; border-bottom: 1px solid var(--line2) }
+.msg-tpl-row { align-items: flex-start }
+.msg-tpl-body {
+  white-space: pre-wrap; font-size: 12px; line-height: 1.6; color: var(--faint);
+  margin-top: 6px; max-height: 66px; overflow: hidden
+}
+.msg-tpl-meta { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 7px }
+
+@media (max-width: 1080px) {
+  .msg-listcard, .msg-panecard { max-height: none }
+}

@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@repo/config": "*",
+    "@repo/email": "*",
     "@repo/shared": "*",
     "@repo/ui": "*",
     "@supabase/supabase-js": "^2.106.2",

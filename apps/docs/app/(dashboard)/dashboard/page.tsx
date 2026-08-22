@@ -31,9 +31,15 @@ async function getDashboardData() {
     heroTitles, aboutParagraphs, quotes, contactPurposes, socialLinks,
     utm,
   ] = await Promise.all([
-    prisma.contactMessage.count({ where: { read: false } }),
+    prisma.contactMessage.count({ where: { status: "UNREAD" } }),
     prisma.contactMessage.count(),
-    prisma.contactMessage.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
+    // Spam and archived rows are excluded: this list links into the Inbox tab,
+    // which does not list them, so anything else here is a dead end.
+    prisma.contactMessage.findMany({
+      where: { status: { in: ["UNREAD", "READ", "REPLIED"] } },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
     prisma.blog.count({ where: { show: true } }),
     prisma.blog.count(),
     prisma.project.count(),
@@ -174,7 +180,7 @@ export default async function DashboardPage() {
             ) : (
               <div className="rows">
                 {d.recentMessages.map((m, i) => (
-                  <Link key={m.id} href="/messages" className="row">
+                  <Link key={m.id} href={`/messages?id=${encodeURIComponent(m.id)}`} className="row">
                     <div className="row-i">{String(i + 1).padStart(2, "0")}</div>
                     <div className="row-main">
                       <div className="row-t">{m.name}</div>
@@ -183,7 +189,7 @@ export default async function DashboardPage() {
                       </div>
                     </div>
                     <div className="row-acts" style={{ gap: 8 }}>
-                      {!m.read ? <Badge variant="warning" dot>new</Badge> : null}
+                      {m.status === "UNREAD" ? <Badge variant="warning" dot>new</Badge> : null}
                       <span className="msg-when">{ago(m.createdAt)}</span>
                     </div>
                   </Link>

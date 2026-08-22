@@ -29,6 +29,7 @@ import {
 } from './lib/data';
 import { getFlags } from './lib/flags';
 import { FLAG_KEYS, flagValue } from '@repo/shared/flags';
+import { env } from '@repo/config/env';
 import { githubHandle, readGithubActivity } from './lib/github';
 import { SITE_URL, SITE_NAME, absoluteUrl } from './lib/site';
 
@@ -227,6 +228,7 @@ export default async function Home() {
                 resumeUrl={siteConfig.resumeUrl}
                 github={github}
                 formEnabled={contactFormEnabled}
+                turnstileSiteKey={env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? null}
               />
             )}
           </main>

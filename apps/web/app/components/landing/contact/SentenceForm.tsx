@@ -16,6 +16,7 @@ import {
   useId,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
   type RefObject,
 } from 'react';
@@ -29,6 +30,7 @@ interface ComposerProps {
   /** The line beside the button — the CMS's availability detail when it has one. */
   note: string;
   scope: RefObject<ScopeHandle | null>;
+  turnstileSiteKey: string | null;
 }
 
 interface SentenceFormProps extends ComposerProps {
@@ -52,6 +54,24 @@ const NEAR = 900;
 const PH_NAME = 'your name';
 const PH_EMAIL = 'you@company.com';
 const PH_MSG = 'here’s what’s on my mind…';
+
+/** Mirrored from HONEYPOT_FIELD/FORM_TOKEN_FIELD in @repo/shared/spam rather than
+    imported: that module is the scorer, and importing it here would ship the
+    heuristics and the disposable-domain list to every visitor. */
+const HONEYPOT_FIELD = 'company_website';
+const FORM_TOKEN_FIELD = 'form_token';
+
+/** NOT display:none — a bot worth defending against skips fields it can tell are
+    unrendered, and fills the ones that are merely somewhere else. */
+const HONEYPOT: CSSProperties = { position: 'absolute', left: '-9999px', top: 0 };
+
+const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+
+declare global {
+  interface Window {
+    turnstile?: { reset: (container?: Element) => void };
+  }
+}
 
 /** The receipt cannot start typing while the scope is still throwing the message
     out — chaos runs to 0.32s and the flatline to 0.55s. A fetch that resolves
@@ -137,10 +157,21 @@ export default function SentenceForm({ enabled, ...props }: SentenceFormProps) {
   return <Composer {...props} />;
 }
 
-function Composer({ purposes, contactEmail, note, scope }: ComposerProps) {
+function Composer({
+  purposes,
+  contactEmail,
+  note,
+  scope,
+  turnstileSiteKey,
+}: ComposerProps) {
   const reduced = useReducedMotion();
   const railId = useId();
   const capId = useId();
+  const uid = useId();
+  const nameId = `${uid}-name`;
+  const emailId = `${uid}-email`;
+  const msgId = `${uid}-message`;
+  const hpId = `${uid}-website`;
 
   // Matched against the CMS rather than hardcoded, so a renamed row cannot post
   // a label the server will refuse to match. The sentence has no grammatical
@@ -162,6 +193,9 @@ function Composer({ purposes, contactEmail, note, scope }: ComposerProps) {
   /** Bumped on a successful send — the fields are cleared through state, so the
       blanks can only be re-measured on the commit after it. */
   const [sends, setSends] = useState(0);
+  /** Fetched per visit rather than rendered into the page: `/` is prerendered
+      for a day, and a token signed at build outlives the verifier's window. */
+  const [formToken, setFormToken] = useState<string | null>(null);
 
   const formRef = useRef<HTMLFormElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -173,6 +207,8 @@ function Composer({ purposes, contactEmail, note, scope }: ComposerProps) {
   const pkRef = useRef<HTMLButtonElement>(null);
   const ackRef = useRef<HTMLSpanElement>(null);
   const typing = useRef<number | null>(null);
+  // Uncontrolled: state would re-render the sentence for a field no human types into.
+  const hpRef = useRef<HTMLInputElement>(null);
 
   const refit = useCallback(() => {
     fitBlank(bNameRef.current);
@@ -217,6 +253,37 @@ function Composer({ purposes, contactEmail, note, scope }: ComposerProps) {
   useEffect(() => {
     if (sends) refit();
   }, [sends, refit]);
+
+  // Nothing waits on this: the form is usable from first paint, and a token
+  // that never arrives is simply left out of the payload.
+  useEffect(() => {
+    const ac = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch('/api/contact/token', { signal: ac.signal });
+        if (!res.ok) return;
+        const body: unknown = await res.json();
+        if (body && typeof body === 'object' && 'token' in body && typeof body.token === 'string') {
+          setFormToken(body.token);
+        }
+      } catch {
+        // Offline, aborted, or a proxy's error page — the visitor is not charged for it.
+      }
+    })();
+    return () => ac.abort();
+  }, []);
+
+  // Loaded on the client and only with a site key, so an unconfigured
+  // deployment never reaches for a third-party script at all. The tag is left
+  // in place on unmount — the widget it rendered would not survive removing it.
+  useEffect(() => {
+    if (!turnstileSiteKey || document.querySelector(`script[src="${TURNSTILE_SRC}"]`)) return;
+    const s = document.createElement('script');
+    s.src = TURNSTILE_SRC;
+    s.async = true;
+    s.defer = true;
+    document.head.appendChild(s);
+  }, [turnstileSiteKey]);
 
   useEffect(
     () => () => {
@@ -340,6 +407,15 @@ function Composer({ purposes, contactEmail, note, scope }: ComposerProps) {
       email: email.trim(),
       purpose,
       message: message.trim(),
+      // Turnstile's implicit render drops its answer into a hidden input inside
+      // the widget, so it is read off the DOM rather than held in state.
+      turnstileToken:
+        formRef.current?.querySelector<HTMLInputElement>('[name="cf-turnstile-response"]')?.value ??
+        '',
+      [HONEYPOT_FIELD]: hpRef.current?.value ?? '',
+      // Omitted, not empty, when the fetch has not landed — an empty string is a
+      // token the server cannot verify.
+      ...(formToken ? { [FORM_TOKEN_FIELD]: formToken } : {}),
     };
 
     const started = Date.now();
@@ -354,6 +430,11 @@ function Composer({ purposes, contactEmail, note, scope }: ComposerProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      // The server answered, so it may have spent the challenge — on a 400 as
+      // much as on a 200. A Turnstile answer is single-use, and re-posting the
+      // spent one would score the retry as a failed challenge.
+      const widget = formRef.current?.querySelector('.cf-turnstile');
+      if (widget) window.turnstile?.reset(widget);
       await settle();
       if (res.ok) {
         setName('');
@@ -430,14 +511,20 @@ function Composer({ purposes, contactEmail, note, scope }: ComposerProps) {
       <p className="sentence">
         <b>Hey Yatin</b> &mdash; I&rsquo;m{' '}
         <span className="blank" ref={bNameRef}>
+          {/* A real label, hidden rather than absent: the sentence is what a
+              sighted visitor reads as the label, but it is prose, not markup a
+              screen reader or an autofill heuristic can tie to the field. */}
+          <label htmlFor={nameId} className="sr-only">
+            Your name
+          </label>
           <input
+            id={nameId}
             ref={nameRef}
             name="name"
             type="text"
             autoComplete="name"
             maxLength={MAX_NAME}
             placeholder={PH_NAME}
-            aria-label="Your name"
             value={name}
             onChange={(e) => {
               setName(e.target.value);
@@ -474,13 +561,16 @@ function Composer({ purposes, contactEmail, note, scope }: ComposerProps) {
         )}
         .{' '}
         <span className="msg-line" ref={bMsgRef}>
+          <label htmlFor={msgId} className="sr-only">
+            Your message
+          </label>
           <textarea
+            id={msgId}
             ref={msgRef}
             name="message"
             rows={1}
             maxLength={MAX_MESSAGE}
             placeholder={PH_MSG}
-            aria-label="Your message"
             aria-describedby={capId}
             value={message}
             onChange={(e) => {
@@ -500,14 +590,17 @@ function Composer({ purposes, contactEmail, note, scope }: ComposerProps) {
         </span>{' '}
         You can reach me back at{' '}
         <span className="blank" ref={bEmailRef}>
+          <label htmlFor={emailId} className="sr-only">
+            Your email address
+          </label>
           <input
+            id={emailId}
             ref={emailRef}
             name="email"
             type="email"
             autoComplete="email"
             maxLength={MAX_EMAIL}
             placeholder={PH_EMAIL}
-            aria-label="Your email address"
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);
@@ -524,6 +617,13 @@ function Composer({ purposes, contactEmail, note, scope }: ComposerProps) {
       <span id={capId} className="sr-only">
         Up to {MAX_MESSAGE} characters.
       </span>
+
+      <div style={HONEYPOT} aria-hidden="true">
+        <label htmlFor={hpId}>Company website</label>
+        <input id={hpId} ref={hpRef} name={HONEYPOT_FIELD} type="text" tabIndex={-1} autoComplete="off" />
+      </div>
+
+      {formToken && <input type="hidden" name={FORM_TOKEN_FIELD} value={formToken} readOnly />}
 
       {purposes.length > 0 && (
         <div className={`chip-rail${railOpen ? ' open' : ''}`} id={railId}>
@@ -544,6 +644,16 @@ function Composer({ purposes, contactEmail, note, scope }: ComposerProps) {
             ))}
           </div>
         </div>
+      )}
+
+      {turnstileSiteKey && (
+        <div
+          className="cf-turnstile"
+          data-sitekey={turnstileSiteKey}
+          data-theme="auto"
+          data-size="flexible"
+          style={{ marginTop: 22 }}
+        />
       )}
 
       <div className="tx-row">
