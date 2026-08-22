@@ -101,7 +101,7 @@ Project.
 - [x] 01 foundations
 - [x] 02 revalidation
 - [x] 03 feature flags
-- [ ] 04 content status
+- [x] 04 content status
 - [ ] 05 inbox
 - [ ] 06 analytics core
 - [ ] 07 dwell time
@@ -427,3 +427,114 @@ None.
 
 None. Phase 06 will add `/api/collect`, which must read `FLAG_KEYS.ANALYTICS` the same way
 `/api/track/utm` now does.
+
+---
+
+## Phase 04 — draft / scheduled / published + preview
+
+### Migration, three steps, all applied to production
+
+| Step | Migration | What |
+|---|---|---|
+| 1 | `add_content_status_nullable` | `ContentStatus` enum; `status`/`publishAt` nullable on both; `publishedAt` + `updatedAt` on Project |
+| 2 | `backfill_content_status` | filled from the old boolean, guarded on `status IS NULL` so a re-run cannot re-classify |
+| 3 | `require_content_status` | `SET NOT NULL`, `DEFAULT 'DRAFT'` |
+
+Recorded before, verified after:
+
+```
+Blog     10 rows — show=true: 0, show=false: 10   ->  10 DRAFT,  0 PUBLISHED
+Project   6 rows — no visibility column at all    ->   6 PUBLISHED
+NULL statuses after backfill: 0 / 0
+Blog PUBLISHED == old show=true count: 0 == 0
+```
+
+**`show` was NOT dropped.** It stays as the rollback path; nothing reads it. The only
+surviving `show: true` in `apps/web` is `getSkills()` on the **Skill** model — a different
+table. Drop `Blog.show` after a week of stable production.
+
+**`DEFAULT 'DRAFT'` is the safety property.** The boolean it replaces defaulted to *visible*;
+a row inserted by a seed or a future migration that does not know about this column is now
+invisible until someone says otherwise.
+
+### 🚨 Draft-leak test — run by hand against a production build
+
+Two of the three review agents stalled, including the draft-leak reviewer, so this was run
+directly rather than trusted. Live data: 10 DRAFT blogs, 6 PUBLISHED projects.
+
+```
+homepage — draft blog titles present      : 0   (of 10 checked)
+homepage — published projects present     : 6/6   (no regression)
+/blog/turborepo-monorepo                  : 404
+/blog/websocket-scaling                   : 404
+/blog/jwt-auth-patterns                   : 404
+/api/blogs/turborepo-monorepo             : 404  {"error":"Blog not found"}   no body leaked
+/sitemap.xml — /blog/ entries             : 0
+/blog/<draft>/opengraph-image             : 200, PNG contains the draft title 0 times
+/api/preview  no token                    : 400
+/api/preview  bogus token                 : 401
+/blog/<draft> with a FORGED __prerender_bypass cookie : 404
+public homepage after all of the above    : still 0 draft titles
+```
+
+### Every public content query — the anti-leak checklist
+
+| Query | `where` |
+|---|---|
+| `readProjects` | `contentWhere(isPreview)` — previously **no `where` at all** |
+| `readBlogs` | `contentWhere(isPreview)` — previously `{ show: true }` |
+| `readBlogBySlug` | `{ slug, ...contentWhere(isPreview) }` + explicit `select` — previously `findUnique({ slug })` and a **JS guard on the next line** that four public surfaces depended on |
+
+| Surface | Visibility |
+|---|---|
+| `/` | honours draft mode — the only place a draft **project** is previewable |
+| `/blog/[slug]` body + `generateMetadata` | honours draft mode |
+| `generateStaticParams` | **never preview** — `draftMode()` throws at build time, and prerendering a draft would cache it for everyone |
+| `sitemap.ts` | **never preview** — a sitemap asks crawlers to index what it lists |
+| `api/blogs/[slug]` | **never preview** — unauthenticated JSON returning the whole body; honouring a cookie would make it a draft-exfiltration endpoint |
+| `opengraph-image` | **never preview** — crawlers send no cookies; the image is cached and re-shared |
+| `not-found.tsx` | **never preview** — reads `blogs.length` only |
+
+**Preview reads are uncached, not differently-keyed.** The cached callbacks hard-code
+`false` and take no visibility argument, so no preview value can structurally reach a cached
+entry — there are no two keys whose non-collision needs proving.
+
+### Deviations
+
+| Doc | Reality |
+|---|---|
+| "add `publishedAt`" to Blog | **It already existed** as the editorial date the article prints. Kept its meaning; only `status`/`publishAt` are new. |
+| Preview covers Blog and Project by slug | **Project has no slug and no detail page.** `PreviewClaims` is `{ type: "Blog"; slug } \| { type: "Home" }`; a draft project is previewed via the homepage. |
+| — | `Project.updatedAt` added, so projects can finally join the stale detector from Phase 02. |
+| — | `previewContentWhere()` originally used `as const`, producing a `readonly` tuple that is **not assignable** to Prisma's `in?: ContentStatus[]`. It failed to typecheck at every call site. Now annotated with the generated enum. |
+
+### Idempotency audit
+
+- `publishDueContent()` — **Pattern A.** `updateMany({ where: { id, status: "SCHEDULED", publishAt: { lte: now } } })`. The status guard *inside* the where is what makes concurrent callers safe: the first matches, the second matches zero rows. No fetch-then-update anywhere.
+- `publishBlogNow` / `publishProjectNow` / `setBlogStatus` / `setProjectStatus` — **Pattern A**, conditional `updateMany`.
+- The backfill migration — guarded on `status IS NULL`, so re-running cannot drag an ARCHIVED row back.
+
+### Verification
+
+- [x] `prisma validate` · `prisma generate` · `tsc --noEmit` (0 errors) · `lint` · `build` (both apps)
+- [x] Route table: `/` `○` **1d**, `/blog/[slug]` `●`, `/sitemap.xml` `○` **1d**; `/api/preview` and `/api/preview/exit` registered `ƒ`
+- [x] Draft-leak test above, all ten checks
+- [x] Migration counts match the recorded baseline exactly
+- [x] No cron job, no `vercel.json`
+- [x] `PREVIEW_SECRET` is unset in this environment and the app still boots, builds and degrades cleanly
+
+### Not yet verified (needs a browser or a configured secret)
+
+- The admin editor by eye — status selector, IST datetime picker, filter tabs, overdue warning
+- A real preview round trip end to end (needs `PREVIEW_SECRET` generated and set in **both** apps)
+- Scheduled publishing on a real timer
+
+### Env vars added
+
+- `PREVIEW_SECRET` — optional, `min(32)`, signs Draft Mode preview links. **Must differ from `JWT_SECRET`.**
+  Generate with `openssl rand -hex 32`. Unset today, so preview is off in both directions.
+
+### Blockers for the next phase
+
+None. Phase 06 must add `/api/collect` and call `maybePublishDue()` from its `after()` block,
+replacing the admin-load trigger as the primary path.

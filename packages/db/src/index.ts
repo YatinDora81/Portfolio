@@ -16,6 +16,7 @@ export {
   NoteKind,
   RevalidationTrigger,
   RevalidationStatus,
+  ContentStatus,
 } from "./generated/prisma/enums";
 /**
  * The generated input types — `Prisma.NoteNodeWhereInput` and friends. Exported

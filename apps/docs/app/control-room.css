@@ -2350,3 +2350,99 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   .fl-noterow { flex-wrap: wrap }
   .fl-note { min-width: 100% }
 }
+
+/* ---------- content lifecycle (blogs · projects) ----------
+   Four states, four hues, and none of them borrowed from `<Badge>`: that
+   component folds `warning` and `destructive` onto the same `.chip.amb`, so two
+   of the four would have come out identical amber — the one thing a status
+   colour cannot do.
+
+   The mapping follows this file's own rule that `--good` and `--amber` are
+   reserved for state, and fills the other two slots with the neutral pair the
+   admin roles already use:
+
+     draft      slate   — not a state yet, just work in progress
+     scheduled  amber   — waiting on something
+     published  green   — live
+     archived   red     — withdrawn on purpose, which is a decision and not a
+                          neutral absence; a second grey would have read as
+                          "draft again" at a glance.
+
+   Every token here is redefined by both dark themes, so the four stay separable
+   in light, GitHub dark and zinc dark without a per-theme override. */
+.chip.st-draft     { border-color: var(--line); color: var(--vioT); background: var(--vioS) }
+.chip.st-scheduled { border-color: var(--amber); color: var(--ambT); background: var(--amber-soft) }
+.chip.st-published { border-color: var(--good); color: var(--goodT); background: var(--good-soft) }
+.chip.st-archived  { border-color: color-mix(in srgb, var(--bad) 40%, transparent); color: var(--bad); background: var(--bad-soft) }
+
+/* `.filt` was built for buttons; as an anchor it needs the box laid out by hand
+   and the count set apart from the label. */
+.lc-tabs .filt { display: inline-flex; align-items: center; gap: 6px; text-decoration: none }
+.lc-tabs .filt b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--dim) }
+.lc-tabs .filt.on b { color: var(--accT) }
+/* A zero tab stays clickable and stays visible: "nothing is scheduled" is an
+   answer, and a tab that vanished at zero would look like a missing feature. */
+.lc-tabs .filt.lc-tab-0 b { color: var(--faint) }
+
+/* `.row` centres its children and clips to one line. A lifecycle row is a
+   title, a meta line, possibly a warning and possibly two buttons, so it stacks
+   from the top — the same shape `.fl-row` needed for the same reason. */
+.lc-row { align-items: flex-start }
+.lc-row-acts { padding-top: 2px; gap: 7px }
+
+/* The one-line facts under a row: when it goes live, or why it is not. */
+.lc-line {
+  display: flex; align-items: center; gap: 6px; margin-top: 5px;
+  font-family: var(--mono); font-size: 10.5px; color: var(--faint)
+}
+.lc-line.bad { color: var(--bad) }
+.lc-line svg { flex: none }
+
+.lc-acts { display: flex; flex-direction: column; gap: 7px; margin-top: 9px }
+.lc-acts:empty { display: none }
+.lc-btns { display: flex; align-items: center; gap: 6px; flex-wrap: wrap }
+.lc-note { font-size: 11.5px; line-height: 1.6; color: var(--faint); max-width: 76ch }
+.lc-note a { color: var(--accT); text-decoration: underline; text-underline-offset: 2px }
+.lc-note-b {
+  padding: 9px 12px; margin-bottom: 10px; border: 1px solid var(--line2);
+  border-radius: var(--r2); background: var(--bg1)
+}
+.lc-link { color: var(--accT); text-decoration: underline; text-underline-offset: 2px }
+.lc-gap { margin-top: 14px }
+
+/* The status selector and its picker, kept as one block so the datetime field
+   appearing under Scheduled reads as part of the same control rather than as a
+   new question further down the form. */
+.lc-field { margin-bottom: 18px }
+.lc-field .f:last-child { margin-bottom: 0 }
+.lc-field-err { margin-top: 8px }
+.lc-field code {
+  font-family: var(--mono); font-size: 10.5px; color: var(--dim);
+  background: var(--bg1); border-radius: 5px; padding: 1px 5px
+}
+
+/* Amber, not red: nothing has failed yet — the admin is mid-edit and the save
+   has not been attempted. Red here would report a problem that does not exist. */
+.lc-warn {
+  margin-top: 8px; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--amber) 34%, transparent);
+  border-left: 3px solid var(--amber); background: var(--amber-soft);
+  color: var(--dim); font-size: 11.5px; line-height: 1.6; max-width: 76ch
+}
+.lc-warn b {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 3px;
+  color: var(--ambT); font-size: 12px; font-weight: 600
+}
+
+@media (max-width: 700px) {
+  .lc-row { flex-wrap: wrap }
+  .lc-row-acts { width: 100% }
+}
+
+/* An archived row keeps full-contrast warnings and buttons — only its title
+   steps back, because the reason it is archived is still worth reading. */
+.lc-arch .row-t { color: var(--dim); font-weight: 450 }
+
+/* The footnote that belongs to the status block above it, not to the field
+   below — it closes `.lc-field`'s own bottom gap rather than adding a second. */
+.lc-after-field { margin-top: -10px; margin-bottom: 18px }

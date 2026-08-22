@@ -2,29 +2,44 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import type { ContentStatus } from "db";
 import { Card, CardHead } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/shared/page-header";
+import { StatusField } from "@/components/lifecycle/status-field";
 import { createBlog, updateBlog } from "@/lib/actions/blogs";
 import { publishSite } from "@/lib/actions/publish";
+import { scheduleProblem, transportError, utcToIstInput } from "@/lib/lifecycle";
 import { IconAlertTriangle } from "@tabler/icons-react";
 
 interface BlogData {
   id: string; slug: string; title: string; description: string;
   content: string; image: string; imageOrientation: string; color: string;
-  show: boolean;
+  status: ContentStatus;
+  /** The stored UTC instant as ISO, or null. Converted to the IST picker below. */
+  publishAtIso: string | null;
 }
 
 export function BlogForm({ blog }: { blog?: BlogData }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [show, setShow] = useState(blog?.show !== false);
+  const [status, setStatus] = useState<ContentStatus>(blog?.status ?? "DRAFT");
+  /**
+   * UTC out of the database, IST into the picker — the reverse of what the
+   * action does on save. Computed in the initialiser rather than an effect so
+   * the field is right in the first paint, and computed with
+   * `utcToIstInput` rather than any `toLocale*` call so the server's HTML and
+   * the browser's hydration produce the same attribute.
+   */
+  const [publishAtIst, setPublishAtIst] = useState(
+    blog?.publishAtIso ? utcToIstInput(new Date(blog.publishAtIso)) : ""
+  );
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [pubError, setPubError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const isEditing = !!blog;
 
   // Which submit button was pressed. A ref, not state: the click lands in the
@@ -34,21 +49,45 @@ export function BlogForm({ blog }: { blog?: BlogData }) {
 
   const handleSubmit = (formData: FormData) => {
     const publish = wantPublish.current;
+
+    // Checked here so an impossible schedule costs no round trip; the action
+    // checks it again, because this copy can be skipped and that one cannot.
+    const problem = scheduleProblem(status, publishAtIst);
+    if (problem) {
+      setSaveError(problem);
+      setBusy(null);
+      return;
+    }
+    setSaveError(null);
+
     startTransition(async () => {
-      if (isEditing) await updateBlog(blog.id, formData);
-      else await createBlog(formData);
-      if (publish) {
-        const res = await publishSite();
+      try {
+        const res = isEditing ? await updateBlog(blog.id, formData) : await createBlog(formData);
         if (!res.ok) {
-          // Decision 5: the post is saved. A publish that fails is a separate,
-          // retryable failure — it never undoes the write, so hold the page and
-          // name the reason rather than navigating away in silence.
-          setPubError(res.error ?? "Could not reach the site.");
-          setBusy(null);
+          setSaveError(res.error ?? "The post was not saved.");
           return;
         }
+
+        if (publish) {
+          const pub = await publishSite();
+          if (!pub.ok) {
+            // Decision 5: the post is saved. A publish that fails is a separate,
+            // retryable failure — it never undoes the write, so hold the page and
+            // name the reason rather than navigating away in silence.
+            setPubError(pub.error ?? "Could not reach the site.");
+            return;
+          }
+        }
+        router.push("/blogs");
+      } catch (e) {
+        // A rejection is the transport under the action, most realistically an
+        // expired session bouncing the POST to /login. Without this the throw
+        // would escape the transition, reach no error boundary, and leave both
+        // buttons disabled for good with nothing on screen to explain it.
+        setSaveError(transportError(e));
+      } finally {
+        setBusy(null);
       }
-      router.push("/blogs");
     });
   };
 
@@ -60,12 +99,12 @@ export function BlogForm({ blog }: { blog?: BlogData }) {
         description={
           isEditing
             ? "Save keeps the change in the admin; Save & Publish also pushes it to the live site."
-            : "Write the post, then decide whether it ships live or stays a draft."
+            : "Write the post, then choose where it sits in the lifecycle — draft, scheduled, or live."
         }
       />
 
       <Card flush>
-        <CardHead title="Post" right={<span className="card-n">{isEditing ? "editing" : "draft"}</span>} />
+        <CardHead title="Post" right={<span className="card-n">{isEditing ? "editing" : "new"}</span>} />
         <div className="card-b">
           <form action={handleSubmit}>
             <div className="f-row">
@@ -130,10 +169,24 @@ export function BlogForm({ blog }: { blog?: BlogData }) {
               hint="Markdown — headings, lists, code fences and links all render on the site."
             />
 
-            <div className="f">
-              <label>Visibility</label>
-              <input type="hidden" name="show" value={show ? "true" : "false"} />
-              <Switch checked={show} onChange={setShow} label="Show on portfolio" />
+            <StatusField
+              noun="post"
+              status={status}
+              onStatus={setStatus}
+              publishAtIst={publishAtIst}
+              onPublishAt={setPublishAtIst}
+              error={saveError}
+            />
+
+            {/* Said out loud rather than left as a silent swap. Anyone who has
+                used this form before will go looking for the switch, and "it
+                moved" is a much shorter conversation than "where did my
+                visibility control go". */}
+            <div className="lc-note lc-after-field">
+              This replaces the old <b>Show on portfolio</b> switch. That switch wrote a boolean
+              the site has stopped reading — the column is still in the database so the lifecycle
+              can be rolled back, but nothing reads it any more, and Status is now the only thing
+              that decides whether a post is reachable.
             </div>
 
             <div

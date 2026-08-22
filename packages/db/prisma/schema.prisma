@@ -125,12 +125,27 @@ model Project {
   title     String
   summary   String
   github    String?
+  /// The live DEMO URL. Not a visibility flag — `status` is. (HeroContent.live
+  /// is a third, unrelated meaning: a nullable "live" sentinel.) Three columns
+  /// in this schema are spelled `live` and none of them mean the same thing,
+  /// which is exactly why the lifecycle column below is not called that.
   live      String?
   logoUrl   String?
   sortOrder Int
   images    String[]
   bullets   ProjectBullet[]
   skills    Skill[]         @relation("ProjectToSkill")
+
+  status      ContentStatus   @default(DRAFT)
+  publishAt   DateTime?
+  publishedAt DateTime?
+  /// Added with the lifecycle, not before it: without an edit timestamp there
+  /// is nothing for the stale detector to compare a project against, so
+  /// projects could not join it.
+  updatedAt   DateTime        @updatedAt
+
+  @@index([status, publishAt])
+  @@index([status, publishedAt])
 }
 
 model ProjectBullet {
@@ -151,9 +166,25 @@ model Blog {
   imageOrientation ImageOrientation @default(LANDSCAPE)
   color            String
   sortOrder        Int
+  /// The date the post claims, and what the article and its OpenGraph card
+  /// print. It predates the lifecycle below and is NOT the same question as
+  /// "is this live" — `status` answers that. Kept because a post's date is
+  /// editorial, and because rewriting it from a status transition would move
+  /// the date on every already-published post.
   publishedAt      DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
+  /// Superseded by `status`, deliberately still here. Dropping it in the same
+  /// change that stopped reading it would leave no way back if the lifecycle
+  /// turned out to hide something it should not have. Drop it once production
+  /// has run a week on `status` alone.
   show             Boolean          @default(true)
+
+  status           ContentStatus  @default(DRAFT)
+  /// When a SCHEDULED post becomes PUBLISHED. UTC, like everything stored here.
+  publishAt        DateTime?
+
+  @@index([status, publishAt])
+  @@index([status, publishedAt])
 }
 
 model Quote {
@@ -528,4 +559,22 @@ model FeatureFlag {
   updatedById String?
   updatedAt   DateTime @updatedAt
   createdAt   DateTime @default(now())
+}
+
+
+/// The publishing lifecycle, replacing a boolean that could only say yes or no.
+///
+/// DRAFT is the default, and that direction matters: a row that arrives without
+/// an explicit status — a seed, a bulk import, a future migration — must be
+/// invisible until someone says otherwise. The boolean it replaces defaulted to
+/// `true`, which is the opposite bet.
+///
+/// ARCHIVED is not DRAFT. Both are hidden from visitors, but a draft is on its
+/// way somewhere and an archived post has been retired, and preview shows the
+/// first while deliberately not resurrecting the second.
+enum ContentStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
 }

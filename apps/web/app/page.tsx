@@ -1,5 +1,6 @@
 
 import { after } from 'next/server';
+import { draftMode } from 'next/headers';
 import { ThemeProvider } from './components/common/ThemeProvider';
 import { CatProvider } from './components/common/CatProvider';
 import MotionProvider from './components/common/MotionProvider';
@@ -60,14 +61,26 @@ export default async function Home() {
   // First and alone: it resolves the live hero row, and `heroVersion` scopes
   // every hero query below it.
   const siteConfig = await getSiteConfig();
+  // The one input that widens the two content queries below past PUBLISHED, and
+  // it is a signed cookie — never a query parameter, so it cannot be linked to.
+  //
+  // Reading `.isEnabled` does not opt this route out of static generation: only
+  // `draftMode().enable()`/`.disable()` register dynamic usage, and during a
+  // prerender there is no provider at all, so this is `false` at build time and
+  // `/` keeps its 1d static entry. A real preview request carries the bypass
+  // cookie, which skips that cached HTML and re-renders here with it `true`.
+  //
+  // This is also the only reason drafts are safe below: a project detail page
+  // does not exist, so the homepage is where a draft project is previewed.
+  const { isEnabled: isPreview } = await draftMode();
   const [heroData, aboutData, skills, experiences, projects, blogs, quotes, contactData, flags] =
     await Promise.all([
       getHeroData(siteConfig.heroVersion),
       getAboutData(),
       getSkills(),
       getExperiences(),
-      getProjects(),
-      getBlogs(),
+      getProjects(isPreview),
+      getBlogs(isPreview),
       getQuotes(),
       getContactData(),
       getFlags(),

@@ -8,6 +8,7 @@
     "./dates": "./src/dates.ts",
     "./flags": "./src/flags.ts",
     "./logger": "./src/logger.ts",
+    "./preview-token": "./src/preview-token.ts",
     "./result": "./src/result.ts",
     "./tags": "./src/tags.ts"
   },
@@ -16,6 +17,8 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@repo/config": "*",
+    "jose": "^6.0.11",
     "server-only": "^0.0.1"
   },
   "devDependencies": {

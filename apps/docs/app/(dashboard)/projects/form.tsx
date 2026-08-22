@@ -2,13 +2,16 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import type { ContentStatus } from "db";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/shared/page-header";
+import { StatusField } from "@/components/lifecycle/status-field";
 import { createProject, updateProject } from "@/lib/actions/projects";
 import { publishSite } from "@/lib/actions/publish";
+import { scheduleProblem, transportError, utcToIstInput } from "@/lib/lifecycle";
 import {
   IconPlus, IconTrash, IconChevronUp, IconChevronDown, IconCheck, IconAlertTriangle,
 } from "@tabler/icons-react";
@@ -18,6 +21,9 @@ interface ProjectData {
   id: string; title: string; summary: string;
   github: string | null; live: string | null; logoUrl: string | null; images: string[];
   skillIds: string[]; bullets: Bullet[];
+  status: ContentStatus;
+  /** The stored UTC instant as ISO, or null. Converted to the IST picker below. */
+  publishAtIso: string | null;
 }
 
 export function ProjectForm({ project, allSkills }: {
@@ -36,8 +42,19 @@ export function ProjectForm({ project, allSkills }: {
   const [images, setImages] = useState<string[]>(project?.images?.length ? project.images : [""]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>(project?.skillIds || []);
   const [bullets, setBullets] = useState<Bullet[]>(project?.bullets || [{ content: "", sortOrder: 0 }]);
+  const [status, setStatus] = useState<ContentStatus>(project?.status ?? "DRAFT");
+  /**
+   * UTC out of the database, IST into the picker — the reverse of what the
+   * action does on save, and done with `utcToIstInput` rather than any
+   * `toLocale*` call so the server's HTML and the browser's hydration produce
+   * the same attribute.
+   */
+  const [publishAtIst, setPublishAtIst] = useState(
+    project?.publishAtIso ? utcToIstInput(new Date(project.publishAtIso)) : ""
+  );
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [pubError, setPubError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Which submit button was pressed. A ref, not state: the click lands in the
   // same event as the submit, so state set here would still be stale by the
@@ -47,6 +64,17 @@ export function ProjectForm({ project, allSkills }: {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const publish = wantPublish.current;
+
+    // Checked here so an impossible schedule costs no round trip; the action
+    // checks it again, because this copy can be skipped and that one cannot.
+    const problem = scheduleProblem(status, publishAtIst);
+    if (problem) {
+      setSaveError(problem);
+      setBusy(null);
+      return;
+    }
+    setSaveError(null);
+
     const data = {
       title, summary,
       github: github || null,
@@ -55,22 +83,39 @@ export function ProjectForm({ project, allSkills }: {
       images: images.filter(Boolean),
       skillIds: selectedSkills,
       bullets: bullets.map((b, i) => ({ ...b, sortOrder: i })),
+      status,
+      // The IST wall clock, not an instant. Converting it is the action's job,
+      // in one place, for both models — see lib/lifecycle.ts.
+      publishAtIst: publishAtIst || null,
     };
     startTransition(async () => {
-      if (isEditing) await updateProject(project.id, data);
-      else await createProject(data);
-      if (publish) {
-        const res = await publishSite();
+      try {
+        const res = isEditing ? await updateProject(project.id, data) : await createProject(data);
         if (!res.ok) {
-          // Decision 5: the project is saved. A publish that fails is a separate,
-          // retryable failure — it never undoes the write, so hold the page and
-          // name the reason rather than navigating away in silence.
-          setPubError(res.error ?? "Could not reach the site.");
-          setBusy(null);
+          setSaveError(res.error ?? "The project was not saved.");
           return;
         }
+
+        if (publish) {
+          const pub = await publishSite();
+          if (!pub.ok) {
+            // Decision 5: the project is saved. A publish that fails is a separate,
+            // retryable failure — it never undoes the write, so hold the page and
+            // name the reason rather than navigating away in silence.
+            setPubError(pub.error ?? "Could not reach the site.");
+            return;
+          }
+        }
+        router.push("/projects");
+      } catch (err) {
+        // A rejection is the transport under the action, most realistically an
+        // expired session bouncing the POST to /login. Without this the throw
+        // would escape the transition, reach no error boundary, and leave both
+        // buttons disabled for good with nothing on screen to explain it.
+        setSaveError(transportError(err));
+      } finally {
+        setBusy(null);
       }
-      router.push("/projects");
     });
   };
 
@@ -270,6 +315,23 @@ export function ProjectForm({ project, allSkills }: {
               </Button>
             </div>
           </div>
+        </div>
+
+        <StatusField
+          noun="project"
+          status={status}
+          onStatus={setStatus}
+          publishAtIst={publishAtIst}
+          onPublishAt={setPublishAtIst}
+          error={saveError}
+        />
+
+        {/* Worth saying, because it changes what Create means on this form: a
+            project used to be public the instant it was inserted. */}
+        <div className="lc-note lc-after-field">
+          Projects had no visibility control at all before this — every row reached visitors from
+          the moment it was created. A new project now starts as a draft, and stays one until you
+          say otherwise.
         </div>
 
         <div

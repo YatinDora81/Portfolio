@@ -4,7 +4,9 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./lock": "./src/lock.ts"
+    "./lock": "./src/lock.ts",
+    "./publish-due": "./src/publish-due.ts",
+    "./visibility": "./src/visibility.ts"
   },
   "type": "module",
   "private": true,

@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { prisma } from "db";
+import { contentWhere } from "db/visibility";
 import { tags } from "@repo/shared/tags";
 import { cdnUrl } from "./site";
 
@@ -222,8 +223,30 @@ export async function getExperiences() {
   }));
 }
 
-async function readProjects() {
+/**
+ * Preview and the public never share a cache entry.
+ *
+ * `unstable_cache` builds its key from the callback source, the key parts and
+ * the arguments, so threading `isPreview` through as an argument would file
+ * draft rows and public rows in the same tagged namespace one key apart. Then
+ * the safety of the whole site rests on two keys never colliding — and if they
+ * ever did, a single preview would populate the entry every anonymous visitor
+ * reads next, silently, for the next 24 hours. That is not a bug anything here
+ * would catch; it is a bug someone reports.
+ *
+ * So preview gets no cache at all. The three cached callbacks below hard-code
+ * `false` and take no visibility argument, which is why no preview value can
+ * reach them: a draft read goes straight to Postgres, uncached and untagged.
+ * It costs nothing worth counting — preview is one signed cookie, one person,
+ * one page, and it already bypasses the route's ISR entry to get here.
+ *
+ * The corollary is that the public entries keep exactly the keys and tags they
+ * had, so `revalidateTag` still reaches them and the route table is unchanged.
+ */
+
+async function readProjects(isPreview: boolean) {
   const projects = await prisma.project.findMany({
+    where: contentWhere(isPreview),
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     include: {
       bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
@@ -242,16 +265,34 @@ async function readProjects() {
   }));
 }
 
+/** The public arm, and the only thing the cache below ever calls. `false` is
+    written here rather than passed in, so no caller can put a preview result
+    into a public entry however it calls `getProjects`. */
+function readPublicProjects() {
+  return readProjects(false);
+}
+
 // Only `projects`, not the per-project tag: this reads every project, so the id
 // of any one of them is not a handle on this entry.
-export const getProjects = unstable_cache(readProjects, ["projects"], {
+const cachedProjects = unstable_cache(readPublicProjects, ["projects"], {
   tags: [tags.projectIndex()],
   revalidate: CACHE_LIFETIME_SECONDS,
 });
 
-async function readBlogs() {
+/**
+ * No date rehydration here, and that is a property of the projection rather
+ * than luck: `readProjects` returns no `Date` at all. `publishedAt` and
+ * `updatedAt` are read by the filter and by the stale detector but never
+ * returned, so nothing this hands back can be a Date that JSON turned into a
+ * string. Return either one through here and it needs reviving first.
+ */
+export async function getProjects(isPreview = false) {
+  return isPreview ? readProjects(true) : cachedProjects();
+}
+
+async function readBlogs(isPreview: boolean) {
   const blogs = await prisma.blog.findMany({
-    where: { show: true },
+    where: contentWhere(isPreview),
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     select: {
       slug: true,
@@ -276,18 +317,55 @@ async function readBlogs() {
   }));
 }
 
-const cachedBlogs = unstable_cache(readBlogs, ["blogs"], {
+/** See `readPublicProjects`: the public arm hard-codes its own visibility. */
+function readPublicBlogs() {
+  return readBlogs(false);
+}
+
+const cachedBlogs = unstable_cache(readPublicBlogs, ["blogs"], {
   tags: [tags.blogIndex()],
   revalidate: CACHE_LIFETIME_SECONDS,
 });
 
-export async function getBlogs() {
-  return (await cachedBlogs()).map(reviveBlogDates);
+export async function getBlogs(isPreview = false) {
+  // Revived on both arms, not just the cached one. The uncached preview read
+  // hands back real Dates already and `new Date(aDate)` is a copy, so running
+  // it either way costs a clone and buys the two arms an identical return type
+  // — which is what stops a caller from working in preview and breaking live.
+  const blogs = isPreview ? await readBlogs(true) : await cachedBlogs();
+  return blogs.map(reviveBlogDates);
 }
 
-async function readBlogBySlug(slug: string) {
-  const blog = await prisma.blog.findUnique({ where: { slug } });
-  if (!blog || !blog.show) return null;
+async function readBlogBySlug(slug: string, isPreview: boolean) {
+  // The predicate is in the query now. This used to be `findUnique({ where:
+  // { slug } })` with `if (!blog || !blog.show) return null` on the next line —
+  // one JS statement standing between an unpublished draft and four public
+  // surfaces: the article, its `generateMetadata`, its OpenGraph image, and the
+  // unauthenticated JSON at `/api/blogs/[slug]`. Any refactor that dropped the
+  // line, or any new caller that read the row before it, leaked all four.
+  //
+  // `findFirst` rather than `findUnique` because the visibility clauses are not
+  // part of the unique key; `slug` is still `@unique`, so this matches at most
+  // one row and still uses that index.
+  //
+  // The `select` is the second half: a draft's `content` is never read out of
+  // Postgres at all, so it cannot sit in a cache entry, a log line or a heap
+  // dump waiting for the guard above it to be removed.
+  const blog = await prisma.blog.findFirst({
+    where: { slug, ...contentWhere(isPreview) },
+    select: {
+      slug: true,
+      title: true,
+      description: true,
+      content: true,
+      image: true,
+      imageOrientation: true,
+      color: true,
+      publishedAt: true,
+      updatedAt: true,
+    },
+  });
+  if (!blog) return null;
   return {
     slug: blog.slug,
     title: blog.title,
@@ -301,7 +379,19 @@ async function readBlogBySlug(slug: string) {
   };
 }
 
-export async function getBlogBySlug(slug: string) {
+/** See `readPublicProjects`. Module-level so its source — half the cache key —
+    is byte-identical on every call for a given slug. */
+function readPublicBlogBySlug(slug: string) {
+  return readBlogBySlug(slug, false);
+}
+
+export async function getBlogBySlug(slug: string, isPreview = false) {
+  // Preview never reaches the cache below, so a draft body is never written to
+  // a tagged entry that a public request could later be served from.
+  if (isPreview) {
+    const draft = await readBlogBySlug(slug, true);
+    return draft === null ? null : reviveBlogDates(draft);
+  }
   // Built per call, not hoisted. `unstable_cache` fixes its tag list at
   // construction and only the *key* varies with the arguments, so a module-level
   // wrapper could carry `blogs` but never `blog:<slug>` — every post would share
@@ -309,7 +399,7 @@ export async function getBlogBySlug(slug: string) {
   // inside the wrapper is what makes the per-post tag possible. The cache key
   // stays stable across calls: it is derived from the callback source plus
   // `keyParts` plus the arguments, all of which are the same for a given slug.
-  const cached = unstable_cache(readBlogBySlug, ["blog-by-slug", slug], {
+  const cached = unstable_cache(readPublicBlogBySlug, ["blog-by-slug", slug], {
     tags: [tags.blog(slug), tags.blogIndex()],
     revalidate: CACHE_LIFETIME_SECONDS,
   });

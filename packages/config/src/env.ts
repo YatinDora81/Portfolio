@@ -53,6 +53,21 @@ const serverSchema = z.object({
   JWT_SECRET: z.string().min(1).optional(),
   SMTP_EMAIL: z.string().email().optional(),
   SMTP_PASSWORD: z.string().min(1).optional(),
+
+  // ---- Optional, per feature. Held by BOTH apps at the same value. --------
+  /**
+   * Signs Draft Mode preview links: the admin mints one, the public app
+   * verifies it before enabling draft mode. It has to be a SEPARATE secret from
+   * `JWT_SECRET` — an admin session token and a preview token must not be
+   * interchangeable, or a 30-minute share link would be a 7-day admin
+   * credential under a different name.
+   *
+   * Optional, and set nowhere yet: with no value, minting and verifying both
+   * refuse and preview is simply off. `min(32)` because it is a signing key
+   * with no legacy value to accommodate — unlike `JWT_SECRET` above, nothing is
+   * deployed against it, so the floor can be right from the start.
+   */
+  PREVIEW_SECRET: z.string().min(32).optional(),
 });
 
 const parsed = serverSchema.safeParse(process.env);

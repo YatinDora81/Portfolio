@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { draftMode } from 'next/headers';
 import { getBlogBySlug, getBlogs } from '@/lib/data';
 import { getFlags } from '@/lib/flags';
 import { FLAG_KEYS, flagValue } from '@repo/shared/flags';
@@ -10,6 +11,13 @@ import BackgroundLines from '@/components/common/BackgroundLines';
 import BlogContent from './BlogContent';
 
 export async function generateStaticParams() {
+  // Public, and structurally unable to be anything else: this runs at build
+  // time with no request behind it, so `draftMode()` would throw here rather
+  // than return false. Prerendering a draft is exactly what must not happen —
+  // the HTML would be cached and served to everyone. Drafts stay reachable in
+  // preview through `dynamicParams`, which renders an unlisted slug on demand.
+  //
+  // Zero slugs today is the correct answer, not a failure: every post is DRAFT.
   const blogs = await getBlogs();
   return blogs.map((b) => ({ slug: b.slug }));
 }
@@ -20,7 +28,10 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const blog = await getBlogBySlug(slug);
+  // Same cookie the page body reads, so a preview of a draft gets that draft's
+  // title instead of "Blog not found" above its own rendered content.
+  const { isEnabled: isPreview } = await draftMode();
+  const blog = await getBlogBySlug(slug, isPreview);
   if (!blog) return { title: 'Blog not found' };
 
   const description = blog.description ?? undefined;
@@ -54,11 +65,17 @@ export default async function BlogPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  // Read before the queries because both of them take it. `.isEnabled` is not a
+  // dynamic API, so this route keeps its SSG entry; a preview request carries
+  // the bypass cookie and skips that entry to get here.
+  const { isEnabled: isPreview } = await draftMode();
   // This route is its own render, so it reads the flags itself rather than
   // inheriting the home page's. That is one cached lookup, not a second query.
   const [blog, allBlogs, flags] = await Promise.all([
-    getBlogBySlug(slug),
-    getBlogs(),
+    getBlogBySlug(slug, isPreview),
+    // Preview too, so "More to read" under a draft lists the other drafts
+    // rather than a public shelf the previewer cannot compare against.
+    getBlogs(isPreview),
     getFlags(),
   ]);
 
