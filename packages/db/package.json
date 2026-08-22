@@ -6,8 +6,10 @@
     ".": "./src/index.ts",
     "./analytics-salt": "./src/analytics-salt.ts",
     "./lock": "./src/lock.ts",
+    "./maintenance": "./src/maintenance.ts",
     "./publish-due": "./src/publish-due.ts",
     "./rate-limit": "./src/rate-limit.ts",
+    "./rollup": "./src/rollup.ts",
     "./visibility": "./src/visibility.ts"
   },
   "type": "module",

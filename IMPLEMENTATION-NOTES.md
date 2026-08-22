@@ -98,7 +98,7 @@ Project.
 
 ## Resume here
 
-**Next: Phase 09 — rollup & retention. It is the last one.** Phases 01-08 and 10 are committed and green
+**All ten phases are complete and committed.**
 (`check-types`, `lint`, `build` all pass; `prisma migrate status` clean).
 
 Before starting 05, re-read the "Deviations" table above. The ones that bite Phase 05:
@@ -142,7 +142,7 @@ Standing decisions from the user this session:
 - [x] 06 analytics core
 - [x] 07 dwell time
 - [x] 08 link registry
-- [ ] 09 rollup
+- [x] 09 rollup
 - [x] 10 media manager
 
 ---
@@ -811,3 +811,85 @@ attribution replayed from sessionStorage. Send/opt-out/attribution were factored
 tracked link still lands in the `resume` channel on the session. `TrackedLink`/`LinkClick`
 carry the honest channel; only the session label is coarse. Worth a Phase 06 edit later —
 pass the link's real channel through rather than assuming resume.
+
+---
+
+## Phase 09 — rollup & retention
+
+No cron, no `vercel.json`, no scheduler. Every scheduled behaviour rides a request already
+being served, inside `after()`.
+
+### 🚨 The headline test — press the button four times
+
+`rollupDay` on a seeded day, four times, snapshotting every `DailyStat` column:
+
+```
+runs:      [{ok:true, rows:6} x 4]
+identical: true
+hash:      233fd2df6dc577a3, 233fd2df6dc577a3, 233fd2df6dc577a3, 233fd2df6dc577a3
+```
+
+Every write is an upsert on `@@unique([date, dimension, key])`. If the numbers had grown,
+`create` was used and the feature is worthless. Reconciliation against a direct raw query
+was exact (`pv=7 uq=2 ss=3` both ways), including an event at `23:59:59.999` — the range is
+half-open (`>= start AND < end`), never `BETWEEN`.
+
+Concurrency: two rollups for one day → one succeeds, one reports "another rollup in
+progress", numbers unchanged, lock released in `finally`.
+
+### 🚨 The retention guard
+
+The spec's rule — delete only events older than the newest summarised day — has a hole,
+because catch-up runs **newest-first**: a fresh summary for yesterday says nothing about a
+gap last month. The floor is the *first unsummarised day* instead. Proven in three stages:
+
+```
+A. nothing summarised          → "skipped: nothing summarised yet"   234-day-old event survives
+B. only yesterday summarised   → "held at 2026-01-01 (unsummarised)" 234-day-old event survives
+C. that day summarised too     → deleted, as intended
+   its DailyStat row survives — retention never prunes summaries
+```
+
+Stage B is the one that matters: the naive rule would have destroyed that day permanently.
+Events piling past 90 days is recoverable; the delete is not.
+
+### Defects found and fixed
+
+| Defect | Fix |
+|---|---|
+| **Dwell median was a median of *flushes*, not visits.** The client sends one row per flush and zeroes its banked total, so a tab-hide and the pagehide after it are two rows describing one stretch of attention. Measured: three visits (2000+8000, 10000, 1000) reported **5000** where the truth is **10000** — half. And `reachedCount` in the same row counted *visits*: one row, two units. The bias scales with engagement, since the visitors who fragment most are the engaged ones. | Both percentile queries fold `sessionId+section` in a subquery first. Now 10000. |
+| **`rollupDay` blew Prisma's 5s transaction timeout at 407 rows** — one upsert per row in a `$transaction`. Found while testing the cap below, and it is the same failure loop: a failing rollup pins the retention floor. | Chunked `INSERT … ON CONFLICT DO UPDATE`, 500 rows a statement. 407 rows now write in one round trip. |
+| **`path` was unbounded permanent storage keyed on unauthenticated input.** `path` is `z.string().max(500)` with no allowlist, `GROUP BY` had no cap, and retention deliberately never deletes `DailyStat`. | Top 200 + a real `(other)` bucket (re-aggregated, so `uniques` in the tail stays a true distinct count). Same for `referrer`. `channel`/`country`/`device` left uncapped — they are bounded by something other than a visitor. |
+| **Only an admin page load ever ran a rollup**, so retention could be blocked indefinitely on a site serving traffic the whole time. The route comment claimed the opposite. | `catchUpRollups()` now runs in the collect route's `after()`, before maintenance so retention sees the floor the same pass just moved. |
+| **One visit whose summed dwell outran `int4` made the whole day fail forever** — and a day that can never be summarised pins the retention floor permanently. | `toInt` clamps to the `int4` range. |
+| `resummarize` ran up to 90 sequential rollups with no budget; **measured at ~41s for 100 days**. | Capped at 14 days plus an 8s wall clock, returning partial progress so the UI can say "run it again". |
+| Session pruning was the one unbatched delete — a correlated `NOT EXISTS` over the whole event table, inside `after()`. | Batched through the same shape. |
+| `releaseLock` stamped epoch instead of deleting, so `JobLock` grew one permanent row per summarised day (~365/year). | Release deletes. Measured 0 after every test. |
+| Nothing pruned `RollupRun`, and the error path grows fastest. | Added a `rollup-run-prune` task. |
+
+### Dashboard
+
+`recharts` (already a dependency). History from `DailyStat`, today from the raw tables.
+
+🚨 **Daily uniques are never summed.** Someone visiting Monday and Tuesday counts twice, and
+because the salt rotates daily, cross-day dedup is mathematically impossible by
+construction. Summed figures are labelled **visits**, and the UI says why.
+
+The empty state got real attention, because with 0 analytics rows it is the state that will
+actually be seen: no NaN, no Infinity, no divide-by-zero, no "0%" funnel that reads as a
+measurement rather than an absence, and no grey `0` badges implying a count where none was
+taken.
+
+### Verification
+
+- [x] `tsc --noEmit` (0 errors) · `lint` · `build` (both apps)
+- [x] Route table unchanged: `/` `○` **1d**, `/blog/[slug]` `●`, `/sitemap.xml` `○` **1d**
+- [x] Idempotency ×4, reconciliation, retention guard, concurrency, catch-up cap — all above
+- [x] **No cron, no `vercel.json`, no `crons` key anywhere**
+- [x] Live DB restored to baseline: every analytics/link/rollup/lock table **0**; messages 7, blogs 10, projects 6, flags 9, UTM 1454
+
+### Known, accepted
+
+`path`, `country` and `referrer` rows are written daily and read by nothing yet — the
+dashboard surfaces `total`, `channel` and `section`. They are cheap and the data is there
+when a view wants it.

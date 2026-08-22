@@ -2778,3 +2778,68 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   .tl-qr { width: 168px; align-self: center }
   .tl-split { grid-template-columns: 1fr }
 }
+
+/* ---------- analytics ---------- */
+.an-status { padding: 13px 16px; display: flex; flex-direction: column; gap: 7px }
+.an-status-line { font-size: 12.5px; line-height: 1.65; color: var(--dim); max-width: 100ch }
+.an-status-line b { color: var(--ink); font-weight: 600 }
+.an-status-line svg { vertical-align: -2px; margin-right: 3px; color: var(--ambT) }
+.an-status-line.dim { font-size: 12px; color: var(--faint) }
+.an-status-line.faint {
+  font-size: 11.5px; color: var(--faint);
+  border-top: 1px solid var(--line2); padding-top: 8px; margin-top: 1px
+}
+.rv-banner code { font-family: var(--mono); font-size: 11px; color: var(--accT) }
+.an-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 2px 0 1px }
+.an-sp { flex: 1; min-width: 0 }
+
+.an-blurb {
+  padding: 11px 16px; font-size: 11.5px; line-height: 1.7; color: var(--faint);
+  border-bottom: 1px solid var(--line2); max-width: 112ch
+}
+.an-blurb b { color: var(--dim); font-weight: 600 }
+.an-blurb em { font-style: normal; color: var(--dim) }
+.an-body { padding: 14px 16px }
+.an-none { padding: 26px 16px; text-align: center; font-size: 12.5px; color: var(--faint) }
+
+.an-split { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--bg2) }
+.an-split-b {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 7px;
+  font-family: var(--mono); font-size: 10.5px; color: var(--faint); transition: .13s
+}
+.an-split-b:hover { color: var(--ink) }
+.an-split-b.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px -1px rgba(17, 17, 22, .2) }
+.dark .an-split-b.on { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06) }
+/* A split with no rows is still worth showing — an empty Mobile column is the finding. */
+.an-split-z { font-size: 8.5px; opacity: .65 }
+
+.an-funnel { display: flex; flex-direction: column; gap: 9px }
+.an-frow { display: grid; grid-template-columns: 108px 1fr 48px 84px 76px; align-items: center; gap: 10px }
+.an-fk { font-size: 12.5px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.an-ft { display: block; height: 8px; border-radius: 99px; background: var(--bg2); overflow: hidden }
+.an-ft span { display: block; height: 100%; border-radius: 99px; background: var(--ch1) }
+.an-fn { font-family: var(--mono); font-size: 12px; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums }
+.an-fc { font-family: var(--mono); font-size: 10.5px; color: var(--faint); text-align: right; font-variant-numeric: tabular-nums }
+.an-fd {
+  display: inline-flex; align-items: center; justify-content: flex-end; gap: 2px;
+  font-family: var(--mono); font-size: 10.5px; color: var(--faint)
+}
+.an-fd.bad { color: var(--bad) }
+
+.an-note {
+  display: flex; align-items: flex-start; gap: 9px; padding: 10px 14px; margin-bottom: 14px;
+  border: 1px dashed var(--line); border-radius: var(--r3);
+  font-size: 12px; line-height: 1.65; color: var(--faint)
+}
+.an-note svg { flex: none; margin-top: 2px }
+
+.an-dims { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 }
+.an-none-inline { font-family: var(--mono); font-size: 10.5px; color: var(--faint) }
+
+/* The tracer sets this inline on its own tooltip rows; hoisted so both charts share it. */
+.utm-tip .r > span { display: inline-flex; align-items: center; gap: 6px }
+
+@media (max-width: 860px) {
+  .an-frow { grid-template-columns: 88px 1fr 46px 70px }
+  .an-frow .an-fc { display: none }
+}

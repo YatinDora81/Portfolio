@@ -3,8 +3,10 @@ import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { EventType, Prisma, prisma } from "db";
 import { computeSessionHash, computeVisitorHash, getDailySalt } from "db/analytics-salt";
+import { runPeriodicMaintenance } from "db/maintenance";
 import { maybePublishDue } from "db/publish-due";
 import { checkRateLimit } from "db/rate-limit";
+import { catchUpRollups } from "db/rollup";
 import { resolveAttribution } from "@repo/shared/attribution";
 import { FLAG_KEYS, flagValue } from "@repo/shared/flags";
 import { logger } from "@repo/shared/logger";
@@ -140,8 +142,11 @@ export async function POST(request: Request) {
       }),
     ]);
 
-    // Public traffic is the scheduler. The admin-load trigger stays as the
-    // fallback for a day with no visitors.
+    // Public traffic is the scheduler: the rollup runs here, not only when an admin
+    // opens the dashboard. Retention refuses to prune days nothing has summarised, so
+    // a site with traffic and no admin visits would otherwise grow without bound.
+    // Both calls are idempotent, self-limiting and locked, so concurrent beacons
+    // cost one extra read each rather than duplicated work.
     after(async () => {
       try {
         const published = await maybePublishDue();
@@ -160,7 +165,9 @@ export async function POST(request: Request) {
             items: published.map((p) => `${p.type}:${p.id}`),
           });
         }
-        // TODO(phase-09): runPeriodicMaintenance()
+        // Before maintenance, so retention sees the floor this pass just moved.
+        await catchUpRollups();
+        await runPeriodicMaintenance();
       } catch (e) {
         // An unhandled throw in `after` takes down the whole invocation.
         logger.error("collect", "post-response work failed", { err: String(e) });

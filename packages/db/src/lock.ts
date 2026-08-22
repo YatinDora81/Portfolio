@@ -28,13 +28,12 @@ export async function acquireLock(
   }
 }
 
-// Guarded on `lockedBy` so a caller whose lock was stolen cannot release the new holder's.
+// Guarded on `lockedBy` so a caller whose lock was stolen cannot release the new
+// holder's. Deleting rather than expiring in place: one key per summarised day means
+// expiring left a permanent row per day, and nothing prunes JobLock.
 async function releaseLock(key: string, holder: string): Promise<void> {
   try {
-    await prisma.jobLock.updateMany({
-      where: { key, lockedBy: holder },
-      data: { expiresAt: new Date(0) },
-    });
+    await prisma.jobLock.deleteMany({ where: { key, lockedBy: holder } });
   } catch (e) {
     console.error("[lock] release failed", key, e);
   }

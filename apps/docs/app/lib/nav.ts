@@ -3,7 +3,7 @@ import {
   IconLayoutGrid, IconInbox, IconSparkles, IconUser, IconCpu, IconBriefcase,
   IconFolderCode, IconPencil, IconQuote, IconTag, IconSettings2, IconShieldCheck,
   IconSend, IconChartBar, IconPalette, IconTerminal2, IconHistory, IconPaw,
-  IconNotebook, IconRefreshDot, IconToggleLeft, IconPhoto, IconLink,
+  IconNotebook, IconRefreshDot, IconToggleLeft, IconPhoto, IconLink, IconChartAreaLine,
 } from "@tabler/icons-react";
 
 export type NavIcon = ComponentType<{ size?: number; className?: string; stroke?: number }>;
@@ -72,6 +72,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/tracker", label: "Tracker", icon: IconChartBar, eyebrow: "outreach · attribution" },
       { href: "/tracked-links", label: "Tracked links", icon: IconLink, eyebrow: "outreach · short links",
         keywords: "short link shortener qr code slug redirect clicks campaign channel resume utm" },
+      { href: "/analytics", label: "Analytics", icon: IconChartAreaLine, eyebrow: "traffic · sessions & sections",
+        keywords: "visits sessions uniques channels funnel reach dwell median attention rollup daily stats devices mobile desktop summarize" },
     ],
   },
   {
