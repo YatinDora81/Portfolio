@@ -96,6 +96,42 @@ false. Phase 04's backfill must therefore produce **10 DRAFT / 0 PUBLISHED** for
 Blog, and — because Project has no flag and all 6 are live — **6 PUBLISHED** for
 Project.
 
+## Resume here
+
+**Next: Phase 05 — inbox, spam defense, email.** Phases 01-04 are committed and green
+(`check-types`, `lint`, `build` all pass; `prisma migrate status` clean).
+
+Before starting 05, re-read the "Deviations" table above. The ones that bite Phase 05:
+
+- `ContactMessage` uses **`message`**, not `body`. It has `read Boolean`, no `status`,
+  no `updatedAt`, no indexes. 7 rows live.
+- The admin sidebar's unread badge reads `contactMessage.count({ where: { read: false } })`
+  in `apps/docs/app/(dashboard)/layout.tsx`. A `status` column has to keep that working.
+- `apps/docs/app/(dashboard)/messages/page.tsx` loads the **entire** table with no `take`
+  and serialises it to the client.
+- SMTP is `apps/docs/app/lib/mail.ts` — nodemailer, `service: "gmail"`, hand-written
+  inline-styled HTML. `SMTP_EMAIL`/`SMTP_PASSWORD` are set. There is no `SMTP_FROM`.
+- `apps/web` has **no** Turnstile keys and no `NOTIFY_EMAIL_TO`. Per the user's decision,
+  build with graceful degradation: absent keys mean that defense is off, not that the
+  form breaks.
+- The contact form posts `{ name, email, purpose, message }` from
+  `apps/web/app/components/landing/contact/SentenceForm.tsx`. Client caps message at 1000
+  chars while the server caps at 5000 — **deliberate, documented, do not "fix" it.**
+- `/api/contact` already gates on `FLAG_KEYS.CONTACT_FORM` and returns 503 when off.
+
+Standing decisions from the user this session:
+
+1. Migrations run against **production** (additive only; print row counts before any
+   data migration). Use the **direct** Neon endpoint — the pooler leaks Prisma's advisory
+   lock. Derive it by dropping `-pooler` from the host.
+2. **Maintenance mode is out of scope.** No middleware in `apps/web`, no Edge Config,
+   no Upstash.
+3. Features needing credentials that are not set (R2, Turnstile) are built to degrade,
+   not to fail.
+4. Commit per phase, the user's name only, no co-author trailer.
+5. **Comments: default to none.** One line, only where a reader would otherwise break
+   something invisible. Never a block header explaining a design decision.
+
 ## Phase log
 
 - [x] 01 foundations
