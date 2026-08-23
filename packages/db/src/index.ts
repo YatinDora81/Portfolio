@@ -4,8 +4,13 @@ import { PrismaClient } from "./generated/prisma/client";
 
 const connectionString = `${process.env.DATABASE_URL}`;
 
-const adapter = new PrismaPg({ connectionString });
-const prisma = new PrismaClient({ adapter });
+// Without the global, every hot reload leaks another client and pg pool.
+const globalForPrisma = globalThis as { __prisma?: PrismaClient };
+
+const prisma =
+  globalForPrisma.__prisma ?? new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.__prisma = prisma;
 
 export { prisma };
 export type * from "./generated/prisma/models";

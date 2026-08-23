@@ -187,6 +187,22 @@ describe("renderMarkdown · containers", () => {
     expect(html("text\n:::\nmore")).toContain("more");
   });
 
+  test("nesting past the depth cap flattens rather than spinning on one line", () => {
+    // Same trap as the stray marker above, reached the other way: capping the
+    // depth by declining to match `:::` leaves the line for the paragraph
+    // branch, which stops on it without advancing. It has to stay consumed.
+    const deep = 40;
+    const out = html(
+      [
+        ...Array.from({ length: deep }, (_, n) => `::: note L${n}`),
+        "deepest",
+        ...Array.from({ length: deep }, () => ":::"),
+      ].join("\n"),
+    );
+    expect(out).toContain("deepest");
+    expect(out.length).toBeLessThan(100_000);
+  });
+
   test("a loose line before the choices is more question, after them more reason", () => {
     const out = html("::: quiz\nWhat prints?\n+ 1\n- 2\nbecause of the closure\n:::");
     expect(out).toContain("What prints?");

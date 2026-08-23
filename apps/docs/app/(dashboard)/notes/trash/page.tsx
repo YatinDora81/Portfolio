@@ -32,16 +32,25 @@ export default async function TrashPage() {
 
   const childrenOf = new Map<string, string[]>();
   for (const r of rows) {
-    if (!r.parentId) continue;
+    if (!r.parentId || r.parentId === r.id) continue;
     const list = childrenOf.get(r.parentId);
     if (list) list.push(r.id);
     else childrenOf.set(r.parentId, [r.id]);
   }
   const gone = new Set(rows.map((r) => r.id));
 
+  // Guarded like `subtreeIds`: a parentId cycle has nothing else to stop it, and
+  // an unguarded walk here grows the queue until the render OOMs the server.
   const countInside = (id: string) => {
+    const seen = new Set([id]);
     const queue = [id];
-    for (let i = 0; i < queue.length; i++) queue.push(...(childrenOf.get(queue[i]!) ?? []));
+    for (let i = 0; i < queue.length; i++) {
+      for (const child of childrenOf.get(queue[i]!) ?? []) {
+        if (seen.has(child)) continue;
+        seen.add(child);
+        queue.push(child);
+      }
+    }
     return queue.length - 1;
   };
 

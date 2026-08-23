@@ -80,13 +80,16 @@ function hash(s: string): string {
   return (h >>> 0).toString(36);
 }
 
+/** Each level copies the lines below it, so unclosed `:::` nests quadratically. */
+const MAX_CONTAINER_DEPTH = 16;
+
 /**
  * Blocks are scanned line by line rather than split on blank lines first. A
  * fenced block is allowed to contain a blank line — code usually does — and any
  * splitter that runs before the fences are found tears that block in half and
  * renders the second half as prose.
  */
-function blocks(lines: string[]): ReactNode[] {
+function blocks(lines: string[], depth = 0): ReactNode[] {
   const out: ReactNode[] = [];
   let i = 0;
 
@@ -122,12 +125,19 @@ function blocks(lines: string[]): ReactNode[] {
       const { body, next } = container(lines, i + 1);
       i = next;
       const id = hash(`${kind}${title}${body.join("\n")}`);
+      // At the cap the container is flattened, but it must still be CONSUMED:
+      // `opensBlock` counts `:::` as an opener, so a line left for the paragraph
+      // branch ends that run before it advances `i`, and the scanner spins here.
       out.push(
-        kind === "quiz"
-          ? quiz(title, body, `${key}-${id}`, id)
-          : kind === "details"
-            ? accordion(title, body, `${key}-${id}`)
-            : callout(kind, title, body, `${key}-${id}`),
+        depth >= MAX_CONTAINER_DEPTH ? (
+          <p key={`${key}-${id}`}>{lineRun([line, ...body], `${key}-${id}`)}</p>
+        ) : kind === "quiz" ? (
+          quiz(title, body, `${key}-${id}`, id)
+        ) : kind === "details" ? (
+          accordion(title, body, `${key}-${id}`, depth)
+        ) : (
+          callout(kind, title, body, `${key}-${id}`, depth)
+        ),
       );
       continue;
     }
@@ -323,22 +333,22 @@ function quiz(title: string, lines: string[], key: string, id: string): ReactNod
 
 /** The browser's own accordion. Its contents are markdown, containers included,
  *  so a long derivation can be folded away one step at a time. */
-function accordion(title: string, body: string[], key: string): ReactNode {
+function accordion(title: string, body: string[], key: string, depth = 0): ReactNode {
   return (
     <details className="nt-acc" key={key}>
       <summary>{title ? inline(title, `${key}s`) : "Details"}</summary>
-      <div className="nt-acc-b">{blocks(body)}</div>
+      <div className="nt-acc-b">{blocks(body, depth + 1)}</div>
     </details>
   );
 }
 
 /** An aside that should not read as the next sentence. `aside` rather than a
  *  `div`, because that is exactly what it is. */
-function callout(kind: string, title: string, body: string[], key: string): ReactNode {
+function callout(kind: string, title: string, body: string[], key: string, depth = 0): ReactNode {
   return (
     <aside className={`nt-call ${kind}`} key={key}>
       <p className="nt-call-t">{title ? inline(title, `${key}t`) : (CALLOUT[kind] ?? "Note")}</p>
-      {blocks(body)}
+      {blocks(body, depth + 1)}
     </aside>
   );
 }

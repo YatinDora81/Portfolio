@@ -165,13 +165,22 @@ export async function subtreeIds(tx: Tx, rootId: string): Promise<string[]> {
   const all = await tx.noteNode.findMany({ select: { id: true, parentId: true } });
   const childrenOf = new Map<string, string[]>();
   for (const n of all) {
-    if (!n.parentId) continue;
+    if (!n.parentId || n.parentId === n.id) continue;
     const list = childrenOf.get(n.parentId);
     if (list) list.push(n.id);
     else childrenOf.set(n.parentId, [n.id]);
   }
+  // Guarded like `rebuildSubtrees`: nothing stops a parentId cycle, and an
+  // unguarded walk over one appends until the heap dies.
+  const seen = new Set([rootId]);
   const out = [rootId];
-  for (let i = 0; i < out.length; i++) out.push(...(childrenOf.get(out[i]!) ?? []));
+  for (let i = 0; i < out.length; i++) {
+    for (const id of childrenOf.get(out[i]!) ?? []) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+    }
+  }
   return out;
 }
 
@@ -188,14 +197,19 @@ export async function restorableIds(tx: Tx, rootId: string): Promise<string[]> {
   const all = await tx.noteNode.findMany({ select: { id: true, parentId: true, trashRoot: true } });
   const childrenOf = new Map<string, { id: string; trashRoot: boolean }[]>();
   for (const n of all) {
-    if (!n.parentId) continue;
+    if (!n.parentId || n.parentId === n.id) continue;
     const list = childrenOf.get(n.parentId);
     if (list) list.push(n);
     else childrenOf.set(n.parentId, [n]);
   }
+  const seen = new Set([rootId]);
   const out = [rootId];
   for (let i = 0; i < out.length; i++) {
-    for (const c of childrenOf.get(out[i]!) ?? []) if (!c.trashRoot) out.push(c.id);
+    for (const c of childrenOf.get(out[i]!) ?? []) {
+      if (c.trashRoot || seen.has(c.id)) continue;
+      seen.add(c.id);
+      out.push(c.id);
+    }
   }
   return out;
 }
@@ -418,13 +432,21 @@ async function copyAnswer(tx: Tx, fromId: string, toId: string) {
   });
 }
 
-async function copyChildren(tx: Tx, fromId: string, toId: string) {
+// `seen` spans the whole copy and holds both sides of it: source rows already
+// copied, and the copies themselves. Both halves are load-bearing. A self-parented
+// row is its own child, so `duplicateIn` — which parents the new root at
+// `src.parentId` — drops that root inside the very subtree being walked; without
+// the copies in `seen` the query keeps handing back rows minted a moment ago, and
+// a fresh id is never one this walk has seen before.
+async function copyChildren(tx: Tx, fromId: string, toId: string, seen = new Set([fromId, toId])) {
   const kids = await tx.noteNode.findMany({
     where: { parentId: fromId, deletedAt: null },
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     select: { id: true, kind: true, title: true, slug: true, sortOrder: true },
   });
   for (const k of kids) {
+    if (seen.has(k.id)) continue;
+    seen.add(k.id);
     const copy = await tx.noteNode.create({
       data: {
         parentId: toId,
@@ -436,8 +458,9 @@ async function copyChildren(tx: Tx, fromId: string, toId: string) {
       },
       select: { id: true },
     });
+    seen.add(copy.id);
     await copyAnswer(tx, k.id, copy.id);
-    await copyChildren(tx, k.id, copy.id);
+    await copyChildren(tx, k.id, copy.id, seen);
   }
 }
 
