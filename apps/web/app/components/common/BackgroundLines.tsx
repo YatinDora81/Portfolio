@@ -71,6 +71,20 @@ export default React.memo(function BackgroundLines() {
   useEffect(() => setMounted(true), []);
   const still = mounted && reduce;
 
+  // Each beam is a motion.linearGradient animating SVG attributes (x1/y1/x2/y2)
+  // forever — SVG attribute animation cannot be GPU-composited, so all 50 run
+  // on the main thread for the life of the page (Lighthouse: "Avoid
+  // non-composited animations", and a steady main-thread tax on mobile).
+  // On small screens only every third beam animates; the faint static line
+  // field underneath keeps the visual density, so the difference is invisible
+  // on a narrow viewport. Gated on `mounted` for the same hydration-safety
+  // reason as `still` above.
+  const [lite, setLite] = useState(false);
+  useEffect(() => {
+    setLite(window.matchMedia('(max-width: 1024px)').matches);
+  }, []);
+  const beamActive = (index: number) => !(mounted && lite) || index % 3 === 0;
+
   // Precompute each beam's random timing/target ONCE, so render stays pure
   // (no Math.random() during render -> deterministic, no hydration surprises).
   const beams = useMemo(
@@ -110,7 +124,7 @@ export default React.memo(function BackgroundLines() {
             are plain <path>s rather than 50 motion instances. */}
         {!still && (
           <g className="bg-beams">
-            {paths.map((path, index) => (
+            {paths.map((path, index) => beamActive(index) && (
               <path
                 key={`beam-${index}`}
                 d={path}
@@ -123,7 +137,7 @@ export default React.memo(function BackgroundLines() {
         )}
         <defs>
           {!still &&
-            beams.map((beam, index) => (
+            beams.map((beam, index) => beamActive(index) && (
               <motion.linearGradient
                 id={`bg-beam-gradient-${index}`}
                 key={`bg-gradient-${index}`}
