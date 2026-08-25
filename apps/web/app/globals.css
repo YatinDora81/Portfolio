@@ -198,6 +198,46 @@
    the year-in-one-line fold shut. */
 #contact { contain-intrinsic-size: auto 1480px; }
 
+/* ── Background beams ───────────────────────────────────────────────────────
+   The sweep used to be 50 Motion `linearGradient`s each tweening x1/y1/x2/y2
+   from JS, forever: one Motion visual element + projection node per beam at
+   hydration, then a 50-write rAF loop that kept the animation chunk on the
+   main thread for ~5s of every Lighthouse trace and never let TTI settle.
+
+   Now each beam is a plain <path pathLength="1"> with a dash that travels its
+   length via a CSS `stroke-dashoffset` keyframe. The gradient is one shared
+   userSpaceOnUse ramp, so the head of a beam is cyan and the tail violet the
+   way it always was. Zero JS per frame; React never re-renders for it.
+
+   The group starts paused. BackgroundLines flips `data-beams="on"` from a
+   requestIdleCallback after load, so the sweep is not competing with
+   hydration or the LCP paint — it is decorative, it can wait 1–2s. */
+.bg-beams path {
+  stroke-dasharray: 0.22 1.78; /* one dash, then a long gap before the next */
+  stroke-dashoffset: 2;
+  stroke-linecap: round;
+  animation: beamSweep var(--beam-dur, 9s) ease-in-out var(--beam-delay, 0s) infinite;
+  animation-play-state: paused;
+}
+[data-beams="on"] .bg-beams path { animation-play-state: running; }
+
+@keyframes beamSweep {
+  to { stroke-dashoffset: 0; }
+}
+
+/* No beams below the desktop breakpoint. A `stroke-dashoffset` sweep cannot
+   run on the compositor, so each beam is a main-thread paint per frame; on a
+   throttled phone CPU that was ~4s of Layerize/Commit/Paint across the trace
+   for half-pixel lines at 40% opacity under a 50% overlay — decoration the
+   viewer can barely see and the battery can definitely feel. The static line
+   field still gives the texture. */
+@media (max-width: 1024px) {
+  .bg-beams-layer { display: none; }
+}
+/* Own compositor layer: a beam frame invalidates this SVG only, never the
+   static field or the overlay sitting on top of it. */
+.bg-beams-layer { will-change: transform; }
+
 .skill-inner-shadow {
   box-shadow:
     inset 0 1px 2px rgba(0, 0, 0, 0.08),
@@ -2308,7 +2348,7 @@ body.cat-on .cw .dot { display: none; }
   /* The background beam sweep. Hidden here rather than only in the component,
      because that gate runs in a passive effect after the hydration paint —
      CSS applies before first paint, so there is no flash to remove. */
-  .bg-beams { display: none; }
+  .bg-beams-layer { display: none; }
 
   /* ── section additions (spec §5) ─────────────────────────────────────── */
 

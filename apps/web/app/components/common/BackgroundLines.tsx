@@ -1,8 +1,12 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { m as motion, useReducedMotion } from 'motion/react';
+import React, { useEffect, useRef } from 'react';
 
+/**
+ * The full line field, drawn once as a single faint path. Fifty strokes, one
+ * DOM node. This is the texture; the beams below are the light that runs
+ * along it.
+ */
 const paths = [
   "M-380 -189C-380 -189 -312 216 152 343C616 470 684 875 684 875",
   "M-373 -197C-373 -197 -305 208 159 335C623 462 691 867 691 867",
@@ -58,54 +62,81 @@ const paths = [
 
 const allPathsD = paths.join('');
 
+/**
+ * Which of the fifty lines carry a beam. Every ~3.5th line, so the sweep reads
+ * as scattered rather than as a comb — 14 beams is what the old 50 looked like
+ * once you subtract the ones that were mid-gap at any moment. Fewer strokes to
+ * repaint per frame, and ~290 fewer DOM nodes than 50 beams each with its own
+ * five-node gradient.
+ *
+ * Timing is fixed per beam rather than Math.random() at mount: the server and
+ * client must agree on the markup, and a deterministic spread looks identical
+ * to a random one.
+ */
+const BEAMS: { i: number; dur: number; delay: number }[] = [
+  { i: 0, dur: 8.5, delay: 0 },
+  { i: 4, dur: 10, delay: 1.1 },
+  { i: 7, dur: 7.5, delay: 2.4 },
+  { i: 11, dur: 9.5, delay: 0.6 },
+  { i: 14, dur: 8, delay: 3.2 },
+  { i: 18, dur: 11, delay: 1.7 },
+  { i: 21, dur: 7, delay: 4.1 },
+  { i: 25, dur: 9, delay: 0.3 },
+  { i: 28, dur: 10.5, delay: 2.9 },
+  { i: 32, dur: 8, delay: 1.4 },
+  { i: 35, dur: 9.5, delay: 3.7 },
+  { i: 39, dur: 7.5, delay: 0.9 },
+  { i: 43, dur: 10, delay: 2.1 },
+  { i: 47, dur: 8.5, delay: 3.5 },
+];
+
 export default React.memo(function BackgroundLines() {
-  // `useReducedMotion()` is NOT SSR-safe: motion-dom initialises its state
-  // lazily, so the server sees `null` and the client's very FIRST render
-  // already sees `true`. Branching rendered output straight off it meant the
-  // server emitted all 50 beams and a reduced-motion visitor's first client
-  // pass emitted none — a mismatch that made React throw away the server markup
-  // for this subtree. Gating on `mounted` keeps render one and the server
-  // identical; the beams are then dropped on the pass after hydration.
-  const reduce = useReducedMotion();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const still = mounted && reduce;
+  const wrapRef = useRef<HTMLDivElement>(null);
 
-  // Each beam is a motion.linearGradient animating SVG attributes (x1/y1/x2/y2)
-  // forever — SVG attribute animation cannot be GPU-composited, so all 50 run
-  // on the main thread for the life of the page (Lighthouse: "Avoid
-  // non-composited animations", and a steady main-thread tax on mobile).
-  // On small screens only every third beam animates; the faint static line
-  // field underneath keeps the visual density, so the difference is invisible
-  // on a narrow viewport. Gated on `mounted` for the same hydration-safety
-  // reason as `still` above.
-  const [lite, setLite] = useState(false);
+  // The beams sit paused (see .bg-beams in globals.css) until the browser has
+  // nothing better to do. Flipping the attribute directly, rather than through
+  // state, means this component never re-renders: the server markup IS the
+  // final markup, hydration has nothing to reconcile, and the only work here is
+  // one attribute write.
   useEffect(() => {
-    setLite(window.matchMedia('(max-width: 1024px)').matches);
-  }, []);
-  const beamActive = (index: number) => !(mounted && lite) || index % 3 === 0;
+    const el = wrapRef.current;
+    if (!el) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (window.matchMedia('(max-width: 1024px)').matches) return;
 
-  // Precompute each beam's random timing/target ONCE, so render stays pure
-  // (no Math.random() during render -> deterministic, no hydration surprises).
-  const beams = useMemo(
-    () =>
-      paths.map(() => ({
-        y2: `${93 + Math.random() * 8}%`,
-        duration: Math.random() * 5 + 5,
-        delay: Math.random() * 2,
-      })),
-    []
-  );
+    const start = () => el.setAttribute('data-beams', 'on');
+    // Safari has no requestIdleCallback; a plain timeout is the fallback there.
+    const ric: typeof window.requestIdleCallback | undefined = window.requestIdleCallback;
+    let idle: number | undefined;
+    let timer: number | undefined;
+    const schedule = () => {
+      if (ric) idle = ric(start, { timeout: 2500 });
+      else timer = window.setTimeout(start, 1500);
+    };
+    if (document.readyState === 'complete') schedule();
+    else window.addEventListener('load', schedule, { once: true });
+
+    return () => {
+      window.removeEventListener('load', schedule);
+      if (idle !== undefined) window.cancelIdleCallback?.(idle);
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, []);
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-0">
+    <div ref={wrapRef} className="pointer-events-none fixed inset-0 z-0">
+      {/* Two SVGs, not one. The line field below is painted once and never
+          again; the beams are in their own SVG on their own compositor layer
+          (.bg-beams-layer), so a sweep frame repaints fourteen half-pixel
+          strokes and not the fifty underneath them as well. */}
       <svg
-        className="h-full w-full"
+        className="absolute inset-0 h-full w-full"
         width="100%"
         height="100%"
         viewBox="0 0 696 316"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
       >
         <path
           d={allPathsD}
@@ -113,59 +144,7 @@ export default React.memo(function BackgroundLines() {
           strokeOpacity="0.05"
           strokeWidth="0.5"
         />
-        {/* The beams are hidden by CSS under prefers-reduced-motion, not by the
-            `still` gate alone: `useEffect` is passive and runs AFTER the
-            hydration paint, so gating on it would start all 50 gradients
-            sweeping and then pop them out — a flash shown to precisely the
-            people who asked for no motion. CSS applies before first paint and
-            cannot mismatch. `still` then unmounts them a tick later, which is
-            invisible (they are already hidden) but stops the animation cost.
-            The paths never animate themselves, only their gradients, so these
-            are plain <path>s rather than 50 motion instances. */}
-        {!still && (
-          <g className="bg-beams">
-            {paths.map((path, index) => beamActive(index) && (
-              <path
-                key={`beam-${index}`}
-                d={path}
-                stroke={`url(#bg-beam-gradient-${index})`}
-                strokeOpacity="0.4"
-                strokeWidth="0.5"
-              />
-            ))}
-          </g>
-        )}
         <defs>
-          {!still &&
-            beams.map((beam, index) => beamActive(index) && (
-              <motion.linearGradient
-                id={`bg-beam-gradient-${index}`}
-                key={`bg-gradient-${index}`}
-                initial={{
-                  x1: '0%',
-                  x2: '0%',
-                  y1: '0%',
-                  y2: '0%',
-                }}
-                animate={{
-                  x1: ['0%', '100%'],
-                  x2: ['0%', '95%'],
-                  y1: ['0%', '100%'],
-                  y2: ['0%', beam.y2],
-                }}
-                transition={{
-                  duration: beam.duration,
-                  ease: 'easeInOut',
-                  repeat: Infinity,
-                  delay: beam.delay,
-                }}
-              >
-                <stop stopColor="#18CCFC" stopOpacity="0" />
-                <stop stopColor="#18CCFC" />
-                <stop offset="32.5%" stopColor="#6344F5" />
-                <stop offset="100%" stopColor="#AE48FF" stopOpacity="0" />
-              </motion.linearGradient>
-            ))}
           <radialGradient
             id="bg-lines-radial"
             cx="0"
@@ -178,6 +157,50 @@ export default React.memo(function BackgroundLines() {
             <stop offset="0.243243" stopColor="var(--foreground)" />
             <stop offset="0.43594" stopColor="var(--foreground)" stopOpacity="0" />
           </radialGradient>
+        </defs>
+      </svg>
+      {/* Desktop only, and hidden under prefers-reduced-motion — both by CSS,
+          which applies before first paint, so there is no flash for exactly
+          the people who asked for none. */}
+      <svg
+        className="bg-beams-layer absolute inset-0 h-full w-full"
+        width="100%"
+        height="100%"
+        viewBox="0 0 696 316"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <g className="bg-beams">
+          {BEAMS.map(({ i, dur, delay }) => (
+            <path
+              key={i}
+              d={paths[i]}
+              pathLength={1}
+              stroke="url(#bg-beam)"
+              strokeOpacity="0.4"
+              strokeWidth="0.5"
+              style={{ '--beam-dur': `${dur}s`, '--beam-delay': `${delay}s` } as React.CSSProperties}
+            />
+          ))}
+        </g>
+        <defs>
+          {/* One gradient for every beam, laid along the lines' direction of
+              travel in user space, so a dash is cyan at its head and violet at
+              its tail wherever it is on the path. */}
+          <linearGradient
+            id="bg-beam"
+            gradientUnits="userSpaceOnUse"
+            x1="-380"
+            y1="-580"
+            x2="1030"
+            y2="880"
+          >
+            <stop offset="0" stopColor="#18CCFC" stopOpacity="0" />
+            <stop offset="0.2" stopColor="#18CCFC" />
+            <stop offset="0.55" stopColor="#6344F5" />
+            <stop offset="1" stopColor="#AE48FF" stopOpacity="0" />
+          </linearGradient>
         </defs>
       </svg>
     </div>
