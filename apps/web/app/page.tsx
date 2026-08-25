@@ -1,4 +1,5 @@
 
+import { Suspense } from 'react';
 import { after } from 'next/server';
 import { draftMode } from 'next/headers';
 import { ThemeProvider } from './components/common/ThemeProvider';
@@ -15,6 +16,7 @@ import Blogs from './components/landing/Blogs';
 import ThoughtOfTheDay from './components/landing/ThoughtOfTheDay';
 import Contact from './components/landing/Contact';
 import Footer from './components/common/Footer';
+import HydrateWhenVisible from './components/common/HydrateWhenVisible';
 import BackgroundLines from './components/common/BackgroundLines';
 import {
   getHeroData,
@@ -197,42 +199,89 @@ export default async function Home() {
               showContact={show.contact}
             />
             <Bridge />
+            {/* Every below-the-fold section sits in its own Suspense boundary,
+                and HydrateWhenVisible suspends inside it until the section is
+                near the viewport. All the data is already in the props — the
+                HTML is complete and visible from the first byte — this only
+                moves React's hydration work (walking ~900 offscreen nodes,
+                attaching handlers, running effects) off the critical path and
+                onto the moment a section is about to be seen. Each boundary
+                then hydrates in its own task rather than the whole page in one
+                ~250ms (raw) main-thread block. */}
             {show.about && (
-              <About
-                paragraphs={aboutData.paragraphs}
-                education={aboutData.education}
-                resumeUrl={siteConfig.resumeUrl}
-                companyLogos={companyLogos}
-              />
+              <Suspense fallback={null}>
+                <HydrateWhenVisible id="hy-about">
+                <About
+                  paragraphs={aboutData.paragraphs}
+                  education={aboutData.education}
+                  resumeUrl={siteConfig.resumeUrl}
+                  companyLogos={companyLogos}
+                />
+                </HydrateWhenVisible>
+              </Suspense>
             )}
-            {show.skills && <Skills skills={skills} />}
-            {show.experience && <Experience experiences={experiences} />}
+            {show.skills && (
+              <Suspense fallback={null}>
+                <HydrateWhenVisible id="hy-skills">
+                <Skills skills={skills} />
+                </HydrateWhenVisible>
+              </Suspense>
+            )}
+            {show.experience && (
+              <Suspense fallback={null}>
+                <HydrateWhenVisible id="hy-experience">
+                <Experience experiences={experiences} />
+                </HydrateWhenVisible>
+              </Suspense>
+            )}
             {show.projects && (
-              <Projects version={siteConfig.projectsVersion} projects={projects} />
+              <Suspense fallback={null}>
+                <HydrateWhenVisible id="hy-projects">
+                <Projects version={siteConfig.projectsVersion} projects={projects} />
+                </HydrateWhenVisible>
+              </Suspense>
             )}
-            {show.blogs && <Blogs blogs={blogs} />}
-            <ThoughtOfTheDay
-              quote={thought.quote}
-              date={thought.date}
-              iso={thought.iso}
-              day={thought.day}
-              days={thought.days}
-            />
-            {show.contact && (
-              <Contact
-                purposes={contactData.purposes}
-                socialLinks={contactData.socialLinks}
-                contactEmail={siteConfig.contactEmail}
-                availabilityStatus={siteConfig.availabilityStatus}
-                availabilityDetail={siteConfig.availabilityDetail}
-                resumeUrl={siteConfig.resumeUrl}
-                github={github}
-                formEnabled={contactFormEnabled}
-                turnstileSiteKey={env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? null}
+            {show.blogs && (
+              <Suspense fallback={null}>
+                <HydrateWhenVisible id="hy-blogs">
+                <Blogs blogs={blogs} />
+                </HydrateWhenVisible>
+              </Suspense>
+            )}
+            <Suspense fallback={null}>
+                <HydrateWhenVisible id="hy-thoughtoftheday">
+              <ThoughtOfTheDay
+                quote={thought.quote}
+                date={thought.date}
+                iso={thought.iso}
+                day={thought.day}
+                days={thought.days}
               />
+                </HydrateWhenVisible>
+              </Suspense>
+            {show.contact && (
+              <Suspense fallback={null}>
+                <HydrateWhenVisible id="hy-contact">
+                <Contact
+                  purposes={contactData.purposes}
+                  socialLinks={contactData.socialLinks}
+                  contactEmail={siteConfig.contactEmail}
+                  availabilityStatus={siteConfig.availabilityStatus}
+                  availabilityDetail={siteConfig.availabilityDetail}
+                  resumeUrl={siteConfig.resumeUrl}
+                  github={github}
+                  formEnabled={contactFormEnabled}
+                  turnstileSiteKey={env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? null}
+                />
+                </HydrateWhenVisible>
+              </Suspense>
             )}
           </main>
-          <Footer copyrightName={siteConfig.copyrightName} />
+          <Suspense fallback={null}>
+                <HydrateWhenVisible id="hy-footer">
+            <Footer copyrightName={siteConfig.copyrightName} />
+                </HydrateWhenVisible>
+              </Suspense>
         </div>
       </div>
       </MotionProvider>
