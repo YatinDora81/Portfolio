@@ -15,7 +15,7 @@
  * Optional prop: wordmark — overrides the desktop text; mobile uses its first word.
  */
 
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import Container from './Container';
 
 interface SocialLink {
@@ -35,6 +35,22 @@ function NameMark({
   className?: string;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  // The sheen sweeps `mask-position` and cannot run on the compositor, so
+  // while it is animating the main thread paints a frame every 16ms — and it
+  // used to do that from page load, for a wordmark five screens below the
+  // fold. It is paused (see `.yfw-wrap.in` below) until the footer is actually
+  // near the viewport, then runs exactly as before.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => el.classList.toggle('in', entries.some((e) => e.isIntersecting)),
+      { rootMargin: '200px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   // Auto-size: longer text → smaller font so glyphs keep natural
   // proportions while textLength stretches them edge-to-edge.
@@ -165,13 +181,16 @@ export default function Footer({
           -webkit-mask-size: 250% 100%;
           mask-size: 250% 100%;
           animation: yfw-sheen 7s ease-in-out infinite;
+          animation-play-state: paused;
         }
+        .yfw-wrap.in .yfw-sheen { animation-play-state: running; }
         .yfw-wrap:hover .yfw-sheen { opacity: 0; }
         @keyframes yfw-sheen {
           0% { -webkit-mask-position: 140% 0; mask-position: 140% 0; }
           45%, 100% { -webkit-mask-position: -40% 0; mask-position: -40% 0; }
         }
-        .yfw-star { animation: yfw-star 3.2s ease-in-out infinite; }
+        .yfw-star { animation: yfw-star 3.2s ease-in-out infinite; animation-play-state: paused; }
+        .yfw-wrap.in .yfw-star { animation-play-state: running; }
         @keyframes yfw-star {
           0%, 100% { opacity: .35; }
           50% { opacity: 1; }
