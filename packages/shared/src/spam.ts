@@ -1,4 +1,8 @@
 export const SPAM_THRESHOLD = 60;
+// Elapsed is measured from token issue, and the contact section hydrates
+// lazily — so this is "time since #contact neared the viewport", not time
+// since page load. Keep it small: raising it would convict fast-scrolling
+// humans, not just bots.
 export const MIN_ELAPSED_MS = 3_000;
 
 // Low enough that our own defenses failing to run cannot convict on their own.

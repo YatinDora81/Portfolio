@@ -265,14 +265,50 @@ function Composer({
     return () => ac.abort();
   }, []);
 
-  // No cleanup: removing the tag would take the widget it rendered with it.
+  // Turnstile is fetched when the form is about to be seen or used — not at
+  // mount. The contact section is five screens below the fold, and the script
+  // (27 kB gz, ~280 ms of main thread on a mid-range phone, two blob workers and
+  // an iframe) was loading on every pageview whether or not anyone scrolled
+  // down. `content-visibility: auto` on #contact means an observer on a child
+  // would never fire, so this watches the section itself, then the form's own
+  // focus as a belt-and-braces path for keyboard / find-in-page arrivals.
+  //
+  // No cleanup for the tag once appended: removing it would take the widget it
+  // rendered with it.
   useEffect(() => {
-    if (!turnstileSiteKey || document.querySelector(`script[src="${TURNSTILE_SRC}"]`)) return;
-    const s = document.createElement('script');
-    s.src = TURNSTILE_SRC;
-    s.async = true;
-    s.defer = true;
-    document.head.appendChild(s);
+    if (!turnstileSiteKey) return;
+    const form = formRef.current;
+    if (!form) return;
+
+    let loaded = false;
+    const load = () => {
+      if (loaded) return;
+      loaded = true;
+      if (document.querySelector(`script[src="${TURNSTILE_SRC}"]`)) return;
+      const s = document.createElement('script');
+      s.src = TURNSTILE_SRC;
+      s.async = true;
+      s.defer = true;
+      document.head.appendChild(s);
+    };
+
+    const target = form.closest('section') ?? form;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          load();
+          io.disconnect();
+        }
+      },
+      { rootMargin: '600px 0px' },
+    );
+    io.observe(target);
+    form.addEventListener('focusin', load, { once: true });
+
+    return () => {
+      io.disconnect();
+      form.removeEventListener('focusin', load);
+    };
   }, [turnstileSiteKey]);
 
   useEffect(
