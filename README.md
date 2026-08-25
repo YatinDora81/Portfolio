@@ -136,10 +136,10 @@ REVALIDATE_SECRET=
 
 ```bash
 # Push schema to database
-cd packages/db && bunx prisma db push
+cd packages/db && bun run db:push
 
 # Generate Prisma client
-bunx prisma generate
+bun run db:generate
 
 # Seed the database (optional)
 bun run seed

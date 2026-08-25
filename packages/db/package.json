@@ -15,6 +15,8 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
     "seed": "bun seed.ts",
     "hero:v2": "bun scripts/install-hero-v2.ts",
     "flags:seed": "bun scripts/seed-flags.ts"
