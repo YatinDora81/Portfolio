@@ -2,14 +2,21 @@
 
 import { cn } from '@/lib/utils';
 import { IconMenu2, IconX } from '@tabler/icons-react';
-import {
-  m as motion,
-  AnimatePresence,
-  useScroll,
-  useMotionValueEvent,
-} from 'motion/react';
+import React, { useEffect, useRef, useState } from 'react';
 
-import React, { useRef, useState } from 'react';
+/**
+ * The docking navbar, without Motion.
+ *
+ * It used to tween `width`, `backdrop-filter` and `box-shadow` with springs —
+ * three properties that need layout + paint on every frame, and that Motion
+ * had to read back from the DOM on mount (a forced reflow in every trace).
+ * The `layoutId` hover pill was the single feature on the site that pulled
+ * Motion's `domMax` bundle in instead of `domAnimation`.
+ *
+ * Everything is a CSS transition now (`.rn-*` in globals.css), switched by a
+ * `data-visible` attribute from one passive scroll listener. Same look, and
+ * the navbar costs nothing at hydration beyond attaching two handlers.
+ */
 
 interface NavbarProps {
   children: React.ReactNode;
@@ -51,27 +58,36 @@ interface MobileNavMenuProps {
   id?: string;
 }
 
-export const Navbar = ({ children, className }: NavbarProps) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollY } = useScroll({
-    target: ref,
-    offset: ['start start', 'end start'],
-  });
-  const [visible, setVisible] = useState<boolean>(false);
+const DOCK_AT = 100;
 
-  useMotionValueEvent(scrollY, 'change', (latest) => {
-    if (latest > 100) {
-      setVisible(true);
-    } else {
-      setVisible(false);
-    }
-  });
+/** True once the page has scrolled past `DOCK_AT`. One passive listener,
+    rAF-coalesced so a fast fling sets state once per frame, not per event. */
+function useDocked(): boolean {
+  const [docked, setDocked] = useState(false);
+  useEffect(() => {
+    let raf = 0;
+    const read = () => {
+      raf = 0;
+      setDocked(window.scrollY > DOCK_AT);
+    };
+    const onScroll = () => {
+      if (!raf) raf = window.requestAnimationFrame(read);
+    };
+    read();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, []);
+  return docked;
+}
+
+export const Navbar = ({ children, className }: NavbarProps) => {
+  const visible = useDocked();
 
   return (
-    <motion.div
-      ref={ref}
-      className={cn('fixed inset-x-0 top-0 z-40 w-full', className)}
-    >
+    <div className={cn('fixed inset-x-0 top-0 z-40 w-full', className)}>
       {React.Children.map(children, (child) =>
         React.isValidElement(child)
           ? React.cloneElement(
@@ -80,103 +96,97 @@ export const Navbar = ({ children, className }: NavbarProps) => {
             )
           : child,
       )}
-    </motion.div>
+    </div>
   );
 };
 
 export const NavBody = ({ children, className, visible }: NavBodyProps) => {
   return (
-    <motion.div
-      animate={{
-        backdropFilter: visible ? 'blur(10px)' : 'none',
-        boxShadow: visible
-          ? '0 0 24px rgba(34, 42, 53, 0.06), 0 1px 1px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(34, 42, 53, 0.04), 0 0 4px rgba(34, 42, 53, 0.08), 0 16px 68px rgba(47, 48, 55, 0.05), 0 1px 0 rgba(255, 255, 255, 0.1) inset'
-          : 'none',
-        width: visible ? '40%' : '100%',
-        y: visible ? 20 : 0,
-        borderRadius: visible ? '12px' : '12px',
-      }}
-      transition={{
-        type: 'spring',
-        stiffness: 200,
-        damping: 50,
-      }}
+    <div
+      data-visible={visible ? 'true' : 'false'}
       style={{
         minWidth: 'min(800px, 100%)',
       }}
       className={cn(
-        'relative z-[60] mx-auto hidden w-full max-w-7xl flex-row items-center justify-between self-start bg-transparent px-4 py-2 lg:flex dark:bg-transparent',
+        'rn-body relative z-[60] mx-auto hidden max-w-7xl flex-row items-center justify-between self-start bg-transparent px-4 py-2 lg:flex dark:bg-transparent',
         visible && 'bg-white/80 dark:bg-neutral-950/80',
         className,
       )}
     >
       {children}
-    </motion.div>
+    </div>
   );
 };
 
 export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
-  const [hovered, setHovered] = useState<number | null>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const pillRef = useRef<HTMLSpanElement>(null);
+
+  // The pill is moved imperatively: a hover should not re-render the nav, and
+  // a transform transition on one <span> is all the "shared layout" this needs.
+  const moveTo = (el: HTMLElement) => {
+    const pill = pillRef.current;
+    if (!pill) return;
+    // On its first showing the pill must snap to the link and only fade —
+    // otherwise it glides in from the nav's corner, since the position vars
+    // default to 0. The inline override is cleared once the snap has been
+    // committed by the forced reflow.
+    const first = !pill.classList.contains('on');
+    if (first) pill.style.transition = 'opacity 0.18s ease';
+    pill.style.setProperty('--pill-x', `${el.offsetLeft}px`);
+    pill.style.setProperty('--pill-y', `${el.offsetTop}px`);
+    pill.style.setProperty('--pill-w', `${el.offsetWidth}px`);
+    pill.style.setProperty('--pill-h', `${el.offsetHeight}px`);
+    pill.classList.add('on');
+    if (first) {
+      void pill.offsetWidth;
+      pill.style.transition = '';
+    }
+  };
+  const hide = () => pillRef.current?.classList.remove('on');
 
   return (
     // A landmark, not a div. `hidden lg:flex` takes it out of the a11y tree
     // below the breakpoint, so it never competes with the mobile menu's own nav.
-    <motion.nav
+    <nav
+      ref={navRef}
       aria-label="Main"
-      onMouseLeave={() => setHovered(null)}
+      onMouseLeave={hide}
       className={cn(
         'absolute inset-0 hidden flex-1 flex-row items-center justify-center space-x-2 text-sm font-medium text-zinc-600 transition duration-200 hover:text-zinc-800 lg:flex lg:space-x-2',
         className,
       )}
     >
+      <span ref={pillRef} className="rn-pill bg-gray-100 dark:bg-neutral-800" aria-hidden="true" />
       {items.map((item, idx) => (
         <a
-          onMouseEnter={() => setHovered(idx)}
+          onMouseEnter={(e) => moveTo(e.currentTarget)}
+          onFocus={(e) => moveTo(e.currentTarget)}
+          onBlur={hide}
           onClick={onItemClick}
           className="relative px-4 py-2 text-neutral-600 dark:text-neutral-300"
           key={`link-${idx}`}
           href={item.link}
         >
-          {hovered === idx && (
-            <motion.div
-              layoutId="hovered"
-              className="absolute inset-0 h-full w-full rounded-full bg-gray-100 dark:bg-neutral-800"
-            />
-          )}
           <span className="relative z-20">{item.name}</span>
         </a>
       ))}
-    </motion.nav>
+    </nav>
   );
 };
 
 export const MobileNav = ({ children, className, visible }: MobileNavProps) => {
   return (
-    <motion.div
-      animate={{
-        backdropFilter: visible ? 'blur(10px)' : 'none',
-        boxShadow: visible
-          ? '0 0 24px rgba(34, 42, 53, 0.06), 0 1px 1px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(34, 42, 53, 0.04), 0 0 4px rgba(34, 42, 53, 0.08), 0 16px 68px rgba(47, 48, 55, 0.05), 0 1px 0 rgba(255, 255, 255, 0.1) inset'
-          : 'none',
-        width: visible ? '90%' : '100%',
-        paddingRight: visible ? '12px' : '0px',
-        paddingLeft: visible ? '12px' : '0px',
-        borderRadius: visible ? '12px' : '12px',
-        y: visible ? 20 : 0,
-      }}
-      transition={{
-        type: 'spring',
-        stiffness: 200,
-        damping: 50,
-      }}
+    <div
+      data-visible={visible ? 'true' : 'false'}
       className={cn(
-        'relative z-50 mx-auto flex w-full max-w-[calc(100vw-2rem)] flex-col items-center justify-between bg-transparent px-4 py-2 lg:hidden',
+        'rn-mobile relative z-50 mx-auto flex max-w-[calc(100vw-2rem)] flex-col items-center justify-between bg-transparent px-4 py-2 lg:hidden',
         visible && 'bg-white/80 dark:bg-neutral-950/80',
         className,
       )}
     >
       {children}
-    </motion.div>
+    </div>
   );
 };
 
@@ -202,24 +212,18 @@ export const MobileNavMenu = ({
   isOpen,
   id,
 }: MobileNavMenuProps) => {
+  if (!isOpen) return null;
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.nav
-          id={id}
-          aria-label="Site"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className={cn(
-            'absolute right-4 top-16 z-50 flex min-w-[160px] flex-col items-start justify-start gap-4 rounded-lg bg-white px-4 py-8 shadow-[0_0_24px_rgba(34,_42,_53,_0.06),_0_1px_1px_rgba(0,_0,_0,_0.05),_0_0_0_1px_rgba(34,_42,_53,_0.04),_0_0_4px_rgba(34,_42,_53,_0.08),_0_16px_68px_rgba(47,_48,_55,_0.05),_0_1px_0_rgba(255,_255,_255,_0.1)_inset] dark:bg-neutral-950',
-            className,
-          )}
-        >
-          {children}
-        </motion.nav>
+    <nav
+      id={id}
+      aria-label="Site"
+      className={cn(
+        'rn-menu absolute right-4 top-16 z-50 flex min-w-[160px] flex-col items-start justify-start gap-4 rounded-lg bg-white px-4 py-8 shadow-[0_0_24px_rgba(34,_42,_53,_0.06),_0_1px_1px_rgba(0,_0,_0,_0.05),_0_0_0_1px_rgba(34,_42,_53,_0.04),_0_0_4px_rgba(34,_42,_53,_0.08),_0_16px_68px_rgba(47,_48,_55,_0.05),_0_1px_0_rgba(255,_255,_255,_0.1)_inset] dark:bg-neutral-950',
+        className,
       )}
-    </AnimatePresence>
+    >
+      {children}
+    </nav>
   );
 };
 

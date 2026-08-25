@@ -238,6 +238,66 @@
    static field or the overlay sitting on top of it. */
 .bg-beams-layer { will-change: transform; }
 
+/* ── Navbar ─────────────────────────────────────────────────────────────────
+   The docked/undocked states were Motion springs on `width`, `backdrop-filter`
+   and `box-shadow` — three properties that force layout + paint per frame, plus
+   a forced-reflow read of each on mount. They are CSS transitions now, driven by
+   a `data-visible` attribute from a passive scroll listener. Same motion, none
+   of the per-frame JS. */
+.rn-body,
+.rn-mobile {
+  transition:
+    width 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.4s ease,
+    backdrop-filter 0.4s ease,
+    -webkit-backdrop-filter 0.4s ease,
+    background-color 0.4s ease;
+  border-radius: 12px;
+  will-change: transform;
+}
+.rn-body[data-visible="true"],
+.rn-mobile[data-visible="true"] {
+  transform: translateY(20px);
+  box-shadow:
+    0 0 24px rgba(34, 42, 53, 0.06),
+    0 1px 1px rgba(0, 0, 0, 0.05),
+    0 0 0 1px rgba(34, 42, 53, 0.04),
+    0 0 4px rgba(34, 42, 53, 0.08),
+    0 16px 68px rgba(47, 48, 55, 0.05),
+    0 1px 0 rgba(255, 255, 255, 0.1) inset;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.rn-body { width: 100%; }
+.rn-body[data-visible="true"] { width: 40%; }
+.rn-mobile { width: 100%; padding-left: 0; padding-right: 0; }
+.rn-mobile[data-visible="true"] { width: 90%; padding-left: 12px; padding-right: 12px; }
+
+/* The hover pill that used to be a `layoutId` shared-layout element — the one
+   feature on the whole site that needed Motion's `domMax` bundle (~110 kB of
+   projection code) instead of `domAnimation`. It is one absolutely-positioned
+   <span> now, moved with a transform transition from measured link offsets. */
+.rn-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 9999px;
+  opacity: 0;
+  transform: translate(var(--pill-x, 0px), var(--pill-y, 0px));
+  width: var(--pill-w, 0px);
+  height: var(--pill-h, 100%);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), width 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease;
+  pointer-events: none;
+}
+.rn-pill.on { opacity: 1; }
+
+/* The mobile menu panel: a CSS entrance instead of AnimatePresence. It is only
+   in the DOM while open, so there is nothing to animate out. */
+.rn-menu { animation: rnMenuIn 0.18s ease-out; }
+@keyframes rnMenuIn { from { opacity: 0; transform: translateY(-4px); } }
+
 .skill-inner-shadow {
   box-shadow:
     inset 0 1px 2px rgba(0, 0, 0, 0.08),
@@ -2349,6 +2409,12 @@ body.cat-on .cw .dot { display: none; }
      because that gate runs in a passive effect after the hydration paint —
      CSS applies before first paint, so there is no flash to remove. */
   .bg-beams-layer { display: none; }
+
+  /* Navbar dock/undock, hover pill and menu panel: snap, don't glide. */
+  .rn-body,
+  .rn-mobile,
+  .rn-pill { transition: none; }
+  .rn-menu { animation: none; }
 
   /* ── section additions (spec §5) ─────────────────────────────────────── */
 
