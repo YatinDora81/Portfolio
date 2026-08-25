@@ -389,22 +389,40 @@
   70% { transform: scale(0.92) rotate(4deg); }
   100% { transform: scale(1); }
 }
+/* The glow pulses `opacity` on a soft radial behind the paw, not
+   `filter: drop-shadow()` on the paw itself. A filter animation re-rasterises
+   the element on the main thread every frame, and since the cat is on by
+   default this one ran for the life of every page view — the navbar was
+   repainting at 60fps forever, which kept a main-thread frame loop alive
+   for the whole Lighthouse trace. Opacity is composited: zero main-thread
+   frames. */
 @keyframes pawGlow {
-  0%, 100% { filter: drop-shadow(0 0 1px rgba(245, 158, 11, 0.25)); }
-  50% { filter: drop-shadow(0 0 7px rgba(245, 158, 11, 0.8)); }
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
 }
 
 .paw {
+  position: relative;
   display: inline-flex;
   transition: transform 0.25s ease, color 0.3s ease;
   will-change: transform;
 }
+.paw::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.55) 0%, rgba(245, 158, 11, 0.18) 45%, transparent 72%);
+  opacity: 0;
+  pointer-events: none;
+  /* Behind the icon, not washed over it; .paw's own stacking context keeps
+     the negative z-index from dropping it behind the page. */
+  z-index: -1;
+}
 .paw-btn:hover .paw { animation: pawWiggle 0.55s ease; }
 .paw-btn:active .paw { animation: pawPounce 0.32s ease; }
-.paw-btn.on .paw {
-  color: #f59e0b;
-  animation: pawGlow 2.4s ease-in-out infinite;
-}
+.paw-btn.on .paw { color: #f59e0b; }
+.paw-btn.on .paw::before { animation: pawGlow 2.4s ease-in-out infinite; }
 .paw-btn.on:hover .paw { animation: pawWiggle 0.55s ease; }
 
 /* Deliberately UNLAYERED: Tailwind's preflight is in `@layer base`, and
@@ -2385,7 +2403,8 @@ body.cat-on .cw .dot { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .paw-btn:hover .paw,
   .paw-btn:active .paw,
-  .paw-btn.on .paw { animation: none; }
+  .paw-btn.on .paw,
+  .paw-btn.on .paw::before { animation: none; }
 
   /* Entrance blur/translate fades can trigger vestibular discomfort — show
      content immediately instead. opacity:1 also guards against the base
