@@ -52,6 +52,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // `if (!theme)` branch was dead and the site never followed their OS again.
     if (!ready) return;
     const root = document.documentElement;
+    // Bail if the class is already right, which on mount it always is: the
+    // inline script set it before first paint. Removing and re-adding the same
+    // class is not a no-op to the style engine — Tailwind's dark variant is
+    // `.dark *`, so any change to <html>'s class list re-resolves the styles
+    // of every element on the page. In the trace that was a full style recalc
+    // + layout + paint (~250ms on a throttled phone) fired from hydration,
+    // for a class that did not change.
+    if (root.classList.contains(theme)) return;
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
   }, [theme, ready]);

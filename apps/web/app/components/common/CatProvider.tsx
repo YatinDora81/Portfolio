@@ -34,7 +34,11 @@ export function CatProvider({ children }: { children: React.ReactNode }) {
   // interpunct when the cat is shooed away. Runs in an effect, so the server
   // HTML never carries the class and there's nothing to hydrate-mismatch.
   useEffect(() => {
-    document.body.classList.toggle('cat-on', showCat);
+    // `toggle` with a force flag still dirties the class list when the state
+    // is already right; guard it so the mount pass is a read, not a write.
+    if (document.body.classList.contains('cat-on') !== showCat) {
+      document.body.classList.toggle('cat-on', showCat);
+    }
 
     const apply = (el: HTMLElement | null) => {
       if (el) el.style.display = showCat ? '' : 'none';
