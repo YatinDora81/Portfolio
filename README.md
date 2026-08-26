@@ -179,3 +179,67 @@ bun run build
 2. On save, the Docs app updates the database and triggers ISR revalidation on the Web app
 3. **Web app** fetches fresh data from the database and renders the portfolio
 4. Visitors see the updated content at [yatindora.in](https://yatindora.in)
+
+## Performance
+
+The web app is fully **server-side rendered** with optimized data loading:
+
+| Metric | Value |
+|--------|-------|
+| Prerendered HTML body | ~244,000 bytes (full content) |
+| CSR bailout | 0 (fully SSR) |
+| Hero `<h1>` in server HTML | ✅ Present |
+| Blog pages | SSG with ISR (on-demand revalidation) |
+| Static payload quotes | 1 (vs 28 before) |
+
+**Key optimizations:**
+- `ThemeProvider` renders children on server (no null-gate)
+- Uses `unstable_cache` for server-side data caching
+- Inline theme script prevents flash of unstyled content
+- Prerendered static pages for blogs and main content
+
+See [PERFORMANCE.md](./PERFORMANCE.md) for detailed optimization explanations.
+
+## Important Implementation Details
+
+### Imports & Paths
+- **Prisma client:** `import { prisma } from "db";` (bare, not `@repo/db`)
+- **UI package:** `@repo/ui` with subpath exports (e.g., `@repo/ui/button`)
+- **Path alias (both apps):** `@/*` → `./app/*`
+
+### Versions
+- **Next.js:** 16.1.5 (pinned)
+- **React:** 19.2.4
+- **Prisma:** 7.8.0
+- **TypeScript:** 5.9.2 (pinned)
+- **Zod:** 3.x (v3 API — use `error.flatten()`, not `treeifyError()`)
+- **Bun:** 1.3.7+
+
+### Auth & Session
+- **JWT:** jose HS256, 7-day expiry, `admin_session` cookie
+- **Layers:**
+  1. Cookie + JWT validation
+  2. Middleware (parses JWT, doesn't inspect role)
+  3. Layout + server actions (session guards)
+- **Roles:** Owner, Admin, Sub-Admin
+- **Password:** 3-strike lockout → email OTP fallback
+
+### Revalidation
+- **ISR:** 24-hour cache on web app
+- **Manual revalidation:** `publishSite()` in `apps/docs/app/lib/actions/publish.ts`
+- **Revalidate endpoint:** `GET/POST /api/revalidate` (accepts secret in `x-revalidate-secret` header or JSON body)
+- **Note:** `revalidateTag(tag, profile)` takes **two arguments** in Next 16; use `"max"` for global or `updateTag(tag)` from server actions for read-your-own-writes
+
+### Next.js Config
+- **`cacheComponents` / `dynamicIO`:** OFF in both apps
+- **Caching strategy:** Use `unstable_cache`, not `'use cache'` directive
+- **Server actions:** `bodySizeLimit` configured in docs app
+
+### Database Notes
+- **Row counts (as of 2026-08-21):**
+  - Blog: 10 (all hidden / `show = false`)
+  - Project: 6 (all live, no visibility column)
+  - ContactMessage: 5
+- **Visibility:** Blog has `show` boolean; Project visibility handled by `data.ts` filtering
+
+See [IMPLEMENTATION-NOTES.md](./IMPLEMENTATION-NOTES.md) for complete technical specifications.
