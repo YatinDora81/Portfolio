@@ -4,6 +4,7 @@
   "private": true,
   "exports": {
     "./terminal": "./src/terminal.ts",
+    "./terrain": "./src/terrain.ts",
     "./*": "./src/*.tsx"
   },
   "scripts": {

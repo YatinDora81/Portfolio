@@ -27,6 +27,34 @@ const CAT_NAP_STYLES: CatNapStyle[] = [
   "tooltip", "ring", "halo", "pixel", "moon", "ticks", "random", "off",
 ];
 
+/** Which layer draws behind the page: v1 the line field, v2 the contour terrain. */
+export type BackgroundVersion = "v1" | "v2";
+
+/**
+ * The background layer, already coerced for the engine: the percent-stored rows
+ * arrive here as 0..1 floats, and every number is inside the range the terrain
+ * was tuned against.
+ */
+export interface SiteBackground {
+  version: BackgroundVersion;
+  /** Master line-opacity multiplier, 0..1. */
+  strength: number;
+  /** The fixed veil over the canvas, 0..1 of --background. */
+  veil: number;
+  /** Marching-squares grid cell, in px. */
+  cell: number;
+  /** How many contour levels the field is sliced into. */
+  levels: number;
+  /** Minor contour alpha, 0..1. */
+  minor: number;
+  /** Major contour alpha — every fourth line — 0..1. */
+  major: number;
+  /** Whether the reading channel is erased out of the field so body copy stays legible. */
+  channel: boolean;
+  /** Pointer flow, press rings and click ripples. */
+  interactive: boolean;
+}
+
 export interface SiteConfig {
   name: string;
   heroVersion: HeroVersion;
@@ -50,6 +78,8 @@ export interface SiteConfig {
   /** How long a nap lasts, in seconds. */
   catNapSeconds: number;
   copyrightName: string;
+  /** What renders under every page, and how the terrain is tuned when it is the one rendering. */
+  background: SiteBackground;
 }
 
 /**
@@ -59,6 +89,19 @@ export interface SiteConfig {
  * second declaration) falls back to the default rather than being trusted.
  */
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+/**
+ * The admin clamps these before it writes them, and this end clamps them again.
+ * A SiteConfig row is a plain string in a table anyone with database access can
+ * edit by hand, and the terrain reads its numbers straight into a per-frame
+ * loop — a `terrainCell` of 1 is a marching-squares grid a pixel wide, which is
+ * a locked tab rather than an ugly background. The engine clamps a third time
+ * for the same reason; none of the three trusts the ones before it.
+ */
+function clampedInt(raw: string | undefined, fallback: number, min: number, max: number) {
+  const n = parseInt(raw ?? "", 10);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+}
 
 async function readSiteConfig(): Promise<SiteConfig> {
   const [rows, content] = await Promise.all([
@@ -84,6 +127,21 @@ async function readSiteConfig(): Promise<SiteConfig> {
   const catNapSeconds = Number.isFinite(rawNapSeconds)
     ? Math.min(300, Math.max(3, rawNapSeconds))
     : 30;
+  const background: SiteBackground = {
+    // v1 unless the row says v2 outright, so an untouched database draws the
+    // line field the site has always drawn.
+    version: map.get("backgroundVersion") === "v2" ? "v2" : "v1",
+    // Stored as whole percents to keep every row a plain integer string; the
+    // divide happens once, here, and the engine only ever sees 0..1.
+    strength: clampedInt(map.get("terrainStrength"), 50, 10, 100) / 100,
+    veil: clampedInt(map.get("terrainVeil"), 50, 0, 90) / 100,
+    cell: clampedInt(map.get("terrainCell"), 12, 8, 28),
+    levels: clampedInt(map.get("terrainLevels"), 14, 4, 24),
+    minor: clampedInt(map.get("terrainMinor"), 20, 2, 60) / 100,
+    major: clampedInt(map.get("terrainMajor"), 48, 5, 90) / 100,
+    channel: (map.get("terrainChannel") ?? "on") !== "off",
+    interactive: (map.get("terrainInteractive") ?? "on") !== "off",
+  };
   return {
     name: map.get("name") ?? "",
     heroVersion,
@@ -113,6 +171,7 @@ async function readSiteConfig(): Promise<SiteConfig> {
     catNapStyle,
     catNapSeconds,
     copyrightName: map.get("copyrightName") ?? "",
+    background,
   };
 }
 

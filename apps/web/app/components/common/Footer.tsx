@@ -164,7 +164,13 @@ export default function Footer({
   const shortText = fullText.split(/\s+/)[0] ?? fullText;
 
   return (
-    <footer className="mt-24 overflow-hidden">
+    <footer
+      className="overflow-hidden pt-24"
+      style={{
+        backgroundImage:
+          'linear-gradient(to bottom, transparent 0px, var(--background) 210px)',
+      }}
+    >
       <style>{`
         .yfw-reveal {
           opacity: 0;

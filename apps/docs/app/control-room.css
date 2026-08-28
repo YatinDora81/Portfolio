@@ -109,9 +109,10 @@
   font-family: var(--mono); font-size: 9px; color: var(--dim); width: 22px; flex: none;
   letter-spacing: .02em; text-align: center; position: relative; z-index: 1
 }
-/* `^..^` and `>_` mark the two entries that are layers over the page rather
-   than sections of it. Tracked in, not shrunk — they have to stay as legible as
-   the digits they stand in for. */
+/* `^..^`, `>_` and `~~~` mark the entries that are layers over or under the
+   page rather than sections of it. Tracked in, not shrunk — they have to stay
+   as legible as the digits they stand in for. Four mono cells is the ceiling:
+   `^..^` fills the 22px rail exactly, and a fifth would clip. */
 .nav-num.glyph { font-size: 8.5px; letter-spacing: -.03em }
 /* On the rail, each ordinal carries the surface it sits on so the hairline is
    cut cleanly behind it. Hover and active repeat their own row fill rather than
@@ -2843,3 +2844,56 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   .an-frow { grid-template-columns: 88px 1fr 46px 70px }
   .an-frow .an-fc { display: none }
 }
+
+/* ---------- background · the terrain dials ----------
+   Sliders rather than number boxes, because every one of these is read inside a
+   per-frame loop: the useful question is never "is 34 right", it is "which way
+   from 34", and only a drag against a redrawing pane answers that.
+
+   The track is deliberately unfilled. Firefox paints `::-moz-range-progress`
+   and WebKit has no counterpart, so a filled bar would exist in one browser and
+   not the other; the mono readout beside the track carries the value in both.
+   Focus is left to the global `.cr :focus-visible`, as everywhere else. */
+/* A range input's intrinsic width is ~129px, and `min-width: auto` on a flex
+   item holds the track at that even inside a `.f-row` half a card wide — the
+   readout gets pushed past the card edge instead of the track giving way. */
+.sld, .sld-in { min-width: 0 }
+.sld-row { display: flex; align-items: center; gap: 10px }
+.sld-in {
+  appearance: none; -webkit-appearance: none; flex: 1; height: 20px;
+  background: transparent; cursor: pointer
+}
+.sld-in::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: var(--bg3) }
+.sld-in::-moz-range-track { height: 4px; border-radius: 99px; background: var(--bg3) }
+/* WebKit lays the thumb out from the track's top edge rather than its middle,
+   so the offset is (4 - 14) / 2 and not a nudge. No transition on the grab:
+   this is a pseudo-element, and the reduced-motion `.cr *` guard cannot reach
+   one, so a transition here would be the one thing on the page that ignored it. */
+.sld-in::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 99px;
+  background: var(--c1); box-shadow: 0 1px 3px rgba(23, 30, 48, .3)
+}
+.sld-in::-moz-range-thumb {
+  width: 14px; height: 14px; border: none; border-radius: 99px;
+  background: var(--c1); box-shadow: 0 1px 3px rgba(23, 30, 48, .3)
+}
+.sld-in:active::-webkit-slider-thumb { transform: scale(1.15) }
+.sld-in:active::-moz-range-thumb { transform: scale(1.15) }
+/* Fixed measure and tabular figures. A readout that grew on the way from 8 to
+   100 would drag the track out from under the pointer mid-drag, which is the
+   one thing a slider is not allowed to do. */
+.sld-v {
+  font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums;
+  color: var(--ink); min-width: 42px; text-align: right; flex: none
+}
+.sld-u { font-style: normal; font-size: 9.5px; color: var(--faint); margin-left: 1px }
+
+/* A dial nothing is reading — the terrain rows while the lines are the layer.
+   The Switch already dims itself (`.tog:disabled`), so the wrapper's opacity is
+   lifted back off it: the two stack to .28, which reads as broken rather than
+   as off. */
+.f.is-off { opacity: .55 }
+.f.is-off .tog:disabled { opacity: 1 }
+.sld-in:disabled { cursor: default }
+.sld-in:disabled::-webkit-slider-thumb { background: var(--bg4); box-shadow: none }
+.sld-in:disabled::-moz-range-thumb { background: var(--bg4); box-shadow: none }

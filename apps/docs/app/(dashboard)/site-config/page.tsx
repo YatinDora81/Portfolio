@@ -20,6 +20,7 @@ import { KEYS, DEFAULTS, keysFor, isUnclaimed, type ConfigOwner } from "@/lib/si
 
 /** Where a key went, for the read-only wayfinding list at the bottom. */
 const OWNERS: Record<Exclude<ConfigOwner, "chrome">, { label: string; href: string }> = {
+  background: { label: "Background", href: "/background" },
   hero: { label: "Hero", href: "/hero" },
   contact: { label: "Contact", href: "/contact-purposes" },
   cat: { label: "Cat", href: "/cat" },

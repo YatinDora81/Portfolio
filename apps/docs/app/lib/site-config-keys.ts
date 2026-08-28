@@ -1,8 +1,8 @@
 /**
  * The one place that says which section owns which SiteConfig row.
  *
- * SiteConfig used to be one page of eleven fields. It is now split across four
- * pages, one per site section, and this registry is what makes that split safe:
+ * SiteConfig used to be one page of eleven fields. It is now split across one
+ * page per site section, and this registry is what makes that split safe:
  * every page renders `keysFor(owner)` and nothing else, so a key can never be
  * edited from two places, and /site-config renders `owner: "chrome"` PLUS any
  * row in the database that is absent from this file — so a key added by a
@@ -17,7 +17,8 @@
  * is missing there is silently dropped on save, so the two move together.
  */
 
-export type ConfigOwner = "hero" | "cat" | "contact" | "projects" | "chrome";
+export type ConfigOwner =
+  | "background" | "hero" | "cat" | "contact" | "projects" | "chrome";
 
 /**
  * Which control draws the key. `napStyle` and `photoList` have no default
@@ -49,6 +50,47 @@ export interface ConfigKeyDef {
 }
 
 export const KEYS: Record<string, ConfigKeyDef> = {
+  // ── Background ──
+  // First, because it is drawn first: this layer is under every section below
+  // it. The eight terrain rows only reach a visitor while `backgroundVersion`
+  // is v2 — v1 is an SVG that reads none of them.
+  backgroundVersion: {
+    owner: "background", control: "versionTiles", label: "Layer",
+    description: "Which field sits under every page — v1's fifty drawn lines, or v2's contour map. Site-wide, not per section.",
+  },
+  terrainStrength: {
+    owner: "background", control: "number", label: "Strength",
+    description: "Master multiplier on every contour's opacity, in percent (10–100). Scales the minor and major lines together — the first dial to reach for.",
+  },
+  terrainVeil: {
+    owner: "background", control: "number", label: "Veil",
+    description: "How much page ground is laid back over the canvas, in percent (0–90). Higher sinks the map further under the text.",
+  },
+  terrainCell: {
+    owner: "background", control: "number", label: "Grid cell",
+    description: "The marching-squares cell, in pixels (8–28). Smaller draws a smoother map and costs more per frame; 12 is what it was tuned at.",
+  },
+  terrainLevels: {
+    owner: "background", control: "number", label: "Levels",
+    description: "How many heights the field is sliced into (4–24). More levels is a denser map, not a taller one.",
+  },
+  terrainMinor: {
+    owner: "background", control: "number", label: "Minor lines",
+    description: "Opacity of an ordinary contour, in percent (2–60), before Strength scales it.",
+  },
+  terrainMajor: {
+    owner: "background", control: "number", label: "Major lines",
+    description: "Opacity of every fourth contour, in percent (5–90). These index lines are what give the map its grain.",
+  },
+  terrainChannel: {
+    owner: "background", control: "toggle", label: "Reading channel",
+    description: "Erases the map out of the 720px column the site's text sits in. Off puts contours behind body copy.",
+  },
+  terrainInteractive: {
+    owner: "background", control: "toggle", label: "Interactive",
+    description: "Flow under a moving pointer, rings under a resting one, a ripple on click. Off draws the map once and leaves it still.",
+  },
+
   // ── Hero ──
   name: {
     owner: "hero", control: "text", label: "Name",
@@ -156,6 +198,19 @@ export const DEFAULTS: Record<string, string> = {
   catNapStyle: "ticks",
   catNapSeconds: "30",
   projectsVersion: "v2",
+  // "v1" so an untouched database renders the background the site has always
+  // rendered; the terrain only appears once someone asks for it here.
+  backgroundVersion: "v1",
+  // Percentages are stored as plain integers and divided by 100 on read, so
+  // every row on this page stays an integer string a human can read.
+  terrainStrength: "50",
+  terrainVeil: "50",
+  terrainCell: "12",
+  terrainLevels: "14",
+  terrainMinor: "20",
+  terrainMajor: "48",
+  terrainChannel: "on",
+  terrainInteractive: "on",
 };
 
 export type ProjectsVersion = "v1" | "v2";
@@ -184,13 +239,60 @@ export const PROJECT_LAYOUTS: { value: ProjectsVersion; name: string; detail: st
   },
 ];
 
+export type BackgroundVersion = "v1" | "v2";
+
+/**
+ * The one coercion for `backgroundVersion`, mirrored by the save action and by
+ * apps/web on read. It leans the other way from `toProjectsVersion`: anything
+ * that is not exactly "v2" is the line field, because that is what the site
+ * rendered before this key existed. A missing row, a truncated value and a
+ * hostile POST therefore all leave the background exactly as it was.
+ */
+export function toBackgroundVersion(raw: string | null | undefined): BackgroundVersion {
+  return raw === "v2" ? "v2" : "v1";
+}
+
+/** The two layers, described well enough to choose between without opening the site. */
+export const BACKGROUND_LAYERS: { value: BackgroundVersion; name: string; detail: string }[] = [
+  {
+    value: "v1",
+    name: "the lines",
+    detail: "fifty curved strokes · one static SVG, re-inked by the theme · fourteen gradient beams sweeping on a CSS keyframe · beams off below 1024px",
+  },
+  {
+    value: "v2",
+    name: "the terrain",
+    detail: "contour map of a height field · flows under a moving pointer, still while you read · rings on press, ripple on click · canvas that sleeps when nothing moves · not drawn at all below 1024px, where the reading channel would erase it whole",
+  },
+];
+
 /** The range `updateSiteConfig` clamps to anyway — mirrored so the field agrees. */
 export const NUMBER_RANGE: Record<string, { min: number; max: number }> = {
   catNapSeconds: { min: 3, max: 300 },
+  // The terrain's six dials. `terrainCell`'s floor is the one that is about
+  // cost rather than taste: the grid is two-dimensional, so halving the cell
+  // quadruples the squares the marching pass walks every frame.
+  terrainStrength: { min: 10, max: 100 },
+  terrainVeil: { min: 0, max: 90 },
+  terrainCell: { min: 8, max: 28 },
+  terrainLevels: { min: 4, max: 24 },
+  terrainMinor: { min: 2, max: 60 },
+  terrainMajor: { min: 5, max: 90 },
 };
 
 /** The value the row holds after the action has had an unparseable number. */
-const NUMBER_FALLBACK: Record<string, number> = { catNapSeconds: 30 };
+const NUMBER_FALLBACK: Record<string, number> = {
+  catNapSeconds: 30,
+  // Without these, `clampNumber` would fall back to each range's floor, and a
+  // fumbled keystroke in the Strength field would silently pick the faintest
+  // map on offer instead of the default one.
+  terrainStrength: 50,
+  terrainVeil: 50,
+  terrainCell: 12,
+  terrainLevels: 14,
+  terrainMinor: 20,
+  terrainMajor: 48,
+};
 
 export function clampNumber(key: string, raw: string): number {
   const range = NUMBER_RANGE[key] ?? { min: 0, max: Number.MAX_SAFE_INTEGER };

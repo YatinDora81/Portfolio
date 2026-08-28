@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
 import MotionProvider from '@/components/common/MotionProvider';
-import BackgroundLines from '@/components/common/BackgroundLines';
+import Background from '@/components/common/Background';
 
 /** Without this file an unknown path falls back to Next's built-in 404, which
     renders its own <title> INSIDE the root layout — two <title> elements in one
@@ -25,8 +25,7 @@ export default function NotFound() {
     <ThemeProvider>
       <MotionProvider>
         <div className="min-h-screen bg-background text-foreground">
-          <BackgroundLines />
-          <div className="pointer-events-none fixed inset-0 z-[1] bg-background/50" />
+          <Background />
 
           {/* Scoped styles: the sprite crop and the two-frame sleep loop — the
               sheet's sleeping frames animate their own pixel "z"s, so nothing

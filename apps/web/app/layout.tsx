@@ -5,6 +5,7 @@ import { SITE_URL, SITE_NAME } from "./lib/site";
 import { getSiteConfig } from "./lib/data";
 import { getFlags } from "./lib/flags";
 import { FLAG_KEYS, flagValue } from "@repo/shared/flags";
+import { BackgroundProvider } from "./components/common/BackgroundProvider";
 import AnalyticsTracker from "./components/common/AnalyticsTracker";
 import OnekoCat from "./components/OnekoCat";
 import ClarityAnalytics from "./components/ClarityAnalytics";
@@ -76,7 +77,7 @@ export default async function RootLayout({
   // The cat rides in the layout, so its nap settings have to be read here too.
   // `getSiteConfig` is memoised per request, so the home page reading it again
   // for everything else costs nothing.
-  const [{ catNapStyle, catNapSeconds }, flags] = await Promise.all([
+  const [{ catNapStyle, catNapSeconds, background }, flags] = await Promise.all([
     getSiteConfig(),
     getFlags(),
   ]);
@@ -109,7 +110,12 @@ export default async function RootLayout({
         />
       </head>
       <body>
-        {children}
+        {/* The background config is handed down from here rather than read per
+            page because error.tsx is a client error boundary — it cannot await
+            the database, and a boundary that fell back to the wrong layer would
+            change the page's whole ground at the exact moment something broke.
+            The layout is the one place above it that can still read a row. */}
+        <BackgroundProvider value={background}>{children}</BackgroundProvider>
         {easterEggs && <OnekoCat napStyle={catNapStyle} napSeconds={catNapSeconds} />}
         {analytics && <AnalyticsTracker />}
         {analytics && <VercelAnalytics />}

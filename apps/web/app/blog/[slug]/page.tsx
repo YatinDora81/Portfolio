@@ -7,7 +7,7 @@ import { getFlags } from '@/lib/flags';
 import { FLAG_KEYS, flagValue } from '@repo/shared/flags';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
 import MotionProvider from '@/components/common/MotionProvider';
-import BackgroundLines from '@/components/common/BackgroundLines';
+import Background from '@/components/common/Background';
 import BlogContent from './BlogContent';
 
 export async function generateStaticParams() {
@@ -74,8 +74,7 @@ export default async function BlogPage({
     <ThemeProvider>
       <MotionProvider>
       <div className="min-h-screen bg-background text-foreground">
-        <BackgroundLines />
-        <div className="pointer-events-none fixed inset-0 z-[1] bg-background/50" />
+        <Background />
 
         <div className="relative z-[2]">
           {/* Back button */}

@@ -17,7 +17,7 @@ import ThoughtOfTheDay from './components/landing/ThoughtOfTheDay';
 import Contact from './components/landing/Contact';
 import Footer from './components/common/Footer';
 import HydrateWhenVisible from './components/common/HydrateWhenVisible';
-import BackgroundLines from './components/common/BackgroundLines';
+import Background from './components/common/Background';
 import {
   getHeroData,
   getAboutData,
@@ -174,8 +174,7 @@ export default async function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(personLd) }}
       />
       <div className="min-h-screen bg-background text-foreground">
-        <BackgroundLines />
-        <div className="pointer-events-none fixed inset-0 z-[1] bg-background/50" />
+        <Background />
         <div className="relative z-[2]">
           <Navbar logo={siteConfig.navbarLogo} sections={show} />
           <main>

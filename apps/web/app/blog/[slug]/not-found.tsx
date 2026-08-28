@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
 import MotionProvider from '@/components/common/MotionProvider';
-import BackgroundLines from '@/components/common/BackgroundLines';
+import Background from '@/components/common/Background';
 import { getFlags } from '@/lib/flags';
 import { getBlogs } from '@/lib/data';
 import { FLAG_KEYS, flagValue } from '@repo/shared/flags';
@@ -15,8 +15,7 @@ export default async function BlogNotFound() {
     <ThemeProvider>
       <MotionProvider>
       <div className="min-h-screen bg-background text-foreground">
-        <BackgroundLines />
-        <div className="pointer-events-none fixed inset-0 z-[1] bg-background/50" />
+        <Background />
 
         <div className="relative z-[2] flex flex-col items-center justify-center min-h-screen px-5">
           <div className="text-center max-w-md">

@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
 import MotionProvider from '@/components/common/MotionProvider';
-import BackgroundLines from '@/components/common/BackgroundLines';
+import Background from '@/components/common/Background';
 
 /** Runtime error boundary for the root segment (must be a client component —
     Next remounts it with `reset` when the user retries). Same family as
@@ -31,8 +31,7 @@ export default function Error({
     <ThemeProvider>
       <MotionProvider>
         <div className="min-h-screen bg-background text-foreground">
-          <BackgroundLines />
-          <div className="pointer-events-none fixed inset-0 z-[1] bg-background/50" />
+          <Background />
 
           {/* The alert frame draws its own startle lines, so nothing extra is
               layered on the sprite. The whole cat pops once on mount — a

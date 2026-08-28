@@ -4,6 +4,7 @@ import {
   IconFolderCode, IconPencil, IconQuote, IconTag, IconSettings2, IconShieldCheck,
   IconSend, IconChartBar, IconPalette, IconTerminal2, IconHistory, IconPaw,
   IconNotebook, IconRefreshDot, IconToggleLeft, IconPhoto, IconLink, IconChartAreaLine,
+  IconStackBack,
 } from "@tabler/icons-react";
 
 export type NavIcon = ComponentType<{ size?: number; className?: string; stroke?: number }>;
@@ -79,6 +80,13 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "The page · top to bottom",
     items: [
+      // First, and a glyph rather than an ordinal: it is behind all eight
+      // sections at once, so there is no one place in the scroll that is its
+      // own. A number here would promise a band you could scroll to, when what
+      // it actually is is the paper the other eight are printed on.
+      { href: "/background", mark: "~~~", label: "Background", icon: IconStackBack,
+        eyebrow: "the background · a layer under the page",
+        keywords: "background terrain contour lines beams canvas layer v1 v2 noise veil strength cell levels opacity" },
       { href: "/hero", n: "01", label: "Hero", icon: IconSparkles, eyebrow: "section 01 · top of the page",
         keywords: "social links resume cv titles badges intro tagline photos version" },
       // Between Hero and About because that is literally where the cat sits on

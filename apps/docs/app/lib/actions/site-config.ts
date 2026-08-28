@@ -26,6 +26,15 @@ const ALLOWED_KEYS = new Set([
   "catNapStyle",
   "catNapSeconds",
   "projectsVersion",
+  "backgroundVersion",
+  "terrainStrength",
+  "terrainVeil",
+  "terrainCell",
+  "terrainLevels",
+  "terrainMinor",
+  "terrainMajor",
+  "terrainChannel",
+  "terrainInteractive",
   "copyrightName",
   // Not in the form's registry, but real rows written by the links page.
   "heroPhotos",
@@ -40,6 +49,24 @@ const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const CAT_NAP_STYLES = new Set([
   "tooltip", "ring", "halo", "pixel", "moon", "ticks", "random", "off",
 ]);
+
+/**
+ * The terrain's numeric rows and the window each is allowed. Mirrors
+ * NUMBER_RANGE in ../site-config-keys.ts, which is what the field draws its
+ * min/max from — the same pair of ends as every other number here, kept apart
+ * so this action stays a leaf with no import back into the UI registry.
+ *
+ * `fallback` is the default, not the floor: a row that will not parse should
+ * come back as the map the site ships with, not as the faintest one on offer.
+ */
+const TERRAIN_RANGES: Record<string, { min: number; max: number; fallback: number }> = {
+  terrainStrength: { min: 10, max: 100, fallback: 50 },
+  terrainVeil: { min: 0, max: 90, fallback: 50 },
+  terrainCell: { min: 8, max: 28, fallback: 12 },
+  terrainLevels: { min: 4, max: 24, fallback: 14 },
+  terrainMinor: { min: 2, max: 60, fallback: 20 },
+  terrainMajor: { min: 5, max: 90, fallback: 48 },
+};
 
 /** Returns the value to persist, or null to drop the entry entirely. */
 function validate(key: string, value: string): string | null {
@@ -64,9 +91,28 @@ function validate(key: string, value: string): string | null {
   // parked here is a section that renders neither layout. apps/web coerces the
   // same way on read; both ends collapse to "v2" rather than trusting the row.
   if (key === "projectsVersion") return value === "v1" ? "v1" : "v2";
+  // Same argument one layer further down: this row decides what every page is
+  // drawn on. It collapses the other way, to "v1", because that is the field
+  // the site rendered before the key existed — a row nobody can read is a row
+  // that changes nothing. apps/web coerces identically on read.
+  if (key === "backgroundVersion") return value === "v2" ? "v2" : "v1";
+  if (key === "terrainChannel" || key === "terrainInteractive") {
+    return value === "off" ? "off" : "on";
+  }
   if (key === "catNapSeconds") {
     const secs = parseInt(value, 10);
     return String(Number.isFinite(secs) ? Math.min(300, Math.max(3, secs)) : 30);
+  }
+  // Clamped here, again by apps/web on read, and once more inside the engine.
+  // Three ends because the terrain is fed straight from rows, and a row is the
+  // one input on this page nobody typed into a field: `terrainCell: 1` is a
+  // marching-squares grid the size of the viewport, re-evaluated every frame.
+  const range = TERRAIN_RANGES[key];
+  if (range) {
+    const n = parseInt(value, 10);
+    return String(
+      Number.isFinite(n) ? Math.min(range.max, Math.max(range.min, n)) : range.fallback,
+    );
   }
   return value;
 }
@@ -114,7 +160,7 @@ export async function updateSiteConfig(entries: { key: string; value: string }[]
   // preview panes on several other admin pages, and the layout-wide revalidate
   // that used to cover them only fired because the form happened to post
   // `heroVersion` on every save — which it no longer holds.
-  for (const path of ["/site-config", "/hero", "/cat", "/contact-purposes", "/projects"]) {
+  for (const path of ["/site-config", "/background", "/hero", "/cat", "/contact-purposes", "/projects"]) {
     revalidatePath(path);
   }
 }
