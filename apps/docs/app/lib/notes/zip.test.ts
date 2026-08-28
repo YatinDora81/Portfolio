@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { crc32, zipSync } from "./zip";
 
-/** Fixed so two runs produce byte-identical archives and a failure is legible. */
 const AT = new Date(2026, 7, 3, 14, 30, 20);
 
 const LOCAL_SIG = "504b0304";
@@ -15,11 +14,6 @@ const EOCD_SIG = "504b0506";
 
 const sigAt = (buf: Buffer, offset: number) => buf.subarray(offset, offset + 4).toString("hex");
 
-/**
- * Reads the archive the way an extractor does: EOCD first, then the central
- * directory it points at, then each local header at the offset the directory
- * claims. Written independently of zip.ts so it can disagree with it.
- */
 function readCentral(buf: Buffer) {
   const eocd = buf.length - 22;
   const count = buf.readUInt16LE(eocd + 10);
@@ -55,7 +49,6 @@ function readCentral(buf: Buffer) {
   return entries;
 }
 
-/** The payload as the local header describes it, decompressed. */
 function readPayload(buf: Buffer, localOffset: number): Buffer {
   expect(sigAt(buf, localOffset)).toBe(LOCAL_SIG);
   const method = buf.readUInt16LE(localOffset + 8);
@@ -68,11 +61,6 @@ function readPayload(buf: Buffer, localOffset: number): Buffer {
 }
 
 describe("crc32", () => {
-  /**
-   * The published check values for CRC-32/ISO-HDLC. They are the point of this
-   * block: a CRC that is merely self-consistent still produces an archive every
-   * real extractor rejects, so the numbers have to come from outside this repo.
-   */
   test("matches the standard check vectors", () => {
     expect(crc32(Buffer.from("123456789", "utf8"))).toBe(0xcbf43926);
     expect(crc32(Buffer.from("The quick brown fox jumps over the lazy dog", "utf8"))).toBe(0x414fa339);
@@ -81,8 +69,6 @@ describe("crc32", () => {
   });
 
   test("is computed over bytes, not characters", () => {
-    // Two code units, four UTF-8 bytes. A char-wise implementation gets this
-    // wrong and nothing else in the suite would notice.
     expect(crc32(Buffer.from("🙂", "utf8"))).toBe(crc32(new Uint8Array([0xf0, 0x9f, 0x99, 0x82])));
   });
 });
@@ -117,9 +103,6 @@ describe("zipSync structure", () => {
       expect(e.crc).toBe(crc32(source));
       expect(e.usize).toBe(source.length);
 
-      // The half that actually breaks in the wild: an extractor reading the
-      // central directory must find the same numbers as one reading the local
-      // header, or the archive opens in exactly one tool.
       const local = e.localOffset;
       expect(buf.readUInt32LE(local + 14)).toBe(e.crc);
       expect(buf.readUInt32LE(local + 18)).toBe(e.csize);
@@ -166,10 +149,6 @@ describe("zipSync structure", () => {
   });
 });
 
-/**
- * The assertion that matters. Everything above is this file agreeing with
- * itself; only a foreign extractor proves the archive is real.
- */
 const UNZIP = spawnSync("unzip", ["-v"], { encoding: "utf8" }).status === 0;
 if (!UNZIP) {
   console.warn("[zip.test] `unzip` not on PATH — the real-extractor assertions are SKIPPED, not passing.");

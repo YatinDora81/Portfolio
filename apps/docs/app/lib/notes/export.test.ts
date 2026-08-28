@@ -30,11 +30,6 @@ const answer = (a: Partial<NonNullable<ExportRow["answer"]>> = {}) => ({
   ...a,
 });
 
-/**
- * Splits the front matter into raw `key -> unparsed value` pairs. Deliberately
- * dumb: it must not repair anything, because what is under test is whether the
- * emitted text is already well formed.
- */
 function frontMatter(md: string): Record<string, string> {
   const m = /^---\n([\s\S]*?)\n---\n/.exec(md);
   if (!m) throw new Error("no front matter");
@@ -46,12 +41,6 @@ function frontMatter(md: string): Record<string, string> {
   return out;
 }
 
-/**
- * The independent check on the quoting. Every escape this file emits — \\ \" \n
- * \r \t \uXXXX — is also a JSON escape, so a JSON parser is a second opinion on
- * whether the scalar is well formed, and one that was not written by the code
- * under test.
- */
 const unquote = (v: string): string => JSON.parse(v) as string;
 
 describe("yamlString", () => {
@@ -140,7 +129,6 @@ describe("questionMarkdown body", () => {
 
   test("a body opening with a rule is not mistaken for more front matter", () => {
     const md = questionMarkdown({ title: "T", path: "/t" }, answer({ body: "---\nafter" }));
-    // The H1 stands between the two, so the leading --- can only read as a rule.
     expect(md.indexOf("# T")).toBeLessThan(md.indexOf("---\nafter"));
     expect(frontMatter(md).title).toBe('"T"');
   });
@@ -208,7 +196,6 @@ describe("folderMarkdown", () => {
     const md = folderMarkdown(rows);
     expect(md).toContain("`/dsa/graphs/dijkstra` · solid · `graphs`");
     expect(md).toContain("`/dsa/graphs/bfs` · again");
-    // A folder has no confidence to report, only where it lives.
     expect(md).toContain("`/dsa/graphs`\n");
   });
 
@@ -320,7 +307,6 @@ describe("safeFilename", () => {
     const long = safeFilename("a".repeat(300), "md");
     expect(long.length).toBeLessThanOrEqual(70);
     expect(long).toEndWith(".md");
-    // The cut lands mid-"..", which would otherwise leave a trailing dot.
     expect(safeFilename(`${"a".repeat(62)}.. tail`, "md")).toBe(`${"a".repeat(62)}.md`);
   });
 

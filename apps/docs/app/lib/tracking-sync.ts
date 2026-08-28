@@ -15,7 +15,6 @@ export interface TrackingSyncResult {
   trackingEnabled: boolean;
 }
 
-/** Same as `bun run sync` in bulk-email-sender: Supabase opens → Google Sheet. */
 export async function syncOpenTrackingToSheet(): Promise<TrackingSyncResult> {
   if (!isSupabaseTrackingEnabled()) {
     return {

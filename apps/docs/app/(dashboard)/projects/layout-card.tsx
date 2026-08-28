@@ -7,25 +7,8 @@ import {
   PROJECT_LAYOUTS, toProjectsVersion, type ProjectsVersion,
 } from "@/lib/site-config-keys";
 
-/**
- * The one row that decides which of the two Projects layouts visitors get.
- *
- * It is a ConfigCard, not a second save path: `projectsVersion` is a SiteConfig
- * row like any other, so it keeps the card that already owns dirty tracking,
- * Reset, Save and Save & Publish — and, critically, posts only the key it was
- * given. Everything below is one `controls` override, exactly the way the Cat
- * page injects its nap picker.
- *
- * Deliberately NOT hero's split. Hero separates "which version am I editing"
- * from "which version ships" because its two versions have their own titles,
- * badges and copy. Projects has no per-version content at all — the same rows
- * are drawn either way — so there is nothing to edit per version and the tile
- * IS the choice. It becomes real when the card saves.
- */
 export function ProjectsLayoutCard({ saved, onPick }: {
-  /** What the row currently holds — the tile that gets the live marker. */
   saved: ProjectsVersion;
-  /** The draft, so the page's preview pane can follow it before a save. */
   onPick: (v: ProjectsVersion) => void;
 }) {
   const handleDraft = useCallback(
@@ -80,8 +63,6 @@ function LayoutTiles({ ctx, saved }: { ctx: ControlContext; saved: ProjectsVersi
               </span>
               <span className="pvr-d">{l.detail}</span>
             </span>
-            {/* Repeats the tile's own state at the right edge, where a reader
-                scanning for "what do visitors get" stops. */}
             {live && <span className="dot" aria-hidden="true" style={{ background: "var(--good)" }} />}
           </button>
         );

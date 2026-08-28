@@ -10,30 +10,13 @@ import { ContactPurposesTable } from "./table";
 interface Purpose { id: string; label: string; emoji: string; sortOrder: number }
 interface Social { id: string; name: string; iconKey: string; detail: string | null }
 
-/**
- * The whole contact section on one screen:
- *
- *   01 Purpose chips · 02 The address · 03 Availability · 04 The dial · preview
- *
- * Two save affordances, never ambiguous: the chips stage into the global save
- * bar and show nothing local, the three SiteConfig keys write through
- * ConfigCard's own footer and say so there.
- *
- * `availabilityStatus` and `availabilityDetail` are one card on purpose. They
- * are one message split across two places on the site — the caption under the
- * oscilloscope and the note beside the transmit button — and editing either
- * alone is how they end up contradicting each other.
- */
 export function ContactSections({
   purposes, socialLinks, config, resumeUrl, githubTile,
 }: {
   purposes: Purpose[];
   socialLinks: Social[];
-  /** Exactly the SiteConfig keys this section owns — the ConfigCard payload. */
   config: Record<string, string>;
-  /** Owned by Hero; the dial's tape row reads it, so the pane needs it. */
   resumeUrl: string;
-  /** Server-rendered: the tile reads the archive, which is a database call. */
   githubTile: React.ReactNode;
 }) {
   const [draft, setDraft] = useState<Record<string, string>>(config);
@@ -102,7 +85,6 @@ export function ContactSections({
   );
 }
 
-/** Same numbered rhythm as the Hero page — one rule set, two prefixes. */
 function Block({ n, title, note }: { n: string; title: string; note?: string }) {
   return (
     <div className="ctc-blk">

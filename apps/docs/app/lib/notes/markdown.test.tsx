@@ -2,12 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { renderMarkdown } from "./markdown";
 
-/**
- * The renderer returns elements, so the assertions go through the same
- * server-side render the reader page does. Anything that shows up as escaped
- * text here is text in the browser too — that is the point of not producing an
- * HTML string anywhere in the pipeline.
- */
 const html = (src: string) => renderToStaticMarkup(renderMarkdown(src));
 
 describe("renderMarkdown · blocks", () => {
@@ -117,8 +111,6 @@ describe("renderMarkdown · containers", () => {
     const out = html(QUIZ);
     expect(out).toContain("Which is O(log n)?");
     expect(out).toContain('type="radio"');
-    // The right choice is marked in the class, so the stylesheet can say so on
-    // :checked — nothing in the reading order gives it away first.
     expect(out).toContain('class="nt-q-o ok"');
     expect(out).toContain("<summary>Show answer</summary>");
     expect(out).toContain("It halves the range.");
@@ -181,16 +173,11 @@ describe("renderMarkdown · containers", () => {
   });
 
   test("a stray closing marker is text, and does not hang the renderer", () => {
-    // It reached `blocks` with nothing to close, and a line that ends a
-    // paragraph without being consumed by anything is an infinite loop.
     expect(html(":::")).toBe("<p>:::</p>");
     expect(html("text\n:::\nmore")).toContain("more");
   });
 
   test("nesting past the depth cap flattens rather than spinning on one line", () => {
-    // Same trap as the stray marker above, reached the other way: capping the
-    // depth by declining to match `:::` leaves the line for the paragraph
-    // branch, which stops on it without advancing. It has to stay consumed.
     const deep = 40;
     const out = html(
       [

@@ -5,30 +5,6 @@ import { findSkillIcon } from "@repo/ui/icons/registry";
 import { cdnUrl } from "@/lib/utils";
 import { DIM, MONO, SectionLabel, parseBullet } from "./frame";
 
-// ─── Projects Preview ────────────────────────────────────────────
-// Mirrors apps/web/app/components/landing/Projects.tsx, which ships in two
-// interchangeable layouts picked by the layout card on this page. Both are drawn
-// here, and the pane switches on the same `projectsVersion` value the site reads.
-//
-//   v1 "the work ledger" — no card and no hover fill, ever. Structure comes
-//      from permanent hairline dividers and a mono index; the feedback lives
-//      inside the content: the 2px active-line bar in the gutter, the image
-//      zoom, the title's underline sweep, and the siblings dimming away.
-//      Its signature detail is the stack set as ONE mono line of `·`-joined
-//      names rather than a pile of pills.
-//
-//   v2 "the build log" — every project is a deployment record: the keyline
-//      header (number — domain ——— ● live), then the screenshot on a dot-grid
-//      pad wearing a `▲ prod` tab, and the title / summary / badges / links
-//      beside it. Closes on the section's sign-off line.
-//
-// Both fold their highlights open on hover only, the way the site does it in
-// CSS, and both are drawn at rest otherwise: the "more builds" fold is closed
-// and its button sits unpressed. What the pane deliberately drops is the
-// section's entrances — v2's typed-out domain and its blur-up IntersectionObserver
-// reveal, plus the signal sweeping the keyline rule — because these panes have
-// never animated an arrival.
-
 interface ProjectData {
   title: string;
   summary: string;
@@ -36,27 +12,20 @@ interface ProjectData {
   technologies: string[];
   github?: string | null;
   live?: string | null;
-  /** OPTIONAL — the site draws `images[0]` as the row's cover. */
   images?: string[];
-  /** OPTIONAL — the small mark the site puts before the title. */
   logoUrl?: string | null;
 }
 
-/** Same cut as the site: three rows lead, the rest are behind the button. */
 const FEATURED = 3;
 
-/** The fold is only open on hover, so this just bounds the reveal. */
 const PREVIEW_BULLETS = 4;
 
 const PREVIEW_CHIPS = 6;
 
 const LINE = "rgba(255,255,255,0.1)";
 
-/** `--lab-dim` on the site's dark theme — the keyline voice the build log's
- *  record header is set in, a step quieter than the section's secondary ink. */
 const LAB_DIM = "#8b8b8d";
 
-/** `--ok` on dark: the deployed signal, and the only green in the section. */
 const OK = "#4ade80";
 
 function ArrowUpRight() {
@@ -68,7 +37,6 @@ function ArrowUpRight() {
   );
 }
 
-/** The site's `.badge` — pill, muted fill, inner shadow, glyph from the registry. */
 function TechBadge({ name }: { name: string }) {
   const icon = findSkillIcon(name);
   return (
@@ -86,7 +54,6 @@ function TechBadge({ name }: { name: string }) {
   );
 }
 
-/** The site's `.pj-dot` — a live signal with its ping. */
 function LiveDot() {
   return (
     <span className="relative size-[5px] shrink-0 rounded-full" style={{ background: OK }} aria-hidden>
@@ -95,8 +62,6 @@ function LiveDot() {
   );
 }
 
-/** The hovered row's fold, holding the highlights at 0fr until then — the same
- *  trick the site uses, so a resting row shows nothing but the summary. */
 function Highlights({ bullets, marker }: { bullets: string[]; marker: string }) {
   const parsed = bullets.slice(0, PREVIEW_BULLETS).map(parseBullet);
   if (parsed.length === 0) return null;
@@ -119,8 +84,6 @@ function Highlights({ bullets, marker }: { bullets: string[]; marker: string }) 
   );
 }
 
-// ─── v1 — the work ledger ────────────────────────────────────────
-
 function LedgerRow({ project, index }: { project: ProjectData; index: number }) {
   const thumb = project.images?.[0];
   const linked = Boolean(project.live ?? project.github);
@@ -132,8 +95,7 @@ function LedgerRow({ project, index }: { project: ProjectData; index: number }) 
       data-pj-row
       className="group relative grid grid-cols-[20px_120px_minmax(0,1fr)] items-start gap-3 border-t border-[rgba(255,255,255,0.1)] py-3 pl-2 pr-0.5 transition-opacity duration-300 motion-reduce:transition-none"
     >
-      {/* the editor's active-line bar — this version's identity, and the only
-          thing that marks the row, since it never gets a box or a fill */}
+
       <span className="pointer-events-none absolute inset-y-3 left-0 w-[2px] origin-top scale-y-0 bg-[#fafafa] transition-transform duration-500 group-hover:scale-y-100 motion-reduce:transition-none" aria-hidden />
 
       <span className="pt-[3px] text-[9px] tracking-[0.05em] text-[#909092] transition-colors group-hover:text-[#fafafa] motion-reduce:transition-none" style={{ fontFamily: MONO }} aria-hidden>
@@ -150,7 +112,7 @@ function LedgerRow({ project, index }: { project: ProjectData; index: number }) 
             className="size-full object-cover object-top saturate-[.9] brightness-[.96] transition-[transform,filter] duration-500 group-hover:scale-[1.045] group-hover:saturate-100 group-hover:brightness-100 motion-reduce:transition-none"
           />
         )}
-        {/* the ring rides above the image so the zoom clips under a fixed hairline */}
+
         <span className="pointer-events-none absolute inset-0 rounded-[inherit] border border-[rgba(255,255,255,0.1)] transition-colors group-hover:border-[rgba(250,250,250,0.26)] motion-reduce:transition-none" aria-hidden />
       </span>
 
@@ -174,7 +136,6 @@ function LedgerRow({ project, index }: { project: ProjectData; index: number }) 
 
         <Highlights bullets={project.bullets} marker="+" />
 
-        {/* the stack as one quiet line, not a pile of pills — the ledger's tell */}
         {chips.length > 0 && (
           <p className="mt-2 text-[9px] leading-[1.9] tracking-[0.03em] text-[#909092]" style={{ fontFamily: MONO }}>
             {chips.map((tech, i) => (
@@ -208,7 +169,6 @@ function LedgerRow({ project, index }: { project: ProjectData; index: number }) 
 
 function ProjectsPreviewLedger({ projects }: { projects: ProjectData[] }) {
   return (
-    // spotlight by subtraction: hovering one row pushes every other one back
     <div className="flex flex-col border-b border-[rgba(255,255,255,0.1)] [&:has([data-pj-row]:hover)_[data-pj-row]:not(:hover)]:opacity-[0.38]">
       {projects.map((project, i) => (
         <LedgerRow key={`${project.title}-${i}`} project={project} index={i} />
@@ -217,34 +177,20 @@ function ProjectsPreviewLedger({ projects }: { projects: ProjectData[] }) {
   );
 }
 
-// ─── v2 — the build log ──────────────────────────────────────────
-
 function safeUrl(value?: string | null) {
   if (!value) return null;
   try {
     const url = new URL(value);
-    // Parsing is not enough: `new URL("localhost:3000")` throws nothing and comes
-    // back as the scheme `localhost:` with no host. The site's `endpointOf` makes
-    // the same check, and the two derivations have to agree or the pane reports a
-    // deployment the section does not.
     const web = url.protocol === "https:" || url.protocol === "http:";
     return web && url.hostname ? url : null;
   } catch {
-    // a hand-typed URL in the CMS must not take the whole pane down
     return null;
   }
 }
 
-/**
- * Where the build runs, derived rather than stored: the live host wins and
- * carries the signal dot, a repo falls back to its path and is only `source`,
- * and a project with neither address gets no header beyond its number.
- */
 function deployment(project: ProjectData) {
   const host = safeUrl(project.live)?.hostname.replace(/^www\./, "");
   if (host) return { domain: host, status: "live", running: true };
-  // Trailing slash trimmed, exactly as `endpointOf` trims it — a repo URL saved
-  // with one would otherwise print a domain the site never shows.
   const path = safeUrl(project.github)?.pathname.replace(/\/$/, "");
   if (path) return { domain: `github.com${path}`, status: "source", running: false };
   return null;
@@ -259,7 +205,7 @@ function LogEntry({ project, index }: { project: ProjectData; index: number }) {
 
   return (
     <article className="group pb-4 pt-2.5">
-      {/* keyline record header, borrowed from the contact section's frequency rows */}
+
       <div className="flex min-w-0 items-center gap-2.5 text-[9px] tracking-[0.16em]" style={{ fontFamily: MONO, color: LAB_DIM }}>
         <span className="shrink-0 transition-colors group-hover:text-[#fafafa] motion-reduce:transition-none">
           {String(index + 1).padStart(2, "0")}
@@ -283,9 +229,7 @@ function LogEntry({ project, index }: { project: ProjectData; index: number }) {
           className="relative rounded-[8px] border border-[rgba(255,255,255,0.1)] p-1.5 transition-[border-color,transform] group-hover:-translate-y-[2px] group-hover:border-[rgba(250,250,250,0.26)] motion-reduce:transition-none"
           style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px)", backgroundSize: "8px 8px" }}
         >
-          {/* the tab sits ON the pad's border, so it needs the pane's own ground.
-              Shown only where there is a production to have shot, matching the
-              section's own condition. */}
+
           {record?.running && (
             <span
               className="absolute -top-[6px] right-2 flex items-center gap-1 bg-[#0a0a0a] px-1 text-[8px] tracking-[0.16em] text-[#909092] transition-colors group-hover:text-[#fafafa] motion-reduce:transition-none"
@@ -361,12 +305,6 @@ function ProjectsPreviewBuildLog({ projects }: { projects: ProjectData[] }) {
   );
 }
 
-/**
- * The line the site sets under the section heading — the first thing a visitor
- * reads, so the pane would misreport the section without it. Counted off the
- * WHOLE list for the same reason `EndOfLog` is: the fold hides rows, not facts,
- * and v2 only claims everything is deployed when everything actually is.
- */
 function PaneNote({ version, projects }: { version: "v1" | "v2"; projects: ProjectData[] }) {
   const note =
     version === "v1"
@@ -383,8 +321,6 @@ function PaneNote({ version, projects }: { version: "v1" | "v2"; projects: Proje
   );
 }
 
-/** The build log's sign-off. Counts the WHOLE list, not the featured cut — the
- *  site's line reports the log, and the fold is only hiding part of it. */
 function EndOfLog({ projects }: { projects: ProjectData[] }) {
   const running = projects.filter((project) => deployment(project)?.running).length;
   return (
@@ -395,8 +331,6 @@ function EndOfLog({ projects }: { projects: ProjectData[] }) {
     </div>
   );
 }
-
-// ─── Dispatch ────────────────────────────────────────────────────
 
 export function ProjectsPreview({ version, projects }: { version: "v1" | "v2"; projects: ProjectData[] }) {
   const featured = projects.slice(0, FEATURED);

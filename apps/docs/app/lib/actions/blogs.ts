@@ -6,18 +6,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { resolveLifecycle } from "@/lib/lifecycle";
 
-/**
- * `"use server"` exports compile to public POST endpoints addressable by action
- * id, so each writer below has to prove the session itself: middleware only
- * checks that the cookie holds a valid JWT, and it never runs for a direct
- * action POST at all. Until this was added, `deleteBlog` was reachable by
- * anyone who could reach the origin.
- *
- * `redirect` rather than a returned `{ ok: false }`, because `deleteBlog` is
- * invoked from an inline server closure in blogs/page.tsx that discards the
- * return value — an expired session would otherwise do nothing at all while the
- * UI carried on as if the write had landed.
- */
+// middleware never runs for a direct server-action POST
 async function requireSession() {
   if (!(await getSession())) redirect("/login");
 }
@@ -44,7 +33,6 @@ export async function createBlog(formData: FormData): Promise<Saved> {
       image: formData.get("image") as string,
       imageOrientation: (formData.get("imageOrientation") as "LANDSCAPE" | "PORTRAIT" | "SQUARE") || "LANDSCAPE",
       color: formData.get("color") as string,
-      // `show` is deliberately absent: `status` replaces it, and the column stays only so the lifecycle can be rolled back.
       status: lifecycle.status,
       publishAt: lifecycle.publishAt,
       sortOrder: count,
@@ -72,7 +60,7 @@ export async function updateBlog(id: string, formData: FormData): Promise<Saved>
       color: formData.get("color") as string,
       status: lifecycle.status,
       publishAt: lifecycle.publishAt,
-      // `publishedAt` is deliberately untouched: it is the printed editorial date, not a lifecycle stamp.
+      // publishedAt is the printed editorial date, not a lifecycle stamp
     },
   });
   revalidatePath("/blogs");

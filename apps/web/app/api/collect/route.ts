@@ -45,7 +45,7 @@ type Body = z.infer<typeof bodySchema>;
 
 const noContent = () => new Response(null, { status: 204 });
 
-// `content-length` is absent on a chunked request, so the stream itself has to be capped.
+// content-length is absent on a chunked request
 async function readCapped(request: Request, cap: number): Promise<string | null> {
   if (Number(request.headers.get("content-length") ?? 0) > cap) return null;
 
@@ -75,9 +75,6 @@ async function readCapped(request: Request, cap: number): Promise<string | null>
   return new TextDecoder().decode(merged);
 }
 
-// Scheduled publishing and retention only ride this route because it is the
-// busiest one; they are not analytics. Registered before every early return, or
-// switching analytics off would also stop publishing posts.
 function schedulePostResponseWork(): void {
   after(async () => {
     try {
@@ -97,11 +94,10 @@ function schedulePostResponseWork(): void {
           items: published.map((p) => `${p.type}:${p.id}`),
         });
       }
-      // Before maintenance, so retention sees the floor this pass just moved.
+      // before maintenance, so retention sees the floor this pass moved
       await catchUpRollups();
       await runPeriodicMaintenance();
     } catch (e) {
-      // An unhandled throw in `after` takes down the whole invocation.
       logger.error("collect", "post-response work failed", { err: String(e) });
     }
   });
@@ -184,7 +180,6 @@ type SessionInput = {
   body: Body;
 };
 
-// Attribution is written once, on creation: re-resolving it would rewrite the source to the last internal click.
 async function getOrCreateSession(input: SessionInput): Promise<{ id: string } | null> {
   const { sessionHash, visitorHash, userAgent, headers, body } = input;
 
@@ -201,7 +196,7 @@ async function getOrCreateSession(input: SessionInput): Promise<{ id: string } |
     utmCampaign: body.utm?.campaign,
     referrer: body.referrer,
     userAgent,
-    // No `secFetchSite`: on a beacon it always reads "same-origin", which would collapse every channel to direct.
+    // no secFetchSite: on a beacon it always reads same-origin
     landingPath: body.landingPath,
     ownHost: headers.get("host") ?? SITE_URL,
   });

@@ -1,17 +1,5 @@
 'use client';
 
-/**
- * Projects — one section, two layouts, picked in the admin.
- *
- * v1 "the work ledger": a ruled list, spotlight by subtraction (hovering a row
- *    dims its siblings), and the stack printed as one quiet mono line.
- * v2 "the build log": each project logged under a keyline that names the host it
- *    runs on, typed in as the entry scrolls up.
- *
- * Everything below the third project ships in the HTML either way — see the
- * comment on MoreBuilds.
- */
-
 import Image from 'next/image';
 import {
   Fragment,
@@ -46,29 +34,18 @@ interface ProjectData {
   images: string[];
 }
 
-/** Where a build actually runs, as v2's keyline prints it. */
 interface Endpoint {
   domain: string;
   status: 'live' | 'source';
 }
 
-/** `**Lead line** rest of the sentence` — the bold lead is the scan line. */
 function parseBullet(content: string) {
   const match = content.match(/^\*\*(.*?)\*\*\s?(.*)/s);
   if (match) return { highlight: match[1]!, detail: match[2]! };
   return { highlight: content, detail: '' };
 }
 
-/**
- * Derived from the links rather than stored: a project's host is already implied
- * by its live URL, and a second CMS field would only ever drift from it. Both
- * URLs are free text in the admin, so neither parse may take the render down.
- */
 function endpointOf(project: ProjectData): Endpoint | null {
-  // Parsing has to SUCCEED AND produce a web address. `new URL('localhost:3000')`
-  // throws nothing — it reads as the scheme `localhost:` with an empty host — so
-  // a truthy parse alone would print a blank domain beside a "live" dot and add
-  // one to the sign-off's tally.
   const parse = (href: string | null) => {
     if (!href) return null;
     try {
@@ -89,7 +66,6 @@ function endpointOf(project: ProjectData): Endpoint | null {
 const FEATURED = 3;
 const FOLD_ID = 'pj-more-builds';
 
-/** Which rows a tap has stuck open. Hover and focus stay CSS-only. */
 function useOpenSet() {
   const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set<number>());
   const toggle = (index: number) =>
@@ -102,8 +78,6 @@ function useOpenSet() {
   return [open, toggle] as const;
 }
 
-// Touch: a tap anywhere on the row toggles it open. Desktop: CSS :hover does
-// it, keyboard: CSS :focus-within does it. Clicks on links always pass through.
 const tapToggle = (onToggle: () => void) => (e: ReactMouseEvent<HTMLElement>) => {
   if ((e.target as Element).closest('a')) return;
   onToggle();
@@ -134,13 +108,6 @@ function Highlights({ bullets }: { bullets: string[] }) {
   );
 }
 
-/* The overflow projects used to mount only once `expanded` flipped, so half the
-   portfolio never reached the served HTML — it existed only inside the flight
-   payload, invisible to crawlers, to a reader with JS off and to find-in-page.
-   They ship in the markup unconditionally now and the fold hides them with CSS
-   instead. `inert` is what makes the collapsed state honest: a zero-height fold
-   still holds real links that Tab would land on with nothing visible under the
-   focus ring, and aria-expanded would be claiming otherwise. */
 function MoreBuilds({ expanded, children }: { expanded: boolean; children: ReactNode }) {
   return (
     <div className={`pj-fold${expanded ? ' open' : ''}`} id={FOLD_ID} inert={!expanded}>
@@ -152,9 +119,6 @@ function MoreBuilds({ expanded, children }: { expanded: boolean; children: React
   );
 }
 
-/* the button stays mounted and toggles both ways — unmounting it on expand
-   dropped keyboard focus onto the body, and a control that vanishes can never
-   report the state it controls */
 function ShowMore({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
   return (
     <button
@@ -171,8 +135,6 @@ function ShowMore({ expanded, onToggle }: { expanded: boolean; onToggle: () => v
     </button>
   );
 }
-
-/* ── v1 — the work ledger ─────────────────────────────────────────────────── */
 
 function LedgerRow({
   project,
@@ -228,7 +190,7 @@ function LedgerRow({
           </div>
         </div>
 
-        {/* the version's signature: the stack as one line of prose, not pills */}
+        {/* the stack as prose, not pills */}
         <p className="pj-stack mono">
           {project.technologies.map((tech, i) => (
             <Fragment key={tech.name}>
@@ -283,9 +245,7 @@ function ProjectsLedger({ projects }: { projects: ProjectData[] }) {
           </p>
         )}
 
-        {/* The fold is a SIBLING of the ruled list, not a child of it: both close
-            themselves with a bottom hairline, and nesting them stacked the two
-            rules on top of each other the moment the fold opened. */}
+        {/* sibling of the list: nesting stacks two hairlines */}
         <div className="pj-list">{featured.map(row)}</div>
 
         {rest.length > 0 && (
@@ -303,8 +263,6 @@ function ProjectsLedger({ projects }: { projects: ProjectData[] }) {
     </section>
   );
 }
-
-/* ── v2 — the build log ───────────────────────────────────────────────────── */
 
 const TYPE_DELAY = 180;
 const TYPE_STEP = 16;
@@ -331,9 +289,6 @@ function LogEntry({
   const cover = project.images[0];
   const domain = endpoint?.domain;
 
-  // null until the effect below starts typing, so the server sends — and a
-  // reader with JS off keeps — the whole domain. By the time it is blanked the
-  // entry has only just come into view behind its own reveal, so nothing flashes.
   const [typed, setTyped] = useState<string | null>(null);
   const [caret, setCaret] = useState(false);
 
@@ -357,10 +312,6 @@ function LogEntry({
     return () => clearTimeout(timer);
   }, [domain, reduced, inView]);
 
-  // `inView` alone, deliberately: `useReducedMotion()` is null on the server and
-  // the real preference on the client's first render, so branching the rendered
-  // className on it is a hydration mismatch. The reduced-motion rescue is in the
-  // stylesheet, where it applies before first paint rather than after hydration.
   const shown = inView;
 
   return (
@@ -384,9 +335,7 @@ function LogEntry({
 
       <div className="pjb-grid">
         <div className="pjb-pad">
-          {/* The tab says the shot is of production, so it only appears where
-              there IS one. The preview never had to decide — all six of its
-              builds were live. */}
+          {/* prod tab only where there is a live url */}
           {endpoint?.status === 'live' && (
             <span className="pjb-prod mono" aria-hidden="true">&#9650; prod</span>
           )}
@@ -414,9 +363,6 @@ function LogEntry({
                 <ArrowUpRight />
               </a>
             ) : (
-              // `.pj-name` carries the title's type when there is no anchor to
-              // carry it — v1 gets this for free, since there `.pj-title` IS
-              // the anchor.
               <span className="pj-name">{project.title}</span>
             )}
             <span className="pjb-hint mono" aria-hidden="true">highlights</span>
@@ -463,14 +409,10 @@ function LogEntry({
 function ProjectsBuildLog({ projects }: { projects: ProjectData[] }) {
   const [expanded, setExpanded] = useState(false);
   const [open, toggle] = useOpenSet();
-  // null on the server and the real preference after mount, so the typing never
-  // decides anything during render.
   const reduced = useReducedMotion() ?? false;
 
   const endpoints = projects.map(endpointOf);
   const liveCount = endpoints.filter((e) => e?.status === 'live').length;
-  // The sign-off and the sub-line both count from the same derivation, so the
-  // copy can only claim what the links actually resolve to.
   const allLive = projects.length > 0 && liveCount === projects.length;
 
   const featured = projects.slice(0, FEATURED);

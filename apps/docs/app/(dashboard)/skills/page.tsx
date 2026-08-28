@@ -17,9 +17,7 @@ export default async function SkillsPage() {
         description="The periodic table. Published skills fill the grid in the order below; hidden ones stay in the vocabulary that tags projects and roles."
       />
 
-      {/* Section strip — the ordinal is the identity device, the anchor says
-          where on the page this lands, and the reaches own up to the two other
-          sections this table quietly changes. */}
+      {/* the ordinal, the anchor, and the sections this also changes */}
       <div className="sec-strip">
         <span className="sec-mark" aria-hidden="true">03</span>
         <div className="sec-anchor">
@@ -34,8 +32,7 @@ export default async function SkillsPage() {
       </div>
 
       <SkillsTable skills={skills.map(s => ({ id: s.id, name: s.name, iconKey: s.iconKey, show: s.show, sortOrder: s.sortOrder }))} />
-      {/* Hidden skills go through too: the wrapper applies `show` after the
-          staging overlay, so toggling one back on is visible before it saves. */}
+      {/* hidden skills go through too; the wrapper applies show later */}
       <StagedSkillsPreview skills={skills.map(s => ({ id: s.id, name: s.name, show: s.show }))} />
     </div>
   );

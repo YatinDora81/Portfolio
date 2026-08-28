@@ -13,37 +13,16 @@ export function DeleteButton({
   newRow = false,
   disabled = false,
 }: {
-  /** Stages the delete when `staged`, writes it immediately otherwise. */
   onDelete: () => void | Promise<void>;
   label?: string;
-  /** The consequence line, for a delete that reaches past the row itself. */
   sub?: string;
-  /**
-   * The delete goes to the staging store instead of the database, so the row
-   * stays on screen with an undo until the save bar commits.
-   */
   staged?: boolean;
-  /**
-   * This row exists only in the browser — it is itself a staged create. Deleting
-   * it drops the create, which means there is no struck-through row and no undo.
-   */
   newRow?: boolean;
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  // A confirm's job is to stand in front of something the undo can't reach.
-  //
-  // The ordinary staged delete isn't that: the row stays visible, struck
-  // through, with its own undo, and nothing reaches the database until Save. It
-  // skips the dialog rather than teaching people to dismiss one.
-  //
-  // Two staged deletes still get it, because for them the undo is a lie:
-  //  - `newRow` — the row has no server identity, so staging its delete removes
-  //    the create outright. It vanishes, and everything typed into it goes too.
-  //  - `sub` — the delete cascades past the row (a skill's tags, an account's
-  //    access), and the row-level undo only covers the row.
   const confirms = !staged || newRow || !!sub;
 
   const trigger = (

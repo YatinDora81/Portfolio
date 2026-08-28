@@ -12,27 +12,14 @@ import { FORM_TOKEN_FIELD, HONEYPOT_FIELD, scoreSpam } from "@repo/shared/spam";
 import { verifyTurnstile } from "@repo/shared/turnstile";
 import { getFlags } from "@/lib/flags";
 
-/**
- * Public, unauthenticated write endpoint — the only one that reaches
- * contactMessage — so every field is bounded and typed here. A truthiness
- * check alone let a caller store megabytes, a non-string, or a bogus address
- * that makes the message impossible to reply to.
- */
 const MAX = { name: 100, email: 254, purpose: 100, message: 5000 } as const;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const RATE_LIMIT = 5;
 const RATE_WINDOW_MS = 3_600_000;
 
-/** Non-strings collapse to "" so they fail the required check. */
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
-/**
- * Reads the body with a hard ceiling, streaming so an oversized one is dropped
- * rather than buffered. `content-length` alone is not a guard: it is absent on a
- * chunked request, which let any caller skip the check entirely and hand
- * `request.json()` a body of any size.
- */
 async function readCapped(request: Request, cap: number): Promise<string | null> {
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (declared > cap) return null;
@@ -63,7 +50,6 @@ async function readCapped(request: Request, cap: number): Promise<string | null>
   );
 }
 
-// Platform-written headers only: nothing strips an inbound `cf-connecting-ip`, so trusting it would let a caller pick its own rate-limit bucket.
 function clientIp(headers: Headers): string | null {
   const direct = headers.get("x-real-ip")?.trim();
   if (direct) return direct;
@@ -71,7 +57,7 @@ function clientIp(headers: Headers): string | null {
   return first || null;
 }
 
-// Order matters: every Chromium UA also says "Safari", and Edge says both.
+// order matters: every chromium ua also says "safari"
 function coarseUa(ua: string): { deviceType: string | null; browser: string | null } {
   const s = ua.toLowerCase();
   if (!s) return { deviceType: null, browser: null };
@@ -119,7 +105,6 @@ export async function POST(request: Request) {
   try {
     body = JSON.parse(raw);
   } catch {
-    // A malformed body is the caller's fault — 400, not 500.
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
@@ -129,7 +114,6 @@ export async function POST(request: Request) {
   const message = str(b.message);
   const purpose = str(b.purpose);
 
-  // Hashed on the next line and never held past it: the raw address is not stored, not logged, not sent anywhere.
   const ip = clientIp(request.headers);
   const ipKey = ip ? sha256(`contact:${ip}`).slice(0, 32) : null;
 
@@ -175,8 +159,6 @@ export async function POST(request: Request) {
   const { deviceType, browser } = coarseUa(request.headers.get("user-agent") ?? "");
 
   try {
-    // Only accept a purpose the site actually offers, so the column can't be
-    // used as free-form storage.
     let safePurpose: string | null = null;
     if (purpose) {
       const known = await prisma.contactPurpose.findFirst({
@@ -196,7 +178,7 @@ export async function POST(request: Request) {
         purpose: safePurpose,
         message,
         status: verdict.isSpam ? MessageStatus.SPAM : MessageStatus.UNREAD,
-        // The legacy `read` column drives the unread badge, which only UNREAD may light up.
+        // legacy column, drives the unread badge
         read: verdict.isSpam,
         spamScore: verdict.score,
         spamReasons: verdict.reasons,
@@ -248,7 +230,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // A flagged message gets this same response; anything else is a feedback loop for tuning past the scorer.
     return Response.json({ success: true });
   } catch {
     return Response.json({ error: "Failed to send message" }, { status: 500 });

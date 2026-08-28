@@ -16,7 +16,6 @@ const stamp = new Intl.DateTimeFormat("en-GB", {
   year: "numeric",
 });
 
-/** Matching on the key alone catches both a root-relative `/key` and an absolute CDN URL. */
 async function referenceSources(): Promise<{ label: string; text: string }[]> {
   const [projects, blogs, experiences, config] = await Promise.all([
     prisma.project.findMany({ select: { title: true, logoUrl: true, images: true } }),
@@ -30,7 +29,6 @@ async function referenceSources(): Promise<{ label: string; text: string }[]> {
       label: `Project · ${p.title}`,
       text: [p.logoUrl ?? "", ...p.images].join("\n"),
     })),
-    // `content` is in the haystack because an image can be embedded in the markdown body.
     ...blogs.map((b) => ({ label: `Blog · ${b.title}`, text: `${b.image}\n${b.content}` })),
     ...experiences.map((e) => ({ label: `Experience · ${e.company}`, text: e.logoUrl ?? "" })),
     ...config.map((c) => ({

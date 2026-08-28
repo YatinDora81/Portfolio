@@ -23,7 +23,6 @@ interface ExperienceData {
   skillIds: string[]; bullets: Bullet[];
 }
 
-/** `**highlight**` runs render in the ink colour, mirroring the live site. */
 function renderBullet(text: string) {
   return text.split(/\*\*(.*?)\*\*/g).map((part, i) =>
     i % 2 === 1
@@ -54,9 +53,7 @@ export function ExperienceForm({ experience, allSkills }: {
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [pubError, setPubError] = useState<string | null>(null);
 
-  // Which submit button was pressed. A ref, not state: the click lands in the
-  // same event as the submit, so state set here would still be stale by the
-  // time the handler reads it.
+  // ref, not state: the click and the submit land in one event
   const wantPublish = useRef(false);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -76,9 +73,6 @@ export function ExperienceForm({ experience, allSkills }: {
       if (publish) {
         const res = await publishSite();
         if (!res.ok) {
-          // Decision 5: the role is saved. A publish that fails is a separate,
-          // retryable failure — it never undoes the write, so hold the page and
-          // name the reason rather than navigating away in silence.
           setPubError(res.error ?? "Could not reach the site.");
           setBusy(null);
           return;
@@ -100,8 +94,6 @@ export function ExperienceForm({ experience, allSkills }: {
         description="One entry on the work timeline — the header line, the period, and the bullets underneath."
       />
 
-      {/* A real <form>: the inputs already carry `required`, but with a plain
-          div and a type="button" submit the browser never validated anything. */}
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <Card flush>
           <CardHead title="Role" />
@@ -151,8 +143,6 @@ export function ExperienceForm({ experience, allSkills }: {
             }
           />
 
-          {/* Per-role scan layer. Lives with the bullets because the number
-              only means anything relative to how many there are. */}
           <div className="filters">
             <label
               htmlFor="visibleBullets"

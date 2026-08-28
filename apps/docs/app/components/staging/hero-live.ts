@@ -7,24 +7,11 @@ export interface HeroContentRow {
   version: string;
   intro: string;
   tagline: string;
-  /** The sentinel "live" on the served version, NULL on the other. */
+  /** sentinel "live" on the served version, NULL on the other */
   live: string | null;
 }
 
-/**
- * The version the site serves *once the staged batch saves* — the pending flip
- * if one exists, otherwise what the database says.
- *
- * Deliberately not derived from `overlay()`. Overlay patches a staged
- * `{ live: true }` onto its row but has no way to clear the other one, so
- * mid-flip both rows read as live and "which one" becomes a coin toss. Reading
- * the op directly is exact, and `HeroCopyCard` guarantees at most one exists by
- * clearing both rows before it stages.
- *
- * Lives here rather than beside the copy card because the preview wrappers need
- * it too: a pane with no version tab of its own has to follow the staged flip,
- * or its "showing N unsaved changes" chip counts a change the pane isn't drawing.
- */
+// reads the op directly, overlay can't clear the other row mid-flip
 export function useLiveVersion(content: HeroContentRow[]): "v1" | "v2" {
   const { ops } = useStaging();
   const flip = ops.find(

@@ -1,6 +1,6 @@
 import { getBlogBySlug } from "@/lib/data";
 
-// Unauthenticated and public: never pass a preview argument here, it would expose draft bodies as JSON.
+// public route: never pass a preview argument here
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> }

@@ -45,7 +45,7 @@ function Result({ outcome }: { outcome: Outcome }) {
   return <div className="rv-err">{outcome.error}</div>;
 }
 
-// Must be caught at every call site: a throw inside a transition reaches no error boundary.
+// a throw inside a transition reaches no error boundary
 function transportError(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "The server could not be reached.";
 }
@@ -73,14 +73,11 @@ function useRunner() {
   return { busy, results, run };
 }
 
-/* ------------------------------------------------------------------ 2. stale */
-
 export interface StaleRow {
   id: string;
   type: string;
   slug: string;
   title: string;
-  /** Pre-formatted IST, not a Date. */
   editedAt: string;
   revalidatedAt: string | null;
 }
@@ -88,7 +85,6 @@ export interface StaleRow {
 interface BulkResult {
   attempted: number;
   failed: number;
-  /** Still stale after this run — the batch is capped. */
   remaining: number;
   error: string | null;
 }
@@ -111,7 +107,6 @@ export function StaleContent({ items }: { items: StaleRow[] }) {
           remaining: res.remaining,
           error: res.error ?? null,
         });
-        // Refresh on a partial run too; only a top-level error leaves the list accurate.
         if (res.error === undefined) router.refresh();
       } catch (e) {
         setBulk({ attempted: 0, failed: 0, remaining: 0, error: transportError(e) });
@@ -206,16 +201,12 @@ export function StaleContent({ items }: { items: StaleRow[] }) {
   );
 }
 
-/* -------------------------------------------------------- 3. manual controls */
-
 export interface TagRow {
   tag: string;
-  /** Pre-formatted IST, or null if never flushed. */
   lastSuccessAt: string | null;
   fails: number;
 }
 
-// Not a tag — kept distinct so its key cannot collide with one.
 const SITE_KEY = "whole-site";
 
 export function ManualControls({ tags }: { tags: TagRow[] }) {
@@ -277,11 +268,8 @@ export function ManualControls({ tags }: { tags: TagRow[] }) {
   );
 }
 
-/* -------------------------------------------------------------- 4. recent log */
-
 export interface LogRow {
   id: string;
-  /** Pre-formatted IST, not a Date. */
   at: string;
   trigger: string;
   paths: string[];
@@ -308,7 +296,7 @@ const STATUS_CHIP: Record<string, string> = {
   TIMEOUT: "chip amb",
 };
 
-// null = no human actor; an id that resolves to nobody is an admin deleted since.
+// null = no human actor
 function actorLabel(id: string | null, actors: Record<string, string>): string {
   if (id === null) return "—";
   return actors[id] ?? id;

@@ -21,7 +21,6 @@ const ROLE_LEVEL: Record<string, number> = { OWNER: 3, ADMIN: 2, SUB_ADMIN: 1 };
 
 const ROLE_LABEL: Record<string, string> = { OWNER: "Owner", ADMIN: "Admin", SUB_ADMIN: "Sub Admin" };
 
-/** `.role` modifiers from the control-room table styles. */
 const ROLE_CLASS: Record<string, string> = { OWNER: "owner", ADMIN: "admin", SUB_ADMIN: "sub" };
 
 function canManage(actorRole: string, targetRole: string) {
@@ -29,7 +28,6 @@ function canManage(actorRole: string, targetRole: string) {
 }
 
 function getRoleOptions(actorRole: string) {
-  // Can only assign roles below your own level
   return Object.entries(ROLE_LEVEL)
     .filter(([, level]) => level < ROLE_LEVEL[actorRole]!)
     .sort((a, b) => b[1] - a[1])
@@ -56,9 +54,6 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
     isDeleted, isNew, isEdited,
   } = useStaging();
 
-  // Nothing here writes: every dialog lands in the staging store and the save
-  // bar commits the lot. `overlay` folds the pending batch back over the server
-  // rows so a staged change is visible immediately.
   const rows = overlay(ENTITY, users, (u) => u.id);
 
   const myRole = currentUser.role;
@@ -73,9 +68,6 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
     setPasswordDialogOpen(true);
   }
 
-  // The match and length rules used to come back from `changePassword`; staged,
-  // they have to be checked here. The rank check still happens server-side when
-  // the batch is applied — this dialog is only offered for accounts you outrank.
   function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
     if (!passwordTarget) return;
@@ -150,7 +142,6 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
                   <td>
                     <div className="row-acts" style={{ justifyContent: "flex-end" }}>
                       {del ? (
-                        // The row stays put until the save; this is the undo.
                         <IconButton
                           aria-label={`Keep ${u.name}`}
                           title="Undo delete"
@@ -164,8 +155,6 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
                         </span>
                       ) : canManageUser ? (
                         <>
-                          {/* A staged account has no row to reset a password on
-                              yet — its password comes from the create dialog. */}
                           {!pending && (
                             <IconButton
                               onClick={() => openPasswordDialog(u)}
@@ -222,9 +211,6 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
         <form
           id="admin-user-form"
           onSubmit={(e) => {
-            // `onSubmit` rather than `action`: the dialog stages and closes, so
-            // there is no server round trip to await. Native validation still
-            // runs first, so `required` below is unaffected.
             e.preventDefault();
             const data = new FormData(e.currentTarget);
             const fields = {
@@ -237,8 +223,6 @@ export function AdminUsersTable({ users, currentUser }: { users: User[]; current
             else stageCreate(ENTITY, {
               ...fields,
               password: String(data.get("password") ?? ""),
-              // Display only — the row renders a joined date, and the server
-              // ignores every key outside the entity's own list.
               createdAt: new Date().toISOString(),
             });
             setDialogOpen(false);

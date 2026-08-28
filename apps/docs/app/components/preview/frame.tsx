@@ -4,11 +4,6 @@ import { useEffect, useState } from "react";
 import { IconDeviceDesktop, IconDeviceMobile, IconEye, IconLock } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
-// ─── Preview Frame ───────────────────────────────────────────────
-// A browser window, drawn with admin tokens, wrapped around a pane that mimics
-// the portfolio's dark mode.
-
-/** Same fallback as the sidebar / top-bar; only the host goes in the URL strip. */
 const SITE_HOST = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in")
   .replace(/^https?:\/\//, "")
   .replace(/\/+$/, "");
@@ -17,10 +12,6 @@ type PreviewWidth = "mobile" | "desktop";
 const WIDTH_KEY = "admin-preview-width";
 const MOBILE_WIDTH = 390;
 
-// `--dim`, not `--faint`: the resting segment sits on the `--bg2` track, where
-// light mode's #8E8E9A measures 2.77:1 — under the 4.5:1 this 10px label needs,
-// and under the 3:1 its icon needs. `--dim` is 6.18:1 there and stays the
-// lighter of the two greys in both dark themes.
 const SEG_BTN: React.CSSProperties = {
   display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 7,
   fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, color: "var(--dim)", transition: ".15s",
@@ -51,17 +42,14 @@ export function PreviewFrame({ children, label = "Portfolio Preview", className,
   children: React.ReactNode;
   label?: string;
   className?: string;
-  /** Staged ops already folded into `children` — shows a marker when > 0. */
   pendingCount?: number;
 }) {
   const [width, setWidth] = useState<PreviewWidth>("desktop");
 
-  // Read the stored choice after mount only — touching localStorage during
-  // render would desync from the server HTML.
   useEffect(() => {
     try {
       if (localStorage.getItem(WIDTH_KEY) === "mobile") setWidth("mobile");
-    } catch { /* private mode — the desktop default is fine */ }
+    } catch { /* ignore */ }
   }, []);
 
   function pick(next: PreviewWidth) {
@@ -73,8 +61,6 @@ export function PreviewFrame({ children, label = "Portfolio Preview", className,
 
   return (
     <div className={cn("mt-6", className)}>
-      {/* Frame chrome follows the admin theme; the pane below stays pinned to the
-          portfolio's own dark palette because that's what it's simulating. */}
       <div className="card-h" style={{ border: "none", padding: "0 2px 10px", flexWrap: "wrap" }}>
         <IconEye size={14} style={{ color: "var(--faint)" }} />
         <span className="card-t">{label}</span>
@@ -100,7 +86,6 @@ export function PreviewFrame({ children, label = "Portfolio Preview", className,
       </div>
 
       <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: "var(--r3)", overflow: "hidden", boxShadow: "var(--shadow)" }}>
-        {/* Window chrome — admin tokens, so it reads as a frame in all three themes */}
         <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 10px", background: "var(--bg1)", borderBottom: "1px solid var(--line2)" }}>
           <span style={{ display: "flex", gap: 5, flex: "none" }} aria-hidden="true">
             <span className="dot" style={{ background: "var(--bad)", opacity: .8 }} />
@@ -120,7 +105,6 @@ export function PreviewFrame({ children, label = "Portfolio Preview", className,
           </span>
         </div>
 
-        {/* Viewport — on mobile the device is centred and the surround stays visible */}
         <div style={{ display: "flex", justifyContent: "center", background: "var(--bg2)", padding: mobile ? "16px 12px" : 0 }}>
           <div
             style={{
@@ -140,34 +124,12 @@ export function PreviewFrame({ children, label = "Portfolio Preview", className,
   );
 }
 
-// ─── Shared ink and type ─────────────────────────────────────────
-// One value each, imported by every section, so the pane can't drift into two
-// greys or two monospaces for the same semantic role.
-
-/** `.text-secondary` in apps/web/globals.css — the site's secondary ink for
- *  every string these previews mirror. NOT `--muted-foreground` (#a3a3a3):
- *  that token is only correct where the site itself reaches for it, e.g. the
- *  contact form's `placeholder:text-muted-foreground/50`. */
 export const DIM = "#909092";
 
-/** Preview-only meta text — the italic "not set" notes and the counted hints
- *  that have no counterpart on the site, held a step back from `DIM`. */
 export const FAINT = "#737373";
 
-/** The site's `--font-mono` is JetBrains Mono, so the pane asks for it first
- *  and degrades to the platform monospace. Deliberately not the admin's
- *  `var(--mono)`: that resolves to 'Geist Mono', a literal family name
- *  `next/font/local` never registers (it exposes a hashed one via
- *  `--font-geist-mono`), so the two stacks could land on different faces in
- *  the same pane. */
 export const MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
 
-// ─── Shared helpers ──────────────────────────────────────────────
-
-/** Mirrors apps/web/app/components/common/SectionHeading.tsx at preview scale:
- *  a sentence-case secondary sub-line over a bold heading. The site has no
- *  uppercase, letter-spaced eyebrow anywhere in a section head — only the size
- *  is reduced here. */
 export function SectionLabel({ sub, main }: { sub: string; main: string }) {
   return (
     <div className="mb-4">
@@ -177,19 +139,11 @@ export function SectionLabel({ sub, main }: { sub: string; main: string }) {
   );
 }
 
-/**
- * Renders `**bold**` CMS markup. `logos` keys a company mark by the lower-cased
- * company name, exactly as `BoldText` does in apps/web — a bolded run that
- * names a company we have a logo for gets its mark inline just before the name.
- * Sized for the 11px terminal type rather than the site's 14px.
- */
 export function renderBold(text: string, logos?: Record<string, string>) {
   const parts = text.split(/\*\*(.*?)\*\*/g);
   return parts.map((part, i) => {
     if (i % 2 === 0) return <span key={i}>{part}</span>;
     const key = part.trim().toLowerCase();
-    // `hasOwn`, not a bare read: a bolded `**constructor**` would otherwise
-    // resolve up the prototype chain and render its source as an image src.
     const logo = logos && Object.hasOwn(logos, key) ? logos[key] : undefined;
     return (
       <b key={i} className="text-[#fafafa]">
@@ -212,15 +166,11 @@ export function renderBold(text: string, logos?: Record<string, string>) {
 const ROTATE_MS = 2500;
 export const FADE_MS = 400;
 
-/** Which title the live site would be showing right now, and whether it is
-    mid-fade. Holds on the first title under reduced motion, or with < 2 titles. */
 export function useRotatingTitle(count: number) {
   const [index, setIndex] = useState(0);
   const [visible, setVisible] = useState(true);
   const [animate, setAnimate] = useState(false);
 
-  // Read the motion preference after mount only — reading it during render
-  // would desync from the server HTML.
   useEffect(() => {
     if (count < 2) { setAnimate(false); return; }
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -231,11 +181,6 @@ export function useRotatingTitle(count: number) {
   }, [count]);
 
   useEffect(() => {
-    // Un-fade FIRST, every time this effect runs. The pending `swap` below is
-    // the only thing that ever restores `visible`, and the cleanup cancels it —
-    // so a staged create/delete landing inside the 400ms fade would otherwise
-    // strand the title at opacity 0. Permanently, once the list drops below two
-    // titles: `animate` goes false and no interval is ever re-armed to fix it.
     setVisible(true);
     if (!animate) return;
     let swap: ReturnType<typeof setTimeout>;
@@ -252,12 +197,8 @@ export function useRotatingTitle(count: number) {
     };
   }, [animate, count]);
 
-  // Wrapped here rather than in the setter so a staged delete that shortens the
-  // list can never leave the index pointing past the end.
   return { index: count > 0 ? index % count : 0, visible };
 }
-
-// ─── Helper ──────────────────────────────────────────────────────
 
 export function parseBullet(content: string) {
   const match = content.match(/^\*\*(.*?)\*\*\s?(.*)/s);

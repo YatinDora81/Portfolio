@@ -3,14 +3,6 @@ import type { Prisma } from "db";
 import type { ParsedQuery } from "./query";
 import { toPrismaWhere } from "./query-sql";
 
-/**
- * Structural assertions only — no database. What is being defended here is the
- * shape of the plan, because every one of these mistakes returns rows rather
- * than an error: a dropped scope silently searches the whole vault, and a
- * negation written across the nullable `answer` relation silently drops every
- * question nobody has answered yet.
- */
-
 function pq(over: Partial<ParsedQuery> = {}): ParsedQuery {
   return {
     text: [],
@@ -32,23 +24,16 @@ function clauses(w: Prisma.NoteNodeWhereInput): Prisma.NoteNodeWhereInput[] {
   return (w.AND ?? []) as Prisma.NoteNodeWhereInput[];
 }
 
-/** Everything after `kind` and `deletedAt`, which every query carries. */
 function extra(w: Prisma.NoteNodeWhereInput): Prisma.NoteNodeWhereInput[] {
   return clauses(w).slice(2);
 }
 
-/**
- * The answer filter a clause asserts, reaching past the `answer: null` branch
- * that a word true of a blank answer carries. Whether that branch is there is
- * pinned separately, below — it is a fact about the word, not about the filter.
- */
 function inner(c: Prisma.NoteNodeWhereInput | undefined): Prisma.NoteAnswerWhereInput {
   const positive = (c?.OR?.[1] ?? c) as Prisma.NoteNodeWhereInput | undefined;
   const rel = positive?.answer as { is: Prisma.NoteAnswerWhereInput } | undefined;
   return rel?.is as Prisma.NoteAnswerWhereInput;
 }
 
-/** What the exact complement of a positive answer filter must look like. */
 function complementOf(f: Prisma.NoteAnswerWhereInput): Prisma.NoteNodeWhereInput {
   return { OR: [{ answer: { is: null } }, { answer: { is: { NOT: f } } }] };
 }
@@ -230,9 +215,6 @@ describe("toPrismaWhere · conf: and has:", () => {
   });
 
   test("a comparison an unanswered question satisfies reaches it", () => {
-    // conf:<=2 is the "Needs revision" chip, and a question with no answer row
-    // reads as confidence 0 everywhere else in the app — so the questions most
-    // in need of revision are exactly the ones a plain `answer: { is: … }` drops.
     const [clause] = extra(toPrismaWhere(pq({ conf: [{ op: "<=", v: 2 }] })));
     expect(clause?.OR?.[0]).toEqual({ answer: { is: null } });
   });
@@ -245,8 +227,6 @@ describe("toPrismaWhere · conf: and has:", () => {
 
   test("is:unrated reaches the unanswered and -is:unrated does not", () => {
     expect(extra(toPrismaWhere(pq({ is: ["unrated"] })))[0]?.OR?.[0]).toEqual({ answer: { is: null } });
-    // The complement has to lose that branch, or a question would be both
-    // unrated and not unrated.
     expect(extra(toPrismaWhere(pq({ notIs: ["unrated"] })))[0]).toEqual({
       answer: { is: { NOT: { confidence: 0 } } },
     });

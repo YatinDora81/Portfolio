@@ -23,7 +23,6 @@ interface Entry {
 
 const FORM_ID = "education-form";
 
-/** "9.1 / 10 CGPA" or "88 %" — null when the entry carries no score. */
 function scoreLabel(e: Entry) {
   if (!e.score) return null;
   const total = e.scoreTotal ? ` / ${e.scoreTotal}` : "";
@@ -31,11 +30,6 @@ function scoreLabel(e: Entry) {
   return `${e.score}${total}${unit}`;
 }
 
-/**
- * The dialog edits every column, so it stages every column. A staged create has
- * to carry the full set anyway — the overlay materialises the pending row out of
- * exactly these fields, and anything missing would render as a blank cell.
- */
 function fieldsFrom(formData: FormData) {
   const s = (k: string) => String(formData.get(k) ?? "");
   return {
@@ -58,36 +52,25 @@ export function EducationTable({ entries }: { entries: Entry[] }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Entry | null>(null);
 
-  // Everything staged for this entity — new rows, pending edits, the pending
-  // drag order — folded onto the server rows, so the list shows what the save
-  // bar is about to write rather than what the database still says.
   const staged = overlay("education", entries, (e) => e.id);
 
-  // The grip commits to the store, not to the server. `useSortable` re-seeds off
-  // the ids it is handed, and those come back already in the staged order, so a
-  // drop lands where it was dropped instead of snapping back.
   const { order, handleProps, itemProps } = useSortable(
     staged.map((e) => e.id),
     (ids) => stageReorder("education", ids)
   );
 
-  // Sorted BY the drag order rather than mapped THROUGH it: the hook re-seeds in
-  // an effect, so for one render after a create its `order` has no slot for the
-  // new row — mapping through it would blink the row out of existence.
   const rank = new Map(order.map((id, i) => [id, i] as const));
   const at = (id: string) => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
   const rows = [...staged].sort((a, b) => at(a.id) - at(b.id));
 
   const openNew = () => { setEditing(null); setDialogOpen(true); };
 
-  /** Keyboard path for reordering. Indices are `rows` indices — one index space. */
   const move = (from: number, to: number) => {
     const ids = rows.map((e) => e.id);
     [ids[from], ids[to]] = [ids[to]!, ids[from]!];
     stageReorder("education", ids);
   };
 
-  /** Exactly one diff mark per row: gone beats new beats edited. */
   const mark = (id: string) =>
     isDeleted("education", id) ? "staged-del"
       : isNew("education", id) ? "staged-new"
@@ -133,8 +116,6 @@ export function EducationTable({ entries }: { entries: Entry[] }) {
                 {score ? <span className="chip">{score}</span> : null}
                 <div className="row-acts">
                   {gone ? (
-                    // The row stays put, struck through, until the bar commits —
-                    // so the undo lives where the delete was.
                     <IconButton
                       aria-label={`Keep ${e.institution}`}
                       title="Undo delete"
@@ -190,7 +171,6 @@ export function EducationTable({ entries }: { entries: Entry[] }) {
         footer={
           <>
             <Button variant="ghost" type="button" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            {/* Not "Save": this only puts the row in the list. The save bar writes. */}
             <Button type="submit" form={FORM_ID}>{editing ? "Update entry" : "Add entry"}</Button>
           </>
         }
@@ -199,8 +179,6 @@ export function EducationTable({ entries }: { entries: Entry[] }) {
           id={FORM_ID}
           action={(formData) => {
             const fields = fieldsFrom(formData);
-            // Editing a row that is itself a pending create folds into that
-            // create — the store keys on the id either way, tempId included.
             if (editing) stageUpdate("education", editing.id, fields);
             else stageCreate("education", fields);
             setDialogOpen(false);

@@ -1,14 +1,5 @@
 'use client';
 
-/**
- * Contact — the composition root and nothing else.
- *
- * Every moving part lives in ./contact/*, so a keystroke re-renders one field
- * rather than the instrument above it, and the wave is driven through an
- * imperative handle rather than props — poking it from state would re-render
- * the section at typing speed.
- */
-
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useInView, useReducedMotion } from 'motion/react';
 import Container from '../common/Container';
@@ -20,7 +11,6 @@ import Frequencies from './contact/Frequencies';
 
 export interface Purpose {
   label: string;
-  /** Drawn as the chip's icon. The only colour the section carries. */
   emoji: string;
 }
 
@@ -43,13 +33,7 @@ interface ContactProps {
   turnstileSiteKey: string | null;
 }
 
-/** IST wall clock, and whether that hour is a plausible one to get a reply.
-    `seconds` is false under reduced motion — a second hand is motion. */
 function useIstClock(seconds: boolean) {
-  // A placeholder, because formatting the visitor's clock during SSR guarantees
-  // a mismatch. The literal does NOT vary with `seconds`: that comes from
-  // useReducedMotion(), which is null on the server and the real value on the
-  // client's first render, so branching here mismatched too.
   const [time, setTime] = useState('--:--:--');
   const [awake, setAwake] = useState<boolean | null>(null);
 
@@ -72,10 +56,9 @@ function useIstClock(seconds: boolean) {
           }),
           10,
         );
-        // `< 24` is not redundant: some ICU builds render midnight as hour 24.
+        // some ICU builds render midnight as hour 24
         setAwake(hour >= 8 && hour < 24);
       } catch {
-        // A runtime without the IANA database still gets a ticking clock.
         setTime(now.toLocaleTimeString('en-GB', { hour12: false }));
         setAwake(null);
       }
@@ -88,8 +71,6 @@ function useIstClock(seconds: boolean) {
   return { time, awake };
 }
 
-/** The entrance stagger, kept in the parent so the children stay ignorant of the
-    cascade: each block is wrapped rather than asked to carry its own delay. */
 const rise = (d: string) => ({ '--d': d }) as CSSProperties;
 
 export default function Contact({
@@ -106,9 +87,7 @@ export default function Contact({
   const reduced = useReducedMotion();
   const { time, awake } = useIstClock(!reduced);
 
-  // Observed on the SECTION, not `.ct`: `#contact` carries
-  // content-visibility:auto, and a container skipping its contents suppresses
-  // IntersectionObserver for everything beneath it.
+  // content-visibility:auto on #contact hides its subtree from the observer
   const sectionRef = useRef<HTMLElement>(null);
   const inView = useInView(sectionRef, { once: true, amount: 0.08 });
 
@@ -130,7 +109,6 @@ export default function Contact({
                 <span className="sr-only">Local time in Bengaluru: </span>
                 <time className="ct-clock">{time}</time>
                 <span>IST</span>
-                {/* The cat's entire budget in this section. */}
                 <span className="awk">· {awake === false ? 'sleeping =^..^=' : 'online'}</span>
               </span>
             </div>

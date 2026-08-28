@@ -39,13 +39,11 @@ export default async function ProjectsPage({ searchParams }: {
   ]);
 
   const cfg = new Map(siteConfigRows.map((c) => [c.key, c.value]));
-  // Coerced here as well as on write, so a row edited around the action still
-  // shows the layout visitors are actually being served.
   const version = toProjectsVersion(cfg.get("projectsVersion") ?? DEFAULTS["projectsVersion"]);
 
   const now = new Date();
 
-  // Both halves of the public filter — must not drift from `publicContentWhere` in db/visibility.
+  // must not drift from publicContentWhere in db/visibility
   const isLive = (p: { status: ContentStatus; publishedAt: Date | null }) =>
     p.status === "PUBLISHED" && p.publishedAt !== null && p.publishedAt <= now;
 
@@ -56,7 +54,6 @@ export default async function ProjectsPage({ searchParams }: {
   const overdue = projects.filter(
     (p) => p.status === "SCHEDULED" && p.publishAt !== null && p.publishAt <= now
   );
-  // PUBLISHED with no stamp reads as live in here but is absent from the site.
   const unstamped = projects.filter((p) => p.status === "PUBLISHED" && p.publishedAt === null);
 
   const rows = active === null ? projects : projects.filter((p) => p.status === active);
@@ -83,13 +80,9 @@ export default async function ProjectsPage({ searchParams }: {
             #projects <IconArrowUpRight className="nudge" size={11} stroke={1.7} />
           </a>
         </div>
-        {/* No reaches: nothing outside section 05 reads a Project row. */}
         <div className="sec-reach" />
       </div>
 
-      {/* Everything below the strip is passed as children, not re-rendered on
-          the client: `ProjectGrid` stays a server import that way, and only the
-          layout row and the pane get state. */}
       <ProjectsSections
         version={version}
         previewProjects={live.map(p => ({
@@ -99,9 +92,6 @@ export default async function ProjectsPage({ searchParams }: {
           live: p.live,
           bullets: p.bullets.map(b => b.content),
           technologies: p.skills.map(s => s.name),
-          // `images` / `logoUrl` are already loaded above for `ProjectGrid` —
-          // without them the preview's cover slot drew an empty grey box on
-          // every row, reading as "these projects have no cover art".
           images: p.images,
           logoUrl: p.logoUrl,
         }))}
@@ -254,8 +244,6 @@ export default async function ProjectsPage({ searchParams }: {
           </Card>
         )}
 
-        {/* Every project, whatever the tab is filtered to: `reorderProjects` rewrites
-            sortOrder from the order of the ids it is handed. */}
         <div className="wk-in s1" style={{ marginTop: projects.length > 0 ? 14 : 0 }}>
           {projects.length > 0 && active !== null && (
             <div className="lc-note lc-note-b">

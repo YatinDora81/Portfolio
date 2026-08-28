@@ -15,24 +15,11 @@ export interface VersionCounts {
   socials: number;
 }
 
-/**
- * Card 01 — the hero has two whole layouts and exactly one of them ships.
- *
- * The old control was a pair of `.filt` pills that had to carry two unrelated
- * facts at once: which version you are editing, and which one visitors get.
- * They are separated here — the tile you pick is the tab, the `live` chip is the
- * site — because the dangerous action on this page is flipping the second while
- * thinking about the first.
- *
- * The flip is staged, not written: it lands in the same batch as the rows it
- * depends on, so a version can never go live a save before its own titles do.
- */
 export function HeroVersionCard({ content, version, onPick, counts, blockedReason }: {
   content: HeroContentRow[];
   version: Version;
   onPick: (v: Version) => void;
   counts: Record<Version, VersionCounts>;
-  /** Set when the shown version isn't servable; disables the flip and says why. */
   blockedReason?: string;
 }) {
   const { stageUpdate, clearUpdate, saving } = useStaging();
@@ -41,9 +28,6 @@ export function HeroVersionCard({ content, version, onPick, counts, blockedReaso
 
   const flip = () => {
     if (!server) return;
-    // Clear both rows first so exactly one live op can exist — that invariant is
-    // what makes `useLiveVersion` exact, and it also means flipping back to the
-    // saved version stages nothing at all instead of a no-op update.
     for (const c of content) clearUpdate("heroContent", c.id, ["live"]);
     if (content.find((c) => c.live)?.version !== version) {
       stageUpdate("heroContent", server.id, { live: true });
@@ -96,8 +80,6 @@ export function HeroVersionCard({ content, version, onPick, counts, blockedReaso
                   {c.badges === 1 ? "badge" : "badges"} · {c.socials} social
                 </span>
               </span>
-              {/* Not a second control: it repeats the tile's own state for a
-                  reader scanning the right edge, where the flip button sits. */}
               {live && <span className="dot" aria-hidden="true" style={{ background: "var(--good)" }} />}
             </button>
           );

@@ -33,7 +33,6 @@ const TIMEOUT_MS = 8000;
 
 const ERROR_BODY_CHARS = 300;
 
-/** Never throws: callers invoke this after the content save has already committed, so an escaping error would report a committed save as a failure. */
 export async function revalidate(opts: RevalidateOpts): Promise<RevalidateResult> {
   const paths = opts.paths ?? [];
   const tags = opts.tags ?? [];
@@ -62,7 +61,6 @@ export async function revalidate(opts: RevalidateOpts): Promise<RevalidateResult
       error = `HTTP ${res.status}: ${(await res.text()).slice(0, ERROR_BODY_CHARS)}`;
     }
   } catch (e) {
-    // `AbortSignal.timeout` rejects with a DOMException named "TimeoutError"; an externally aborted request gives "AbortError".
     const name = e instanceof Error ? e.name : "";
     const timedOut = name === "TimeoutError" || name === "AbortError";
     status = timedOut ? "TIMEOUT" : "FAILED";
@@ -103,7 +101,6 @@ export async function revalidate(opts: RevalidateOpts): Promise<RevalidateResult
       } else {
         await prisma.tagState.upsert({
           where: { tag },
-          // The epoch, not `now`: seeding `lastSuccessAt` with the current time would mark a tag that has never once succeeded as fresh.
           create: { tag, lastSuccessAt: new Date(0), lastAttemptAt: now, consecutiveFails: 1 },
           update: { lastAttemptAt: now, consecutiveFails: { increment: 1 } },
         });
@@ -126,7 +123,6 @@ export type RevalidationHealth = {
   success: number;
   failed: number;
   timeout: number;
-  /** 0..1, and 1 when nothing was attempted. */
   successRate: number;
   p95DurationMs: number;
 };
@@ -158,7 +154,6 @@ export async function readHealth(sinceDays = 7): Promise<RevalidationHealth> {
   const total = success + failed + timeout;
 
   const n = durations.length;
-  // `noUncheckedIndexedAccess` types the indexed read as possibly undefined even after the clamp, hence the `?? 0`.
   const idx = Math.min(Math.max(Math.ceil(0.95 * n) - 1, 0), n - 1);
   const p95DurationMs = n === 0 ? 0 : (durations[idx]?.durationMs ?? 0);
 

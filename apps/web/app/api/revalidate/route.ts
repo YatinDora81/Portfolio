@@ -13,14 +13,11 @@ const bodySchema = z.object({
   tags: z.array(z.string().max(MAX_ENTRY_LENGTH)).max(MAX_ENTRIES).default([]),
 });
 
-// An empty body is the legacy full flush that existing callers still send; `paths`/`tags` flush only those.
 export async function POST(request: NextRequest) {
   let raw: unknown;
   try {
     raw = await request.json();
   } catch {
-    // An unparseable body threw before the secret check and surfaced as a bare
-    // 500 with no body at all.
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
@@ -30,7 +27,7 @@ export async function POST(request: NextRequest) {
   }
   const { paths, tags } = parsed.data;
 
-  // `??` not `||`: an empty header must fail, not fall through to the body.
+  // ?? not ||: an empty header must fail, not fall through
   const presented = request.headers.get("x-revalidate-secret") ?? parsed.data.secret;
   if (!presented || !safeEqual(presented, env.REVALIDATE_SECRET)) {
     return NextResponse.json({ error: "Invalid secret" }, { status: 401 });
@@ -38,18 +35,13 @@ export async function POST(request: NextRequest) {
 
   try {
     if (paths.length === 0 && tags.length === 0) {
-      // "layout" flushes every route nested under the root layout — the homepage,
-      // /sitemap.xml AND /blog/<slug>. A bare revalidatePath("/") only emits the
-      // `_N_T_/` tag, which no other route carries, so blog posts and the sitemap
-      // stayed stale until their 24h window expired.
+      // "layout" flushes every route under the root layout, not just /
       revalidatePath("/", "layout");
     } else {
       for (const path of paths) revalidatePath(path);
-      // Two arguments — Next 16 dropped the one-arg call.
       for (const tag of tags) revalidateTag(tag, "max");
     }
   } catch (e) {
-    // Not path validation: `revalidatePath("blog/x")` matches nothing and still answers 200 rather than throwing.
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Revalidation failed" },
       { status: 500 },

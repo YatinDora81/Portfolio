@@ -14,19 +14,6 @@ import {
   type VaultRow,
 } from "./vault-view";
 
-/**
- * These functions replaced six SQL queries, and the queries were the spec.
- * Each block below pins one of the guarantees Postgres used to make, so that
- * "the numbers moved" is a failing test rather than something noticed a month
- * later on a folder overview.
- *
- * The subtle one is `below`: `folderStats` counted descendants by PATH PREFIX
- * and the sidebar badge counted them by parentage. One pass answers both now,
- * and it has to keep answering the prefix question — including for a row whose
- * parent is missing, which `buildTree` promotes to a root but whose path still
- * names the folder it belongs to.
- */
-
 let n = 0;
 const ans = (a: Partial<VaultAnswer> = {}): VaultAnswer => ({
   body: "",
@@ -56,7 +43,6 @@ const question = (path: string, extra: Partial<VaultRow> = {}): VaultRow => ({
   ...extra,
 });
 
-/** Wires parentId from the paths, the way the database always has. */
 const vault = (rows: VaultRow[], trashCount = 0): VaultPayload => {
   const byPath = new Map(rows.map((r) => [r.path, r]));
   return {
@@ -84,14 +70,11 @@ describe("folderStatsIn", () => {
   const ix = indexVault(vault(DSA));
 
   test("counts the whole subtree by path prefix, not the level below", () => {
-    // /dsa holds graphs + shortest, and four questions across three levels.
     expect(folderStatsIn(ix, "/dsa")).toEqual({ questions: 4, folders: 2, solidPct: 50 });
   });
 
   test("solid is confidence >= 3, rounded", () => {
-    // bfs(4) and dijkstra(3) of four questions.
     expect(folderStatsIn(ix, "/dsa").solidPct).toBe(50);
-    // graphs: bfs(4), dfs(1), dijkstra(3) — two of three.
     expect(folderStatsIn(ix, "/dsa/graphs").solidPct).toBe(67);
   });
 
@@ -147,11 +130,6 @@ describe("nextQuestionIn", () => {
   const ix = indexVault(vault(DSA));
   const at = (path: string) => nextQuestionIn(ix, ix.byPath.get(path)!);
 
-  // Reading order through DSA is bfs → dfs → dijkstra → dp: the sidebar's
-  // depth-first walk, questions only. Each hop below pins one kind of move the
-  // overscroll gesture makes, so a change to `buildTree`'s ordering — or to the
-  // walk — announces itself here rather than as a scroll that lands somewhere odd.
-
   test("within a folder, next is simply the next sibling question", () => {
     expect(at("/dsa/graphs/bfs")).toMatchObject({
       title: "dfs",
@@ -161,7 +139,6 @@ describe("nextQuestionIn", () => {
   });
 
   test("the last question in a folder descends into the next folder's first", () => {
-    // dfs is graphs' last direct question; the walk continues into /shortest.
     expect(at("/dsa/graphs/dfs")).toMatchObject({
       title: "dijkstra",
       parentTitle: "shortest",
@@ -170,7 +147,6 @@ describe("nextQuestionIn", () => {
   });
 
   test("a level that runs out climbs to the parent and carries on", () => {
-    // dijkstra ends /shortest AND ends /graphs; the walk climbs two levels to dp.
     expect(at("/dsa/graphs/shortest/dijkstra")).toMatchObject({
       title: "dp",
       parentTitle: "dsa",
@@ -179,8 +155,6 @@ describe("nextQuestionIn", () => {
   });
 
   test("the vault's last question has no next — an empty folder is not a stop", () => {
-    // /redis follows dp in the tree, but a folder with nothing in it is a place
-    // the gesture would strand you. The walk skips it and honestly ends.
     expect(at("/dsa/dp")).toBeNull();
   });
 });
@@ -208,8 +182,6 @@ describe("crumbsIn", () => {
 
 describe("indexVault", () => {
   test("an orphan becomes a root but still counts toward the path above it", () => {
-    // No /gone row: buildTree promotes the child, and the prefix count is what
-    // the old `folderStats` query would still have returned.
     const ix = indexVault(vault([question("/gone/kept", { parentId: "missing" })]));
     expect(ix.tree.map((t) => t.path)).toEqual(["/gone/kept"]);
     expect(folderStatsIn(ix, "/gone")).toEqual({ questions: 1, folders: 0, solidPct: 0 });
@@ -234,11 +206,6 @@ describe("indexVault", () => {
   });
 
   test("an orphan's sibling strip is empty, the way the query it replaced left it", () => {
-    // Pinned rather than fixed: `buildTree` promotes the row to a root, `below`
-    // still counts it under its path's ancestors, but `kids` never files it under
-    // a parent that is not there — and `parentId: <missing>` matched nothing in
-    // the SQL either. A later tidy in either direction should have to argue with
-    // this test first.
     const ix = indexVault(vault([question("/gone/kept", { parentId: "missing" })]));
     const row = ix.byPath.get("/gone/kept")!;
     expect(siblingsIn(ix, row)).toEqual([]);
@@ -280,8 +247,6 @@ describe("the ratings overlay", () => {
     expect(folderStatsIn(before, "/dsa/graphs").solidPct).toBe(67);
 
     const after = indexVault(base, new Map([[dfs.id, 4]]));
-    // The note itself, the folder percentage and the row's own label — one
-    // number, three readers, no chance of them disagreeing.
     expect(questionViewIn(after, after.byPath.get("/dsa/graphs/dfs")!).answer.confidence).toBe(4);
     expect(folderStatsIn(after, "/dsa/graphs").solidPct).toBe(100);
     expect(

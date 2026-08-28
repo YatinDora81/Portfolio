@@ -2,7 +2,6 @@ import type { MetadataRoute } from "next";
 import { getBlogs } from "./lib/data";
 import { SITE_URL } from "./lib/site";
 
-// Regenerate on the same cadence as the pages themselves.
 export const revalidate = 86400;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

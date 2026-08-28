@@ -42,12 +42,10 @@ interface Item {
 
 let seq = 0;
 
-// A throw inside an event handler reaches no error boundary, so every await here is wrapped.
 function transportError(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "The server could not be reached.";
 }
 
-/** Natural size and the blur placeholder from one decode, so nothing is measured at render. */
 async function describe(
   file: File,
 ): Promise<{ width: number; height: number; blurDataUrl?: string }> {
@@ -80,7 +78,6 @@ function putToR2(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url, true);
-    // Signed, so R2 rejects the PUT outright if this is not the approved type.
     xhr.setRequestHeader("Content-Type", contentType);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
@@ -139,7 +136,7 @@ export function Uploader({
         blurDataUrl = shape.blurDataUrl;
         patch(item.uid, shape);
       } catch {
-        // A format this browser cannot decode still uploads, just without dimensions.
+        // still uploads, just without dimensions
       }
 
       patch(item.uid, { phase: "signing" });
@@ -191,7 +188,6 @@ export function Uploader({
           name: file.name,
           bytes: file.size,
           mimeType: allowed ? (file.type as AllowedImageType) : null,
-          // Refused here, before anything asks the server to sign it.
           phase: !allowed ? "rejected" : tooBig ? "rejected" : "reading",
           progress: 0,
           altText: "",
@@ -242,7 +238,7 @@ export function Uploader({
         try {
           await discardUpload({ key: item.key });
         } catch {
-          // Worst case is orphaned bytes, which the orphan view reports.
+          // worst case is orphaned bytes
         }
       }
       drop(item.uid);
@@ -365,7 +361,6 @@ function QueueRow({
 
   return (
     <div className={`md-q-row${bad ? " bad" : ""}`}>
-      {/* Decorative: the filename beside it names the file. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className="md-q-thumb" src={item.preview} alt="" />
 

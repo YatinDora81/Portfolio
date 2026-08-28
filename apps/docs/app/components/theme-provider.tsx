@@ -4,8 +4,6 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 export type Theme = "light" | "dark1" | "dark2";
 
-/** html classes per theme — `dark` must stay for Tailwind's dark variant
-    and every `.dark .x` rule; the theme-* class carries the token palette. */
 const THEME_CLASS: Record<Theme, string> = {
   light: "",
   dark1: "dark theme-gh",

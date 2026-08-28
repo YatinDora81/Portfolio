@@ -6,14 +6,6 @@ import { ThemeProvider } from '@/components/common/ThemeProvider';
 import MotionProvider from '@/components/common/MotionProvider';
 import Background from '@/components/common/Background';
 
-/** Runtime error boundary for the root segment (must be a client component —
-    Next remounts it with `reset` when the user retries). Same family as
-    not-found: the oneko sprite reacts to the state of the page, this time the
-    `alert` frame (`[[-7,-3]]` on the 32px grid, 3x = 96px) — the cat that
-    startled when something crashed mid-pounce. Error-page UX rules apply:
-    plain words about what happened, no blame, a retry as the primary action
-    and home as the exit. The digest is printed so a screenshot is enough to
-    find the server-side log line. */
 export default function Error({
   error,
   reset,
@@ -22,8 +14,6 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Surface in the console for local debugging; production already reports
-    // the digest server-side.
     console.error(error);
   }, [error]);
 
@@ -33,9 +23,6 @@ export default function Error({
         <div className="min-h-screen bg-background text-foreground">
           <Background />
 
-          {/* The alert frame draws its own startle lines, so nothing extra is
-              layered on the sprite. The whole cat pops once on mount — a
-              startle, not a loop; reduced motion gets the static frame. */}
           <style>{`
             .er-cat{width:96px;height:96px;background:url('/oneko/oneko.gif') no-repeat -672px -288px;background-size:768px 384px;image-rendering:pixelated}
             @media (prefers-reduced-motion: no-preference){

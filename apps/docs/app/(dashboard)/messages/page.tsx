@@ -29,7 +29,6 @@ const WHERE: Record<TabKey, Prisma.ContactMessageWhereInput> = {
   spam: { status: "SPAM" },
 };
 
-// A notification links with only `?id=`, so the tab has to come from the message's status.
 const STATUS_TAB: Record<MessageStatus, TabKey> = {
   UNREAD: "inbox",
   READ: "inbox",
@@ -131,7 +130,6 @@ export default async function MessagesPage({
 
   const vars = { name: selected?.name ?? "", purpose: selected?.purpose ?? "" };
 
-  // Substituted server-side; the server re-applies it on send for anything typed by hand.
   const composerTemplates = templates.map((t) => ({
     id: t.id,
     name: t.name,

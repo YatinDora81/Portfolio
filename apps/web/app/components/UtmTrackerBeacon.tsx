@@ -14,7 +14,6 @@ export default function UtmTrackerBeacon() {
     const term = url.searchParams.get("utm_term");
     const messageId = url.searchParams.get("mid");
 
-    // Track when source+medium+campaign are present; content can be empty.
     if (!source || !medium || !campaign) return;
 
     const fingerprint = JSON.stringify({
@@ -27,7 +26,6 @@ export default function UtmTrackerBeacon() {
       path: url.pathname,
     });
 
-    // Prevent duplicate inserts for the same UTM payload during SPA hydration/reloads.
     if (sessionStorage.getItem(STORAGE_KEY) === fingerprint) return;
     sessionStorage.setItem(STORAGE_KEY, fingerprint);
 

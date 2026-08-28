@@ -6,19 +6,9 @@ import {
 import type { TooltipContentProps } from "recharts";
 import type { UtmSeries } from "@/lib/utm";
 
-/**
- * Dedicated categorical ramp, defined once in the light `:root` and shared by every
- * theme on purpose: hue encodes the *source*, so a series keeps its identity across a
- * theme switch, and `--good`/`--amber` stay reserved for status. Everything else here
- * (grid, axes, crosshair, tooltip, surface) still re-skins per theme.
- */
 const COLORS = ["var(--ch1)", "var(--ch2)", "var(--ch3)", "var(--ch4)"];
 
-/**
- * Recharts dataKeys index straight into each row object, so a source literally
- * named "day" would shadow the x-axis key (and "constructor" would be worse).
- * Keying by position is unique by construction; `label` carries the real name.
- */
+// positional, so a source named "day" can't shadow the x-axis key
 const slot = (i: number) => `s_${i}`;
 
 const colorAt = (i: number) => COLORS[i] ?? "var(--dim)";
@@ -27,7 +17,6 @@ type Props = {
   data: UtmSeries;
   title?: string;
   subtitle?: string;
-  /** Rendered in `.card-h` between the subtitle and the legend (e.g. the range picker). */
   controls?: React.ReactNode;
   className?: string;
 };
@@ -41,8 +30,6 @@ export default function UtmTracerChart({ data, title, subtitle, controls, classN
     return row;
   });
 
-  /** Rendered off our own series list, so every source shows up in legend order
-      with an explicit 0 — recharts' own ordering and null-filtering don't apply. */
   function Tip({ active, label, payload }: TooltipContentProps) {
     if (!active || !payload?.length) return null;
     const byKey = new Map(payload.map((p) => [String(p.dataKey), p.value]));
@@ -64,8 +51,6 @@ export default function UtmTracerChart({ data, title, subtitle, controls, classN
 
   return (
     <div className={className ? `card ${className}` : "card"} style={{ marginBottom: 14 }}>
-      {/* `.card-h` is a nowrap flex row; with controls in it the strip has to be able to
-          break onto a second line rather than push the legend off a narrow viewport. */}
       <div className="card-h" style={{ flexWrap: "wrap" }}>
         <span className="card-t">{title ?? "UTM Tracer"}</span>
         <span className="card-n">{subtitle ?? `last ${n} days · ${data.totalHits} hits`}</span>
@@ -89,11 +74,6 @@ export default function UtmTracerChart({ data, title, subtitle, controls, classN
           <ResponsiveContainer width="100%" height={230}>
             <AreaChart data={rows} margin={{ top: 14, right: 14, bottom: 6, left: 0 }}>
               <CartesianGrid vertical={false} stroke="var(--gridc)" />
-              {/* Measured, not counted: a *numeric* `interval` makes recharts skip
-                  collision detection entirely, so a fixed ~10 labels that fit on a
-                  desktop card overlap at 390px — and doubly so once a year-straddling
-                  range widens every label to "Dec 1, 2025". `equidistantPreserveStart`
-                  picks the densest even stride that actually fits the rendered axis. */}
               <XAxis
                 dataKey="day"
                 interval="equidistantPreserveStart"

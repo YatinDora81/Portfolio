@@ -1,9 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/**
- * Control-room card. `flush` drops the inner padding for content that should
- * sit edge to edge — tables, `.rows` lists, `.qcard` stacks.
- */
 export function Card({
   children,
   className,
@@ -20,7 +16,6 @@ export function Card({
   );
 }
 
-/** Card header strip: title, optional `/ 04` count, and right-aligned actions. */
 export function CardHead({
   title,
   count,

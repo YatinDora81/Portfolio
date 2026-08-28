@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
-// Use for every secret check: `===` returns early and leaks the correct prefix length.
+// `===` returns early and leaks the matching prefix length
 export function safeEqual(a: string, b: string): boolean {
   const ab = Buffer.from(a);
   const bb = Buffer.from(b);

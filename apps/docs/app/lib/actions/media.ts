@@ -122,7 +122,6 @@ export async function signUpload(input: {
   };
 }
 
-/** HEADs the object rather than trust the client, and upserts on `key` so a retry is idempotent. */
 export async function completeUpload(input: {
   key: string;
   filename: string;
@@ -153,7 +152,6 @@ export async function completeUpload(input: {
     };
   }
 
-  // Delivered bytes differ from what was approved: drop the object too, or it is orphaned.
   if (head.data.bytes > MAX_UPLOAD_BYTES) {
     await deleteObject(key);
     logger.warn("media", "discarded an oversized upload", { key, bytes: head.data.bytes });
@@ -183,7 +181,6 @@ export async function completeUpload(input: {
     where: { key },
     create: {
       key,
-      // From the key, because that folder is the one that was sanitized and signed.
       folder: folderOfKey(key),
       uploadedById: session.userId,
       ...shared,
@@ -217,7 +214,6 @@ export async function discardUpload(input: {
   return { ok: true };
 }
 
-/** Object first: if it cannot be removed the row stays, as the only record the bytes exist. */
 export async function deleteAsset(input: { id: string }): Promise<{ ok: boolean; error?: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };

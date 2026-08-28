@@ -3,12 +3,6 @@
 import { cdnUrl } from "@/lib/utils";
 import { DIM, FAINT, MONO, SectionLabel } from "./frame";
 
-// ─── Blogs Preview ───────────────────────────────────────────────
-// Mirrors apps/web/app/components/landing/Blogs.tsx: two masonry columns fed by
-// index parity, cards whose image height comes from the post's orientation, a
-// "Read article" chevron under the copy, and the "Show More Blogs" button that
-// only appears past the fourth post.
-
 interface BlogData {
   title: string;
   description: string;
@@ -16,11 +10,6 @@ interface BlogData {
   imageOrientation?: string;
 }
 
-/**
- * `imageHeightMap` from the real component, at preview scale (~40%). The
- * per-orientation rotation is what makes the two columns stagger, so the
- * lengths — 3 landscape, 2 portrait, 2 square — matter as much as the values.
- */
 const IMAGE_HEIGHTS: Record<string, number[]> = {
   LANDSCAPE: [70, 45, 58],
   PORTRAIT: [84, 78],
@@ -32,7 +21,6 @@ function imageHeight(orientation: string | undefined, index: number): number {
   return heights[index % heights.length]!;
 }
 
-/** The site renders four, then hides the rest behind the button. So does this. */
 const INITIAL_BLOGS = 4;
 
 function BlogCard({ blog, index }: { blog: BlogData; index: number }) {
@@ -43,15 +31,12 @@ function BlogCard({ blog, index }: { blog: BlogData; index: number }) {
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={cdnUrl(blog.image)} alt={blog.title} className="size-full object-cover" />
-            {/* the card's dark wash — from-black/40 to transparent, bottom up */}
             <div
               className="absolute inset-0"
               style={{ background: "linear-gradient(to top, rgba(0,0,0,0.4), transparent)" }}
             />
           </>
         ) : (
-          // No cover: the site falls back to the post's own gradient, which the
-          // preview isn't given — a muted card-to-border wash stands in.
           <div className="size-full" style={{ background: "linear-gradient(135deg, #262626, #171717)" }} />
         )}
       </div>
@@ -59,7 +44,6 @@ function BlogCard({ blog, index }: { blog: BlogData; index: number }) {
         <h4 className="line-clamp-2 text-[11px] font-semibold leading-snug text-[#fafafa]">
           {blog.title || "Untitled post"}
         </h4>
-        {/* Blogs.tsx:54 / :57 — both are `.text-secondary`, not muted-foreground */}
         <p className="mt-1 line-clamp-2 text-[9px] leading-relaxed" style={{ color: DIM }}>{blog.description}</p>
         <span className="mt-2 inline-flex items-center gap-0.5 text-[8px] font-medium" style={{ color: DIM }}>
           Read article
@@ -75,8 +59,6 @@ function BlogCard({ blog, index }: { blog: BlogData; index: number }) {
 export function BlogsPreview({ blogs }: { blogs: BlogData[] }) {
   const visible = blogs.slice(0, INITIAL_BLOGS);
 
-  // Same split the site uses: evens down the left column, odds down the right,
-  // each card keeping its ORIGINAL index so the height rotation lines up.
   const col1 = visible.filter((_, i) => i % 2 === 0);
   const col2 = visible.filter((_, i) => i % 2 === 1);
 
@@ -93,7 +75,6 @@ export function BlogsPreview({ blogs }: { blogs: BlogData[] }) {
         </p>
       ) : (
         <>
-          {/* one column below the site's `sm` breakpoint, two above it */}
           <div className="grid grid-cols-2 gap-2.5 @max-[420px]:grid-cols-1">
             <div className="flex flex-col gap-2.5">
               {col1.map((blog, i) => (

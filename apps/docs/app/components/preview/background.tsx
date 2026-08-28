@@ -4,85 +4,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createTerrain, type TerrainHandle } from "@repo/ui/terrain";
 import { DIM, FAINT, MONO } from "./frame";
 
-// ─── Background Preview ──────────────────────────────────────────
-// What draws under every page, in the two layers the card above picks between.
-//
-//   v1 "the lines" — a static mirror of
-//      apps/web/app/components/common/BackgroundLines.tsx: the same fifty-path
-//      field at the same 0.05 stroke opacity under the same radial gradient,
-//      and the fourteen beams frozen at one instant of their sweep. Nothing on
-//      this page can tune it, so the pane only has to prove which layer is live.
-//
-//   v2 "the terrain" — not a mirror. This is the real engine from
-//      @repo/ui/terrain, running the draft settings on a real canvas, because a
-//      hand-drawn stand-in for a contour map is a picture of a decision rather
-//      than the decision. Move the pointer inside the frame and the field flows;
-//      click and it ripples, exactly as it will for a visitor.
-//
-// Over both: the veil at its own opacity, and a strip of page type inside the
-// 720px column, because "is the map too strong" is only answerable next to the
-// words it would be sitting behind — stacked in the site's own order, map under
-// veil under type, or the pane would be judging a page nobody is served.
-//
-// Under it: the contrast meter ported from the source, which is the number the
-// strip of type can only gesture at.
-
-/** The site's dark `--foreground`, and the ground the frame pins the pane to.
- *  Deliberately not an admin token: `PreviewFrame` holds this pane on the
- *  portfolio's dark palette in all three control-room themes, so ink read from
- *  `--ink` would paint the map black on black the moment the admin went light. */
 const INK: [number, number, number] = [250, 250, 250];
 const GROUND = "#0a0a0a";
 
-/** apps/web `--border`, dark — every hairline in the fake page. */
 const WIRE = "rgba(255,255,255,0.1)";
 
-/** The v1 veil, which is not a dial: `Background.tsx`'s lines branch hard-codes
- *  `bg-background/50`, and only the terrain reads `terrainVeil`. Pinning it here
- *  is the difference between the pane showing the site and the pane showing a
- *  page that cannot exist — the dials keep their last values after a flip back
- *  to v1, so without this the lines end up under whatever the map was tuned to. */
 const V1_VEIL = 0.5;
 
-/**
- * The pane stands in for a 1280px laptop instead of reducing the type by hand
- * the way every other preview in this folder does, and the reading channel is
- * what forces it: the engine erases a fixed 720px column (Container is
- * max-w-3xl), so a canvas driven at the pane's own ~800px would have the channel
- * swallow the entire frame and leave nothing to judge. Scene coordinates in, one
- * uniform transform out — the column keeps the share of the frame it really has.
- */
 const SCENE_W = 1280;
 
-/** Below this the pane IS the frame's 390px phone, so it stands in for itself —
- *  and a 720px channel wider than the viewport is the truth there, not a bug. */
 const NARROW = 520;
 
-/** The stage, in pane pixels. Tall enough that the hero taper and the body
- *  channel are both on screen at once; the scene height follows from it. */
 const STAGE_H = 360;
 
-/** CH_INNER / CH_OUTER in packages/ui/src/terrain.ts. Duplicated rather than
- *  exported because they are the *engine's* geometry and this is only a ruler
- *  drawn over it — if the two ever disagree, the hairlines are the wrong one. */
 const CH_INNER = 360;
 const CH_OUTER = 450;
 
-// ─── the contrast meter ──────────────────────────────────────────
-// terrain-50.html's `measure()`, ported because it is the only instrument that
-// makes the strength decision answerable, and because the dials on this page
-// reach well past where the channel constants in terrain.ts were solved:
-// strength to 100, minor to 60, major to 90, and a one-click `channel: off`.
-// The strip of type above says "a line crosses a word"; this says how far.
-//
-// Worst pixel inside the column, composited exactly the way the page composites
-// it — the map's ink over the ground at whatever alpha survived the erase, then
-// the veil, then the type on top. Alpha is all that varies: the canvas is one
-// ink. WCAG 1.4.3 wants 4.5:1 for normal text.
-
 const AA = 4.5;
 
-/** `#rrggbb` → the channels the compositing works in. */
 function rgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
@@ -90,18 +29,10 @@ function rgb(hex: string): [number, number, number] {
 
 const GROUND_RGB = rgb(GROUND);
 
-/** The dimmest type the portfolio sets on this ground — apps/web's dark
- *  `--secondary-ink`, which is exactly what `DIM` is. Read off `DIM` rather than
- *  repeated, so the meter can never be measuring a colour the pane stopped
- *  drawing. The map is worst against the faintest grey, so this is the test. */
 const TEXT = rgb(DIM);
 
-/** How long after the last change the field can still be moving: a ripple runs
- *  out over 2.2s and the draw-in takes 1.4s, so 2.6s covers the slowest of the
- *  two with a tick to spare. Past it, the last reading is the reading. */
 const SETTLE = 2600;
 
-/** The source re-read every 1.2s for as long as its loop ran. */
 const METER_MS = 1200;
 
 function lum([r, g, b]: [number, number, number]): number {
@@ -149,17 +80,10 @@ export function BackgroundPreview({
 }) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const heroRef = useRef<HTMLDivElement | null>(null);
-  // Held here rather than inside TerrainLayer because the meter reads the same
-  // pixels the engine writes, and the veil it has to composite over is a prop
-  // of this component, not of the layer.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [reduced, setReduced] = useState(false);
 
-  // The blanket `.cr * { animation: none !important }` in control-room.css
-  // cannot touch a rAF loop, so the loop has to ask for itself — the same
-  // arrangement the nap tiles use. Read after mount only: this renders on the
-  // server too, and a media query there would disagree with the first client pass.
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     const sync = () => setReduced(mq.matches);
@@ -168,8 +92,6 @@ export function BackgroundPreview({
     return () => mq.removeEventListener("change", sync);
   }, []);
 
-  // The scene is measured, never assumed: the frame's device toggle changes the
-  // pane width without changing anything this component is told.
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
@@ -188,24 +110,11 @@ export function BackgroundPreview({
   const ready = sceneW > 0 && sceneH > 0;
 
   const terrain = version === "v2";
-  // Below 1024px apps/web builds no canvas at all (BackgroundTerrain.tsx), so
-  // neither does the pane. Judging v2 at the frame's phone width against a map
-  // the visitor is never shown is the one way this preview could lie outright —
-  // and it is the width where the difference from v1, which keeps its fifty
-  // lines all the way down, actually matters to the choice being made here.
   const drawsTerrain = terrain && !narrow;
   const live = drawsTerrain && interactive && !reduced;
-  // v1's veil is not on any dial — see V1_VEIL. One value for the div and for
-  // the meter, so what is measured is what is drawn.
   const veilAlpha = terrain ? veil : V1_VEIL;
 
-  /* ── the meter ─────────────────────────────────────────────────── */
-
   const scratchRef = useRef<HTMLCanvasElement | null>(null);
-  // Last moment the field could still have been moving. Everything that changes
-  // what is drawn stamps it, and the meter only reads pixels inside its window:
-  // the engine's loop sleeps, and a readback ticking on forever under an idle
-  // map is precisely the cost that whole design refuses to pay.
   const hotRef = useRef(0);
   const [ratio, setRatio] = useState<number | null>(null);
   const touch = useCallback(() => { hotRef.current = performance.now(); }, []);
@@ -221,17 +130,10 @@ export function BackgroundPreview({
       const canvas = canvasRef.current;
       if (!canvas?.width || !canvas.height) return;
 
-      // The engine writes `canvas.width` in device pixels and `style.width` in
-      // scene ones, so the ratio between them is the DPR it settled on.
       const dpr = canvas.width / sceneW;
       const x0 = Math.max(0, Math.round((sceneW / 2 - CH_INNER) * dpr));
       const cw = Math.min(canvas.width, Math.round(2 * CH_INNER * dpr));
 
-      // A scratch canvas rather than reading the live one: repeated getImageData
-      // on the surface the engine is drawing into is what pushes a canvas off
-      // the GPU. Copied 1:1 at device resolution, unlike the source, which drew
-      // down to CSS pixels — resampling averages the worst pixel away, and this
-      // number is only useful if it rounds toward failing.
       const scratch = (scratchRef.current ??= document.createElement("canvas"));
       scratch.width = cw; // assigning either dimension clears the bitmap
       scratch.height = canvas.height;
@@ -263,9 +165,6 @@ export function BackgroundPreview({
 
       <div
         ref={stageRef}
-        // The engine takes the pointer straight off this element, so the meter
-        // never hears about it — these two keep its window open for as long as
-        // someone is pushing the field around inside the box.
         onPointerMove={drawsTerrain ? touch : undefined}
         onPointerDown={drawsTerrain ? touch : undefined}
         style={{
@@ -276,8 +175,6 @@ export function BackgroundPreview({
           background: GROUND,
           overflow: "hidden",
           cursor: live ? "crosshair" : "default",
-          // The engine reads pointermove off this element, so a touch drag has to
-          // reach it as a pointer event rather than being eaten as a pane scroll.
           touchAction: live ? "none" : undefined,
         }}
       >
@@ -293,7 +190,6 @@ export function BackgroundPreview({
               transform: `scale(${scale})`,
             }}
           >
-            {/* z-0 · the layer itself — the site's own stacking order, kept */}
             {drawsTerrain ? (
               <TerrainLayer
                 stageRef={stageRef}
@@ -314,10 +210,6 @@ export function BackgroundPreview({
               <LinesLayer beams={!reduced && !narrow} />
             )}
 
-            {/* z-1 · the veil — apps/web's `bg-background/50`, on its own dial
-                under the terrain and pinned under the lines. A flat rgba rather
-                than an opacity, which would put the whole layer on the
-                compositor for a fill that never changes. */}
             <div
               aria-hidden="true"
               style={{
@@ -329,19 +221,13 @@ export function BackgroundPreview({
               }}
             />
 
-            {/* the ruler: where the 720px column sits, and where its feather
-                runs out. Over the veil so it stays readable at 90%, under the
-                page because it is scaffolding and the page is the subject. */}
             <ChannelMarks sceneW={sceneW} mode={drawsTerrain && channel ? "erased" : "drawn"} />
 
-            {/* z-2 · the page */}
             <FakePage heroRef={heroRef} />
           </div>
         )}
       </div>
 
-      {/* Above the notes, not below them: it is the only thing on this page
-          that can say no to a setting. */}
       {drawsTerrain && (
         <div className="mt-2" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span className={`chip${ratio === null ? "" : passes ? " on" : " bad"}`}>
@@ -385,8 +271,6 @@ function Note({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── v2 · the real engine ────────────────────────────────────────
-
 function TerrainLayer({
   stageRef,
   heroRef,
@@ -410,43 +294,24 @@ function TerrainLayer({
   reducedMotion: boolean;
 }) {
   const handleRef = useRef<TerrainHandle | null>(null);
-  // The engine calls `size()` once per resize and must never read it off the
-  // canvas — `resize()` writes explicit pixel dimensions onto the element, so a
-  // size derived from its own box would freeze at whatever it last returned.
   const sizeRef = useRef({ w, h });
   const optionsRef = useRef(options);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    // Both, and not just the canvas: `events` falling through to `undefined`
-    // hands the engine its full-page mode, where pointer coordinates are read
-    // as viewport coordinates and a scroll listener goes on the window. That is
-    // a silently wrong pane rather than a missing one. It cannot happen — this
-    // layer only mounts once the stage's ResizeObserver has reported — so the
-    // guard is here to keep it that way, not because the ref is ever null.
     const stage = stageRef.current;
     if (!canvas || !stage) return;
 
     const handle = createTerrain(
       {
         canvas,
-        // Two constants behind two closures: the contract asks for these to be
-        // memoised because the frame asks for them every frame, and here there
-        // is nothing to memoise — the pane's palette is pinned.
         ink: () => INK,
         dark: () => true,
         size: () => sizeRef.current,
         heroBottom: () => {
           const el = heroRef.current;
-          // Scene coordinates, and the canvas does not scroll inside the scene,
-          // so the laid-out offset is the edge — the site's rect-relative read
-          // is only needed where the canvas is fixed and the hero scrolls past it.
-          // Transforms do not touch offsetTop, so the scale above is irrelevant.
           return el ? el.offsetTop + el.offsetHeight : null;
         },
-        // Bound to the stage rather than the window so the flow, the press rings
-        // and the ripples all answer to the pointer *inside the box* — which is
-        // the only place the owner can try them before publishing.
         events: stage,
       },
       optionsRef.current
@@ -459,9 +324,7 @@ function TerrainLayer({
     };
   }, [stageRef, heroRef, canvasRef]);
 
-  // `createTerrain` sizes itself on construction, so the first run of this
-  // effect would rebuild the backing store, the channel gradient and the grid
-  // for a dimension that has not moved yet.
+  // createTerrain sizes itself on construction
   const sized = useRef(false);
   useEffect(() => {
     sizeRef.current = { w, h };
@@ -473,9 +336,6 @@ function TerrainLayer({
   useEffect(() => {
     const next = { strength, cell, levels, minor, major, channel, interactive, reducedMotion };
     optionsRef.current = next;
-    // No `resize()` alongside it: `update()` reallocates the grid itself when the
-    // cell pitch changes, and a resize here would rebuild the backing store and
-    // the channel gradient for a dimension that has not moved.
     handleRef.current?.update(next);
   }, [strength, cell, levels, minor, major, channel, interactive, reducedMotion]);
 
@@ -487,20 +347,6 @@ function TerrainLayer({
     />
   );
 }
-
-// ─── v1 · the lines, mirrored ────────────────────────────────────
-// Copied from apps/web/app/components/common/BackgroundLines.tsx, which is v1
-// and is not touched by any of this. Same fifty paths, same viewBox, same
-// stroke weights and opacities; only three things change, and all three are
-// because this is a pane and not the page:
-//
-//   · the gradient ids are prefixed, so nothing here can ever collide with a
-//     site id (the source's are hard-coded and would);
-//   · the radial stops pin `#fafafa` where the site writes `var(--foreground)`,
-//     which does not exist inside the control room;
-//   · the beams hold one frame instead of sweeping — the panes in this folder
-//     have never animated, and a CSS sweep here would be killed by the
-//     control room's reduced-motion guard anyway.
 
 const paths = [
   "M-380 -189C-380 -189 -312 216 152 343C616 470 684 875 684 875",
@@ -557,8 +403,6 @@ const paths = [
 
 const allPathsD = paths.join("");
 
-/** The source's own table, verbatim — which lines carry a beam, and the fixed
- *  duration and delay each was given so the spread is deterministic. */
 const BEAMS: { i: number; dur: number; delay: number }[] = [
   { i: 0, dur: 8.5, delay: 0 },
   { i: 4, dur: 10, delay: 1.1 },
@@ -576,12 +420,8 @@ const BEAMS: { i: number; dur: number; delay: number }[] = [
   { i: 47, dur: 8.5, delay: 3.5 },
 ];
 
-/** Six seconds into the sweep. Late enough that every beam has cleared its
- *  delay, and the fourteen dashes land scattered rather than in a comb. */
 const BEAM_T = 6;
 
-/** `beamSweep` runs stroke-dashoffset 2 → 0 over `dur`, on repeat, after
- *  `delay`. This is that animation, evaluated once at BEAM_T. */
 function frozenOffset(dur: number, delay: number): number {
   const elapsed = BEAM_T - delay;
   if (elapsed <= 0) return 2;
@@ -617,9 +457,6 @@ function LinesLayer({ beams }: { beams: boolean }) {
         </defs>
       </svg>
 
-      {/* Dropped under reduced motion and below 1024px, because the site drops
-          the whole beam layer in both cases — a pane that kept them would be
-          showing a background half its visitors never get. */}
       {beams && (
         <svg
           style={{ position: "absolute", inset: 0, zIndex: 0, width: "100%", height: "100%" }}
@@ -657,12 +494,6 @@ function LinesLayer({ beams }: { beams: boolean }) {
   );
 }
 
-// ─── the ruler and the page ──────────────────────────────────────
-
-/** `erased` is the terrain's channel doing its job; `drawn` is either layer
-    putting ink through the column. v1 has no erase at all, so it can never be
-    the first — captioning it "erased" described the one comparison this pane
-    exists to support, backwards. */
 function ChannelMarks({ sceneW, mode }: { sceneW: number; mode: "erased" | "drawn" }) {
   const half = sceneW / 2;
   const edge = (x: number, o: number) => (
@@ -703,28 +534,9 @@ function ChannelMarks({ sceneW, mode }: { sceneW: number; mode: "erased" | "draw
   );
 }
 
-/**
- * Stand-in page type, at the site's own sizes rather than this folder's reduced
- * ones — the scene scale below already does the reducing, and the point of the
- * strip is the ratio between the column and the map, which only survives if both
- * are drawn in the same coordinates. The hero block is measured, not guessed:
- * the engine tapers its erase at whatever y this div ends on.
- */
 function FakePage({ heroRef }: { heroRef: React.RefObject<HTMLDivElement | null> }) {
   return (
-    // z-2, the same order the site stacks in: content sits above the veil
-    // (`relative z-[2]` on every page), so nothing the visitor reads is ever
-    // dimmed by it. A pane that veiled its own words would show the map doing
-    // damage it does not do, and the strength dial would be tuned down to fix
-    // a page that was never broken.
-    //
-    // Absolute at the scene's origin rather than in flow, so it is also the
-    // hero's offset parent at exactly y=0 — `offsetTop` stays the scene
-    // coordinate the engine's `heroBottom()` is read in.
     <div style={{ position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none" }}>
-      {/* Container.tsx: max-w-3xl (768) with px-6, which is the 720 of content
-          the engine's ±360 erase is cut to. Border-box, so 768 here is 720 of
-          type — the hairlines either side of it are the same 720. */}
       <div style={{ width: 768, maxWidth: "100%", margin: "0 auto", padding: "0 24px" }}>
         <div ref={heroRef} style={{ padding: "44px 0 20px" }}>
           <p style={{ fontFamily: MONO, fontSize: 11, letterSpacing: ".18em", textTransform: "uppercase", color: DIM }}>
@@ -738,8 +550,6 @@ function FakePage({ heroRef }: { heroRef: React.RefObject<HTMLDivElement | null>
           </p>
         </div>
 
-        {/* Everything below this rule is where the erase steps up to body
-            strength — display type at 64/800 shrugs the map off, 14px copy does not. */}
         <div style={{ borderTop: `1px solid ${WIRE}`, paddingTop: 26 }}>
           <p style={{ fontSize: 12, color: DIM, margin: 0 }}>Body copy</p>
           <h2 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-.02em", color: "#fafafa", margin: "4px 0 12px" }}>

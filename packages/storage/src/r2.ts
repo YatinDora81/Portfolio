@@ -38,7 +38,6 @@ interface Bound {
 
 let bound: Bound | null = null;
 
-// Lazy, never at module scope: a page importing this must still render with no R2 credentials.
 function connect(): Bound | null {
   if (bound) return bound;
 
@@ -71,7 +70,6 @@ function reason(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "R2 refused the request.";
 }
 
-// With no CDN_BASE_URL this stays root-relative, which is what `cdnUrl()` resolves at render.
 export function publicUrlFor(key: string): string {
   const base = env.CDN_BASE_URL?.replace(/\/$/, "");
   return base ? `${base}/${key}` : `/${key}`;
@@ -79,13 +77,11 @@ export function publicUrlFor(key: string): string {
 
 export interface SignedUpload {
   uploadUrl: string;
-  /** The browser MUST send this header; it is part of the signature. */
   contentType: string;
   expiresInSeconds: number;
   maxBytes: number;
 }
 
-// A presigned PUT carries no content-length-range: `maxBytes` is advisory, `headObject` verifies.
 export async function createUploadUrl(
   key: string,
   contentType: string,

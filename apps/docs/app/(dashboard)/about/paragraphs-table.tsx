@@ -18,8 +18,6 @@ interface Paragraph { id: string; content: string; sortOrder: number }
 
 const FORM_ID = "about-paragraph-form";
 
-// Paragraphs run long, so the row title wraps to two lines instead of the
-// single-line ellipsis `.row-t` gives short labels.
 const clamp2: React.CSSProperties = {
   whiteSpace: "normal",
   display: "-webkit-box",
@@ -38,8 +36,6 @@ export function AboutParagraphsTable({ paragraphs }: { paragraphs: Paragraph[] }
     isDeleted, isNew, isEdited, saving,
   } = useStaging();
 
-  // Nothing here writes to the database — every action stages, and the page
-  // renders the staged view so the change is on screen before it is saved.
   const staged = overlay("aboutParagraph", paragraphs, (p) => p.id);
 
   const { order, handleProps, itemProps } = useSortable(
@@ -50,23 +46,16 @@ export function AboutParagraphsTable({ paragraphs }: { paragraphs: Paragraph[] }
 
   const byId = new Map(staged.map((p) => [p.id, p] as const));
   const seen = new Set(order);
-  // `order` is the drag preview and only re-seeds after a render, so a row
-  // staged this tick is appended rather than dropped for a frame.
+  // order re-seeds after a render, so append anything staged this tick
   const rows = [...order.flatMap((id) => byId.get(id) ?? []), ...staged.filter((p) => !seen.has(p.id))];
 
-  /** One mark per row: on its way out, brand new, or edited. */
   const mark = (id: string) =>
     isDeleted("aboutParagraph", id) ? "staged-del"
       : isNew("aboutParagraph", id) ? "staged-new"
         : isEdited("aboutParagraph", id) ? "staged-edit"
           : null;
 
-  /**
-   * Swap a paragraph with its neighbour and stage the whole order. Indices are
-   * `rows` indices, and `rows` drops ids that no longer exist — so it is NOT
-   * positionally aligned with `order`. Building the payload from `rows` keeps
-   * one index space and can't stage a stale id.
-   */
+  // indices are rows indices; rows is not positionally aligned with order
   const move = (from: number, to: number) => {
     const ids = rows.map((p) => p.id);
     [ids[from], ids[to]] = [ids[to]!, ids[from]!];
@@ -179,8 +168,6 @@ export function AboutParagraphsTable({ paragraphs }: { paragraphs: Paragraph[] }
           id={FORM_ID}
           action={(formData) => {
             const content = String(formData.get("content") ?? "").trim();
-            // The server trims too; trimming here keeps the staged preview and
-            // the saved row identical. A blank one would fail the whole batch.
             if (!content) return;
             if (editing) stageUpdate("aboutParagraph", editing.id, { content });
             else stageCreate("aboutParagraph", { content });

@@ -95,7 +95,7 @@ const DEFAULT_BY_KEY = new Map<string, boolean>(
 
 export type FlagMap = Record<string, boolean>;
 
-// Fails open: a missing row or a failed read must not blank out the section.
+// fails open: a missing row must not blank out a section
 export function flagValue(map: FlagMap, key: FlagKey): boolean {
   const stored = map[key];
   if (typeof stored === "boolean") return stored;

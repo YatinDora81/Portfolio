@@ -17,22 +17,6 @@ import { vaultJson, type ExportRow } from "./export";
 import { parseImport, type VaultNode } from "./import";
 import { TRASH_PREFIX, untomb } from "./paths";
 
-/**
- * The data-integrity half of the acceptance checklist, run against a real
- * Postgres — because every claim on that list is a claim about what the DATABASE
- * does. A unique index that only exists in the schema file, a cascade that was
- * never actually declared, and an `unnest` join that Prisma silently refuses to
- * parameterise all pass a unit test and fail in production.
- *
- * Nothing here is committed. Each case runs inside a transaction that ends by
- * throwing, so the rows exist for the length of one assertion and the database
- * is byte-identical afterwards. That matters more than usual here: DATABASE_URL
- * on this repo points at the live database.
- *
- * Run it with the env the db package uses:
- *   cd packages/db && bun test ../../apps/docs/app/lib/notes/core.integration.test.ts
- */
-
 const ROLLBACK = Symbol("rollback");
 
 async function inRollback(fn: (tx: Tx) => Promise<void>) {
@@ -54,7 +38,6 @@ const pathOf = async (tx: Tx, id: string) =>
 
 const rowOf = (tx: Tx, id: string) => tx.noteNode.findUniqueOrThrow({ where: { id } });
 
-/** /a/b/c, returned as its three ids. */
 async function abc(tx: Tx) {
   const a = await createIn(tx, null, "FOLDER", "acc test a");
   const b = await createIn(tx, a.id, "FOLDER", "b");
@@ -106,7 +89,6 @@ describe.skipIf(!live)("notes · data integrity", () => {
       const { a, b } = await abc(tx);
       await expect(moveIn(tx, a.id, b.id)).rejects.toThrow(NoteError);
       await expect(moveIn(tx, a.id, b.id)).rejects.toThrow(/own descendant/i);
-      // and the tree is untouched by the refusal
       expect(await pathOf(tx, b.id)).toBe("/acc-test-a/b");
     });
   });
@@ -122,7 +104,6 @@ describe.skipIf(!live)("notes · data integrity", () => {
     await inRollback(async (tx) => {
       const one = await createIn(tx, null, "FOLDER", "acc dsa");
       const two = await createIn(tx, null, "FOLDER", "acc dsa two");
-      // "/acc-dsa" is a string prefix of "/acc-dsa-two" but not its ancestor.
       await moveIn(tx, one.id, two.id);
       expect(await pathOf(tx, one.id)).toBe("/acc-dsa-two/acc-dsa");
     });
@@ -141,12 +122,10 @@ describe.skipIf(!live)("notes · data integrity", () => {
       expect(trashed.deletedAt).not.toBeNull();
       expect(trashed.path.startsWith(TRASH_PREFIX)).toBe(true);
       expect(untomb(trashed.path)).toBe("/acc-dsa/dp");
-      // the descendant went with it, and moved under the tombstone
       const inner = await rowOf(tx, q.id);
       expect(inner.deletedAt).not.toBeNull();
       expect(inner.path).toBe(`${trashed.path}/inner`);
 
-      // the whole point: this must not raise a unique violation
       const again = await createIn(tx, dsa.id, "FOLDER", "dp");
       expect(again.path).toBe("/acc-dsa/dp");
     });
@@ -187,9 +166,6 @@ describe.skipIf(!live)("notes · data integrity", () => {
   });
 
   test("a subtree holding an already-trashed node repaths correctly", async () => {
-    // The case the one-statement LIKE prefix rewrite silently skips: the inner
-    // tombstone does not carry its parent's prefix, so a prefix rewrite leaves
-    // it pointing at an ancestry that no longer exists.
     await inRollback(async (tx) => {
       const dsa = await createIn(tx, null, "FOLDER", "acc dsa");
       const dp = await createIn(tx, dsa.id, "FOLDER", "dp");
@@ -218,7 +194,6 @@ describe.skipIf(!live)("notes · data integrity", () => {
       await trashIn(tx, thrown.id);
       await trashIn(tx, dp.id);
 
-      // one tombstone over the whole subtree, not two stacked on each other
       const outer = await rowOf(tx, dp.id);
       expect(untomb(outer.path)).toBe("/acc-dsa/dp");
       const inner = await rowOf(tx, thrown.id);
@@ -227,14 +202,11 @@ describe.skipIf(!live)("notes · data integrity", () => {
 
       await restoreIn(tx, dp.id);
 
-      // the folder and what it was holding come back
       expect((await rowOf(tx, dp.id)).path).toBe("/acc-dsa/dp");
       const back = await rowOf(tx, kept.id);
       expect(back.deletedAt).toBeNull();
       expect(back.path).toBe("/acc-dsa/dp/kept");
 
-      // but the question that was thrown away on its own account stays thrown
-      // away, and gets its own tombstone back
       const still = await rowOf(tx, thrown.id);
       expect(still.deletedAt).not.toBeNull();
       expect(still.trashRoot).toBe(true);
@@ -250,7 +222,6 @@ describe.skipIf(!live)("notes · data integrity", () => {
 
       await trashIn(tx, dp.id);
 
-      // rebuilding the same shape must collide with nothing, at any depth
       const again = await createIn(tx, dsa.id, "FOLDER", "dp");
       const innerAgain = await createIn(tx, again.id, "QUESTION", "inner");
       expect(again.path).toBe("/acc-dsa/dp");
@@ -405,7 +376,6 @@ describe.skipIf(!live)("notes · data integrity", () => {
       expect(kids[0]!.answer?.body).toBe("the body");
       expect(kids[0]!.answer?.tags).toEqual(["one", "two"]);
       expect(kids[0]!.answer?.confidence).toBe(3);
-      // the original is untouched
       expect((await rowOf(tx, q.id)).path).toBe("/acc-dup/inner");
     });
   });
@@ -426,16 +396,6 @@ describe.skipIf(!live)("notes · data integrity", () => {
   });
 });
 
-/* ---------------------------------------------------------------- import -- */
-
-/**
- * The bytes /notes/export would serve for one subtree, parsed back into a value.
- *
- * Deliberately routed through `vaultJson` and `parseImport` rather than handing
- * `importIn` a list built in the test: what these cases are for is the seam
- * between the two halves, and a fixture that skips the serialiser proves the
- * importer works on a file nobody will ever have.
- */
 async function exportOf(tx: Tx, rootId: string): Promise<VaultNode[]> {
   const ids = await subtreeIds(tx, rootId);
   const rows = await tx.noteNode.findMany({ where: { id: { in: ids } }, include: { answer: true } });
@@ -460,8 +420,6 @@ async function exportOf(tx: Tx, rootId: string): Promise<VaultNode[]> {
   return parsed(JSON.parse(vaultJson(shaped)));
 }
 
-/** `parseImport`, with its refusal turned into a failed test rather than a
- *  silently skipped one. */
 function parsed(raw: unknown): VaultNode[] {
   const r = parseImport(raw);
   if (!r.ok) throw new Error(`the file was refused: ${r.error}`);
@@ -476,9 +434,6 @@ const kidsOf = (tx: Tx, id: string) =>
 
 describe.skipIf(!live)("notes · import", () => {
   test("a folder export lands intact inside another folder", async () => {
-    // The case a literal reading of parentId gets wrong: the file's top row
-    // points at a parent that was deliberately left out of the export, and the
-    // graft re-parents it somewhere else entirely.
     await inRollback(async (tx) => {
       const home = await createIn(tx, null, "FOLDER", "acc imp home");
       const src = await createIn(tx, home.id, "FOLDER", "src");
@@ -513,14 +468,12 @@ describe.skipIf(!live)("notes · import", () => {
       ]);
       expect(inner.map((n) => n.depth)).toEqual([1, 2, 3]);
 
-      // A question keeps its answer; a folder never gains one.
       const copy = inner.find((n) => n.kind === "QUESTION")!;
       expect(copy.answer?.body).toBe("a bridge is an edge whose removal disconnects");
       expect(copy.answer?.tags).toEqual(["graphs"]);
       expect(copy.answer?.confidence).toBe(3);
       expect(inner.filter((n) => n.kind === "FOLDER").every((n) => n.answer === null)).toBe(true);
 
-      // and the original is untouched
       expect(await pathOf(tx, src.id)).toBe("/acc-imp-home/src");
     });
   });
@@ -536,7 +489,6 @@ describe.skipIf(!live)("notes · import", () => {
 
       expect(await pathOf(tx, r.rootIds[0]!)).toBe("/acc-imp-home/dsa-2");
       expect((await kidsOf(tx, r.rootIds[0]!)).map((k) => k.path)).toEqual(["/acc-imp-home/dsa-2/inner"]);
-      // the original kept its name and its child
       expect(await pathOf(tx, dsa.id)).toBe("/acc-imp-home/dsa");
       expect(await tx.noteNode.count({ where: { parentId: home.id, deletedAt: null } })).toBe(2);
     });
@@ -588,17 +540,14 @@ describe.skipIf(!live)("notes · import", () => {
         "/acc-imp-nested/dsa/graphs/shortest-path/when-is-bfs-enough · 4 · QUESTION",
       ]);
 
-      // "children": [] is an empty folder, and it is the only way to say so.
       const dp = rows.find((n) => n.slug === "dynamic-programming")!;
       expect(dp.kind).toBe("FOLDER");
       expect(dp.answer).toBeNull();
 
-      // A bare string is a question with an empty body — and it still gets a row.
       const bfs = rows.find((n) => n.slug === "when-is-bfs-enough")!;
       expect(bfs.answer?.body).toBe("");
       expect(bfs.answer?.confidence).toBe(0);
 
-      // every question has an answer, no folder does
       for (const n of rows) expect(n.answer === null).toBe(n.kind === "FOLDER");
 
       const parentOf = new Map(rows.map((n) => [n.slug, n.parentId]));
@@ -607,9 +556,6 @@ describe.skipIf(!live)("notes · import", () => {
   });
 
   test("two sibling folders with the same title both arrive, each keeping its own children", async () => {
-    // The collision the in-memory `taken` list exists for. A hand-written
-    // outline repeats names constantly, and without it the second "Graphs"
-    // resolves to the same slug and dies on the path unique index.
     await inRollback(async (tx) => {
       const dest = await createIn(tx, null, "FOLDER", "acc imp dupes");
       await createIn(tx, dest.id, "FOLDER", "graphs");
@@ -696,12 +642,10 @@ describe.skipIf(!live)("notes · import", () => {
         ["/acc-imp-lies/truthful-title", 1, "truthful-title"],
         ["/acc-imp-lies/truthful-title/child", 2, "child"],
       ]);
-      // the content, though, is exactly what the file said
       expect(rows[1]!.answer?.body).toBe("kept");
       expect(rows[1]!.answer?.tags).toEqual(["kept"]);
       expect(rows[1]!.answer?.confidence).toBe(4);
       expect(rows[1]!.answer?.lastRevisedAt?.toISOString()).toBe("2026-07-19T11:02:00.000Z");
-      // and no id from the file was used
       expect(await tx.noteNode.count({ where: { id: { in: ["liar-1", "liar-2"] } } })).toBe(0);
     });
   });
@@ -747,7 +691,6 @@ describe.skipIf(!live)("notes · import", () => {
       await createIn(tx, null, "FOLDER", "acc imp occupied");
       const before = await tx.noteNode.count();
       await expect(importIn(tx, null, parsed([{ title: "x" }]), "restore")).rejects.toThrow(/empty vault/i);
-      // and it cannot be aimed at a folder to sidestep that
       const somewhere = await createIn(tx, null, "FOLDER", "acc imp anywhere");
       await expect(importIn(tx, somewhere.id, parsed([{ title: "x" }]), "restore")).rejects.toThrow(/can't be aimed/i);
       expect(await tx.noteNode.count()).toBe(before + 1);

@@ -14,7 +14,7 @@ export function isTab(value: unknown): value is TabKey {
   return typeof value === "string" && (TAB_KEYS as readonly string[]).includes(value);
 }
 
-// Keyed by the codes `scoreSpam` writes.
+// keyed by the codes scoreSpam writes
 const REASON_LABEL: Record<string, string> = {
   "honeypot-filled": "filled the hidden honeypot field",
   "turnstile-failed": "failed the Turnstile challenge",
@@ -42,7 +42,6 @@ export function initials(name: string): string {
   return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
 }
 
-/** Stable hue per sender, computed rather than tokenised because `.mava` ships no background. */
 export function avatarStyle(name: string): React.CSSProperties {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;

@@ -31,7 +31,6 @@ import { Uploader } from "./uploader";
 
 export interface MediaRow extends MediaAssetDto {
   createdLabel: string;
-  /** Where the key was found. Empty means nothing on the site points at it. */
   usedIn: string[];
 }
 
@@ -70,7 +69,6 @@ export function MediaLibrary({
 }: {
   rows: MediaRow[];
   storage: { configured: boolean; missing: string[] };
-  /** How many stored fields the orphan scan read, so the number has a denominator. */
   scanned: number;
 }) {
   const [rows, setRows] = useState<MediaRow[]>(initial);
@@ -79,7 +77,7 @@ export function MediaLibrary({
   const [q, setQ] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [uploadFolder, setUploadFolder] = useState("uploads");
-  // Snapshotted so a row does not leave the audit list the instant its alt text is saved.
+  // snapshotted so a saved row stays in the audit list
   const [auditIds, setAuditIds] = useState<ReadonlySet<string>>(new Set());
 
   const folders = useMemo(

@@ -34,7 +34,6 @@ export default async function AnalyticsPage({
 
   const days = parseWindow((await searchParams).days);
 
-  // Opening the page is the fallback scheduler; a rollup failure must not take the page with it.
   let caughtUp = { processed: 0, remaining: 0, error: null as string | null };
   try {
     const res = await catchUpRollups();
@@ -46,7 +45,7 @@ export default async function AnalyticsPage({
 
   const view = await readAnalytics(days);
 
-  // Only the analytics tables: RateLimitBucket also fills from the contact form.
+  // RateLimitBucket also fills from the contact form
   const analyticsTables = new Set(["AnalyticsSession", "AnalyticsEvent", "DailyStat", "RollupRun"]);
   const rowsAnywhere = view.counts.some((c) => analyticsTables.has(c.table) && c.rows > 0);
   const hasTraffic = view.visits > 0 || view.sessions > 0;
@@ -56,7 +55,6 @@ export default async function AnalyticsPage({
   const nextUnsummarized = view.summarizedThroughKey
     ? toDateKey(new Date(new Date(`${view.summarizedThroughKey}T00:00:00.000Z`).getTime() + DAY_MS))
     : view.fromKey;
-  // With nothing collected, pre-filling the window start would aim at a fortnight of empty days.
   const suggestedFrom =
     !rowsAnywhere || nextUnsummarized > yesterdayKey ? yesterdayKey : nextUnsummarized;
 
@@ -97,7 +95,6 @@ export default async function AnalyticsPage({
         suggestedFrom={suggestedFrom}
         suggestedTo={yesterdayKey}
       />
-
 
       <div className="stat-grid">
         <div className="stat">
@@ -153,7 +150,6 @@ export default async function AnalyticsPage({
         )}
       </Card>
 
-
       <Card flush className="rv-card">
         <CardHead
           title="Channels"
@@ -195,7 +191,6 @@ export default async function AnalyticsPage({
         ) : null}
       </Card>
 
-
       <div className="an-note">
         <IconDeviceMobile size={13} stroke={1.6} />
         Desktop and mobile are expected to diverge here: much of the public site is hover-driven,
@@ -204,7 +199,6 @@ export default async function AnalyticsPage({
       </div>
 
       <SectionPanels sections={view.sections} hasData={view.hasSectionData} windowDays={days} />
-
 
       <Card flush className="rv-card">
         <CardHead title="Raw rows" count={view.counts.length} />

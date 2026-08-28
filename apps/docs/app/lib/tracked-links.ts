@@ -8,7 +8,7 @@ export function shortUrl(slug: string): string {
   return `${SITE}/r/${slug}`;
 }
 
-/** Long form of the same link; only the short /r form increments the click count. */
+// only the short /r form increments the click count
 export function fullUrl(link: {
   destination: string;
   slug: string;
@@ -22,7 +22,7 @@ export function fullUrl(link: {
   return url.toString();
 }
 
-/** Fixed black on white whatever the admin theme is: a themed QR stops scanning. */
+// a themed QR stops scanning
 export async function qrDataUrl(text: string): Promise<string | null> {
   try {
     return await QRCode.toDataURL(text, {

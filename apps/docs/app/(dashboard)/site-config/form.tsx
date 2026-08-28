@@ -11,15 +11,12 @@ import { IconAlertTriangle } from "@tabler/icons-react";
 
 interface MovedRow {
   key: string;
-  /** The key's own name in the registry — "Dot colour", not "heroDotColor". */
   label: string;
   value: string;
-  /** The section that writes it now. */
   owner: string;
   href: string;
 }
 
-/** Where each card's rows actually appear, in the visitor's terms. */
 const WHERE: Record<string, string> = {
   Navbar: "top of every page",
   Footer: "bottom of every page",
@@ -27,14 +24,6 @@ const WHERE: Record<string, string> = {
   Unclaimed: "safety net — no section owns these",
 };
 
-/**
- * Two owned rows, one save, and the safety net.
- *
- * The editing itself is `ConfigCard`, which posts ONLY the keys it is given —
- * that is the property the whole four-page SiteConfig split rests on, so this
- * page hands it `chromeKeys` plus whatever the database holds that no section
- * claims, and nothing else.
- */
 export function SiteChromeForm({
   chromeKeys,
   unclaimedKeys,
@@ -44,15 +33,12 @@ export function SiteChromeForm({
   sections,
 }: {
   chromeKeys: string[];
-  /** DB rows absent from the registry. Editable here so nothing is orphaned. */
   unclaimedKeys: string[];
   values: Record<string, string>;
   moved: MovedRow[];
   hasBlogs: boolean;
   sections: Record<NavSection, boolean>;
 }) {
-  // The preview follows the fields as they are typed rather than after a save,
-  // which is the only way "does this wordmark fit" is answerable here.
   const [draft, setDraft] = useState(values);
   const onDraftChange = useCallback((next: Record<string, string>) => setDraft(next), []);
 
@@ -86,9 +72,6 @@ export function SiteChromeForm({
     return out;
   }, [chromeKeys, unclaimedKeys]);
 
-  // Minimal definitions for rows the registry has never heard of. Plain text,
-  // because we cannot know what the value means — but editable, which is the
-  // entire point of the net.
   const extraDefs = useMemo<Record<string, ConfigKeyDef>>(
     () => Object.fromEntries(unclaimedKeys.map(k => [k, {
       owner: "chrome" as const,
@@ -126,8 +109,6 @@ export function SiteChromeForm({
           </div>
         )}
 
-        {/* Where the other nine keys went. Read-only by design: one row with two
-            writers is exactly the race the split was made to avoid. */}
         <Card flush>
           <CardHead
             title="Edited elsewhere"
@@ -148,10 +129,6 @@ export function SiteChromeForm({
         </Card>
       </div>
 
-      {/* Not a hero any more: this page holds the frame around the page, so the
-          preview draws that frame. Bare `PreviewFrame` on purpose — there is no
-          staged entity behind chrome, so a Staged* wrapper's pending-change chip
-          would read zero forever while the card above is dirty. */}
       <PreviewFrame label="Chrome — navbar and footer">
         <ChromePreview
           logo={draft["navbarLogo"] ?? ""}

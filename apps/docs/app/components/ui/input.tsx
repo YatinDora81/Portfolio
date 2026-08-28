@@ -5,7 +5,6 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   hint?: string;
-  /** Render the value in the mono face — for URLs, slugs, IDs. */
   mono?: boolean;
 }
 

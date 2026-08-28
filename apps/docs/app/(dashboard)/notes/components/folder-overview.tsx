@@ -5,12 +5,6 @@ import { NewNoteButtons } from "./new-note-buttons";
 import { NoteActions } from "./note-actions";
 import { NoteLink } from "./vault-provider";
 
-/**
- * What a folder is, rather than what it contains: three numbers, the things you
- * can do to it, and the level immediately below. Nothing here recurses — the
- * tree in the left pane already draws the shape of the whole vault, and a second
- * copy of it in the reading pane would be two answers to the same question.
- */
 export function FolderOverview({ node }: { node: FolderView }) {
   const { stats } = node;
 
@@ -60,8 +54,6 @@ export function FolderOverview({ node }: { node: FolderView }) {
           ))}
         </div>
       ) : (
-        // Named as empty rather than left blank. A folder with nothing in it and
-        // a folder that failed to load look identical otherwise.
         <p className="nt-empty">
           Nothing in here yet. Add a question, or a subfolder to sort the ones coming.
         </p>

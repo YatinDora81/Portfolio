@@ -22,7 +22,6 @@ const FORM_ID = "hero-title-form";
 
 export function HeroTitlesTable({ titles, version }: {
   titles: Title[];
-  /** Owned by HeroSections — titles and badges always edit the same hero. */
   version: Version;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -32,42 +31,28 @@ export function HeroTitlesTable({ titles, version }: {
     isDeleted, isNew, isEdited, saving,
   } = useStaging();
 
-  // Nothing here writes to the database — every action stages, and the page
-  // renders the staged view so the change is on screen before it is saved.
-  // The version scopes the reorder lookup as well: `stageReorder` keeps one
-  // pending drag per tab, so an unscoped overlay would apply the other tab's.
   const staged = overlay("heroTitle", titles, (t) => t.id, version);
 
-  // After the overlay, never before: a staged create only carries a version
-  // once `overlay` has materialised it, so filtering first strands new rows.
+  // filter after the overlay, or staged creates get stranded
   const mine = staged.filter((t) => t.version === version);
 
   const { order, handleProps, itemProps } = useSortable(
     mine.map((t) => t.id),
-    // sortOrder is dense within a version, so the drag belongs to this tab alone.
     (ids) => stageReorder("heroTitle", ids, version),
     { disabled: saving }
   );
 
   const byId = new Map(mine.map((t) => [t.id, t] as const));
   const seen = new Set(order);
-  // `order` is the drag preview and only re-seeds after a render, so a row
-  // staged this tick is appended rather than dropped for a frame.
   const rows = [...order.flatMap((id) => byId.get(id) ?? []), ...mine.filter((t) => !seen.has(t.id))];
 
-  /** One mark per row: on its way out, brand new, or edited. */
   const mark = (id: string) =>
     isDeleted("heroTitle", id) ? "staged-del"
       : isNew("heroTitle", id) ? "staged-new"
         : isEdited("heroTitle", id) ? "staged-edit"
           : null;
 
-  /**
-   * Swap a title with its neighbour and stage the whole order. Indices are
-   * `rows` indices, and `rows` drops ids that no longer exist — so it is NOT
-   * positionally aligned with `order`. Building the payload from `rows` keeps
-   * one index space and can't stage a stale id.
-   */
+  // indices are into `rows`, which is not aligned with `order`
   const move = (from: number, to: number) => {
     const ids = rows.map((t) => t.id);
     [ids[from], ids[to]] = [ids[to]!, ids[from]!];
@@ -172,11 +157,8 @@ export function HeroTitlesTable({ titles, version }: {
           id={FORM_ID}
           action={(formData) => {
             const title = String(formData.get("title") ?? "").trim();
-            // The server trims too; trimming here keeps the staged preview and
-            // the saved row identical. A blank one would fail the whole batch.
             if (!title) return;
             if (editing) stageUpdate("heroTitle", editing.id, { title });
-            // The column is NOT NULL and the server rejects a create without it.
             else stageCreate("heroTitle", { title, version });
             setDialogOpen(false);
           }}

@@ -1,4 +1,3 @@
-/** `education` is a div inside `#about`, not a section of its own. */
 export const SECTIONS = [
   'hero',
   'about',

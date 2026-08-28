@@ -32,7 +32,6 @@ export async function login(formData: FormData) {
     return { error: "Invalid credentials" };
   }
 
-  // Check if account is locked due to too many failed attempts
   if (user.failedAttempts >= MAX_FAILED_ATTEMPTS) {
     return {
       error: "Account locked due to too many failed attempts. Please use OTP to login.",
@@ -63,7 +62,6 @@ export async function login(formData: FormData) {
     };
   }
 
-  // Successful login — reset failed attempts
   await prisma.adminUser.update({
     where: { id: user.id },
     data: { failedAttempts: 0, otp: null, otpExpiresAt: null },
@@ -80,7 +78,7 @@ export async function sendLoginOtp(formData: FormData) {
 
   const user = await prisma.adminUser.findUnique({ where: { email } });
   if (!user) {
-    // Don't reveal if user exists
+    // don't reveal whether the account exists
     return { success: true };
   }
 
@@ -88,7 +86,6 @@ export async function sendLoginOtp(formData: FormData) {
     return { error: "OTP login is only available after 3 failed password attempts." };
   }
 
-  // Generate 6-digit OTP
   const otp = crypto.randomInt(100000, 999999).toString();
   const hashedOtp = await bcrypt.hash(otp, 10);
 
@@ -130,7 +127,6 @@ export async function verifyLoginOtp(formData: FormData) {
     return { error: "Invalid OTP" };
   }
 
-  // Successful OTP login — reset everything
   await prisma.adminUser.update({
     where: { id: user.id },
     data: { failedAttempts: 0, otp: null, otpExpiresAt: null },
@@ -152,9 +148,6 @@ export async function changePassword(formData: FormData) {
 
   const isOwnPassword = session.userId === targetUserId;
 
-  // Resetting someone else's password means you must strictly outrank them.
-  // Checking only for SUB_ADMIN let an ADMIN reset the OWNER's password and
-  // take the account — a lower role must never be able to seize a higher one.
   if (!isOwnPassword) {
     const LEVEL: Record<string, number> = { OWNER: 3, ADMIN: 2, SUB_ADMIN: 1 };
     const target = await prisma.adminUser.findUnique({
@@ -171,9 +164,6 @@ export async function changePassword(formData: FormData) {
     return { error: "New password fields are required" };
   }
 
-  // Changing your OWN password always costs the current one. The override is
-  // derived from who you are, not read from the form — as a client field it let
-  // anyone skip verification on their own account.
   const adminOverride = !isOwnPassword;
   if (isOwnPassword && !currentPassword) {
     return { error: "Current password is required" };
@@ -187,7 +177,6 @@ export async function changePassword(formData: FormData) {
     return { error: "New passwords do not match" };
   }
 
-  // Verify current password for own password change (skip if admin override)
   if (isOwnPassword && !adminOverride) {
     const user = await prisma.adminUser.findUnique({ where: { id: targetUserId } });
     if (!user) return { error: "User not found" };
@@ -210,7 +199,7 @@ export async function forgotPassword(formData: FormData) {
   if (!email) return { error: "Email is required" };
 
   const user = await prisma.adminUser.findUnique({ where: { email } });
-  // Always return success to avoid email enumeration
+  // always succeed, no email enumeration
   if (!user) return { success: true };
 
   const token = await new SignJWT({ userId: user.id, email: user.email })

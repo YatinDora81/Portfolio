@@ -4,7 +4,7 @@ import { PrismaClient } from "./generated/prisma/client";
 
 const connectionString = `${process.env.DATABASE_URL}`;
 
-// Without the global, every hot reload leaks another client and pg pool.
+// without this, every hot reload leaks a client and pool
 const globalForPrisma = globalThis as { __prisma?: PrismaClient };
 
 const prisma =
@@ -25,10 +25,4 @@ export {
   MessageStatus,
   EventType,
 } from "./generated/prisma/enums";
-/**
- * The generated input types — `Prisma.NoteNodeWhereInput` and friends. Exported
- * so a caller can *build* a query as a value and hand it to a `findMany`, which
- * is what compiling the notes search language to SQL needs; every other model
- * here is queried with an inline literal and never needed it.
- */
 export { Prisma } from "./generated/prisma/client";

@@ -6,7 +6,6 @@ export function Switch({ checked, onChange, label, ariaLabel, disabled }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label?: string;
-  /** Names the switch where there is no visible caption; wins over `label`. */
   ariaLabel?: string;
   disabled?: boolean;
 }) {

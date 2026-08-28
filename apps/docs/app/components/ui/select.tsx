@@ -8,7 +8,6 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   options: { value: string; label: string }[];
 }
 
-// The chevron is drawn by `.sel`'s background gradients, so no icon element here.
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, label, error, hint, options, ...props }, ref) => (
     <div className="f">

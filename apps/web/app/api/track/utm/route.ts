@@ -12,27 +12,15 @@ interface UtmPayload {
   path?: string | null;
 }
 
-/**
- * Truncate rather than reject: a genuinely long user-agent should still be
- * recorded, but nothing here may write unbounded text. The browser-side
- * sessionStorage gate is a UX nicety — anyone can POST this directly — so the
- * real limits live in this file.
- */
 function clean(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;
   const s = v.trim();
   return s.length > 0 ? s.slice(0, max) : null;
 }
 
-/** Repeat hits with an identical fingerprint inside this window are dropped. */
 const DEDUP_MINUTES = 10;
 
-/**
- * Reads the body with a hard ceiling, streaming so an oversized one is dropped
- * rather than buffered. `content-length` alone is not a guard: it is absent on a
- * chunked request, which let any caller skip the check entirely and hand
- * `request.json()` a body of any size.
- */
+// content-length is absent on a chunked request
 async function readCapped(request: Request, cap: number): Promise<string | null> {
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (declared > cap) return null;
@@ -64,7 +52,6 @@ async function readCapped(request: Request, cap: number): Promise<string | null>
 }
 
 export async function POST(request: Request) {
-  // 200, not 503: the caller is a fire-and-forget `keepalive` beacon, and an error would log in every visitor's console.
   if (!flagValue(await getFlags(), FLAG_KEYS.ANALYTICS)) {
     return Response.json(
       { skipped: true, reason: "Analytics collection is off" },
@@ -79,8 +66,7 @@ export async function POST(request: Request) {
 
   let body: UtmPayload;
   try {
-    // `?? {}` because a body of literal `null` parses without throwing, and
-    // reading a field off it threw a TypeError that surfaced as a bare 500.
+    // a body of literal null parses without throwing
     body = (JSON.parse(raw) ?? {}) as UtmPayload;
   } catch {
     return Response.json({ skipped: true, reason: "Invalid JSON body" }, { status: 400 });
@@ -94,7 +80,6 @@ export async function POST(request: Request) {
   const messageId = clean(body.messageId);
   const path = clean(body.path, 512);
 
-  // Insert when source+medium+campaign are present; content is optional.
   if (!source || !medium || !campaign) {
     return Response.json(
       { skipped: true, reason: "Missing required utm_source/utm_medium/utm_campaign" },
@@ -106,7 +91,6 @@ export async function POST(request: Request) {
   const userAgent = clean(request.headers.get("user-agent"), 512);
 
   try {
-    // Server-side dedup, since the client gate is trivially bypassed.
     const since = new Date(Date.now() - DEDUP_MINUTES * 60 * 1000);
     const duplicate = await prisma.utmTracker.findFirst({
       where: { source, medium, campaign, content, messageId, path, visitedAt: { gte: since } },

@@ -36,7 +36,6 @@ export interface DetailMessage {
   deviceType: string | null;
   browser: string | null;
   referrer: string | null;
-  /** All three pre-formatted in IST on the server. */
   receivedAt: string;
   readAt: string | null;
   repliedAt: string | null;
@@ -105,7 +104,6 @@ export function MessageDetail({ message, replies, templates, defaultSubject, spa
 
   const opened = useRef(false);
 
-  // Marks read on open, including a cold load straight from the notification link.
   useEffect(() => {
     if (message.status !== "UNREAD" || opened.current) return;
     opened.current = true;
@@ -291,7 +289,6 @@ export function MessageDetail({ message, replies, templates, defaultSubject, spa
           />
         </div>
 
-        {/* Public input. Text, always — never markup. */}
         <div className="msg-body">{message.body}</div>
 
         <div className="msg-composer">

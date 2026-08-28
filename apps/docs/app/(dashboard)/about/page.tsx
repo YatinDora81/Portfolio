@@ -13,23 +13,8 @@ import {
   IconArrowUpRight, IconArrowRight, IconLock, IconTerminal2,
 } from "@tabler/icons-react";
 
-/**
- * Section 02 — one page for one section of the site.
- *
- * The bio paragraphs and the education timeline used to be two nav rows for one
- * screen on the portfolio; they are one page now. Both tables are the same
- * staged components they always were and commit through the same save bar, so
- * nothing about the write path changed — only where the two of them live.
- *
- * The masthead below is the section's own idiom turned into a table of
- * contents: About *is* a shell on the public site, so the four things this page
- * is answerable for are drawn as four commands with their live answers, and
- * each answer is a link to the control that changes it.
- */
-
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/$/, "");
 
-/** Host only — the full Drive URL is 90 mono characters and blows the line out. */
 function hostOf(url: string): string | null {
   try {
     return new URL(url).host.replace(/^www\./, "");
@@ -42,21 +27,14 @@ export default async function AboutPage() {
   const [paragraphs, education, experiences, configRows] = await Promise.all([
     prisma.aboutParagraph.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
     prisma.education.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
-    // Only for the paragraphs' company marks — the site reuses the same logos.
     prisma.experience.findMany({ select: { company: true, logoUrl: true } }),
     prisma.siteConfig.findMany({ where: { key: "resumeUrl" } }),
   ]);
 
-  // Read, never written here: `resumeUrl` has exactly one writer (updateResumeUrl,
-  // on Hero) and a second form pointed at the same row would race it.
   const resumeUrl = configRows.find((c) => c.key === "resumeUrl")?.value ?? "";
   const resumeHost = hostOf(resumeUrl);
   const withLogo = experiences.filter((e) => e.logoUrl).length;
 
-  // `education` is a nav command onto #education, so with no entries the target
-  // is gone and the site drops the command — which is exactly what the row above
-  // this one says. Counting it anyway had `help` claim a command the masthead
-  // had just declared dropped, two lines apart.
   const discoverable = TERMINAL_COMMANDS.filter(
     (c) => c.discoverable && !(c.cmd === "education" && education.length === 0)
   ).length;
@@ -211,8 +189,6 @@ export default async function AboutPage() {
           </Card>
         </section>
 
-        {/* Last on the page, one pane for both tables — the site draws them as one
-            screen, so two panes would be two answers to the same question. */}
         <StagedAboutPreview
           paragraphs={paragraphs.map(p => ({ id: p.id, content: p.content }))}
           experiences={experiences}

@@ -1,15 +1,3 @@
-/* ================================================================
-   CONTROL ROOM — admin design system for admin.yatindora.in
-   Ported from the redesign mockup. Light + dark, amber cat-eye accent,
-   mono data labels.
-
-   Scoping note: the mockup injected this as one global <style>. Here the
-   tokens live on :root / .dark (ThemeProvider toggles `.dark` on <html>),
-   and the component classes stay unscoped — the admin app styles everything
-   with Tailwind utilities, so there are no name collisions with `.card`,
-   `.btn`, `.row` and friends.
-   ================================================================ */
-
 :root {
   --bg: #FAFAFB; --bg1: #F4F4F6; --bg2: #EDEDF0; --bg3: #E3E3E8; --bg4: #D4D4DB;
   --glass: rgba(255, 255, 255, .86);
@@ -23,10 +11,6 @@
   --blue: #64748B;
   --grad: linear-gradient(135deg, #7A6BF0, #5646D6);
   --gridc: rgba(17, 17, 22, .06); --tickc: rgba(17, 17, 22, .3);
-  /* Categorical chart series. Deliberately theme-independent: hue encodes the
-     *source*, so a series keeps its identity when the theme changes, and status
-     tokens (--good/--amber) stay reserved for state. Validated all-pairs against
-     #FFFFFF, #161B22 and #1F1F23 — worst CVD ΔE 12.6, worst normal-vision ΔE 18.3. */
   --ch1: #14A79A; --ch2: #E4610E; --ch3: #8B5CF6; --ch4: #BE185D;
   --card: #FFFFFF; --panel: rgba(255, 255, 255, .96); --chipG: rgba(255, 255, 255, .9);
   --veil: rgba(17, 17, 22, .4); --accT: #5B4BD6; --goodT: #15803D; --vioT: #55606E; --vioS: rgba(100, 116, 139, .12);
@@ -35,13 +19,10 @@
   --mono: 'Geist Mono', ui-monospace, monospace;
   --r1: 8px; --r2: 10px; --r3: 12px;
   --shadow: 0 1px 2px rgba(17, 17, 22, .06), 0 12px 32px -16px rgba(17, 17, 22, .16);
-  /* `--shadow` is downward-only, so it is a no-op on the viewport floor. */
   --shadow-up: 0 -1px 2px rgba(17, 17, 22, .05), 0 -12px 32px -16px rgba(17, 17, 22, .14);
 }
 
 .cr {
-  /* `dvh`: the save band is this box's bottom edge now, and `100vh` on mobile
-     Safari is the large viewport — its buttons would sit behind the toolbar. */
   font-family: var(--ui); background: var(--bg); color: var(--ink); height: 100vh; height: 100dvh; width: 100%;
   display: flex; overflow: hidden; font-size: 14px; line-height: 1.5; position: relative; isolation: isolate;
 }
@@ -56,7 +37,6 @@
 .cr :focus-visible { outline: 2px solid var(--c1); outline-offset: 2px; border-radius: 6px }
 .cr a { color: inherit; text-decoration: none }
 
-/* ---------- sidebar ---------- */
 .sb {
   width: 254px; min-width: 254px; background: var(--glass); backdrop-filter: blur(18px) saturate(1.6);
   -webkit-backdrop-filter: blur(18px) saturate(1.6); border-right: 1px solid var(--line2);
@@ -70,9 +50,6 @@
 .sb-brand-name { font-family: var(--disp); font-weight: 700; font-size: 14.5px; letter-spacing: -.01em }
 .sb-brand-sub { font-family: var(--mono); font-size: 9.5px; color: var(--faint); letter-spacing: .03em; margin-top: 2px }
 .sb-nav { flex: 1; overflow-y: auto; padding: 8px 10px }
-/* The composited sidebar fill — `--glass` over `--bg` in light, the zoned
-   `--sbg` in dark. The ordinal rail is drawn behind the numbers and each number
-   punches a hole in it with this colour, so it has to be a real opaque value. */
 .sb { --sb-rail: var(--bg) }
 .dark .sb { --sb-rail: var(--sbg) }
 .nav-grp + .nav-grp { margin-top: 2px }
@@ -81,14 +58,8 @@
   font-family: var(--mono); font-size: 9px; letter-spacing: .18em; text-transform: uppercase;
   color: var(--dim); padding: 15px 8px 7px
 }
-/* The heading rules off to the sidebar's edge, so a group reads as a band
-   rather than as a stray line of small caps. */
 .nav-label::after { content: ''; flex: 1; height: 1px; background: var(--line2) }
 .nav-run { position: relative }
-/* Only the page-order group is a *sequence*, so only it gets the rail: one
-   hairline threading 01 → 08, stopped at the first and last row's centre so it
-   reads as a run with two ends rather than a border. The other two groups are
-   sets, and a rail would claim an order they haven't got. */
 .nav-grp.run .nav-run::before {
   content: ''; position: absolute; left: 19.5px; top: 16px; bottom: 16px; width: 1px;
   background: var(--line2)
@@ -109,14 +80,7 @@
   font-family: var(--mono); font-size: 9px; color: var(--dim); width: 22px; flex: none;
   letter-spacing: .02em; text-align: center; position: relative; z-index: 1
 }
-/* `^..^`, `>_` and `~~~` mark the entries that are layers over or under the
-   page rather than sections of it. Tracked in, not shrunk — they have to stay
-   as legible as the digits they stand in for. Four mono cells is the ceiling:
-   `^..^` fills the 22px rail exactly, and a fifth would clip. */
 .nav-num.glyph { font-size: 8.5px; letter-spacing: -.03em }
-/* On the rail, each ordinal carries the surface it sits on so the hairline is
-   cut cleanly behind it. Hover and active repeat their own row fill rather than
-   the bare sidebar, or the number would read as a hole punched in the highlight. */
 .nav-grp.run .nav-num { background: var(--sb-rail); border-radius: 5px; padding: 2px 1px }
 .nav-grp.run .nav-item:hover .nav-num { background: linear-gradient(var(--bg2), var(--bg2)), var(--sb-rail) }
 .nav-grp.run .nav-item.on .nav-num {
@@ -126,8 +90,6 @@
 }
 .nav-ic { flex: none; opacity: .9 }
 .nav-txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
-/* `--pri`/`--priFg` rather than `--c1`/white: white on the GitHub theme's blue
-   `--c1` is 2.5:1, and this is a number somebody has to read. */
 .nav-badge {
   font-family: var(--mono); font-size: 10px; background: var(--pri); color: var(--priFg); font-weight: 700;
   border-radius: 99px; padding: 1px 7px; line-height: 1.5
@@ -163,10 +125,7 @@
 .me-out { margin-left: auto; color: var(--faint); padding: 6px; border-radius: 7px }
 .me-out:hover { color: var(--bad); background: var(--bad-soft) }
 
-/* ---------- main / topbar ---------- */
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; z-index: 1 }
-/* `backdrop-filter` makes .tb a stacking context, so a dropdown inside it can
-   never out-paint `.content` on its own — the topbar itself has to be raised. */
 .tb {
   height: 56px; flex: none; border-bottom: 1px solid var(--line2); display: flex; align-items: center;
   gap: 10px; padding: 0 22px; background: var(--glass); backdrop-filter: blur(16px) saturate(1.6);
@@ -206,8 +165,6 @@
   box-shadow: 0 1px 2px rgba(17, 17, 22, .15), 0 8px 20px -10px rgba(106, 90, 224, .5)
 }
 .pub.dirty:hover { filter: brightness(1.07) }
-/* the dot only ever sits inside `.pub.dirty`, so it tracks that button's own
-   foreground — a fixed light knob would vanish on Dark2's teal `--pri`. */
 .pub-dot { width: 6px; height: 6px; border-radius: 99px; background: currentColor }
 .spin { animation: spin 1s linear infinite }
 @keyframes spin { to { transform: rotate(360deg) } }
@@ -218,15 +175,8 @@
 }
 @keyframes slidebar { from { left: -38% } to { left: 104% } }
 
-/* ---------- content / views ---------- */
-/* The gutter is reserved on both edges so the reading column stays centred on
-   `.main` whether or not the page overflows — that is what lets the save band
-   mirror it with plain symmetric padding. The old 84px bottom padding was the
-   sticky bar's travel reserve, and was itself the bug. */
 .content { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable both-edges; padding: 24px 28px 32px; position: relative }
 .view { max-width: 1060px; margin: 0 auto; animation: up .32s cubic-bezier(.3, .7, .3, 1) both }
-/* Data consoles (tracker, refer emails) carry tables far wider than the reading
-   column, so they opt out of the 1060px cap and use the full viewport instead. */
 .view.wide { max-width: 1600px }
 @keyframes up { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
 .vh { margin-bottom: 20px }
@@ -247,7 +197,6 @@
 .card-b { padding: 16px }
 .hint { font-size: 12px; color: var(--faint); display: flex; align-items: center; gap: 7px }
 
-/* buttons */
 .btn {
   display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 12.5px; border-radius: 9px;
   padding: 7px 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); transition: .15s;
@@ -268,7 +217,6 @@
 .ibtn.amber { color: var(--c1) }
 .ibtn:disabled { opacity: .35; cursor: default }
 
-/* list rows */
 .rows { display: flex; flex-direction: column }
 .row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--line2); transition: background .13s }
 .row:last-child { border-bottom: none }
@@ -284,7 +232,6 @@
 .row:hover .move { opacity: 1 }
 .dimmed { opacity: .45 }
 
-/* chips / badges */
 .chip {
   display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px;
   border: 1px solid var(--line); border-radius: 99px; padding: 3px 9px; color: var(--dim); background: var(--card)
@@ -294,7 +241,6 @@
 .chip.amb { border-color: var(--amber); color: var(--ambT); background: var(--amber-soft) }
 .dot { width: 6px; height: 6px; border-radius: 99px; background: currentColor; flex: none }
 
-/* toggle */
 .tog {
   width: 35px; height: 20px; border-radius: 99px; background: var(--bg4); border: 1px solid transparent;
   position: relative; transition: .18s; flex: none
@@ -310,11 +256,8 @@
 .tog:active { transform: scale(.93) }
 .tog:disabled { opacity: .5; cursor: default }
 
-/* fields */
 .f { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px }
 .f label { font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint) }
-/* `.sel` is qualified to `select` throughout: the inbox uses `.msg-it.sel` for the
-   selected row, and an unqualified `.sel` leaked this border + radius onto it. */
 .in, .ta, select.sel {
   background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px;
   font-size: 13.5px; width: 100%; transition: border-color .15s, box-shadow .15s; box-shadow: 0 1px 2px rgba(23, 30, 48, .04)
@@ -331,26 +274,11 @@ select.sel option { background: var(--card); color: var(--ink) }
 .f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px }
 .f-hint { font-size: 11px; color: var(--faint); margin-top: -2px }
 
-/* Colour swatch. `.in`'s padding would letterbox the colour, so the native
-   picker is stripped to nothing and fills this well instead. The ring belongs
-   on the well for the same reason: `.cr :focus-visible` would paint its outline
-   on a transparent input, which is to say nowhere. */
 .swatch { position: relative; flex: none; width: 38px; height: 36px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden }
 .swatch:has(:focus-visible) { outline: 2px solid var(--c1); outline-offset: 2px }
 .swatch input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer }
 
-/* modal */
 .veil {
-  /* Dialogs portal onto `.cr`, so this sits beside the sidebar rather than
-     under it. Above the palette (100) on purpose: navigating from the palette
-     is what raises the leave guard, and the asker must not cover the question.
-
-     `dvh` for the reason `.cr` gives: left to `inset` alone the height comes
-     from the fixed containing block, which on mobile is the large viewport, and
-     centring inside a box taller than the screen puts every dialog below the
-     middle of it. No `vh` fallback here — `height` and `bottom` together are
-     over-constrained, so a browser without `dvh` would take 100vh and land back
-     on the large viewport. Dropping the declaration leaves `inset` in charge. */
   position: fixed; inset: 0; height: 100dvh;
   background: var(--veil); backdrop-filter: blur(3px); z-index: 110;
   display: grid; place-items: center; padding: 20px; animation: fade .16s both
@@ -371,7 +299,6 @@ select.sel option { background: var(--card); color: var(--ink) }
   background: var(--bg1); border-radius: 0 0 16px 16px
 }
 
-/* toasts */
 .toasts { position: fixed; bottom: 20px; right: 20px; z-index: 120; display: flex; flex-direction: column; gap: 8px }
 .toast {
   display: flex; align-items: center; gap: 9px; background: var(--panel); backdrop-filter: blur(14px);
@@ -384,7 +311,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 .toast.out { animation: toastOut .3s both }
 @keyframes toastOut { to { opacity: 0; transform: translateY(8px) scale(.97) } }
 
-/* empty */
 .empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 20px; text-align: center; color: var(--faint) }
 .empty-ic {
   width: 42px; height: 42px; border-radius: 12px; background: var(--bg1); border: 1px dashed var(--line2);
@@ -393,7 +319,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 .empty b { color: var(--dim); font-weight: 600; font-size: 13.5px }
 .empty span { font-size: 12px; max-width: 34ch }
 
-/* dashboard */
 .stat-grid { display: grid; grid-template-columns: 1.7fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px }
 .stat {
   background: var(--card); border: 1px solid var(--line2); border-radius: var(--r2); padding: 14px 15px;
@@ -417,8 +342,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 .stat:first-child .stat-v { font-size: 46px; letter-spacing: -.04em }
 .stat:first-child .stat-m { font-size: 12.5px; margin-top: 8px }
 .stat:first-child .spark { right: 16px; bottom: 16px; transform: scale(1.3); transform-origin: bottom right }
-/* `.even` is for metric rows that aren't 4-up with a hero tile — refer-emails has
-   seven equal KPIs, which the 1.7fr-first grid would otherwise wrap lopsidedly. */
 .stat-grid.even { grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)) }
 .stat-grid.even .stat:first-child { padding: 14px 15px }
 .stat-grid.even .stat:first-child .stat-v { font-size: 28px; letter-spacing: -.03em }
@@ -442,10 +365,7 @@ select.sel option { background: var(--card); color: var(--ink) }
 .nudge { transition: transform .16s }
 .row:hover .nudge, .btn:hover .nudge, .stat:hover .nudge { transform: translate(2px, -2px) }
 
-/* inbox */
 .inbox { display: grid; grid-template-columns: 330px 1fr; gap: 14px; align-items: start; min-height: 480px }
-/* Sized off the viewport rather than off `.content`, so it has to allow for the
-   save band (~56px) whether or not the band is up. */
 .msg-list { display: flex; flex-direction: column; max-height: calc(100dvh - 306px); overflow-y: auto }
 .msg-it { display: flex; gap: 10px; padding: 12px 13px; border-bottom: 1px solid var(--line2); text-align: left; transition: background .13s; width: 100% }
 .msg-it:hover { background: var(--bg1) }
@@ -467,7 +387,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 .filt:hover { color: var(--dim) }
 .filt.on { border-color: var(--c1); color: var(--accT); background: var(--accS) }
 
-/* projects */
 .proj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px }
 .pcard {
   background: var(--card); border: 1px solid var(--line2); border-radius: var(--r3); overflow: hidden;
@@ -489,7 +408,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 .pfoot { display: flex; align-items: center; gap: 4px; margin-top: auto; padding-top: 6px; border-top: 1px solid var(--line2) }
 .pfoot .sp { flex: 1 }
 
-/* skills */
 .skill-cat { margin-bottom: 18px }
 .skill-cat-h { display: flex; align-items: center; gap: 9px; margin-bottom: 9px }
 .skill-cat-t { font-family: var(--mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim) }
@@ -505,7 +423,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 .skill-n { font-size: 13px; font-weight: 500 }
 .skill-u { font-family: var(--mono); font-size: 9px; color: var(--faint) }
 
-/* experience */
 .xp { position: relative; padding-left: 22px }
 .xp::before { content: ''; position: absolute; left: 6px; top: 8px; bottom: 8px; width: 1px; background: var(--line) }
 .xp-item { position: relative; margin-bottom: 14px }
@@ -515,7 +432,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 }
 .xp-item.now::before { border-color: var(--c1); background: var(--c1) }
 
-/* quotes */
 .qcard {
   position: relative; padding: 13px 15px 13px 18px; display: flex; gap: 12px; align-items: flex-start;
   border-bottom: 1px solid var(--line2)
@@ -527,9 +443,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 .qtext { font-family: var(--disp); font-size: 14.5px; font-weight: 600; line-height: 1.55; letter-spacing: -.005em }
 .qauth { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 5px }
 
-/* tables (admins, tracker, refer emails) */
-/* Wide tables scroll inside their own card rather than clipping at the card edge.
-   The card must not clip the scroller, hence overflow: visible on the parent. */
 .tbl-scroll { overflow-x: auto; overflow-y: hidden; max-width: 100% }
 .card > .tbl-scroll { border-radius: 0 0 var(--r3) var(--r3) }
 .tbl-scroll::-webkit-scrollbar { height: 9px }
@@ -537,7 +450,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 .tbl-scroll::-webkit-scrollbar-thumb:hover { background: var(--faint) }
 .tbl-scroll::-webkit-scrollbar-track { background: transparent }
 .tbl { width: 100%; border-collapse: collapse }
-/* Sticky header so column names survive a long scroll down a 1400-row table. */
 .tbl-scroll .tbl th { position: sticky; top: 0; z-index: 2 }
 .tbl th {
   font-family: var(--mono); font-size: 9px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint);
@@ -551,7 +463,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 .role.admin { background: var(--vioS); color: var(--vioT) }
 .role.sub { background: var(--bg2); color: var(--dim) }
 
-/* login */
 .login {
   min-height: 100vh; min-height: 100dvh;
   width: 100%; display: grid; place-items: center; background: var(--bg); position: relative;
@@ -581,7 +492,6 @@ select.sel option { background: var(--card); color: var(--ink) }
   border: 1px solid transparent; border-radius: 10px; padding: 9px 12px; margin-bottom: 14px
 }
 
-/* command palette */
 .pal {
   position: fixed; inset: 0; height: 100dvh;
   z-index: 100; background: var(--veil); backdrop-filter: blur(3px);
@@ -607,13 +517,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 .sb-mark, .lg-mark, .ava { box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--c1) 45%, transparent) }
 .cr, .login { font-feature-settings: 'cv11' }
 
-/* ---------- dark mode: two themes on a shared quality layer ----------
-   html carries `dark` plus exactly one of `theme-gh` (Dark1) or
-   `theme-zinc` (Dark2). Tokens live on the theme class; the `.dark`
-   rules below are the shared engineering: elevation instead of shadow
-   deletion, a zoned (darker) sidebar, input wells, brand-colored glows. */
-
-/* ── Dark1 · GitHub Dark ── */
 .theme-gh {
   --sbg: #010409; --bg: #0D1117; --card: #161B22; --panel: rgba(28, 33, 41, .98); --well: #0D1117;
   --glass: rgba(13, 17, 23, .9); --chipG: rgba(1, 4, 9, .7);
@@ -633,7 +536,6 @@ select.sel option { background: var(--card); color: var(--ink) }
   --shadow-up: 0 -1px 2px rgba(0, 0, 0, .5), 0 -20px 48px -24px rgba(0, 2, 6, .75);
 }
 
-/* ── Dark2 · shadcn zinc + teal ── */
 .theme-zinc {
   --sbg: #09090B; --bg: #18181B; --card: #1F1F23; --panel: rgba(39, 39, 42, .97); --well: #141417;
   --glass: rgba(24, 24, 27, .88); --chipG: rgba(9, 9, 11, .66);
@@ -653,56 +555,34 @@ select.sel option { background: var(--card); color: var(--ink) }
   --shadow-up: 0 -1px 2px rgba(0, 0, 0, .45), 0 -20px 48px -24px rgba(0, 0, 0, .7);
 }
 
-/* ── shared dark quality layer ── */
 .dark .cr ::selection, .dark .login ::selection { background: color-mix(in srgb, var(--c1) 30%, transparent) }
 .dark .cr ::-webkit-scrollbar-thumb { background: var(--bg4); background-clip: padding-box }
 .dark .cr ::-webkit-scrollbar-thumb:hover { background: var(--faint); background-clip: padding-box }
 .dark .pcover { filter: brightness(.8) contrast(1.06) saturate(1.05) }
 .dark .pcard:hover .pcover { filter: brightness(.8) contrast(1.06) saturate(1.3) }
 .dark .mava { filter: saturate(.85) brightness(.9) }
-/* `select.sel` again, not `.sel` — these rules sit after `.msg-it.sel` at equal
-   specificity, so an unqualified match would strip the selected row's accent bar. */
-/* light-mode paper shadows off; elevation comes from the ladder + ambients */
 .dark .tb-live, .dark .tb-search, .dark .pub, .dark .btn, .dark .in, .dark .ta, .dark select.sel,
 .dark .qa-btn, .dark .skill { box-shadow: none }
-/* elevation, not deletion: resting surfaces keep a whisper of depth */
 .dark .card, .dark .stat, .dark .qa-btn, .dark .pcard, .dark .skill, .dark .live-card {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 1px 2px rgba(0, 0, 0, .35) }
 .dark .stat:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 10px 26px -14px rgba(0, 0, 0, .6) }
-/* the sidebar is its own (lowest) zone */
 .dark .sb { background: var(--sbg) }
-/* inputs read as wells sunk below the card — `background-color`, not the
-   shorthand: the shorthand would reset `select.sel`'s gradient chevron away */
 .dark .in, .dark .ta, .dark .tb-search, .dark select.sel { background-color: var(--well) }
-/* glows are brand-colored, never dead black */
 .dark .pub { box-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 20px -10px color-mix(in srgb, var(--pri) 60%, transparent) }
 .dark .pub.dirty { box-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 20px -10px color-mix(in srgb, var(--pri) 60%, transparent) }
 .dark .btn.pri { box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--pri) 55%, transparent) }
 .dark .sb-mark, .dark .lg-mark, .dark .ava { box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--c1) 50%, transparent) }
 
-/* ---------- icon library — reference grid + picker ----------
-   Sits after the dark block on purpose: the swatch rules below need to win
-   over `.dark .card`-style overrides without a specificity fight. */
-
-/* Brand glyphs ship their own hardcoded hex, and a few knock white shapes out
-   of a coloured field — so the swatch behind them stays light in BOTH themes.
-   On a dark card, Linux (#333 on transparent) would otherwise vanish. */
 .ico-sw {
   width: 30px; height: 30px; flex: none; padding: 5px; border-radius: 8px;
   display: grid; place-items: center; background: #FFFFFF; border: 1px solid var(--line2)
 }
 .ico-sw svg { width: 100%; height: 100%; display: block }
-/* Pin ink too, not just the swatch: a glyph drawn in currentColor would
-   otherwise inherit the theme's near-white --ink and vanish into the light
-   swatch this rule just forced. `.ico-sw.ink` below re-darkens the field and
-   wins on specificity, so line art keeps following --ink. */
 .dark .ico-sw { background: #F1F1F4; border-color: rgba(255, 255, 255, .09); color: #121217 }
-/* Social marks are currentColor line art — they want ink, not a light swatch. */
 .ico-sw.ink { background: var(--bg1); border-color: var(--line2); color: var(--ink) }
 .dark .ico-sw.ink { background: rgba(255, 255, 255, .06); color: var(--ink) }
 .ico-sw.sm { width: 24px; height: 24px; padding: 4px; border-radius: 7px }
 
-/* ---- reference grid ---- */
 .ico-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 8px }
 .ico-cell {
   display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; text-align: left;
@@ -720,13 +600,11 @@ select.sel option { background: var(--card); color: var(--ink) }
 .ico-cell:hover .ico-cp { opacity: 1 }
 .ico-cell.copied { border-color: var(--good); background: var(--good-soft) }
 .ico-cell.copied .ico-cp { opacity: 1; color: var(--good) }
-/* Used-count pip — how many DB rows point at this key right now. */
 .ico-n {
   font-family: var(--mono); font-size: 9px; color: var(--accT); background: var(--accS);
   border-radius: 99px; padding: 1px 6px; flex: none; line-height: 1.6
 }
 
-/* ---- unresolved-key callout ---- */
 .ico-warn {
   display: flex; gap: 10px; align-items: flex-start; padding: 11px 13px; margin-bottom: 14px;
   border-radius: var(--r2); background: var(--amber-soft); border: 1px solid var(--amber);
@@ -738,7 +616,6 @@ select.sel option { background: var(--card); color: var(--ink) }
   border: 1px solid var(--line2); border-radius: 5px; padding: 1px 5px; color: var(--ink)
 }
 
-/* ---- picker ---- */
 .ipick { position: relative }
 .ipick-btn {
   display: flex; align-items: center; gap: 9px; width: 100%; min-height: 38px; text-align: left;
@@ -757,8 +634,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 .ipick-chev { flex: none; color: var(--faint); transition: transform .16s }
 .ipick-btn[aria-expanded='true'] .ipick-chev { transform: rotate(180deg) }
 
-/* Portalled to <body> and fixed-positioned — the dialogs it lives in have an
-   `overflow-y: auto` body that would otherwise clip it. */
 .ipick-pop {
   position: fixed; z-index: 120; background: var(--panel);
   backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
@@ -789,7 +664,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 .ipick-clear { font-family: var(--mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint) }
 .ipick-clear:hover { color: var(--bad) }
 
-/* ---------- terminal command reference ---------- */
 .cmd-tbl td { vertical-align: top }
 .cmd-name { font-family: var(--mono); font-size: 12.5px; color: var(--ink); white-space: nowrap }
 .cmd-prompt { color: var(--good) }
@@ -809,9 +683,6 @@ select.sel option { background: var(--card); color: var(--ink) }
   border: 1px solid var(--line2); border-radius: 5px; padding: 1px 5px; color: var(--ink)
 }
 
-/* ---------- drag-to-reorder ----------
-   Pointer-driven (see lib/use-sortable.ts), so the handle must opt out of
-   touch scrolling or a drag on mobile just scrolls the page instead. */
 .sortable { transition: opacity .15s, transform .15s, box-shadow .15s }
 .sortable[data-dragging] {
   opacity: .55; transform: scale(.985);
@@ -819,14 +690,12 @@ select.sel option { background: var(--card); color: var(--ink) }
 }
 .dark .sortable[data-dragging] { box-shadow: 0 12px 28px -14px rgba(0, 0, 0, .6) }
 
-/* The row grip was decorative until now — make it look grabbable. */
 .row-grip {
   color: var(--faint); flex: none; display: inline-flex; align-items: center;
   touch-action: none; border-radius: 5px; padding: 1px
 }
 .row-grip:hover { color: var(--ink); background: var(--bg2) }
 
-/* Project cards drag from a grip on the cover; the rest of the cover is links. */
 .pgrip {
   position: absolute; top: 9px; left: 10px; z-index: 2; touch-action: none;
   display: inline-flex; align-items: center; justify-content: center;
@@ -835,7 +704,6 @@ select.sel option { background: var(--card); color: var(--ink) }
   opacity: 0; transition: opacity .15s
 }
 .pcard:hover .pgrip, .pcard[data-dragging] .pgrip { opacity: 1 }
-/* Coarse pointers get no hover, so the grip has to stay visible there. */
 @media (hover: none) { .pgrip { opacity: 1 } }
 
 .sr-only {
@@ -843,13 +711,11 @@ select.sel option { background: var(--card); color: var(--ink) }
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0
 }
 
-/* ---------- responsive ---------- */
 .sb-veil { display: none }
 @media (max-width: 1080px) {
   .tb-search { min-width: 112px }
   .stat-grid { grid-template-columns: 1fr 1fr }
   .stat:first-child { grid-column: 1/-1 }
-  /* `.even` has no hero tile, so it keeps flowing rather than spanning row one. */
   .stat-grid.even { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) }
   .stat-grid.even .stat:first-child { grid-column: auto }
   .dash-grid { grid-template-columns: 1fr }
@@ -863,8 +729,6 @@ select.sel option { background: var(--card); color: var(--ink) }
     background: var(--panel)
   }
   .sb.open { transform: none }
-  /* The drawer is `--panel`, not the zoned sidebar, so the rail's ordinal halos
-     have to follow it or they show as patches on the wrong colour in dark. */
   .sb, .dark .sb { --sb-rail: var(--panel) }
   .sb-veil { display: block; position: fixed; inset: 0; background: var(--veil); backdrop-filter: blur(2px); z-index: 55; animation: fade .2s both }
   .tb-burger { display: inline-flex }
@@ -872,19 +736,11 @@ select.sel option { background: var(--card); color: var(--ink) }
   .tb-search { min-width: 0 }
   .tb-search .lbl { display: none }
   .content { padding: 16px 14px 24px }
-  /* 14px content padding + the 10px reserved gutter. */
   .savebar { padding-left: 24px; padding-right: 24px }
   .vh h1 { font-size: 23px }
   .f-row { grid-template-columns: 1fr }
-  /* The theme pill is ~95px wide and would push the topbar past a 390px viewport,
-     so it collapses to an icon sized like `.ibtn` (the button keeps its aria-label).
-     Scoped through `.thm` because the base `.thm-btn` rule sits later in this file. */
   .thm-lbl, .thm-chev { display: none }
   .thm .thm-btn { padding: 6px }
-  /* The menu is right-anchored to a trigger that sits at the LEFT end of `.tb-right`,
-     so at this width it opens ~80px off the left edge and `.cr`'s overflow clip eats
-     the swatches and labels. Dropping the positioning context re-anchors it to `.tb`
-     (already `position: relative`), which puts it fully on screen under the bar. */
   .tb .thm { position: static }
   .tb .thm-menu { right: 14px }
 }
@@ -892,7 +748,6 @@ select.sel option { background: var(--card); color: var(--ink) }
   .cr *, .login * { animation: none !important; transition: none !important }
 }
 
-/* ---------- theme dropdown ---------- */
 .thm { position: relative }
 .thm-btn { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--dim);
   background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 7px 12px; cursor: pointer;
@@ -914,17 +769,11 @@ select.sel option { background: var(--card); color: var(--ink) }
 .thm-it .ck { margin-left: auto; opacity: 0; flex: none }
 .thm-it.on .ck { opacity: 1 }
 
-/* ---------- UTM tracer chart ---------- */
 .utm-legend { display: flex; gap: 12px; margin-left: auto; flex-wrap: wrap }
 .lg-it { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: var(--dim) }
 .lg-dot { width: 8px; height: 8px; border-radius: 3px; flex: none }
-/* Range picker strip. `.in` is width:100%, so the date fields are sized down to
-   match `SEL_STYLE` in the tracker table and the strip wraps inside `.card-h`. */
 .utm-range { display: flex; align-items: center; gap: 6px; flex-wrap: wrap }
 .utm-range .in { width: auto; padding: 5px 10px; font-size: 12px }
-/* Nothing else in the app declares `color-scheme`, so the UA keeps painting the date
-   field's calendar button with its light-scheme (near-black) glyph — invisible on the
-   dark `--well`. Scoped to these inputs so light mode and the custom scrollbars are untouched. */
 .dark .utm-range .in { color-scheme: dark }
 .utm-wrap { position: relative; padding: 8px 10px 4px }
 .utm-wrap .recharts-cartesian-axis-tick text { font-family: var(--mono); font-size: 9px; fill: var(--faint); letter-spacing: .04em }
@@ -938,33 +787,13 @@ select.sel option { background: var(--card); color: var(--ink) }
 .utm-tip .r b { color: var(--ink); font-weight: 600 }
 .utm-empty { padding: 34px 16px; text-align: center; font-size: 12.5px; color: var(--faint) }
 
-/* ---------- staged changes: save bar ----------
-   The third and last child of `.main`'s column, below the scroller — not a
-   sticky child of `.content`. Sticky only travels inside the content box, so on
-   a page shorter than the viewport the bar exhausted its range and parked ~108px
-   above the bottom edge, over whatever the page ended with. As a band the
-   scroller physically ends where the bar begins, so clearance is structural
-   rather than a trailing strip measured to the bar's height per breakpoint.
-
-   Nothing passes behind it, so no `backdrop-filter` — `--glass` over `.cr`'s
-   flat `--bg` is the surface `.tb` already reads as. `z-index: 8` is vestigial
-   (band and scroller cannot overlap) and kept only so the ladder stays legible:
-   over `.tbl` sticky th (2) and `.pubbar` (5), under `.tb` (10) and — since
-   `.main` is a stacking context at 1 — under the sidebar (40/60), `.sb-veil`
-   (55), the palette (100), the dialog veil (110) and the toasts (120). The
-   veil outranks the palette deliberately: dialogs portal out to `.cr`, so a
-   dialog raised by navigating from the palette has to cover the palette. */
 .savebar {
   flex: none; position: relative; z-index: 8;
   padding: 9px 38px; padding-bottom: calc(9px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--line2); background: var(--glass);
   box-shadow: var(--shadow-up); animation: up .24s cubic-bezier(.3, .7, .3, 1) both
 }
-/* 28px of `.content` padding + its 10px reserved gutter, so this column and
-   `.view` resolve to the same rectangle whether or not the cap binds. */
 .savebar-inner { max-width: 1060px; margin: 0 auto; display: flex; align-items: center; gap: 10px }
-/* count chip — holds the `.dot` + the number; `.dot` is currentColor, so it
-   inherits the accent here rather than needing a knob of its own. */
 .savebar-chip {
   display: inline-flex; align-items: center; gap: 6px; flex: none; font-family: var(--mono); font-size: 10px;
   font-weight: 700; color: var(--accT); background: var(--accS); border-radius: 99px; padding: 3px 9px;
@@ -974,27 +803,15 @@ select.sel option { background: var(--card); color: var(--ink) }
 .savebar-txt b { color: var(--ink); font-weight: 600 }
 .savebar-acts { display: flex; align-items: center; gap: 8px; flex: none; margin-left: auto }
 .savebar .btn { white-space: nowrap }
-/* 390px: chip + label keep line one, the three buttons share line two. The
-   `> .btn` fallback keeps it from overflowing if the actions aren't wrapped. */
 @media (max-width: 560px) {
   .savebar-inner { flex-wrap: wrap; row-gap: 8px }
   .savebar-acts { flex: 1 1 100%; margin-left: 0; justify-content: flex-end }
-  /* `auto` basis, not 0: the buttons share the leftover width but never shrink
-     below "Save & Publish"'s own nowrap width, which is what would overflow. */
   .savebar-acts .btn, .savebar-inner > .btn { flex: 1 1 auto; justify-content: center; padding: 8px 10px }
 }
 
-/* ---------- staged rows ----------
-   Diff colours so the bar's count is explainable at a glance: added / edited /
-   deleted. Listed per surface because the row shape differs by page (`.row` on
-   the list pages, `.qcard` on quotes, `.skill` on skills, `.tbl tr` on admin
-   users), and a `tr` can't carry the rail under `border-collapse`, so its first
-   cell does. These sit after `.row:hover` / `.tbl tr:hover td` deliberately —
-   equal specificity, later wins. */
 .row.staged-new, .qcard.staged-new, .skill.staged-new { --stg: var(--good); background: var(--good-soft); box-shadow: inset 2px 0 0 var(--stg) }
 .row.staged-edit, .qcard.staged-edit, .skill.staged-edit { --stg: var(--amber); background: var(--amber-soft); box-shadow: inset 2px 0 0 var(--stg) }
 .row.staged-del, .qcard.staged-del, .skill.staged-del { --stg: var(--bad); background: var(--bad-soft); box-shadow: inset 2px 0 0 var(--stg) }
-/* the quote card paints its own rail over that inset shadow — recolour it too. */
 .qcard.staged-new::before, .qcard.staged-edit::before, .qcard.staged-del::before { background: var(--stg) }
 .tbl tr.staged-new td { background: var(--good-soft) }
 .tbl tr.staged-edit td { background: var(--amber-soft) }
@@ -1002,16 +819,10 @@ select.sel option { background: var(--card); color: var(--ink) }
 .tbl tr.staged-new td:first-child { box-shadow: inset 2px 0 0 var(--good) }
 .tbl tr.staged-edit td:first-child { box-shadow: inset 2px 0 0 var(--amber) }
 .tbl tr.staged-del td:first-child { box-shadow: inset 2px 0 0 var(--bad) }
-/* struck through but still readable — `--dim`, not `.dimmed`'s opacity, and the
-   strike stays off the row's controls so the undo affordance reads normally. */
 .staged-del .row-t, .staged-del .row-m, .staged-del .qtext, .staged-del .qauth, .staged-del .skill-n {
   text-decoration: line-through; text-decoration-thickness: 1px; color: var(--dim)
 }
 
-/* ── Change history ─────────────────────────────────────────────────────────
-   A timeline rather than a table: the question this page answers is "what
-   happened, in what order, and by whom", and a rail with dated groups reads
-   that far faster than five columns of equal weight. */
 .hist-pub { display: flex; align-items: center; gap: 11px; padding: 12px 15px; border: 1px solid var(--line2); border-radius: 10px; background: var(--card); font-size: 13.5px; margin-bottom: 4px }
 .hist-pub i { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--good-soft); color: var(--good); flex: none }
 .hist-pub .sub { color: var(--dim) }
@@ -1021,8 +832,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 
 .hist-ev { display: grid; grid-template-columns: 50px 18px minmax(0, 1fr) auto; align-items: start; width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; font: inherit; color: inherit }
 .hist-time { font-family: var(--mono); font-size: 10.5px; color: var(--faint); padding-top: 15px; white-space: nowrap }
-/* The rail is drawn by the row so it joins up automatically however many
-   events a day holds; the first and last stubs stop it dangling. */
 .hist-rail { position: relative; align-self: stretch; display: flex; justify-content: center }
 .hist-rail::before { content: ""; position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line2) }
 .hist-ev:first-child .hist-rail::before { top: 15px }
@@ -1044,37 +853,21 @@ select.sel option { background: var(--card); color: var(--ink) }
 .hist-diff { display: grid; gap: 7px }
 .hist-field { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11.5px; color: var(--faint) }
 .hist-field b { font-family: var(--mono); font-weight: 500; font-size: 11px; color: var(--dim) }
-/* Stacked, not side by side: the values are sentences, and two narrow columns
-   wrap them into unreadable ribbons. */
 .hist-val { padding: 8px 10px; border-radius: 7px; font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; border-left: 2px solid }
 .hist-val.was { background: var(--bad-soft); border-color: var(--bad) }
 .hist-val.now { background: var(--good-soft); border-color: var(--good) }
 .hist-val em { color: var(--faint) }
 
-/* ── Cat (/cat) ─────────────────────────────────────────────────────────────
-   The one page whose subject moves. Two SiteConfig rows are editable and four
-   surfaces are only documented, so the page has to look like two different
-   kinds of thing at once: config cards that can go dirty, and a ledger that
-   never can. The nap tiles carry their own (private, `.nsp`) stylesheet — see
-   components/cat/nap-stage.tsx. */
-
-/* dirty = amber keyline, on the card that actually changed. Sits after
-   `.card:hover` so it wins at equal specificity. */
 .cat-card.is-dirty, .cat-foot.is-dirty { border-color: var(--amber) }
 
-/* nap length — the number and its shortcuts are one control, so they share a row */
 .cat-secs { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: 16px; align-items: start }
 .cat-secs .f { margin-bottom: 0 }
 .cat-shorts { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 25px }
-/* `.filt` is a filter pill by origin, where a faint keyline is fine. These
-   write a value, so the boundary is raised to --line (3:1) and the label to
-   --dim (4.5:1 in all three themes). */
 .cat-shorts .filt { cursor: pointer; font-variant-numeric: tabular-nums; border-color: var(--line); color: var(--dim) }
 .cat-shorts .filt:hover:not(:disabled) { color: var(--ink) }
 .cat-shorts .filt[aria-pressed='true'] { border-color: var(--c1); color: var(--accT); background: var(--accS) }
 .cat-shorts .filt:disabled { opacity: .45; cursor: default }
 
-/* the sentence that reads both cards back as one behaviour */
 .cat-say {
   margin-top: 16px; padding: 12px 14px; border-radius: var(--r2); background: var(--bg1);
   border: 1px solid var(--line2); font-size: 12.5px; line-height: 1.75; color: var(--dim); max-width: 76ch
@@ -1085,7 +878,6 @@ select.sel option { background: var(--card); color: var(--ink) }
   background: var(--accS); border-radius: 5px; padding: 1px 6px; white-space: nowrap
 }
 
-/* one save row for both config cards — never two on a page */
 .cat-foot {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
   padding: 10px 14px; border: 1px solid var(--line2); border-radius: var(--r3);
@@ -1093,7 +885,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 }
 .cat-foot-note { display: flex; align-items: center; gap: 7px; margin-right: auto; font-size: 12px; color: var(--dim) }
 
-/* surfaces — documentation rows, so they read as prose rather than as list items */
 .cat-surf .row { align-items: flex-start; padding: 13px 14px }
 .cat-glyph {
   width: 30px; height: 30px; flex: none; margin-top: 1px; border-radius: var(--r1);
@@ -1108,7 +899,6 @@ select.sel option { background: var(--card); color: var(--ink) }
   text-transform: uppercase; color: var(--dim); border: 1px dashed var(--line); border-radius: 99px; padding: 4px 10px
 }
 
-/* facts — a ledger; the key column is fixed so the values line up */
 .cat-facts { display: flex; flex-direction: column }
 .cat-fact {
   display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 14px;
@@ -1133,15 +923,6 @@ select.sel option { background: var(--card); color: var(--ink) }
   .cat-fact { grid-template-columns: 1fr; gap: 5px }
 }
 
-/* ══ SHARED · added once, by the shell ══════════════════════════════════════
-   Three families every section page draws from. They live here rather than in
-   each page so the regrouped admin reads as one product: the same strip under
-   every header, the same treatment for a value a section shows but does not
-   own, the same footer under every self-saving config card.
-   Per-page families (.cat-*, .abt-*, .hro-*, .ctc-*) go after this block. */
-
-/* ── Skip link ──────────────────────────────────────────────────────────────
-   Eighteen nav rows stand between the tab ring and the page. */
 .skip {
   position: fixed; top: 10px; left: 10px; z-index: 200;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--r2);
@@ -1150,22 +931,10 @@ select.sel option { background: var(--card); color: var(--ink) }
 }
 .skip:focus { transform: none }
 
-/* ── Command palette rows ───────────────────────────────────────────────────
-   The ordinal and the group heading come straight from nav.ts, so a row in the
-   palette is recognisably the same row as in the sidebar. */
 .pal-n { font-family: var(--mono); font-size: 9px; color: var(--dim); width: 24px; flex: none; text-align: right }
 .pal-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .pal-w { font-family: var(--mono); font-size: 9px; letter-spacing: .08em; color: var(--faint); margin-left: 9px }
 
-/* ── Section strip ──────────────────────────────────────────────────────────
-   Sits directly under the page header on the ten page-order routes and answers
-   three questions at a glance: which band of the site this is, where to look at
-   it live, and what else it quietly changes.
-
-   The mark is the section-identity device — there is deliberately no per-section
-   hue, because three themes make a hue system a liability and --ch1..--ch4 are
-   spoken for by the chart series. It must stay on --card: --faint is 2.77:1 on
-   --bg2 in light mode, and light is the theme the app boots into. */
 .sec-strip {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   background: var(--card); border: 1px solid var(--line2); border-radius: var(--r3);
@@ -1182,18 +951,12 @@ select.sel option { background: var(--card); color: var(--ink) }
 }
 .sec-anchor a { display: inline-flex; align-items: center; gap: 5px; border-bottom: 1px solid transparent }
 .sec-anchor a:hover { color: var(--ink); border-bottom-color: var(--line) }
-/* Zero to three chips naming sections this page silently changes — the honesty
-   tax on a strict one-page-per-section split. */
 .sec-reach { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto }
 .sec-reach .chip { font-size: 10px }
 @media (max-width: 640px) {
   .sec-reach { margin-left: 0 }
 }
 
-/* ── Borrowed values ────────────────────────────────────────────────────────
-   A key or row a section renders but another section owns. Never an input and
-   never disabled-looking: a disabled field says "you can't", this says "not
-   here — there", and points at the page that can. */
 .borrowed {
   display: flex; align-items: center; gap: 10px; padding: 11px 14px;
   border-bottom: 1px solid var(--line2); font-size: 13px; min-width: 0
@@ -1212,10 +975,6 @@ select.sel option { background: var(--card); color: var(--ink) }
 }
 .borrowed-go:hover { text-decoration: underline }
 
-/* ── Config card ────────────────────────────────────────────────────────────
-   The second of the admin's two save affordances. Staged tables commit through
-   the save bar and show nothing local; a config card writes SiteConfig on its
-   own, so it says so in its own footer and never borrows the bar's language. */
 .card.cfg-dirty { border-color: var(--amber) }
 .cfg-foot {
   display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
@@ -1227,24 +986,9 @@ select.sel option { background: var(--card); color: var(--ink) }
   color: var(--ambT); background: var(--amber-soft); border-top: 1px solid var(--line2)
 }
 .cfg-err svg { flex: none; margin-top: 1px }
-/* A stack of labelled fields inside a card body, at the row rhythm the tables
-   use, so a config page and a table page scan at the same speed. */
 .cfg-rows { display: grid; gap: 14px }
 .cfg-rows > .f { gap: 6px }
 
-/* ── About · section 02 ─────────────────────────────────────────────────────
-   Two routes, one place. `/about` holds the rows (bio paragraphs, education);
-   `/terminal` is the read-only reference for the shell those rows print inside.
-   Nothing in the data links them — the terminal has no model — so this family
-   is what makes them read as one section: the same tab pair, the same numbered
-   block rules, the same footer, in the same positions on both pages.
-
-   Everything resolves through existing tokens. `--well` is the one exception
-   worth naming: it exists only on the two dark themes, so every use here
-   carries the light-mode fallback `var(--bg1)` rather than collapsing to
-   transparent. */
-
-/* section nav — /about ⇄ /terminal */
 .abt-nav { display: flex; align-items: stretch; gap: 2px; margin: 0 0 18px; border-bottom: 1px solid var(--line2) }
 .abt-tab {
   display: inline-flex; align-items: baseline; gap: 8px; padding: 8px 12px 10px;
@@ -1253,21 +997,15 @@ select.sel option { background: var(--card); color: var(--ink) }
 }
 .abt-tab:hover { color: var(--ink); background: var(--bg1) }
 .abt-tab.on { color: var(--ink); font-weight: 650 }
-/* Sits ON the container's hairline rather than under it, so the active route
-   physically joins the page below the strip. */
 .abt-tab.on::after {
   content: ''; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px;
   border-radius: 99px 99px 0 0; background: var(--c1)
 }
 .abt-tab-g { font-family: var(--mono); font-size: 10px; letter-spacing: .04em; color: var(--faint); flex: none }
 .abt-tab.on .abt-tab-g { color: var(--c1) }
-/* `--dim`, not `--faint`: this rides the tab's `--bg1` hover fill, where light
-   mode's --faint measures under 4.5:1 for 9.5px type. */
 .abt-tab-s { font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); flex: none }
 @media (max-width: 560px) { .abt-tab-s { display: none } }
 
-/* masthead — About's table of contents, written in the section's own idiom.
-   Four commands, their live answers, and a link to whatever changes each one. */
 .abt-shell {
   border: 1px solid var(--line2); border-radius: var(--r3); overflow: hidden;
   background: var(--well, var(--bg1)); margin-bottom: 4px
@@ -1287,20 +1025,14 @@ a.abt-l:hover { background: var(--bg2) }
 .abt-l .cmd-prompt { flex: none }
 .abt-l-static { opacity: .8 }
 .abt-out { color: var(--dim); min-width: 0 }
-/* `--dim` even though it is decorative and aria-hidden: --faint on the light
-   theme's --bg1 is 3.0:1, under the floor this 12px glyph would need. */
 .abt-arrow { color: var(--dim) }
 .abt-go {
   margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 5px;
   font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim)
 }
 a.abt-l:hover .abt-go { color: var(--accT) }
-/* The real terminal draws an OUTLINE caret when nothing is focused, which is
-   exactly this pane's state — so no blink, and no new keyframe. */
 .abt-caret { display: inline-block; width: 7px; height: 12px; border: 1px solid var(--dim); border-radius: 1px; transform: translateY(1px) }
 
-/* numbered block rule — the rhythm both routes share. Kept outside the cards so
-   the two staged tables keep their markup, and their staging behaviour, exactly. */
 .abt-h { margin: 26px 0 10px }
 .abt-h-r { display: flex; align-items: center; gap: 10px }
 .abt-h-r::after { content: ''; flex: 1; height: 1px; background: var(--line2) }
@@ -1311,10 +1043,8 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   font-family: var(--mono); font-size: 11px; background: var(--bg1);
   border: 1px solid var(--line2); border-radius: 5px; padding: 1px 5px; color: var(--ink)
 }
-/* Jump targets for the masthead links; clears the block rule above the card. */
 .abt-anchor { scroll-margin-top: 20px }
 
-/* read-only banner — the state this page is permanently in */
 .abt-ro {
   display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px; margin-bottom: 12px;
   border: 1px solid var(--line2); border-radius: var(--r2); background: var(--bg1);
@@ -1325,9 +1055,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 
 .abt-facts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px }
 
-/* Entrance stagger — four steps, then flat, per the motion budget. The global
-   reduced-motion rule kills `animation` outright, and with it the `both` fill,
-   so the blocks simply render in place. */
 .abt-stag > * { animation: up .3s cubic-bezier(.3, .7, .3, 1) both }
 .abt-stag > *:nth-child(2) { animation-delay: .06s }
 .abt-stag > *:nth-child(3) { animation-delay: .12s }
@@ -1341,21 +1068,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .abt-foot-l { color: var(--accT); font-weight: 550; text-decoration: underline; text-underline-offset: 2px }
 .abt-foot-l:hover { text-decoration-thickness: 2px }
 
-/* ══ WORK SECTIONS ═══════════════════════════════════════════════════════════
-   Skills · Experience · Projects · Blogs · Thought of the day · Site chrome.
-
-   Own block, own prefixes (.wk- .skl- .xpr- .prj- .blg- .tod- .chr-). The
-   shared families the regroup introduced — .sec-*, .cfg-*, .borrowed — are
-   declared once, further up, and nothing here redefines them. Every colour
-   resolves through a token; the only literals are the site's own category
-   accents, passed in as `--cat` from the component that already mirrors
-   apps/web/app/lib/skill-meta.ts, and they are never used to carry text. */
-
-/* ---------- shared by these six pages ---------- */
-
-/* A figure strip that reads as instrumentation rather than as a stat card:
-   it belongs to the card it heads, so it sits inside `.card` above the list
-   and shares that card's keyline instead of floating as its own surface. */
 .wk-meter { display: flex; align-items: center; gap: 0 18px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--line2) }
 .wk-fig { display: flex; align-items: baseline; gap: 7px; min-width: 0 }
 .wk-fig b { font-family: var(--disp); font-size: 19px; font-weight: 650; letter-spacing: -.025em; line-height: 1 }
@@ -1363,24 +1075,15 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .wk-fig span { font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); white-space: nowrap }
 .wk-meter .sp { flex: 1 }
 
-/* Card entrance stagger — four steps, 60ms, on the existing `up` keyframe.
-   Beyond the fourth the delay stops reading as rhythm and starts reading as
-   lag, so the ladder deliberately stops there. */
 .wk-in { animation: up .28s cubic-bezier(.3, .7, .3, 1) both }
 .wk-in.s1 { animation-delay: .06s }
 .wk-in.s2 { animation-delay: .12s }
 .wk-in.s3 { animation-delay: .18s }
 
-/* Rule with a mono cap — the divider these pages use to say "the site cuts
-   here": the projects fold, the experience bullet fold, the blog groups. */
 .wk-cut { display: flex; align-items: center; gap: 10px; margin: 16px 0 10px; font-family: var(--mono); font-size: 9.5px; letter-spacing: .15em; text-transform: uppercase; color: var(--faint) }
 .wk-cut::after { content: ''; flex: 1; height: 1px; background: var(--line2) }
 .wk-cut .n { color: var(--dim) }
 
-/* ---------- 03 · Skills ----------
-   The site renders one continuous grid in sortOrder and treats category as a
-   *filter*, so the admin does the same: one draggable sequence, dimmed by the
-   legend, rather than category folders that would make a drag mean nothing. */
 .skl-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 11px 16px; border-bottom: 1px solid var(--line2) }
 .skl-chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px;
@@ -1389,15 +1092,12 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 }
 .skl-chip:hover { border-color: var(--line); color: var(--ink) }
 .skl-chip[aria-pressed="true"] { border-color: var(--line); background: var(--bg1); color: var(--ink); font-weight: 600 }
-/* Decorative only: the accent identifies the cluster, the label carries it. */
 .skl-chip i { width: 7px; height: 7px; border-radius: 99px; background: var(--cat, var(--faint)); flex: none }
 .skl-chip[aria-pressed="true"] i { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cat, var(--faint)) 22%, transparent) }
 .skl-chip b { font-weight: 500; color: var(--faint) }
 .skl-chip[aria-pressed="true"] b { color: var(--dim) }
 
 .skill.skl-el { position: relative; padding-top: 9px }
-/* The site's own resting chrome on a periodic-table card: one accent hairline
-   across the top and nothing else. Same device, admin scale. */
 .skl-el::after {
   content: ''; position: absolute; left: 11px; right: 11px; top: 0; height: 2px;
   border-radius: 0 0 99px 99px; background: var(--cat, var(--faint)); opacity: .55
@@ -1406,7 +1106,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .skill.hid.skl-mute { opacity: .16 }
 .skl-sym { font-family: var(--mono); font-size: 9px; color: var(--faint); letter-spacing: .04em }
 
-/* ---------- 04 · Experience ---------- */
 .xpr-mark {
   width: 38px; height: 38px; border-radius: 10px; flex: none; overflow: hidden;
   border: 1px solid var(--line2); background: var(--bg1); display: grid; place-items: center
@@ -1417,13 +1116,9 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .xpr-b { position: relative; padding-left: 15px; font-size: 13px; line-height: 1.6; color: var(--dim) }
 .xpr-b::before { content: ''; position: absolute; left: 2px; top: .62em; width: 4px; height: 4px; border-radius: 99px; background: var(--faint) }
 .xpr-b b { color: var(--ink); font-weight: 600 }
-/* Below the site's own fold — legible, but visibly a second tier. */
 .xpr-b.fold { color: var(--faint) }
 .xpr-b.fold b { color: var(--dim) }
 
-/* ---------- 05 · Projects ----------
-   The site opens with three cards and folds the rest, so the fold is drawn
-   through the grid rather than described in a hint nobody reads. */
 .proj-grid > .wk-cut { grid-column: 1 / -1; margin: 4px 0 0 }
 .prj-feat .pcover { border-bottom-color: color-mix(in srgb, var(--c1) 40%, var(--line2)) }
 .prj-feat .pnum { color: var(--accT); border-color: color-mix(in srgb, var(--c1) 40%, transparent) }
@@ -1434,16 +1129,12 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   border: 1px solid var(--line2); backdrop-filter: blur(6px)
 }
 
-/* ---------- 06 · Blogs ---------- */
 .blg-thumb {
   width: 54px; height: 36px; border-radius: 7px; flex: none;
   border: 1px solid var(--line2); background: var(--bg2) center / cover no-repeat
 }
 .blg-thumb.none { display: grid; place-items: center; color: var(--faint); border-style: dashed }
 
-/* ---------- 07 · Thought of the day ----------
-   The rotation rule is the section, so it gets the page's largest object: a
-   day dial and the two picks either side of it. */
 .tod-ledger { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) }
 .tod-cell { padding: 15px 17px; border-right: 1px solid var(--line2); min-width: 0 }
 .tod-cell:last-child { border-right: none }
@@ -1459,12 +1150,8 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   .tod-cell { border-right: none; border-bottom: 1px solid var(--line2) }
   .tod-cell:last-child { border-bottom: none }
 }
-/* Tomorrow's pick, on the same rail device as today's. */
 .qcard.tod-next::before { background: var(--amber) }
 
-/* ---------- Site chrome ----------
-   The pane keeps the public site's palette, so these two strips are the only
-   place in the admin that hard-codes the site's own ink. */
 .chr-strip { border-radius: 10px; border: 1px solid rgba(255, 255, 255, .1); padding: 9px 12px }
 .chr-nav { display: flex; align-items: center; gap: 14px }
 .chr-word { font-weight: 700; font-size: 12px; letter-spacing: -.01em }
@@ -1472,21 +1159,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .chr-toggles { display: flex; gap: 6px; margin-left: auto }
 .chr-toggles span { width: 15px; height: 15px; border-radius: 99px; border: 1px solid rgba(255, 255, 255, .16); display: grid; place-items: center; font-size: 8px }
 
-/* ══ HERO · section 01 — and CONTACT · section 08 ═════════════════════════════
-   Two pages, one block, own prefixes (.hro- .ctc-). The shared families the
-   regroup introduced — .sec-*, .cfg-*, .borrowed — are declared further up and
-   nothing here redefines them. Every colour resolves through a token.
-
-   Both pages are long: Hero carries a version switch, three staged tables, five
-   SiteConfig fields, a résumé form and a preview; Contact carries a staged
-   table, three fields, the contribution tile and a preview. Without a rhythm
-   they read as a dump, so the numbered block strip below is doing structural
-   work, not decoration. */
-
-/* ---------- the numbered block strip ----------
-   One ordinal, one name, one aside, and a rule out to the margin. Rendered at
-   the same weight as `.hist-day` so a reader who knows the change log already
-   knows what this is: a divider that names what follows. */
 .hro-page, .ctc-page { display: grid; gap: 12px }
 .hro-blk, .ctc-blk { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 10px }
 .hro-page > .hro-blk:first-child, .ctc-page > .ctc-blk:first-child { margin-top: 0 }
@@ -1499,10 +1171,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .hro-blk-m, .ctc-blk-m { font-size: 11.5px; color: var(--faint); min-width: 0 }
 .hro-blk i, .ctc-blk i { flex: 1; min-width: 24px; height: 1px; background: var(--line2) }
 
-/* ---------- 01 · version ----------
-   The old control was a pair of `.filt` pills carrying two unrelated facts at
-   once — which version you are editing, and which one visitors get. Split here:
-   the tile is the tab, the chip and the dot are the site. */
 .hro-vers { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line2) }
 .hro-ver {
   display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--card);
@@ -1519,34 +1187,23 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .hro-ver-st { font-size: 12.5px; color: var(--dim) }
 .hro-ver-st.live { color: var(--goodT); font-weight: 600 }
 .hro-ver-c { font-family: var(--mono); font-size: 10px; letter-spacing: .04em; color: var(--faint) }
-/* --faint is 2.77:1 on a tint in light mode, and light is the theme the app
-   boots into — so the moment this tile gains a background, the count steps up. */
 .hro-ver:hover .hro-ver-c, .hro-ver.on .hro-ver-c { color: var(--dim) }
 .hro-ver .dot { margin-left: auto; flex: none }
 @media (max-width: 620px) { .hro-vers { grid-template-columns: 1fr } }
 
-/* The one place on the page that can say "this cannot ship yet". Amber, not
-   red: nothing is broken, the flip is simply blocked until a title exists. */
 .hro-warn {
   display: flex; align-items: flex-start; gap: 8px; padding: 10px 16px;
   border-top: 1px solid var(--line2); background: var(--amber-soft);
   color: var(--ambT); font-size: 12.5px; line-height: 1.5
 }
 
-/* Which version the card below is scoped to — a label, never a control. */
 .hro-scope {
   font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase;
   color: var(--faint)
 }
 
-/* Copy, titles and badges are one hero: tighter than the block gap so they read
-   as one object with three parts. */
 .hro-stack { display: grid; gap: 8px }
 
-/* ---------- 03 · the photo deck ----------
-   `heroPhotos`' first editor anywhere. It is a list, not a text box, because
-   the stored value is one comma-separated row and typing commas by hand is how
-   a path silently becomes two broken ones. */
 .hro-ph { display: grid; gap: 8px }
 .hro-ph-row { display: flex; align-items: center; gap: 10px }
 .hro-ph-row .in { flex: 1; min-width: 0 }
@@ -1567,10 +1224,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .hro-ph-empty span { font-size: 12px; max-width: 34ch }
 .hro-ph-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px }
 
-/* ---------- 04 · the contribution tile ----------
-   Contact's signature object. The archive lives in Postgres and only the site
-   writes it, so everything here is a readout — the one control is the refresh,
-   and it asks the site to go and look rather than editing anything. */
 .ctc-figs {
   display: flex; align-items: baseline; gap: 0 26px; flex-wrap: wrap;
   padding: 14px 16px; border-bottom: 1px solid var(--line2)
@@ -1589,8 +1242,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 }
 .ctc-bars:hover i { opacity: .55 }
 .ctc-bars i:hover { opacity: 1 }
-/* A week the archive cannot vouch for is a gap, never a zero — a zero would
-   claim a quiet week that may simply never have been captured. */
 .ctc-bars i.gap { height: 2px; background: var(--line); opacity: 1; border-radius: 99px }
 .ctc-weeks figcaption {
   display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px;
@@ -1601,12 +1252,10 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   padding: 12px 16px; border-top: 1px solid var(--line2); background: var(--bg1)
 }
-/* `.ctc-foot` is a tinted band, so both strings on it take --dim, not --faint. */
 .ctc-asof { margin-left: auto; font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; color: var(--dim) }
 .ctc-refresh { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; min-width: 0 }
 .ctc-refresh-m { font-size: 11.5px; color: var(--dim); max-width: 52ch }
 
-/* 03 · the two halves of one message, and where the other half of it shows up. */
 .ctc-mirror {
   display: flex; align-items: center; gap: 8px; padding: 11px 16px;
   font-size: 12px; color: var(--dim)
@@ -1615,13 +1264,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   content: ''; width: 5px; height: 5px; border-radius: 99px; background: var(--faint); flex: none
 }
 
-/* ---------- notes · the vault shell ----------
-   The vault is an instrument, not a reading view, so it declines `.content`'s
-   reading gutter and takes the whole box. `.content` is already
-   `position: relative`, so `inset: 0` resolves against its padding box — the
-   visible area minus the reserved scrollbar gutters — and, being out of flow,
-   leaves `.content` nothing to scroll. That is the point: a tree beside a
-   document wants two scrollers, not one that drags both. */
 .nt {
   position: absolute; inset: 0; min-height: 0;
   display: grid; grid-template-columns: 278px minmax(0, 1fr)
@@ -1636,30 +1278,16 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   color: var(--faint); background: var(--card); border: 1px solid var(--line2); border-radius: var(--r1);
   cursor: text; transition: border-color .13s, box-shadow .13s
 }
-/* The same ring `.in:focus` gets. A border that merely changes colour is the
-   one focus state in this sheet you can miss at a glance, and this box is the
-   keyboard's first stop — `/` lands here from anywhere in the section. */
 .nt-filter:focus-within { border-color: var(--c1); box-shadow: 0 0 0 3px var(--accS) }
 .nt-filter > svg { flex: none; pointer-events: none; transition: color .13s }
-/* Lit while the filter is doing something, so a tree hiding most of its rows is
-   never a tree that looks broken. */
 .nt-filter.on > svg { color: var(--accT) }
 .nt-filter input { flex: 1; min-width: 0; border: none; background: none; outline: none; font-size: 13px; color: var(--ink) }
-/* `.cr :focus-visible` outranks the `outline: none` above, so the input drew a
-   second ring inside the box's own. The focus belongs to the whole control —
-   the icon and the clear button are part of it — so the outer ring is the one
-   that stays. */
 .nt-filter input:focus-visible { outline: none }
 .nt-filter input::placeholder { color: var(--faint) }
-/* WebKit draws its own clear button inside type="search", at its own size and
-   in its own grey. Removed so the control looks the same in every browser and
-   the one below is the only one. */
 .nt-filter input::-webkit-search-cancel-button,
 .nt-filter input::-webkit-search-decoration { -webkit-appearance: none; appearance: none }
 .nt-filter-x { flex: none; padding: 2px; border-radius: 5px; color: var(--faint); display: inline-flex; transition: color .13s, background .13s }
 .nt-filter-x:hover { color: var(--ink); background: var(--bg2) }
-/* The match line carries a live count and two affordances (see-all, a sample
-   query) rather than a number nobody can act on. */
 .nt-count { flex: none; min-height: 18px; padding: 4px 14px; font-family: var(--mono); font-size: 9.5px; line-height: 1.5; color: var(--faint) }
 .nt-count button { font-family: var(--mono); font-size: 9.5px; color: var(--accT) }
 .nt-count button:hover { text-decoration: underline }
@@ -1668,15 +1296,9 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-foot { flex: none; padding: 8px; border-top: 1px solid var(--line2) }
 .nt-empty { padding: 26px 16px; text-align: center; font-size: 12.5px; line-height: 1.6; color: var(--faint) }
 .nt-pane { min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: 22px 30px 72px }
-/* No inner wrapper ships between the pane and a page, so the frame is capped
-   here. Capping the scroller itself would park the scrollbar in the middle of
-   the column. */
 .nt-pane > * { width: 100%; max-width: 860px; margin-inline: auto }
 
-/* ---------- notes · tree ---------- */
 .nt-tree { outline: none }
-/* One hairline threading a whole nested run, so an indent reads as descent
-   rather than as three unexplained gaps. */
 .nt-group { margin-left: 14px; padding-left: 5px; border-left: 1px solid var(--line2) }
 .nt-item { outline: none }
 .nt-row {
@@ -1689,44 +1311,18 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-ic { width: 15px; flex: none; text-align: center; font-size: 13px; opacity: .8 }
 .nt-tx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .nt-n { font-family: var(--mono); font-size: 9.5px; color: var(--faint); flex: none }
-/* Transparent, never absent: `visibility` or `display` would pull the grip out
-   of the tab order, and the keyboard drives half of this tree. `:focus-within`
-   sits on the row and not on the item on purpose — it walks upward, so on the
-   item it would light the grip of every ancestor of whatever is focused. The
-   third hook is the roving-tabindex row, which is "the focused row" even while
-   the caret is parked in the filter box. */
 .nt-gr { flex: none; padding: 0 2px; border-radius: 5px; font-size: 13px; color: var(--faint); opacity: 0; transition: opacity .12s, color .12s }
 .nt-row:hover .nt-gr, .nt-row:focus-within .nt-gr, .nt-item.kfoc > .nt-row .nt-gr { opacity: .85 }
 .nt-gr:hover, .nt-gr:focus-visible { opacity: 1; color: var(--ink) }
-/* Selection and focus are independent facts about a row and are routinely both
-   true — selection is which note is open, focus is where the arrow keys are —
-   so they are kept on different properties and compose: the fill says "open",
-   the ring says "here". */
 .nt-item.sel > .nt-row { background: var(--accS); color: var(--accT); font-weight: 500 }
 .nt-item.sel > .nt-row .nt-ic { opacity: 1; color: var(--c1) }
-/* 2.4.11 asks for >=3:1 against what the ring actually touches, and on a
-   selected row that is two different colours: `--accS` inside it and the pane's
-   `--bg` outside. Measured on both — `--c1` over `--accS` is 4.4:1 in light and
-   6.3:1 / 7.5:1 in the two darks; over `--bg` it is 4.9 / 7.5 / 9.4. `outline`
-   rather than a shadow so the ring survives forced-colors mode, and the row is
-   raised so an inset ring is never painted under the next one. */
 .nt-item.kfoc > .nt-row { outline: 2px solid var(--c1); outline-offset: -2px; z-index: 1 }
 .nt-hit { background: var(--amber-soft); color: var(--ambT); border-radius: 3px; padding: 0 1px }
-/* `display: none` is the right answer for a row the filter rejected. It is the
-   wrong answer for a folder kept only so a matching child still has a parent:
-   that row is context *and* a live target, so it steps down to --faint and
-   keeps its full hit area. No opacity on top of the token — --faint is already
-   this file's quiet floor (3.1:1 in light), and fading it further would put a
-   clickable label under the line. */
 .nt-item.hid { display: none }
 .nt-item.anc > .nt-row { color: var(--faint) }
 .nt-item.anc > .nt-row .nt-ic { opacity: .5 }
 .nt-item.anc > .nt-row:hover, .nt-item.anc.kfoc > .nt-row { color: var(--ink) }
 .nt-item.anc > .nt-row:hover .nt-ic, .nt-item.anc.kfoc > .nt-row .nt-ic { opacity: .8 }
-/* Move mode draws its rings with `box-shadow`. A row has exactly one `outline`
-   and it belongs to keyboard focus — which is precisely the state a keyboard
-   move puts a row in, so the two would overwrite each other. The mockup's
-   dashed edge went with it; `box-shadow` cannot dash. */
 .nt-item.grab > .nt-row { background: var(--amber-soft); color: var(--ambT); box-shadow: inset 0 0 0 1px var(--amber) }
 .nt-item.drop > .nt-row { background: var(--good-soft); color: var(--goodT); box-shadow: inset 0 0 0 1px var(--good) }
 .nt-inline { display: flex; align-items: center; gap: 6px; padding: 3px 7px }
@@ -1736,7 +1332,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   background: var(--card); border: 1px solid var(--c1); border-radius: 6px; outline: none
 }
 
-/* ---------- notes · reader ---------- */
 .nt-crumb {
   display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-bottom: 14px;
   font-family: var(--mono); font-size: 11px; color: var(--faint)
@@ -1769,15 +1364,9 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 }
 .nt-conf { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--faint) }
 .nt-dots { font-size: 14px; letter-spacing: 2px; cursor: pointer }
-/* The text-tone tokens, not the raw hues: `--good` and `--amber` are tuned for
-   fills and land at ~3:1 on light `--bg`, and this is a control somebody reads
-   before they click it. */
 .nt-dots.lo { color: var(--bad) }
 .nt-dots.mid { color: var(--ambT) }
 .nt-dots.hi { color: var(--goodT) }
-/* Measure belongs to the prose, not to the frame: the pane is capped at 860px
-   because the actions row and the sibling strip want the width, and the answer
-   is capped again here because 860px of 14.5px text is ~95 characters. */
 .nt-answer { max-width: 70ch; border-top: 1px solid var(--line2); padding-top: 16px; font-size: 14.5px; line-height: 1.75; color: var(--ink) }
 .nt-answer p { margin-bottom: 13px }
 .nt-answer p:last-child { margin-bottom: 0 }
@@ -1788,24 +1377,15 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-answer li:last-child { margin-bottom: 0 }
 .nt-answer li::marker { color: var(--faint) }
 .nt-answer blockquote { margin: 14px 0; padding: 2px 0 2px 14px; border-left: 2px solid var(--line); color: var(--dim) }
-/* Underlined, not merely tinted. `.cr a` strips decoration app-wide, and in a
-   wall of prose the tint is the one cue a colour-blind reader does not get. */
 .nt-answer a { color: var(--accT); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px }
 .nt-answer a:hover { text-decoration-thickness: 2px }
 .nt-answer code { font-family: var(--mono); font-size: 12.5px; background: var(--bg2); border-radius: 4px; padding: 1px 5px }
-/* No `pre-wrap`: a reflowed line is a lie about where the code breaks, so long
-   lines scroll inside the block instead. */
 .nt-answer pre {
   margin: 14px 0; padding: 13px 15px; font-family: var(--mono); font-size: 12.5px; line-height: 1.65;
   color: var(--dim); background: var(--bg1); border: 1px solid var(--line2); border-radius: var(--r2);
   overflow-x: auto
 }
 .nt-answer pre code { background: none; padding: 0; font-size: inherit }
-/* ---------- notes · answer blocks ----------
-   The three `:::` containers renderMarkdown emits. No JavaScript reaches any of
-   them: `details` is the browser's accordion, and the quiz's right/wrong marks
-   are `:checked` selectors — which is what lets the reader stay a server
-   component and the revise deck render the identical markup on the client. */
 .nt-q { margin: 16px 0; padding: 14px 16px; background: var(--bg1); border: 1px solid var(--line2); border-radius: var(--r2) }
 .nt-q-ask { font-weight: 500; margin-bottom: 11px }
 .nt-q-opts { display: flex; flex-direction: column; gap: 7px }
@@ -1814,8 +1394,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   border: 1px solid var(--line2); background: var(--card); cursor: pointer; transition: border-color .13s, background .13s
 }
 .nt-q-o:hover { border-color: var(--line) }
-/* Off-screen rather than `display: none`: the input still has to take focus and
-   answer the space bar, which is the whole keyboard story for this control. */
 .nt-q-o input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0 }
 .nt-q-o:has(input:focus-visible) { outline: 2px solid var(--c1); outline-offset: 2px }
 .nt-q-box {
@@ -1824,9 +1402,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 }
 .nt-q-o input[type="checkbox"] ~ .nt-q-box { border-radius: 5px }
 .nt-q-t { flex: 1; min-width: 0 }
-/* The verdict. Marking wrong on every checked option and then overriding it for
-   the correct ones keeps the answer out of the markup's reading order — it is a
-   pair of selectors, not a label anyone can see before they choose. */
 .nt-q-o input:checked ~ .nt-q-box { border-color: var(--bad); background: var(--bad-soft) }
 .nt-q-o input:checked ~ .nt-q-t::after { content: ' ✕'; color: var(--bad); font-weight: 600 }
 .nt-q-o.ok input:checked ~ .nt-q-box { border-color: var(--good); background: var(--good-soft) }
@@ -1881,7 +1456,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-acts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--line2) }
 .nt-stamp { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint) }
 
-/* ---------- notes · editor ---------- */
 .nt-field { margin-bottom: 14px }
 .nt-lb { display: block; margin-bottom: 6px; font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint) }
 .nt-in, .nt-ta {
@@ -1889,17 +1463,10 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   background: var(--card); border: 1px solid var(--line); border-radius: var(--r1);
   transition: border-color .15s, box-shadow .15s
 }
-/* Deliberately no `outline: none` here, unlike `.in`: the tinted ring below is
-   ~1.2:1 against the field and cannot be the whole focus indicator, so
-   `.cr :focus-visible` is left to draw the real one on top. */
 .nt-in:focus, .nt-ta:focus { border-color: var(--c1); box-shadow: 0 0 0 3px var(--accS) }
 .nt-ta { font-family: var(--mono); font-size: 13px; line-height: 1.7; min-height: 240px; resize: vertical }
 .nt-hint { margin-top: 5px; font-family: var(--mono); font-size: 10px; color: var(--faint) }
 
-/* ---------- notes · scroll advance ----------
-   The strip under everything else: overscrolling at the bottom fills the bar
-   and follows `next`. Styled to the sibling strip's vocabulary — same border,
-   same mono label — so it reads as furniture, not a feature. */
 .nt-adv { margin-top: 26px; padding-top: 13px; border-top: 1px solid var(--line2) }
 .nt-adv-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 9px }
 .nt-adv-lb { flex: none; font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint) }
@@ -1913,9 +1480,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-adv-end { padding-bottom: 2px; text-align: center }
 .nt-dirty { font-family: var(--mono); font-size: 10px; color: var(--ambT); background: var(--amber-soft); border-radius: 5px; padding: 2px 7px }
 
-/* ---------- notes · folder overview ---------- */
-/* The tiles have no class of their own — the strip owns its children so a
-   folder header stays three numbers and not three components. */
 .nt-stat { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 18px }
 .nt-stat > div { min-width: 92px; padding: 9px 13px; background: var(--bg1); border-radius: var(--r1) }
 .nt-sv { font-family: var(--disp); font-size: 19px; font-weight: 600; letter-spacing: -.02em }
@@ -1931,7 +1495,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-lt { flex: 1; min-width: 0; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .nt-lm { flex: none; font-family: var(--mono); font-size: 10px; color: var(--faint) }
 
-/* ---------- notes · revise ---------- */
 .nt-rev { max-width: 580px; margin: 0 auto; padding: 40px 0 }
 .nt-rev-top { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; font-family: var(--mono); font-size: 10.5px; color: var(--faint) }
 .nt-rev-top span:last-child { margin-left: auto }
@@ -1950,18 +1513,12 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   background: var(--card); border: 1px solid var(--line); border-radius: var(--r1);
   transition: color .14s, border-color .14s
 }
-/* Keyed to position rather than to a `data-v`, because the row *is* the scale:
-   Again / Shaky / Good / Solid, in that order, or the colours lie. */
 .nt-rev-btn:nth-child(1):hover { color: var(--bad); border-color: var(--bad) }
 .nt-rev-btn:nth-child(2):hover { color: var(--ambT); border-color: var(--amber) }
 .nt-rev-btn:nth-child(3):hover { color: var(--goodT); border-color: var(--goodT) }
 .nt-rev-btn:nth-child(4):hover { color: var(--goodT); border-color: var(--good) }
 .nt-rev-kb { margin-top: 14px; text-align: center; font-family: var(--mono); font-size: 10px; color: var(--faint) }
 
-/* ---------- notes · search ----------
-   Head and body carry vertical rhythm only: `.nt-pane` already owns the
-   horizontal gutter and the 860px measure, and a second one here would inset
-   the results twice. */
 .nt-sr-head { padding-bottom: 2px }
 .nt-sr-box {
   display: flex; align-items: center; gap: 10px; padding: 11px 14px; color: var(--faint);
@@ -1976,8 +1533,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-sr-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 10px; font-family: var(--mono); font-size: 10.5px; color: var(--faint) }
 .nt-sr-meta button { padding: 2px 7px; font-family: var(--mono); font-size: 10.5px; color: var(--dim); border: 1px solid var(--line2); border-radius: 5px }
 .nt-sr-meta button:hover { border-color: var(--c1); color: var(--accT) }
-/* A filter the parser could not place. Named, not swallowed — silently dropping
-   `conf:<=2` is how you come to trust a result set that never applied it. */
 .nt-bad { color: var(--bad) }
 .nt-qf { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px }
 .nt-qf button {
@@ -2026,7 +1581,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-tg.on { background: var(--accS); color: var(--accT) }
 .nt-cf { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--faint) }
 
-/* ---------- notes · menu, move mode, blank ---------- */
 .nt-menu {
   position: fixed; z-index: 130; min-width: 208px; padding: 5px;
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--r2); box-shadow: var(--shadow)
@@ -2037,10 +1591,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-mi.danger:hover { background: var(--bad-soft); color: var(--bad) }
 .nt-mk { margin-left: auto; font-family: var(--mono); font-size: 9.5px; color: var(--faint) }
 .nt-msep { height: 1px; margin: 4px 0; background: var(--line2) }
-/* Move mode's visible half. The polite live region says it to a screen reader;
-   this says it to everyone else, because a mode you cannot see is a mode you
-   cannot work out how to leave. Above `.toasts` (120) — an undo toast must not
-   cover the thing telling you Escape cancels. */
 .nt-live {
   position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 130;
   display: flex; align-items: center; gap: 9px; max-width: 90vw; padding: 9px 15px;
@@ -2052,11 +1602,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-blank-p { max-width: 42ch; margin-bottom: 18px; font-size: 13.5px; line-height: 1.65; color: var(--dim) }
 .nt-blank-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px }
 
-/* ---------- notes · import ----------
-   Everything here lives inside `.modal-b`, which already scrolls at 88vh, so
-   only the tree preview caps its own height: it is the one part that can be
-   five thousand rows long, and letting it push the mode picker and the Import
-   button off the bottom would hide the two controls the dialog is for. */
 .nt-imp-dest { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 12.5px; color: var(--faint) }
 .nt-imp-help { margin-bottom: 14px; border: 1px solid var(--line2); border-radius: var(--r1); background: var(--bg1) }
 .nt-imp-help > summary {
@@ -2064,9 +1609,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   display: flex; align-items: center; gap: 7px
 }
 .nt-imp-help > summary::-webkit-details-marker { display: none }
-/* The disclosure triangle, drawn from borders rather than set as a glyph: the
-   marker is suppressed above to keep the row a flex line, and '▸' renders at a
-   different weight and baseline in every font this sheet loads. */
 .nt-imp-help > summary::before {
   content: ''; flex: none; width: 0; height: 0; transition: transform .15s;
   border-left: 5px solid var(--faint); border-top: 4px solid transparent; border-bottom: 4px solid transparent
@@ -2074,7 +1616,7 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-imp-help[open] > summary::before { transform: rotate(90deg) }
 .nt-imp-help > summary:hover { color: var(--ink) }
 .nt-imp-p { padding: 0 12px; margin-bottom: 9px; font-size: 12.5px; line-height: 1.65; color: var(--dim) }
-/* Stated, not inherited — Tailwind's preflight resets every list to none. */
+/* tailwind preflight resets every list to none */
 .nt-imp-ul { padding: 0 12px 0 30px; margin-bottom: 11px; font-size: 12.5px; line-height: 1.7; color: var(--dim); list-style: disc }
 .nt-imp-ul li::marker { color: var(--faint) }
 .nt-imp-p code, .nt-imp-ul code { font-family: var(--mono); font-size: 11.5px; background: var(--bg2); border-radius: 4px; padding: 1px 4px }
@@ -2087,8 +1629,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-imp-file label { cursor: pointer }
 .nt-imp-sum { display: flex; flex-wrap: wrap; gap: 6px; margin: 15px 0 9px }
 .nt-imp-prev { max-height: 200px; overflow-y: auto; padding: 5px; border: 1px solid var(--line2); border-radius: var(--r1); background: var(--bg1) }
-/* Rows borrowed wholesale from the tree, so the preview reads as the thing it
-   is previewing — minus the affordances, since none of it is clickable yet. */
 .nt-imp-prev .nt-row { cursor: default }
 .nt-imp-prev .nt-row:hover { background: none; color: var(--dim) }
 .nt-imp-more { padding: 5px 8px; font-family: var(--mono); font-size: 10px; color: var(--faint) }
@@ -2102,12 +1642,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 }
 .nt-imp-warn svg { flex: none; margin-top: 1px }
 
-/* ---------- notes · responsive and motion ---------- */
-/* Below this the panes stop being a pair: 278px of tree leaves the reader about
-   300px, which is neither. So the vault drops back into `.content`'s flow — one
-   page, one scroller, the tree pane gone — and the breadcrumb, folder overview
-   and search become how you move around. Nothing here is hidden that is not
-   reachable another way. */
 @media (max-width: 900px) {
   .nt { position: static; display: block }
   .nt-tp { display: none }
@@ -2117,27 +1651,10 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   .nt-syntax td { display: block }
   .nt-syntax td:first-child { width: auto; padding-bottom: 0 }
 }
-/* `.cr *` above already stops everything inside the shell. This repeats it for
-   the two boxes that may portal to `document.body` instead. */
 @media (prefers-reduced-motion: reduce) {
   .nt *, .nt-menu, .nt-menu *, .nt-live { transition: none !important }
 }
 
-/* ---------- the sidebar rail ----------
-   /notes owns a tree pane of its own, so 254px of nav beside it is chrome
-   competing with chrome. On that route the sidebar collapses to a 58px glyph
-   gutter, and an explicit ⌘\ overrides the route either way.
-
-   The technique is the whole reason this is cheap: `.sb-inner` is ALWAYS 254px
-   and absolutely positioned, and railing narrows and clips `.sb` around it.
-   Nothing inside the sidebar reflows, so the collapse animates one width instead
-   of relaying out eighteen rows, and hover-peek is a pure overflow and opacity
-   reveal with no layout work at all.
-
-   Railing is a server-rendered class, not a `useEffect`. Reading it after
-   hydration would paint every /notes load at 254px and snap it to 58px — the
-   same flash the inline theme script in apps/web exists to prevent, and far more
-   visible, because it shoves the whole page sideways. */
 .sb {
   background: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-right: none;
   transition: width .22s cubic-bezier(.4, 0, .2, 1), min-width .22s cubic-bezier(.4, 0, .2, 1),
@@ -2153,20 +1670,9 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .dark .sb-inner { background: var(--sbg) }
 
 .sb.rail { width: 58px; min-width: 58px; overflow: hidden }
-/* Peeking lifts the full sidebar over the page rather than pushing it aside, so
-   the tree underneath keeps its scroll position and its measured column width.
-
-   The keyboard half is `:has(:focus-visible)` and not `:focus-within`, because a
-   mouse click leaves the row it clicked focused: the very click that navigates to
-   /notes rails the sidebar and then holds it peeked open by its own link, and no
-   amount of moving the pointer away closes it again. `:focus-visible` is exactly
-   the distinction wanted — tabbing in still opens the nav, clicking through it
-   does not. Wrapped in `:is()` so the list stays forgiving: where `:has()` is
-   unsupported this falls back to hover-peek instead of dropping the rule whole. */
 .sb.rail:is(:hover, :has(:focus-visible)) { overflow: visible; z-index: 70 }
 .sb.rail:is(:hover, :has(:focus-visible)) .sb-inner { box-shadow: var(--shadow) }
 
-/* Everything past the 58px gutter fades rather than moves. */
 .sb.rail .nav-txt, .sb.rail .nav-badge, .sb.rail .nav-label span,
 .sb.rail .sb-brand > div:last-child, .sb.rail .sb-foot { opacity: 0; transition: opacity .16s .02s }
 .sb.rail:is(:hover, :has(:focus-visible)) .nav-txt,
@@ -2175,16 +1681,10 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .sb.rail:is(:hover, :has(:focus-visible)) .sb-brand > div:last-child,
 .sb.rail:is(:hover, :has(:focus-visible)) .sb-foot { opacity: 1 }
 
-/* The ordinal rail is wayfinding for the full nav. In a 58px gutter you navigate
-   by glyph, and the numbers only shove the icons off centre, so they go — along
-   with the hairline that threads them. */
 .sb.rail .nav-num, .sb.rail .nav-grp.run .nav-run::before { display: none }
 .sb.rail .nav-item { padding-left: 11px }
 .sb.rail .nav-label { padding: 14px 8px 8px }
 
-/* The `4` badge sits in exactly the part that gets clipped, and silently losing
-   "you have mail" is a real regression — so it is redrawn as a dot on the glyph,
-   ringed in the sidebar's own fill so it reads as attached to the icon. */
 .nav-ic { position: relative }
 .sb.rail .nav-item.has-badge .nav-ic::after {
   content: ''; position: absolute; top: -2px; right: -3px; width: 6px; height: 6px;
@@ -2195,8 +1695,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 
 .rail-btn { flex: none }
 
-/* Below this width the sidebar is already a drawer over the page, so railing it
-   would collapse a thing that is not on screen to begin with. */
 @media (max-width: 960px) {
   .sb.rail { width: 254px; min-width: 254px; overflow: visible }
   .sb.rail .nav-txt, .sb.rail .nav-badge, .sb.rail .nav-label span,
@@ -2207,26 +1705,14 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   .rail-btn { display: none }
 }
 
-/* ---------- the palette's notes footer ----------
-   The palette gained a second kind of row — vault questions, matched by Postgres
-   rather than by the in-memory nav list — so it needs a line that says what the
-   extra keystroke does and how much of the result set is on screen. */
 .pal-foot {
   display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-top: 1px solid var(--line2);
   font-family: var(--mono); font-size: 10px; color: var(--faint)
 }
 .pal-foot span { display: flex; align-items: center; gap: 5px }
-/* The snippet under a note row wraps to two lines at most and never pushes the
-   row taller than the nav rows beside it. */
 .pal-it .pal-w { display: block; margin-left: 0; margin-top: 3px; font-family: var(--ui); font-size: 11.5px;
   letter-spacing: 0; line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 
-/* ---------- projects · the layout choice ----------
-   Two tiles, and unlike the hero's `.hro-ver` tabs they are not a view filter:
-   Projects has no per-version content, so the tile you pick IS the row, pending
-   until the card below saves it. That is why these carry their own border
-   instead of bleeding to the card edge — they sit inside `.card-b`, in the field
-   flow, where every other control on this page is something you are editing. */
 .pvr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
 .pvr {
   display: flex; align-items: flex-start; gap: 12px; padding: 13px 14px; text-align: left;
@@ -2247,15 +1733,10 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .pvr-d {
   font-family: var(--mono); font-size: 10px; letter-spacing: .03em; line-height: 1.6; color: var(--faint)
 }
-/* --faint is 2.77:1 on a tint in light mode, the theme the app boots into — so
-   the detail line steps up the moment the tile gains a background. */
 .pvr:hover .pvr-d, .pvr.on .pvr-d { color: var(--dim) }
 .pvr .dot { margin-left: auto; flex: none; margin-top: 6px }
-/* The detail lines are the widest thing here; below this they stack rather than
-   wrap to four lines each. */
 @media (max-width: 760px) { .pvr-grid { grid-template-columns: 1fr } }
 
-/* revalidation */
 .rv-banner {
   display: flex; align-items: flex-start; gap: 11px; padding: 13px 15px; margin-bottom: 14px;
   border: 1px solid var(--line2); border-left: 3px solid var(--bg4); border-radius: var(--r2);
@@ -2269,10 +1750,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .rv-card { margin-bottom: 14px }
 .rv-card:last-child { margin-bottom: 0 }
 
-/* The error text is the reason this page exists. It is never clamped, never
-   ellipsised and never swapped for a friendlier sentence: a half-printed
-   message is the same dead end as no message at all, which is the state that
-   let stale pages sit unnoticed in the first place. */
 .rv-err {
   font-family: var(--mono); font-size: 11px; line-height: 1.6; color: var(--bad);
   background: var(--bad-soft); border: 1px solid color-mix(in srgb, var(--bad) 22%, transparent);
@@ -2289,8 +1766,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .rv-none { color: var(--faint) }
 .rv-http { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-left: 7px }
 .rv-targets { display: flex; flex-wrap: wrap; gap: 5px }
-/* A row whose error runs to three lines should not centre its one-word status
-   chip against the middle of that paragraph. */
 .rv-log td { vertical-align: top }
 .rv-log .rv-err { max-width: 340px }
 .chip.bad { border-color: var(--bad); color: var(--bad); background: var(--bad-soft) }
@@ -2306,19 +1781,10 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .rv-tile-s { font-size: 11px; line-height: 1.6; color: var(--faint); flex: 1 }
 @media (max-width: 700px) { .rv-grid { grid-template-columns: 1fr } }
 
-/* ---------- feature flags ----------
-   The banner, the error block and the green tick are revalidation's own
-   `.rv-*` classes, used verbatim: both pages report the same two facts — a
-   thing was attempted, and here is exactly what the server said — and a second
-   copy of those rules would only give them somewhere to drift apart. What
-   follows is the part a switchboard needs and a log does not. */
 .fl-blurb {
   padding: 10px 16px; border-bottom: 1px solid var(--line2);
   font-size: 11.5px; line-height: 1.65; color: var(--faint)
 }
-/* `.row` centres its children and clips `.row-t` to one line; a flag row is a
-   paragraph, a stamp, a text field and possibly a wrapped error, so it stacks
-   from the top and wraps. */
 .fl-row { align-items: flex-start; padding: 13px 14px }
 .fl-head { display: flex; align-items: center; flex-wrap: wrap; gap: 7px }
 .fl-name { font-size: 13.5px; font-weight: 500; color: var(--ink) }
@@ -2331,10 +1797,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .fl-out { margin-top: 9px }
 .fl-switch { display: flex; align-items: center; gap: 8px; flex: none; padding-top: 2px; color: var(--faint) }
 
-/* Amber, not red: the save worked. Red would send the admin back to re-toggle
-   a switch that is already in the database. The server's own words sit in the
-   mono line at the bottom, unclamped and selectable, for the same reason
-   `.rv-err` is — a half-printed message is the same dead end as none. */
 .fl-warn {
   border: 1px solid color-mix(in srgb, var(--amber) 34%, transparent);
   border-left: 3px solid var(--amber); border-radius: 8px; padding: 8px 10px;
@@ -2352,46 +1814,19 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   .fl-note { min-width: 100% }
 }
 
-/* ---------- content lifecycle (blogs · projects) ----------
-   Four states, four hues, and none of them borrowed from `<Badge>`: that
-   component folds `warning` and `destructive` onto the same `.chip.amb`, so two
-   of the four would have come out identical amber — the one thing a status
-   colour cannot do.
-
-   The mapping follows this file's own rule that `--good` and `--amber` are
-   reserved for state, and fills the other two slots with the neutral pair the
-   admin roles already use:
-
-     draft      slate   — not a state yet, just work in progress
-     scheduled  amber   — waiting on something
-     published  green   — live
-     archived   red     — withdrawn on purpose, which is a decision and not a
-                          neutral absence; a second grey would have read as
-                          "draft again" at a glance.
-
-   Every token here is redefined by both dark themes, so the four stay separable
-   in light, GitHub dark and zinc dark without a per-theme override. */
 .chip.st-draft     { border-color: var(--line); color: var(--vioT); background: var(--vioS) }
 .chip.st-scheduled { border-color: var(--amber); color: var(--ambT); background: var(--amber-soft) }
 .chip.st-published { border-color: var(--good); color: var(--goodT); background: var(--good-soft) }
 .chip.st-archived  { border-color: color-mix(in srgb, var(--bad) 40%, transparent); color: var(--bad); background: var(--bad-soft) }
 
-/* `.filt` was built for buttons; as an anchor it needs the box laid out by hand
-   and the count set apart from the label. */
 .lc-tabs .filt { display: inline-flex; align-items: center; gap: 6px; text-decoration: none }
 .lc-tabs .filt b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--dim) }
 .lc-tabs .filt.on b { color: var(--accT) }
-/* A zero tab stays clickable and stays visible: "nothing is scheduled" is an
-   answer, and a tab that vanished at zero would look like a missing feature. */
 .lc-tabs .filt.lc-tab-0 b { color: var(--faint) }
 
-/* `.row` centres its children and clips to one line. A lifecycle row is a
-   title, a meta line, possibly a warning and possibly two buttons, so it stacks
-   from the top — the same shape `.fl-row` needed for the same reason. */
 .lc-row { align-items: flex-start }
 .lc-row-acts { padding-top: 2px; gap: 7px }
 
-/* The one-line facts under a row: when it goes live, or why it is not. */
 .lc-line {
   display: flex; align-items: center; gap: 6px; margin-top: 5px;
   font-family: var(--mono); font-size: 10.5px; color: var(--faint)
@@ -2411,9 +1846,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .lc-link { color: var(--accT); text-decoration: underline; text-underline-offset: 2px }
 .lc-gap { margin-top: 14px }
 
-/* The status selector and its picker, kept as one block so the datetime field
-   appearing under Scheduled reads as part of the same control rather than as a
-   new question further down the form. */
 .lc-field { margin-bottom: 18px }
 .lc-field .f:last-child { margin-bottom: 0 }
 .lc-field-err { margin-top: 8px }
@@ -2422,8 +1854,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   background: var(--bg1); border-radius: 5px; padding: 1px 5px
 }
 
-/* Amber, not red: nothing has failed yet — the admin is mid-edit and the save
-   has not been attempted. Red here would report a problem that does not exist. */
 .lc-warn {
   margin-top: 8px; padding: 8px 10px; border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--amber) 34%, transparent);
@@ -2440,23 +1870,14 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   .lc-row-acts { width: 100% }
 }
 
-/* An archived row keeps full-contrast warnings and buttons — only its title
-   steps back, because the reason it is archived is still worth reading. */
 .lc-arch .row-t { color: var(--dim); font-weight: 450 }
 
-/* The footnote that belongs to the status block above it, not to the field
-   below — it closes `.lc-field`'s own bottom gap rather than adding a second. */
 .lc-after-field { margin-top: -10px; margin-bottom: 18px }
 
-/* ---------- inbox: tabs, bulk bar, reading pane, composer ----------
-   The list row stopped being one button when it grew a checkbox and a star, so
-   `.msg-it` hands its padding to the `<a>` inside it and the two controls sit
-   outside the link rather than nested in it. */
 .msg-tabs { border: 1px solid var(--line2); border-radius: var(--r3); background: var(--card); margin-bottom: 14px }
 .msg-tabs .filt { display: inline-flex; align-items: center; gap: 6px; text-decoration: none }
 .msg-tabs .filt b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--dim) }
 .msg-tabs .filt.on b { color: var(--accT) }
-/* An empty tab stays visible and clickable: "no spam" is an answer. */
 .msg-tabs .filt.msg-tab-0 b { color: var(--faint) }
 
 .msg-bar {
@@ -2489,8 +1910,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 }
 .msg-more:hover { color: var(--accT); background: var(--bg1) }
 
-/* Both columns scroll inside themselves, so the page keeps one scrollbar and the
-   tab strip stays put while a long thread is read. */
 .msg-listcard, .msg-panecard { display: flex; flex-direction: column; max-height: calc(100dvh - 262px) }
 .msg-list { max-height: none; flex: 1 }
 .msg-head { flex: none }
@@ -2543,8 +1962,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 }
 .msg-reply { padding: 11px 13px; border: 1px solid var(--line2); border-radius: var(--r2); background: var(--bg1) }
 .msg-reply + .msg-reply { margin-top: 8px }
-/* A failed send is kept and shown, not swept up — it is the only record that a
-   reply was attempted at all. */
 .msg-reply.failed { border-left: 3px solid var(--bad); background: var(--bad-soft) }
 .msg-reply-h { display: flex; align-items: center; gap: 8px; font-size: 12.5px }
 .msg-reply-at { font-family: var(--mono); font-size: 9.5px; color: var(--faint); flex: none }
@@ -2565,12 +1982,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 @media (max-width: 1080px) {
   .msg-listcard, .msg-panecard { max-height: none }
 }
-
-/* ── Media library ──────────────────────────────────────────────────────────
-   Uploads never touch this app: the browser signs, PUTs straight to R2, then
-   registers the row. The queue below the drop zone is that middle state made
-   visible — bytes in the bucket with no row yet, held there by the alt field.
-   ─────────────────────────────────────────────────────────────────────────── */
 
 .md-upcard { margin-bottom: 14px }
 .md-up-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px }
@@ -2650,8 +2061,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .md-cell-b { display: block; padding: 10px 11px 11px }
 .md-name { display: block; font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .md-meta { display: block; font-family: var(--mono); font-size: 9.5px; color: var(--faint); margin-top: 3px }
-/* Two lines of the description, because the whole point of the audit is that
-   the words are readable without opening anything. */
 .md-alt {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   font-size: 11.5px; line-height: 1.5; color: var(--dim); margin-top: 6px; min-height: 34px
@@ -2708,7 +2117,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   .md-search { min-width: 0; width: 100% }
 }
 
-/* tracked links */
 .tl-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px }
 .tl-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px }
 
@@ -2727,7 +2135,7 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .tl-line-n { font-size: 11.5px; line-height: 1.6; color: var(--faint); margin-top: 6px }
 .tl-line-n code, .tl-line-n b { font-family: var(--mono); font-size: 11px; color: var(--dim) }
 
-/* Fixed white behind the QR in every theme: inverted or tinted modules stop scanning. */
+/* fixed white: tinted or inverted qr modules stop scanning */
 .tl-qr {
   flex: none; width: 168px; padding: 10px; border: 1px solid var(--line2);
   border-radius: var(--r2); background: #fff; text-align: center
@@ -2780,7 +2188,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   .tl-split { grid-template-columns: 1fr }
 }
 
-/* ---------- analytics ---------- */
 .an-status { padding: 13px 16px; display: flex; flex-direction: column; gap: 7px }
 .an-status-line { font-size: 12.5px; line-height: 1.65; color: var(--dim); max-width: 100ch }
 .an-status-line b { color: var(--ink); font-weight: 600 }
@@ -2811,7 +2218,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .an-split-b:hover { color: var(--ink) }
 .an-split-b.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px -1px rgba(17, 17, 22, .2) }
 .dark .an-split-b.on { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06) }
-/* A split with no rows is still worth showing — an empty Mobile column is the finding. */
 .an-split-z { font-size: 8.5px; opacity: .65 }
 
 .an-funnel { display: flex; flex-direction: column; gap: 9px }
@@ -2837,7 +2243,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .an-dims { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 }
 .an-none-inline { font-family: var(--mono); font-size: 10.5px; color: var(--faint) }
 
-/* The tracer sets this inline on its own tooltip rows; hoisted so both charts share it. */
 .utm-tip .r > span { display: inline-flex; align-items: center; gap: 6px }
 
 @media (max-width: 860px) {
@@ -2845,18 +2250,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   .an-frow .an-fc { display: none }
 }
 
-/* ---------- background · the terrain dials ----------
-   Sliders rather than number boxes, because every one of these is read inside a
-   per-frame loop: the useful question is never "is 34 right", it is "which way
-   from 34", and only a drag against a redrawing pane answers that.
-
-   The track is deliberately unfilled. Firefox paints `::-moz-range-progress`
-   and WebKit has no counterpart, so a filled bar would exist in one browser and
-   not the other; the mono readout beside the track carries the value in both.
-   Focus is left to the global `.cr :focus-visible`, as everywhere else. */
-/* A range input's intrinsic width is ~129px, and `min-width: auto` on a flex
-   item holds the track at that even inside a `.f-row` half a card wide — the
-   readout gets pushed past the card edge instead of the track giving way. */
 .sld, .sld-in { min-width: 0 }
 .sld-row { display: flex; align-items: center; gap: 10px }
 .sld-in {
@@ -2865,10 +2258,7 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 }
 .sld-in::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: var(--bg3) }
 .sld-in::-moz-range-track { height: 4px; border-radius: 99px; background: var(--bg3) }
-/* WebKit lays the thumb out from the track's top edge rather than its middle,
-   so the offset is (4 - 14) / 2 and not a nudge. No transition on the grab:
-   this is a pseudo-element, and the reduced-motion `.cr *` guard cannot reach
-   one, so a transition here would be the one thing on the page that ignored it. */
+/* webkit lays the thumb out from the track's top edge */
 .sld-in::-webkit-slider-thumb {
   -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 99px;
   background: var(--c1); box-shadow: 0 1px 3px rgba(23, 30, 48, .3)
@@ -2879,19 +2269,12 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 }
 .sld-in:active::-webkit-slider-thumb { transform: scale(1.15) }
 .sld-in:active::-moz-range-thumb { transform: scale(1.15) }
-/* Fixed measure and tabular figures. A readout that grew on the way from 8 to
-   100 would drag the track out from under the pointer mid-drag, which is the
-   one thing a slider is not allowed to do. */
 .sld-v {
   font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums;
   color: var(--ink); min-width: 42px; text-align: right; flex: none
 }
 .sld-u { font-style: normal; font-size: 9.5px; color: var(--faint); margin-left: 1px }
 
-/* A dial nothing is reading — the terrain rows while the lines are the layer.
-   The Switch already dims itself (`.tog:disabled`), so the wrapper's opacity is
-   lifted back off it: the two stack to .28, which reads as broken rather than
-   as off. */
 .f.is-off { opacity: .55 }
 .f.is-off .tog:disabled { opacity: 1 }
 .sld-in:disabled { cursor: default }

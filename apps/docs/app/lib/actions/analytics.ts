@@ -7,7 +7,6 @@ import { eachUtcDay, toDateKey, utcYesterday } from "@repo/shared/dates";
 import { logger } from "@repo/shared/logger";
 import { getSession } from "@/lib/session";
 
-// Both bounds keep the request inside the platform timeout; the rest comes back as `remaining`.
 const MAX_RANGE_DAYS = 14;
 const BUDGET_MS = 8_000;
 
@@ -61,7 +60,6 @@ export async function resummarize(input: { from: string; to: string }): Promise<
     };
   }
 
-  // Clamped to yesterday: today is still being written, and a partial day is never redone.
   const yesterday = utcYesterday();
   const { from } = parsed.data;
   const to = parsed.data.to > yesterday ? yesterday : parsed.data.to;
@@ -74,7 +72,6 @@ export async function resummarize(input: { from: string; to: string }): Promise<
     };
   }
 
-  // Oldest first, so repeated presses resume where the last one stopped.
   const days = eachUtcDay(from, to);
   const began = Date.now();
 

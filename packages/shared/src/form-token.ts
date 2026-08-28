@@ -5,7 +5,7 @@ import { safeEqual } from "./crypto";
 
 const MAX_AGE_MS = 2 * 60 * 60 * 1000;
 
-// Instances render and verify on their own clocks; a second of drift is not a bot.
+// clock drift between instances
 const FUTURE_SKEW_MS = 60_000;
 
 function sign(ts: number, secret: string): string {
@@ -18,7 +18,6 @@ export function signFormTimestamp(ts: number = Date.now()): string | null {
   return `${ts}.${sign(ts, secret)}`;
 }
 
-/** Four facts the scorer prices differently: elapsed ms, no secret, nothing sent, or sent and invalid. */
 export function verifyFormTimestamp(
   token: string | null | undefined,
 ): number | null | "unconfigured" | "absent" {

@@ -1,20 +1,5 @@
 'use client';
 
-/**
- * Footer v6.1 — "the finale", responsive wordmark
- *
- * Desktop (lg+): full name — YATIN DORA. Tablet/mobile: YATIN.
- * Font size auto-scales to the text length so the full name keeps natural
- * letter proportions while still spanning edge-to-edge.
- *
- * Three layers on the name: gradient melt, sheen sweep (~7s), and a pointer
- * spotlight that works with mouse AND touch. Click/tap → back to top.
- * Above it: breathing ✦ divider + editorial mono copyright. Socials live in
- * Let's Connect only.
- *
- * Optional prop: wordmark — overrides the desktop text; mobile uses its first word.
- */
-
 import { useEffect, useRef } from 'react';
 import Container from './Container';
 
@@ -36,11 +21,6 @@ function NameMark({
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  // The sheen sweeps `mask-position` and cannot run on the compositor, so
-  // while it is animating the main thread paints a frame every 16ms — and it
-  // used to do that from page load, for a wordmark five screens below the
-  // fold. It is paused (see `.yfw-wrap.in` below) until the footer is actually
-  // near the viewport, then runs exactly as before.
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -52,13 +32,11 @@ function NameMark({
     return () => io.disconnect();
   }, []);
 
-  // Auto-size: longer text → smaller font so glyphs keep natural
-  // proportions while textLength stretches them edge-to-edge.
   const effLen = [...text].reduce((a, ch) => a + (ch === ' ' ? 0.5 : 1), 0);
   const fs = Math.max(54, Math.min(100, Math.round(665 / Math.max(effLen, 1))));
   const capH = fs * 0.727;
   const y = Math.round(5 + capH);
-  const vbH = Math.round(5 + capH * 0.77); // bottom crop — 77% of cap height visible
+  const vbH = Math.round(5 + capH * 0.77); // bottom crop, 77% of cap height visible
 
   const textProps = {
     x: 200,
@@ -99,9 +77,6 @@ function NameMark({
       }}
       className={[
         'yfw-wrap relative mt-8 w-full cursor-pointer select-none text-foreground',
-        // `ring-inset`: the footer sets `overflow-hidden` for the sheen mask,
-        // and an outset ring on this full-width last child is clipped on three
-        // sides by it — only the top 2px survived.
         'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground/70',
         className ?? '',
       ].join(' ')}
@@ -208,7 +183,6 @@ export default function Footer({
       `}</style>
 
       <Container className="pt-10">
-        {/* breathing ✦ divider */}
         <div
           aria-hidden
           className="flex items-center gap-3 text-[10px] text-secondary"
@@ -218,14 +192,12 @@ export default function Footer({
           <span className="h-px flex-1 bg-border" />
         </div>
 
-        {/* editorial mono copyright */}
         <p className="mt-7 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-secondary">
           &copy; {new Date().getFullYear()} {copyrightName} &mdash; all rights
           reserved
         </p>
       </Container>
 
-      {/* THE NAME — full name on desktop, first name on tablet/mobile */}
       <NameMark
         text={fullText}
         gradientId="yfw-fade-lg"

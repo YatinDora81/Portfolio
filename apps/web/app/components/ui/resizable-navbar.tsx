@@ -4,20 +4,6 @@ import { cn } from '@/lib/utils';
 import { IconMenu2, IconX } from '@tabler/icons-react';
 import React, { useEffect, useRef, useState } from 'react';
 
-/**
- * The docking navbar, without Motion.
- *
- * It used to tween `width`, `backdrop-filter` and `box-shadow` with springs —
- * three properties that need layout + paint on every frame, and that Motion
- * had to read back from the DOM on mount (a forced reflow in every trace).
- * The `layoutId` hover pill was the single feature on the site that pulled
- * Motion's `domMax` bundle in instead of `domAnimation`.
- *
- * Everything is a CSS transition now (`.rn-*` in globals.css), switched by a
- * `data-visible` attribute from one passive scroll listener. Same look, and
- * the navbar costs nothing at hydration beyond attaching two handlers.
- */
-
 interface NavbarProps {
   children: React.ReactNode;
   className?: string;
@@ -54,14 +40,11 @@ interface MobileNavMenuProps {
   className?: string;
   isOpen: boolean;
   onClose: () => void;
-  /** Anchor id for the panel. */
   id?: string;
 }
 
 const DOCK_AT = 100;
 
-/** True once the page has scrolled past `DOCK_AT`. One passive listener,
-    rAF-coalesced so a fast fling sets state once per frame, not per event. */
 function useDocked(): boolean {
   const [docked, setDocked] = useState(false);
   useEffect(() => {
@@ -122,15 +105,10 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
   const navRef = useRef<HTMLElement>(null);
   const pillRef = useRef<HTMLSpanElement>(null);
 
-  // The pill is moved imperatively: a hover should not re-render the nav, and
-  // a transform transition on one <span> is all the "shared layout" this needs.
   const moveTo = (el: HTMLElement) => {
     const pill = pillRef.current;
     if (!pill) return;
-    // On its first showing the pill must snap to the link and only fade —
-    // otherwise it glides in from the nav's corner, since the position vars
-    // default to 0. The inline override is cleared once the snap has been
-    // committed by the forced reflow.
+    // first show must snap, not glide in from the corner
     const first = !pill.classList.contains('on');
     if (first) pill.style.transition = 'opacity 0.18s ease';
     pill.style.setProperty('--pill-x', `${el.offsetLeft}px`);
@@ -146,8 +124,6 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
   const hide = () => pillRef.current?.classList.remove('on');
 
   return (
-    // A landmark, not a div. `hidden lg:flex` takes it out of the a11y tree
-    // below the breakpoint, so it never competes with the mobile menu's own nav.
     <nav
       ref={navRef}
       aria-label="Main"
@@ -227,13 +203,6 @@ export const MobileNavMenu = ({
   );
 };
 
-/**
- * A real <button>, not an <svg> with an onClick. Below `lg` the desktop NavItems
- * row is hidden, so this control is the ONLY route to Skills/Experience/
- * Projects/Contact — as a bare icon it was skipped by Tab entirely and
- * announced as nothing, which put the whole navigation out of reach of a
- * keyboard or screen-reader visitor on a phone.
- */
 export const MobileNavToggle = ({
   isOpen,
   onClick,
@@ -248,10 +217,6 @@ export const MobileNavToggle = ({
       onClick={onClick}
       aria-label={isOpen ? 'Close menu' : 'Open menu'}
       aria-expanded={isOpen}
-      /* No aria-controls: the panel is only in the DOM while open, which is the
-         one state the attribute would never be read in — a dangling IDREF every
-         time it matters. aria-expanded plus DOM adjacency is the real
-         association here. */
       className="relative z-20 -m-2 flex items-center justify-center p-2 text-black dark:text-white"
     >
       <Icon aria-hidden="true" />

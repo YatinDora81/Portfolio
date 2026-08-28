@@ -11,20 +11,6 @@ import {
   IconArrowUpRight, IconLock,
 } from "@tabler/icons-react";
 
-/**
- * Reference for the About-section terminal — the second half of section 02.
- *
- * Everything here is read from @repo/ui/terminal — the same list the portfolio
- * drives its behaviour from — so this page cannot describe a command that
- * doesn't exist, or claim the wrong focus behaviour.
- *
- * It is filed under About rather than under Site because that is where the
- * terminal lives on the page, and it shares About's `.abt-*` chrome (the same
- * section nav, the same numbered block rules) so the two routes read as one
- * place. It writes NOTHING: there is no model behind a command table, and an
- * editing affordance here would be a lie in the shape of a button.
- */
-
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/$/, "");
 
 const KIND_LABEL: Record<string, string> = {
@@ -34,7 +20,7 @@ const KIND_LABEL: Record<string, string> = {
   egg: "Undocumented · not in help, ls or Tab",
 };
 
-// Keyed by `target`, not `cmd`; a target missing here is treated as present, matching flagValue's fail-open.
+// keyed by target, not cmd; a missing target reads as present
 const NAV_FLAG: Record<string, FlagKey> = {
   "#skills": FLAG_KEYS.SECTION_SKILLS,
   "#experience": FLAG_KEYS.SECTION_EXPERIENCE,
@@ -54,7 +40,6 @@ const KEYS = [
 ];
 
 export default async function TerminalPage() {
-  // The terminal prints these, so it's worth seeing what it will actually say.
   const [paragraphs, blogCount, flagRows] = await Promise.all([
     prisma.aboutParagraph.count(),
     prisma.blog.count({ where: { show: true } }),
@@ -64,7 +49,6 @@ export default async function TerminalPage() {
   const flags: FlagMap = Object.fromEntries(flagRows.map((f) => [f.key, f.enabled]));
   const aboutOff = !flagValue(flags, FLAG_KEYS.SECTION_ABOUT);
 
-  // The flag is checked before the post count: with `section.blogs` off, publishing brings nothing back.
   const notOnPage = new Map<string, string>();
   for (const c of TERMINAL_COMMANDS) {
     if (c.kind !== "nav" || !c.target) continue;
@@ -101,7 +85,6 @@ export default async function TerminalPage() {
             open on the site <IconArrowUpRight size={11} className="nudge" />
           </a>
         </div>
-        {/* No `.sec-reach`: this page changes nothing, which is the point of it. */}
       </div>
 
       <AboutSectionNav active="terminal" />

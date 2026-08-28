@@ -1,18 +1,10 @@
 // oneko.js: https://github.com/adryd325/oneko.js
-// + corner-nap feature: drop the cat near any edge/corner of the window and it
-//   sleeps for a configurable time, then wakes up and resumes chasing.
-// + drag-hint UI: rounded blur vignette + two-stage bottom release toast.
-// + six nap indicator styles: tooltip | ring | halo | pixel | moon | ticks
-//   (plus "random", which picks a new style for every nap, and "off", which
-//   turns napping off and leaves the plain draggable cat).
 //
-// Config via <Script> data attributes (all optional):
-//   data-cat          path to sprite gif            default "./oneko.gif"
-//   data-nap-style    tooltip|ring|halo|pixel|moon|ticks|random|off  default "ticks"
-//   data-nap-seconds  nap length in seconds (3-300)               default 30
-//   data-nap-edge     px from window edge that counts as nap zone default 64
-//
-// Everything (styles + elements) is injected by this file — no other changes.
+// optional data attributes:
+// data-cat: sprite gif path
+// data-nap-style: tooltip|ring|halo|pixel|moon|ticks|random|off
+// data-nap-seconds: 3 to 300
+// data-nap-edge: px from window edge
 
 (function oneko() {
   const isReducedMotion =
@@ -22,13 +14,11 @@
   const curScript = document.currentScript;
 
   if (isReducedMotion) return;
-  // Everything below appends to the document, so a second execution would leave
-  // two cats chasing the pointer and two rAF loops driving them.
   if (document.getElementById('oneko')) return;
 
   const ds = (curScript && curScript.dataset) || {};
 
-  /** localStorage throws outright when site data is blocked, not just when full. */
+  // localStorage throws when site data is blocked
   function readStore(key) {
     try { return localStorage.getItem(key); } catch (e) { return null; }
   }
@@ -45,15 +35,10 @@
   ) {
     napStyleCfg = 'ticks';
   }
-  // "off" keeps the cat draggable but never lets it sleep, so the whole nap
-  // affordance — zone toast included — has to stay quiet rather than promise a
-  // nap that will not happen.
   const napsEnabled = napStyleCfg !== 'off';
   const napSeconds = Math.min(300, Math.max(3, parseInt(ds.napSeconds || '30', 10) || 30));
   const napDurationMs = napSeconds * 1000;
   const napHintMargin = 220;
-  // Capped below the hint margin: a zone wider than the hint would arm the drop
-  // while the toast that explains it is still hidden.
   const napEdgeMargin = Math.min(
     napHintMargin - 24,
     Math.max(24, parseInt(ds.napEdge || '64', 10) || 64)
@@ -66,14 +51,11 @@
 
   const nekoEl = document.createElement('div');
 
-  // A stored position outranks nothing: it can be malformed, and it can be from
-  // a window bigger than this one — park the cat off-screen and the only way
-  // back is clearing storage, since it takes the pointer to move it.
   let savedPos = null;
   try {
     const parsed = JSON.parse(readStore('oneko-pos') || 'null');
     if (parsed && Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) savedPos = parsed;
-  } catch (e) { /* malformed — start from the corner */ }
+  } catch (e) { /* malformed */ }
   let nekoPosX = Math.min(Math.max(16, savedPos ? savedPos.x : 32), window.innerWidth - 16);
   let nekoPosY = Math.min(Math.max(16, savedPos ? savedPos.y : 32), window.innerHeight - 16);
 
@@ -85,7 +67,6 @@
   let idleAnimation = null;
   let idleAnimationFrame = 0;
   let isDragging = false;
-  /** A click is a drag that never moved, and a click is how you wake the cat. */
   let dragMoved = false;
 
   nekoEl.innerHTML =
@@ -187,7 +168,6 @@
     return distToEdge() < napEdgeMargin;
   }
 
-  /** True while the site's cat toggle has the cat shooed away. */
   function isHidden() {
     return nekoEl.style.display === 'none';
   }
@@ -257,8 +237,6 @@
     nekoEl.style.setProperty('--nk-shift', '0px');
     nekoEl.style.setProperty('--nk-drop', '0px');
     hideAllIndicators();
-    // The z's drift on <body> with their own 1.6s timers, so without this they
-    // keep rising off a cat that has already woken up — or been shooed away.
     document.querySelectorAll('.oneko-zz').forEach((z) => z.remove());
   }
 
@@ -285,9 +263,6 @@
   }
 
   function setDragUI(on) {
-    // The vignette frames the window edges, which only means anything when the
-    // edges are somewhere to drop the cat. With naps off it is just a page-wide
-    // blur that answers to nothing.
     document.body.classList.toggle('oneko-dragging', on && napsEnabled);
     if (!on) {
       document.body.classList.remove('oneko-in-zone');
@@ -295,8 +270,6 @@
     }
   }
 
-  // Injects every style and element the feature needs: blur vignette, release
-  // toast, the halo layer, and the CSS for all six nap indicators.
   function installFeatureUI() {
     const style = document.createElement('style');
     style.textContent = `
@@ -340,14 +313,8 @@
       #nk-ticks{position:absolute;left:50%;top:50%;width:96px;height:96px;margin:-48px 0 0 -48px;animation:nk-scale .3s cubic-bezier(.34,1.56,.64,1)}
       #nk-ticks line{stroke:#34d399;stroke-width:2;stroke-linecap:round;transition:opacity .3s}
       .oneko-zz{position:fixed;z-index:2147483200;font:500 15px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#a3a3a3;pointer-events:none;animation:oneko-zrise 1.6s ease-out forwards}
-      /* The indicators are drawn for a dark page — white strokes, and a moon
-         whose crescent is faked by a cutout circle painted the page's own
-         background. On the light theme that cutout is a black blob and the
-         white strokes are gone, so the three of them get inverted here. The
-         pill, bubble and toast carry their own dark surface and stay put. */
-      /* first-of-type so this lands on the track only: as a bare
-         "#nk-ring circle" it also outranks the #id rule below, and paints the
-         countdown arc the same grey as the track it runs on. */
+      /* light theme: the indicators are drawn for a dark page */
+      /* first-of-type keeps this on the track, not the arc */
       html:not(.dark) #nk-ring circle:first-of-type{stroke:rgba(17,17,22,.16)}
       html:not(.dark) #nk-ring-arc,html:not(.dark) #nk-ticks line{stroke:#059669}
       html:not(.dark) #nk-moon path{stroke:rgba(17,17,22,.16)}
@@ -427,16 +394,13 @@
       mousePosY = event.clientY;
     });
 
-    // Mouse drag support
     nekoEl.style.cursor = 'grab';
     nekoEl.addEventListener('mousedown', function (event) {
-      // Right- and middle-clicks get no drag: the context menu opens on
-      // mousedown and eats the mouseup, which would strand the vignette.
       if (event.button !== 0) return;
       event.preventDefault();
       isDragging = true;
       dragMoved = false;
-      wakeUp(); // picking the cat up interrupts its nap
+      wakeUp();
       nekoEl.style.cursor = 'grabbing';
       setDragUI(true);
       updateZoneUI();
@@ -447,16 +411,12 @@
       isDragging = false;
       nekoEl.style.cursor = 'grab';
       setDragUI(false);
-      // Only a drop starts a nap. A click that never moved is how you wake the
-      // cat up, and re-napping it on the mouseup would make it unwakeable.
       if (startNap && dragMoved) maybeStartNap();
     }
 
     document.addEventListener('mousemove', function (event) {
       if (!isDragging) return;
-      // This drag ends AT the window edge, so releasing a few pixels outside it
-      // is routine — and that mouseup never reaches us. `buttons` is the only
-      // thing that tells us the drop already happened.
+      // a mouseup outside the window never reaches us
       if (event.buttons === 0) {
         endDrag(true);
         return;
@@ -471,11 +431,8 @@
     });
 
     document.addEventListener('mouseup', function () { endDrag(true); });
-    // Alt-tabbing mid-drag would otherwise leave the vignette over the page.
-    // No nap from here — the cat was never dropped, it was abandoned.
     window.addEventListener('blur', function () { endDrag(false); });
 
-    // Touch drag support
     nekoEl.addEventListener('touchstart', function (event) {
       event.preventDefault();
       isDragging = true;
@@ -591,10 +548,6 @@
   }
 
   function frame() {
-    // Shooed away by the site's cat toggle. The nap indicators are siblings of
-    // the cat rather than children — the halo and the drifting z's are on
-    // <body> — so without this they would go on drawing over a page that has
-    // no cat on it.
     if (isHidden()) {
       if (napUntil) wakeUp();
       return;
@@ -605,7 +558,6 @@
       return;
     }
 
-    // Corner nap: dropped near an edge, so ignore the mouse and sleep it off
     if (napUntil) {
       const remaining = napUntil - Date.now();
       if (remaining > 0) {
@@ -619,7 +571,6 @@
         if (napFrame === 2 || napFrame % 14 === 0) spawnZ();
         return;
       }
-      // nap over — wake with the usual startled pause, then resume chasing
       wakeUp();
       idleTime = 4;
       setSprite('alert', 0);

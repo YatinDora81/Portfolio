@@ -2,27 +2,6 @@ import { prisma } from "db";
 import { WHERE, draft, labelOf } from "@/lib/audit";
 import { commitAudit } from "@/lib/audit-writer";
 
-/**
- * Rewrites the two About paragraphs and records the edit in the admin's change
- * history, in one transaction — a script that writes content behind the
- * dashboard's back otherwise leaves the log insisting nothing happened.
- *
- * It lives here rather than in `packages/db/scripts` because the audit draft is
- * an apps/docs module: reaching down from the app into the database package is
- * the direction the dependency already runs, and the reverse only resolves by
- * accident.
- *
- * Idempotent: rows are matched on sortOrder, a row already holding the new text
- * is skipped, and an empty draft writes no event — so a second run changes
- * nothing in either the table or the history.
- *
- * It deliberately does NOT publish. The site serves this section from ISR, so
- * the new copy reaches visitors when someone presses Publish in the admin.
- *
- * Run from `apps/docs`:
- *   bun run about:copy
- */
-
 const ENTITY = "aboutParagraph";
 
 const COPY = [
@@ -39,9 +18,6 @@ const COPY = [
 ];
 
 async function main() {
-  // The history has to name somebody. Nobody is signed in here, so the change
-  // is attributed to the owner account and `surface` records the door it came
-  // through — "script" rather than "staging".
   const owner = await prisma.adminUser.findFirst({
     where: { role: "OWNER" },
     orderBy: { createdAt: "asc" },
@@ -60,8 +36,6 @@ async function main() {
     });
 
     for (const { sortOrder, content } of COPY) {
-      // Same tiebreak the admin and the site read with, so "row 1" here is the
-      // row they both call first.
       const before = await tx.aboutParagraph.findFirst({
         where: { sortOrder },
         orderBy: { id: "asc" },
@@ -70,8 +44,6 @@ async function main() {
       if (before.content === content) continue;
 
       await tx.aboutParagraph.update({ where: { id: before.id }, data: { content } });
-      // Read back rather than trusting the payload — the log should record what
-      // the column actually holds.
       const after = await tx.aboutParagraph.findUnique({ where: { id: before.id } });
 
       d.row({

@@ -3,19 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IconBraces, IconDownload, IconFileText, IconFileZip } from "@tabler/icons-react";
 
-/**
- * The Export menu, rendered from three places: the reader's action row, the
- * folder overview and the tree's context menu. The props are the whole contract
- * — a node id, what that node is, and its title — because a menu that needed
- * the loaded row would have to be threaded a different shape from each caller.
- *
- * Every item is a plain `<a download>`. No fetch, no blob, no object URL: the
- * browser already knows how to download a URL, it shows its own progress for a
- * large vault, and the filename comes off the response's Content-Disposition
- * rather than being guessed twice. A failed export is then an ordinary HTTP
- * response the user can see, not a swallowed promise.
- */
-
 type ExportKind = "FOLDER" | "QUESTION" | "VAULT";
 
 interface Choice {
@@ -31,8 +18,6 @@ const CHOICES: Choice[] = [
   { format: "zip", label: "Archive", hint: ".zip", Icon: IconFileZip },
 ];
 
-/** A single question has nothing to archive — one file in a zip is a worse
- *  version of the file. The route refuses it too; this keeps the two agreeing. */
 const choicesFor = (kind: ExportKind) =>
   kind === "QUESTION" ? CHOICES.filter((c) => c.format !== "zip") : CHOICES;
 
@@ -51,8 +36,6 @@ export function ExportMenu({ nodeId, kind, title }: { nodeId: string | null; kin
     if (refocus) btnRef.current?.focus();
   }, []);
 
-  /** `.nt-menu` is position:fixed, so it is placed against the trigger's
-   *  viewport rect and clamped rather than relying on a positioned ancestor. */
   const place = useCallback(() => {
     const r = btnRef.current?.getBoundingClientRect();
     if (!r) return;
@@ -77,9 +60,7 @@ export function ExportMenu({ nodeId, kind, title }: { nodeId: string | null; kin
       const t = e.target as Node;
       if (!menuRef.current?.contains(t) && !btnRef.current?.contains(t)) close(false);
     };
-    // Fixed positioning does not follow the page. Rather than re-measure on
-    // every scroll frame, the menu closes — a dropdown left hanging beside
-    // nothing is worse than one that needed a second click.
+    // fixed positioning does not follow the page
     const onScroll = () => close(false);
 
     document.addEventListener("keydown", onKey, true);
@@ -94,7 +75,6 @@ export function ExportMenu({ nodeId, kind, title }: { nodeId: string | null; kin
     };
   }, [open, place, close]);
 
-  // Focus moves into the menu on open so the keyboard never lands nowhere.
   useEffect(() => {
     if (open && at) menuRef.current?.querySelector<HTMLAnchorElement>("a")?.focus();
   }, [open, at]);
@@ -115,8 +95,6 @@ export function ExportMenu({ nodeId, kind, title }: { nodeId: string | null; kin
       e.preventDefault();
       items[items.length - 1]?.focus();
     } else if (e.key === "Tab") {
-      // Tabbing out of a menu closes it, and the trigger is where the tab order
-      // should resume from.
       close(true);
     }
   };
@@ -129,9 +107,6 @@ export function ExportMenu({ nodeId, kind, title }: { nodeId: string | null; kin
       <button
         ref={btnRef}
         type="button"
-        // Plain `.btn`, not `.btn.ghost`: the only place this renders is the
-        // `.nt-acts` row, where every sibling is a bordered button. A borderless
-        // Export beside them reads as disabled rather than as quieter.
         className="btn"
         aria-haspopup="menu"
         aria-expanded={open}

@@ -1,20 +1,12 @@
 'use client';
 
-// Aliased so the peek effect below can still reach the DOM's own `Image`
-// constructor for its preloads.
+// aliased so the peek effect can still reach the DOM's own Image
 import NextImage from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { skillIconMap, socialIconMap } from '@repo/ui/icons/registry';
 import MagneticLink from '../interactions/MagneticLink';
 
-/**
- * The peek photo cannot be a next/image: the pointer handler assigns `img.src`
- * as the cursor moves, and next/image owns that attribute. It can still be
- * *served* by the optimiser though — the endpoint is just a URL — which is the
- * difference between the 2 MB source PNG and ~25 kB of AVIF per photo.
- * Deliberately no srcset: a srcset would outrank every `src` the handler writes.
- */
-const PEEK_W = 384; // the widest .peek renders at 164 CSS px; this covers 2x
+const PEEK_W = 384; // .peek renders at 164 css px, this covers 2x
 const optimized = (src: string, w: number) =>
   `/_next/image?url=${encodeURIComponent(src)}&w=${w}&q=75`;
 
@@ -22,7 +14,6 @@ type HeroVersion = 'v1' | 'v2';
 
 interface HeroProps {
   version: HeroVersion;
-  /** v1 rotates through these; v2 ships a single row and holds still. */
   titles: string[];
   skills: { name: string; iconKey: string }[];
   socialLinks: { name: string; href: string; iconKey: string }[];
@@ -32,21 +23,15 @@ interface HeroProps {
   avatarUrl: string;
   resumeUrl: string;
   availabilityStatus: string;
-  /** Hex colour for the status dot. Empty follows `--foreground`, as it always did. */
   dotColor?: string;
-  /** Whether that dot keeps its ping ripple. Defaults to on. */
   dotPulse?: boolean;
-  /** Total skills shown in the Skills section — drives v2's "+N more" chip. */
   totalSkills?: number;
-  /** Optional extra photos for the name-hover peek deck. Defaults to [avatarUrl]. */
   photos?: string[];
-  /** Whether the sections this hero links out to actually rendered. */
   showAbout: boolean;
   showSkills: boolean;
   showContact: boolean;
 }
 
-/** v1 draws a fifth stroke that v2 drops. */
 function ResumeIcon({ fifthLine }: { fifthLine: boolean }) {
   return (
     <svg
@@ -184,7 +169,6 @@ function HeroBodyV2({
   );
 }
 
-/** Filled paw print — 13x13 via CSS, three of them make the scroll cue. */
 function Paw() {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -197,19 +181,12 @@ function Paw() {
   );
 }
 
-/**
- * The role word in the `// role ▮` line. Rotates through every CMS title
- * (2500ms hold, 400ms fade) and holds on the first one under reduced motion.
- * The visible word is aria-hidden; the full list is exposed once, statically,
- * to screen readers by the caller.
- */
 function RotatingRole({ titles }: { titles: string[] }) {
   const [index, setIndex] = useState(0);
   const [visible, setVisible] = useState(true);
   const [animate, setAnimate] = useState(false);
 
-  // Read the motion preference after mount only — reading it during render
-  // would desync from the server HTML.
+  // read the motion preference after mount, or it desyncs from the server html
   useEffect(() => {
     if (titles.length < 2) return;
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -267,9 +244,6 @@ export default function Hero({
 
   const deck = photos && photos.length > 0 ? photos : avatarUrl ? [avatarUrl] : [];
 
-  // The photo deck peeks out and trails the cursor while the nameplate is
-  // hovered; gliding across the letters flips through the photos. Pointer-fine
-  // devices only — everything else gets the static .peek-stack deck instead.
   useEffect(() => {
     const hero = heroRef.current;
     const nameEl = nameRef.current;
@@ -286,9 +260,6 @@ export default function Hero({
     document.documentElement.classList.toggle('no-peek', !canPeek);
     if (!canPeek) return;
 
-    // Preload the alternates so each flip is instant. Same optimised URL the
-    // flip will ask for — preloading the original would warm the wrong cache
-    // entry and pull a megabyte per photo to do it.
     list.slice(1).forEach((src) => {
       const pre = new Image();
       pre.src = optimized(src, PEEK_W);
@@ -320,7 +291,7 @@ export default function Hero({
         trail = 0;
         idx = (idx + 1) % list.length;
         img.src = optimized(list[idx] as string, PEEK_W);
-        s = Math.max(0.84, s - 0.12); // tiny pop on each flip
+        s = Math.max(0.84, s - 0.12);
       }
     };
 
@@ -358,9 +329,6 @@ export default function Hero({
     <section className="hero" id="hero" ref={heroRef}>
       <div className="hcontainer">
         <div className="toprow animate-fade-in-blur">
-          {/* The dot is CMS-driven twice over: an unset colour leaves the
-              custom property off entirely so the CSS fallback (`--foreground`)
-              keeps its theme-following monochrome. */}
           <span
             className={`avail mono${dotPulse ? '' : ' still'}`}
             style={dotColor ? ({ '--avail-dot': dotColor } as React.CSSProperties) : undefined}
@@ -407,7 +375,6 @@ export default function Hero({
           </div>
         </div>
 
-        {/* touch / reduced-motion fallback for the cursor-trailing photo */}
         <div className="peek-stack animate-fade-in-blur animate-delay-1" aria-hidden="true">
           {deck.slice(0, 3).map((src) => (
             <NextImage key={src} src={src} alt="" width={86} height={104} loading="lazy" />
@@ -431,7 +398,6 @@ export default function Hero({
             &larr; hover my name
           </span>
         </p>
-        {/* the rotation is decorative — screen readers get the full list, once */}
         <span
           className="sr-only"
           style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}
@@ -461,7 +427,6 @@ export default function Hero({
         )}
       </div>
 
-      {/* absolutely positioned, so it takes no part in the hero's flex column */}
       {deck.length > 0 && (
         // eslint-disable-next-line @next/next/no-img-element
         <img

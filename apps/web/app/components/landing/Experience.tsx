@@ -1,24 +1,5 @@
 'use client';
 
-/**
- * Experience — "commit history"
- *
- * The 6–12 bullet problem: recruiter eye-tracking shows the first bullet gets
- * read ~3.5x more than the fourth and dense walls get skipped, so a role shows
- * its first `visibleBullets` as a scan layer and folds the rest behind a
- * count-labelled hairline toggle. Folded bullets stay in the DOM
- * (grid-rows 0fr→1fr) so SSR/SEO sees every line. Bullet markers are em
- * dashes in the terminal voice, numeric tokens render as mono "metric anchors"
- * (quantified lines hold recruiter gaze ~2x longer), and the tech chips sit
- * ABOVE the bullets — chips are metadata, they describe the role, and the
- * recruiter scan checks the stack before reading bullet one. Hover: cursor
- * spotlight + sibling dim. A role with no more bullets than its limit renders
- * everything with no toggle.
- *
- * CMS note: `visibleBullets` is set per role in the admin (default 4) — keep
- * each role's strongest, most quantified achievements in those first slots.
- */
-
 import { useId, useRef, useState } from 'react';
 import { useInView, useReducedMotion } from 'motion/react';
 import Container from '../common/Container';
@@ -35,25 +16,19 @@ export interface ExperienceData {
   isCurrent: boolean;
   website: string | null;
   logoUrl: string | null;
-  /** Bullets shown before the toggle — set per role in the admin. */
   visibleBullets: number;
   bullets: string[];
   technologies: string[];
 }
 
-/** Used when a role predates the per-role column, or it's been zeroed out. */
 const DEFAULT_VISIBLE_BULLETS = 4;
 
-/* Bold-lead bullets: "**scan line** rest of the detail".
-   NOTE: identical to the parseBullet in landing/Projects.tsx — duplicated on
-   purpose; a later pass can hoist one copy into a shared module. */
 function parseBullet(content: string) {
   const match = content.match(/^\*\*(.*?)\*\*\s?(.*)/s);
   if (match) return { highlight: match[1]!, detail: match[2]! };
   return { highlight: content, detail: '' };
 }
 
-/* "95%", "100+", "10k+", "40%", "12 minutes" → mono metric anchors. */
 const METRIC = /(\d[\d,.]*\s?(?:%|\+|x|k\+?|K\+?|M\+?|hrs?|mins?|minutes?|mos?|yrs?)?)/g;
 
 function MetricizedDetail({ text }: { text: string }) {
@@ -79,7 +54,6 @@ const MONTHS = [
   'july', 'august', 'september', 'october', 'november', 'december',
 ];
 
-/** Absolute month index for a "July 2025"-style string; NaN when unparseable. */
 function monthOrdinal(value: string): number {
   if (/present|current|now/i.test(value)) {
     const now = new Date();
@@ -93,12 +67,6 @@ function monthOrdinal(value: string): number {
   return year * 12 + (month === -1 ? 0 : month);
 }
 
-/**
- * LinkedIn-style inclusive tenure: "July 2025" → "Present" gives "1 yr 1 mo".
- * startDate/endDate are plain strings in this schema, so this parses month
- * names rather than Date objects. Returns '' when unparseable so the pill is
- * simply omitted.
- */
 function tenure(start: string, end: string, isCurrent: boolean): string {
   const from = monthOrdinal(start);
   const to = isCurrent ? monthOrdinal('present') : monthOrdinal(end);
@@ -140,8 +108,6 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
   const inView = useInView(cardRef, { once: true, amount: 0.15 });
   const reducedMotion = useReducedMotion();
 
-  /* spotlight follows the cursor — written straight to the element so
-     mousemove never re-renders React */
   const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const el = cardRef.current;
     if (!el) return;
@@ -154,7 +120,6 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
     const next = !open;
     setOpen(next);
     if (!next) {
-      // collapsing pulls the page up — don't strand the reader below the fold
       window.setTimeout(
         () => {
           const btn = moreRef.current;
@@ -193,12 +158,6 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
                 decoding="async"
               />
             )}
-            {/* The heading is unconditional and the link lives INSIDE it. It
-                used to be the fallback branch, so a role with a website was a
-                bare <a> — and since both roles have one, the section
-                contributed nothing to the heading outline and a screen reader
-                went straight from "Experience" to "Projects" with no way to
-                move between roles. */}
             <h3 className="xp-name">
               {exp.website ? (
                 <a href={exp.website} target="_blank" rel="noopener noreferrer">
@@ -230,8 +189,6 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
         </div>
       </div>
 
-      {/* the stack is metadata — it describes the role, so it sits with the
-          role header and never moves when the fold opens */}
       {exp.technologies.length > 0 && (
         <div className="xp-badges">
           {exp.technologies.map((tech) => {
@@ -246,7 +203,6 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
         </div>
       )}
 
-      {/* the scan layer — first MAX_VISIBLE achievements */}
       <ul className="xp-log">
         {head.map((bullet, i) => (
           <LogLine key={i} bullet={bullet} index={i} />
@@ -255,10 +211,6 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
 
       {overflows && (
         <>
-          {/* bullets 4..n never leave the DOM — SSR & crawlers see everything */}
-          {/* `inert` keeps the bullets in the DOM for SSR and crawlers while
-              taking them out of the accessibility tree, so the collapsed state
-              matches what aria-expanded on the toggle claims. */}
           <div className="xp-fold" id={foldId} inert={!open} aria-hidden={!open}>
             <div>
               <ul className="xp-log">

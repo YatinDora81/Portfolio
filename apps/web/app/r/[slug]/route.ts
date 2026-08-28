@@ -8,7 +8,6 @@ import { isValidSlug, safeDestination } from "@repo/shared/slug";
 
 export const dynamic = "force-dynamic";
 
-// 302, never 301: a cached permanent redirect never reaches this server again, so only the first click counts.
 function bounce(target: string, base: string): Response {
   return new Response(null, {
     status: 302,
@@ -39,12 +38,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     }
 
     const target = new URL(destination, base);
-    // Rung 1 of the attribution ladder — /api/collect reads this as `linkSlug`.
     target.searchParams.set("ref", slug);
 
     const userAgent = request.headers.get("user-agent") ?? "";
     const prefetching = request.headers.get("sec-purpose")?.includes("prefetch") ?? false;
-    // Slack and LinkedIn unfurlers fetch a pasted link at once, which would count as a click.
     if (!isBot(userAgent) && !prefetching) {
       const facts = readFacts(request.headers, userAgent);
       after(() => recordClick(link.id, facts));
@@ -65,7 +62,6 @@ type ClickFacts = {
   referrerHost: string | null;
 };
 
-// Read while the request is still here: `after` runs past the response.
 function readFacts(headers: Headers, userAgent: string): ClickFacts {
   const referrerHost = normalizeHost(headers.get("referer"));
   const ownHost = normalizeHost(headers.get("host"));

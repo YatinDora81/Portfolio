@@ -75,7 +75,6 @@ export async function createTrackedLink(input: {
     };
   }
 
-  // Insert-and-retry rather than check-then-insert: the unique index decides the race.
   for (let attempt = 1; attempt <= SLUG_ATTEMPTS; attempt++) {
     const slug = generateSlug();
     try {
@@ -125,7 +124,6 @@ export async function setTrackedLinkActive(
   const parsed = z.object({ id: z.string().uuid(), active: z.boolean() }).safeParse({ id, active });
   if (!parsed.success) return { ok: false, error: "That is not a link this server knows." };
 
-  // `updateMany` reports a missing row as zero rows rather than throwing.
   const { count } = await prisma.trackedLink.updateMany({
     where: { id: parsed.data.id },
     data: { active: parsed.data.active },

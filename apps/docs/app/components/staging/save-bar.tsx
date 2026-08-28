@@ -8,25 +8,11 @@ import type { Entity } from "@/lib/actions/staging";
 import { WHERE } from "@/lib/audit";
 import { useStaging } from "./staging-provider";
 
-/**
- * The page-level Cancel / Save / Save & Publish bar.
- *
- * A band under the scroller — the last child of `.main`'s column — rather than
- * a sticky child of `.content`. Sticky only travels inside the content box, so
- * on a page shorter than the viewport it ran out of range and came to rest a
- * content-length-dependent distance above the bottom edge. As a sibling the
- * scroller ends where the bar begins, so the last row clears it for free.
- *
- * Styling is `.savebar` in `control-room.css`; `.savebar-inner` holds its
- * contents on the `.view` reading column.
- */
-
 export function SaveBar() {
   const { ops, count, saving, discardAll, commit } = useStaging();
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [asking, setAsking] = useState(false);
 
-  // One line per surface, in the order the changes were staged.
   const breakdown = useMemo(() => {
     const tally = new Map<Entity, number>();
     for (const op of ops) tally.set(op.entity, (tally.get(op.entity) ?? 0) + 1);
@@ -34,8 +20,6 @@ export function SaveBar() {
   }, [ops]);
 
   async function run(publish: boolean) {
-    // Belt and braces with the store's own in-flight ref: neither button may put
-    // a second batch in the air while the first is still out there.
     if (busy || saving) return;
     setBusy(publish ? "publish" : "save");
     try {
@@ -75,10 +59,6 @@ export function SaveBar() {
         </div>
       </div>
 
-      {/* Cancel throws away the whole batch, and the batch spans pages — on
-          /quotes it can be holding three hero titles no card here is marked
-          with. Discarding that on one click, with nothing on screen to explain
-          the number, is the one destructive button in the bar. */}
       <Dialog
         open={asking}
         onClose={() => setAsking(false)}
@@ -100,8 +80,6 @@ export function SaveBar() {
           Nothing has been written yet, so this changes nothing on the live site — but the rows below
           go back to what the database says, and there is no undo for that.
         </p>
-        {/* Always listed, even for a single surface: the whole point is that the
-            batch can be holding rows the page you are looking at never shows. */}
         <div style={{ display: "grid", gap: 6 }}>
           {breakdown.map((g) => (
             <div key={g.entity} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13 }}>

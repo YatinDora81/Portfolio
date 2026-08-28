@@ -22,7 +22,6 @@ interface TrackerRow {
 
 const AUTO_SYNC_INTERVAL_MS = 40_000;
 
-/** Compact `.sel` sizing for the filter strip — `.sel` is full width by default. */
 const SEL_STYLE: React.CSSProperties = {
   width: "auto",
   minWidth: 132,

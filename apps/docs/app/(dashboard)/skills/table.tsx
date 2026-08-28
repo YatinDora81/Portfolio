@@ -17,10 +17,6 @@ import {
   IconGripVertical, IconArrowBackUp,
 } from "@tabler/icons-react";
 import { findSkillIcon } from "@repo/ui/icons/registry";
-// The category vocabulary the site's periodic table actually filters on. It
-// already lives once in this app (the preview mirrors apps/web's skill-meta.ts,
-// which sits behind that app's own `@/` alias), so the admin's clusters can
-// never name a chip the site does not draw.
 import { CATEGORIES, metaFor, deriveSymbol, type CategoryId } from "@/components/preview/skills";
 
 interface Skill { id: string; name: string; iconKey: string; show: boolean; sortOrder: number }
@@ -34,7 +30,6 @@ function SkillChip({ skill, sortable, muted }: { skill: Skill; sortable: Sortabl
   const cluster = CATEGORIES.find(c => c.id === category);
 
   const gone = isDeleted("skill", skill.id);
-  /** Exactly one diff mark per chip: gone beats new beats edited. */
   const mark = gone ? "staged-del"
     : isNew("skill", skill.id) ? "staged-new"
       : isEdited("skill", skill.id) ? "staged-edit"
@@ -43,8 +38,6 @@ function SkillChip({ skill, sortable, muted }: { skill: Skill; sortable: Sortabl
   return (
     <div
       className={cn("skill sortable skl-el", !skill.show && "hid", muted && "skl-mute", mark)}
-      // The site's own accent for this cluster, decorative: it paints the 2px
-      // hairline and the legend dot only, never any text.
       style={{ ["--cat" as string]: color }}
       title={cluster ? `${skill.name} — ${cluster.label}` : skill.name}
       {...sortable.itemProps(skill.id)}
@@ -52,9 +45,7 @@ function SkillChip({ skill, sortable, muted }: { skill: Skill; sortable: Sortabl
       <span className="row-grip" title="Drag to reorder" {...sortable.handleProps(skill.id)}>
         <IconGripVertical size={13} />
       </span>
-      {/* The glyph the site will actually draw. With no registry entry the site
-          falls back to the two-letter element symbol, so that is what shows
-          here — a red warning would claim a hole the grid does not have. */}
+
       <span className={cn("ico-sw sm", !icon && "ink")}>
         {icon
           ? <icon.Icon />
@@ -63,16 +54,13 @@ function SkillChip({ skill, sortable, muted }: { skill: Skill; sortable: Sortabl
       <div style={{ minWidth: 0 }}>
         <div className="skill-n">{skill.name}</div>
         <div className="skl-sym">
-          {/* The icon key is only worth surfacing when it diverges from the name
-              — that mismatch is what decides which glyph the site renders. */}
+
           {icon
             ? (skill.iconKey !== skill.name ? skill.iconKey : cluster?.label ?? "")
             : `no icon · draws ${deriveSymbol(skill.name)}`}
         </div>
       </div>
       {gone ? (
-        // The chip stays put, struck through, until the bar commits — so the undo
-        // takes the place of the controls that are no longer meaningful.
         <button
           className="ibtn"
           aria-label={`Keep ${skill.name}`}
@@ -105,7 +93,6 @@ function SkillChip({ skill, sortable, muted }: { skill: Skill; sortable: Sortabl
   );
 }
 
-/** Edit opens the same dialog as Add, seeded with this skill. */
 function SkillEditButton({ skill }: { skill: Skill }) {
   const [open, setOpen] = useState(false);
   return (
@@ -118,7 +105,6 @@ function SkillEditButton({ skill }: { skill: Skill }) {
   );
 }
 
-/** Mounted only while open, so `show` always re-seeds from the row being edited. */
 function SkillDialog({ onClose, editing }: { onClose: () => void; editing: Skill | null }) {
   const { stageCreate, stageUpdate } = useStaging();
   const [show, setShow] = useState(editing?.show ?? true);
@@ -129,15 +115,11 @@ function SkillDialog({ onClose, editing }: { onClose: () => void; editing: Skill
     <Dialog open onClose={onClose} title={editing ? "Edit skill" : "Add skill"} icon={IconCpu}>
       <form
         action={(formData) => {
-          // A staged create has to carry every field the chip renders, since the
-          // overlay materialises the pending row out of exactly this bag.
           const fields = {
             name: String(formData.get("name") ?? ""),
             iconKey: String(formData.get("iconKey") ?? ""),
             show,
           };
-          // Editing a row that is itself a pending create folds into that create
-          // — the store keys on the id either way, tempId included.
           if (editing) stageUpdate("skill", editing.id, fields);
           else stageCreate("skill", fields);
           onClose();
@@ -150,8 +132,6 @@ function SkillDialog({ onClose, editing }: { onClose: () => void; editing: Skill
             value={name}
             onChange={e => setName(e.target.value)}
             required
-            // The cluster is derived from the name and never stored, so the only
-            // honest place to show it is beside the field that decides it.
             hint={name.trim()
               ? `Filters under “${cluster?.label}” on the site`
               : "The name decides which cluster it filters under"}
@@ -164,9 +144,7 @@ function SkillDialog({ onClose, editing }: { onClose: () => void; editing: Skill
             hint="Usually the same as the name — browse them all under Icon library."
           />
         </div>
-        {/* Deliberately not a `.f` wrapper: `.f label` would restyle the Switch's
-            own caption into the mono field-label face. Single source of truth for
-            `show` — this state is what gets staged, so no mirror field. */}
+
         <div style={{ marginBottom: 14 }}>
           <Switch
             checked={show}
@@ -176,7 +154,7 @@ function SkillDialog({ onClose, editing }: { onClose: () => void; editing: Skill
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, paddingTop: 4 }}>
           <Button variant="ghost" type="button" onClick={onClose}>Cancel</Button>
-          {/* Not "Save": this only puts the chip in the list. The save bar writes. */}
+
           <Button type="submit">{editing ? "Update skill" : "Add skill"}</Button>
         </div>
       </form>
@@ -189,24 +167,14 @@ export function SkillsTable({ skills }: { skills: Skill[] }) {
   const [addOpen, setAddOpen] = useState(false);
   const [filter, setFilter] = useState<CategoryId | null>(null);
 
-  // Everything staged for this entity — new chips, pending edits and toggles,
-  // the pending drag order — folded onto the server rows, so a toggled skill
-  // hops lanes the moment it is clicked rather than after a round trip.
   const staged = overlay("skill", skills, (s) => s.id);
 
-  // One hook over the flat list: `sortOrder` is a single sequence and the site
-  // renders it as one continuous grid. Category is a *filter* there, not a
-  // folder — which is exactly why it is a filter here too. Clusters as folders
-  // would make a cross-cluster drag mean nothing, since the category is derived
-  // from the name and cannot be changed by moving a chip.
   const sortable = useSortable(
     staged.map((s) => s.id),
     (ids) => stageReorder("skill", ids)
   );
 
-  // Sorted BY the drag order rather than mapped THROUGH it: the hook re-seeds in
-  // an effect, so for one render after a create its `order` has no slot for the
-  // new chip — mapping through it would blink the chip out of existence.
+  // sorted by drag order, not mapped through it
   const rank = new Map(sortable.order.map((id, i) => [id, i] as const));
   const at = (id: string) => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
   const ordered = [...staged].sort((a, b) => at(a.id) - at(b.id));
@@ -214,8 +182,6 @@ export function SkillsTable({ skills }: { skills: Skill[] }) {
   const grid = ordered.filter(s => s.show);
   const tray = ordered.filter(s => !s.show);
 
-  // Counted over the published grid only — the legend describes what visitors
-  // can filter, and a hidden skill is not in that table at all.
   const counts = useMemo(() => {
     const m = new Map<CategoryId, number>();
     for (const s of grid) {

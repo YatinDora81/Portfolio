@@ -4,29 +4,12 @@ import type { ReactNode } from "react";
 import { findSkillIcon, skillIconMap } from "@repo/ui/icons/registry";
 import { DIM, FAINT, MONO, SectionLabel } from "./frame";
 
-// ─── Skills Preview ──────────────────────────────────────────────
-// Mirrors apps/web/app/components/landing/Skills.tsx — the "periodic table".
-//
-// The cards are borderless and transparent at rest; the only chrome is the
-// brand-coloured hairline across the top of each one, which is what makes the
-// grid read as a periodic table rather than a row of chips. Above it sits the
-// category filter, whose resting state has "All" selected — so the All chip is
-// drawn lit, and no counts show (the site only prints a count on a *category*
-// chip once it is the one selected).
-//
-// Icons come from the shared @repo/ui registry, the same table the site draws
-// from and the same one the admin's icon picker offers, so a glyph can never
-// drift between the preview and the published grid.
-
 const BORDER = "rgba(255,255,255,0.1)";
 
-/** The grid is the whole point of this section, so the cap is generous — but a
- *  60-skill table would out-scroll the admin card it lives in. */
 const MAX_CARDS = 40;
 
 export type CategoryId = "frontend" | "backend" | "database" | "devops" | "core";
 
-/** Mirrors `skillCategories` in apps/web/app/lib/skill-meta.ts. */
 export const CATEGORIES: { id: CategoryId; label: string; color: string }[] = [
   { id: "frontend", label: "Frontend", color: "#38BDF8" },
   { id: "backend", label: "Backend", color: "#34D399" },
@@ -35,13 +18,7 @@ export const CATEGORIES: { id: CategoryId; label: string; color: string }[] = [
   { id: "core", label: "CS & Tooling", color: "#F472B6" },
 ];
 
-/**
- * Accent colour per skill, bucketed by the chip it belongs to — the same table
- * `getSkillMeta` reads on the site. It is restated rather than imported
- * because it lives behind apps/web's own `@/` alias, which does not resolve
- * from this app. Only the presentation metadata is duplicated: the icons,
- * which are the part that actually grows, still come from @repo/ui.
- */
+// duplicated: apps/web's @/ alias doesn't resolve from this app
 const META: Record<CategoryId, Record<string, string>> = {
   frontend: {
     "Next.js": "#E5E5E5", "React": "#61DAFB", "React.js": "#61DAFB", "TypeScript": "#3178C6",
@@ -71,20 +48,16 @@ const META: Record<CategoryId, Record<string, string>> = {
   },
 };
 
-/** Flattened once at module scope: skill name → its chip and accent. */
 const LOOKUP: Record<string, { category: CategoryId; color: string }> = Object.fromEntries(
   CATEGORIES.flatMap((c) =>
     Object.entries(META[c.id]).map(([name, color]) => [name, { category: c.id, color }] as const),
   ),
 );
 
-/** Same fallback the site uses: unmapped skills land in "CS & Tooling". */
 export function metaFor(name: string): { category: CategoryId; color: string } {
   return LOOKUP[name] ?? { category: "core", color: "#F472B6" };
 }
 
-/** `deriveSymbol` from skill-meta — the two-letter element symbol a card falls
- *  back to when the registry has no glyph for it, so no card is ever a hole. */
 export function deriveSymbol(name: string): string {
   const letters = name.replace(/[^a-zA-Z0-9]/g, "");
   if (letters.length === 0) return "??";
@@ -100,15 +73,6 @@ function rgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-/**
- * The site looks up `iconKey` first and the display name second. The preview is
- * handed names (the pages do not carry `iconKey` through the staging overlay),
- * so the alias/case-insensitive registry lookup is the third try — that is what
- * still resolves a skill stored as "react" or "React.js".
- *
- * No `tune()` here: it darkens bright brand colours for LIGHT mode only and
- * returns the hex untouched in dark, which is the only mode this pane renders.
- */
 function iconFor(name: string, iconKey?: string): ReactNode {
   const byKey = iconKey ? skillIconMap[iconKey] : undefined;
   if (byKey) return byKey;
@@ -119,15 +83,11 @@ function iconFor(name: string, iconKey?: string): ReactNode {
 }
 
 export function SkillsPreview({ skills }: {
-  /** `iconKey` is optional: no call site passes it today, and the name-based
-   *  lookup above resolves the overwhelming majority of rows without it. */
   skills: { name: string; iconKey?: string }[];
 }) {
   const shown = skills.slice(0, MAX_CARDS);
   const hidden = skills.length - shown.length;
 
-  // Counted over every skill, not just the drawn ones — the chips describe the
-  // published grid, which the card cap is only truncating for display.
   const counts = new Map<CategoryId, number>();
   for (const s of skills) {
     const { category } = metaFor(s.name);
@@ -154,7 +114,6 @@ export function SkillsPreview({ skills }: {
         <p className="mt-5 text-[10px] italic" style={{ color: FAINT }}>No visible skills</p>
       ) : (
         <>
-          {/* category filter — resting state, so "All" is the lit chip */}
           <div className="mt-4 flex flex-wrap items-center gap-1.5">
             {chips.map((chip) => (
               <span
@@ -178,7 +137,6 @@ export function SkillsPreview({ skills }: {
             ))}
           </div>
 
-          {/* the table — one continuous grid, original order intact */}
           <div className="mt-4 flex flex-wrap justify-center gap-1.5">
             {shown.map((s, i) => {
               const { color } = metaFor(s.name);
@@ -188,15 +146,12 @@ export function SkillsPreview({ skills }: {
                   key={`${i}-${s.name}`}
                   className="relative flex aspect-square w-[58px] flex-col justify-between overflow-hidden rounded-lg p-1.5"
                 >
-                  {/* category accent hairline — the card's only resting chrome */}
                   <span
                     aria-hidden="true"
                     className="pointer-events-none absolute inset-x-2 top-0 h-[2px] rounded-b-full"
                     style={{ background: rgba(color, 0.4) }}
                   />
 
-                  {/* the row the atomic number / symbol sits in, commented out
-                      on the site too — it still holds the card's top spacing */}
                   <span aria-hidden="true" className="block h-1" />
 
                   <span className="flex size-6 items-center justify-center self-center">
@@ -221,9 +176,6 @@ export function SkillsPreview({ skills }: {
             })}
           </div>
 
-          {/* The live readout row. Nothing is hovered in a preview, so the site
-              leaves it empty — its reserved height is used here to own up to
-              the card cap instead of hiding it above the fold. */}
           <div
             className="mt-4 flex h-4 items-center justify-center text-[9px]"
             style={{ fontFamily: MONO, color: DIM }}

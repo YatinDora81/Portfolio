@@ -1,7 +1,6 @@
 export default function PreviewBanner({ status }: { status: string }) {
   return (
     <>
-      {/* Reserves the fixed bar's height so it cannot sit on top of the footer. */}
       <div aria-hidden="true" className="h-10 print:hidden" />
 
       <aside

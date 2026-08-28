@@ -10,7 +10,7 @@ import {
   IconAlertTriangle, IconCircleCheck, IconEye, IconRefresh, IconRocket,
 } from "@tabler/icons-react";
 
-// `stale` = the status moved but the flush did not.
+// stale = the status moved but the flush did not
 type Outcome =
   | { kind: "done" }
   | { kind: "stale"; error: string }
@@ -22,11 +22,9 @@ export type LifecycleKind = "blog" | "project";
 export function RowActions({ kind, id, slug, title, status, previewBlocked }: {
   kind: LifecycleKind;
   id: string;
-  /** Null for a project, which has no detail page. */
   slug: string | null;
   title: string;
   status: ContentStatus;
-  /** Why preview links cannot be minted right now, or null when they can. */
   previewBlocked: string | null;
 }) {
   const [busy, setBusy] = useState<"publish" | "preview" | null>(null);
@@ -37,7 +35,7 @@ export function RowActions({ kind, id, slug, title, status, previewBlocked }: {
   const canPreview = status === "DRAFT" || status === "SCHEDULED";
   if (!canPublishNow && !canPreview) return null;
 
-  // Must be caught: a throw inside a transition reaches no error boundary.
+  // a throw inside a transition reaches no error boundary
   const publishNow = () => {
     setBusy("publish");
     setOutcome(null);
@@ -67,14 +65,13 @@ export function RowActions({ kind, id, slug, title, status, previewBlocked }: {
     start(async () => {
       try {
         const res = await createPreviewLink(
-          // A project has no detail page, so its preview is the homepage in draft mode.
           kind === "blog" && slug ? { type: "Blog", slug } : { type: "Home" }
         );
         if (!res.ok || !res.url) {
           setOutcome({ kind: "failed", error: res.error ?? "No preview link was returned." });
           return;
         }
-        // The await broke the user-gesture chain, so this may be blocked; the link stays on screen.
+        // the await broke the gesture chain, so this may be blocked
         window.open(res.url, "_blank", "noopener,noreferrer");
         setOutcome({ kind: "link", url: res.url });
       } catch (e) {

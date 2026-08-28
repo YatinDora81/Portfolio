@@ -46,7 +46,7 @@ export function sendEvents(events: CollectEvent[], attribution: Attribution): vo
     landingPath: attribution.landingPath,
   });
 
-  // sendBeacon survives the unload that cancels a plain fetch.
+  // sendBeacon survives the unload that cancels a fetch
   try {
     if (
       typeof navigator.sendBeacon === 'function' &&
@@ -55,7 +55,7 @@ export function sendEvents(events: CollectEvent[], attribution: Attribution): vo
       return;
     }
   } catch {
-    // Fall through to fetch.
+    // falls through to fetch
   }
 
   void fetch(ENDPOINT, {

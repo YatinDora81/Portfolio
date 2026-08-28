@@ -10,17 +10,9 @@ import { cn } from "@/lib/utils";
 
 const SEARCH = `${NOTES_ROOT}/search`;
 
-/** Long enough that a whole word costs one navigation, short enough that the
- *  results still feel attached to the keyboard. */
 const DEBOUNCE = 250;
 
-/**
- * `parseQuery`'s own split, duplicated here because query.ts does not export it.
- *
- * It has to be the same split. A chip that removes `tag:redis` with a string
- * replace also takes the middle out of `tag:redisson` and leaves behind a query
- * nobody typed — tokens are compared whole, or not at all.
- */
+// same split parseQuery uses
 const TOKENS = /(?:[^\s"]+|"[^"]*")+/g;
 
 const SYNTAX: readonly (readonly [string, string])[] = [
@@ -46,8 +38,6 @@ function hrefForQuery(raw: string): string {
 const hasToken = (raw: string, token: string) =>
   tokensOf(raw).some((t) => t.toLowerCase() === token.toLowerCase());
 
-/** Adds only what is missing, token by token, so clicking the `union find` row
- *  of the syntax card on a query that already says `union` adds `find` alone. */
 function addTokens(raw: string, add: string): string {
   const have = new Set(tokensOf(raw).map((t) => t.toLowerCase()));
   return join([...tokensOf(raw), ...tokensOf(add).filter((t) => !have.has(t.toLowerCase()))]);
@@ -56,11 +46,8 @@ function addTokens(raw: string, add: string): string {
 const dropTokens = (raw: string, hit: (t: string) => boolean) =>
   join(tokensOf(raw).filter((t) => !hit(t)));
 
-/** Quoted only when the tag needs it, so the common case stays readable. */
 const tagToken = (tag: string) => (/\s/.test(tag) ? `tag:"${tag}"` : `tag:${tag}`);
 
-/** Whether a token names this tag *positively* — `#x` and `tag:x` are one thing
- *  to the parser, and `-tag:x` is a different token that a chip must not eat. */
 function namesTag(token: string, tag: string): boolean {
   const t = token.toLowerCase();
   const want = tag.toLowerCase();
@@ -69,18 +56,6 @@ function namesTag(token: string, tag: string): boolean {
   return false;
 }
 
-/**
- * The search head: the box, the syntax card, the quick filters and the facets.
- *
- * The URL is the state. Every control here is a real link or a real GET form
- * aimed at /notes/search, so the page still searches with the tab hydrating or
- * with scripting off entirely; the handlers only upgrade a document load into a
- * client navigation. That is also why the box is the one client file — nothing
- * else on the page needs to be.
- *
- * Typing `replace`s and chips `push`: a query built one keystroke at a time is
- * one destination, but a chip is a decision, and Back should undo it.
- */
 export function SearchBox({
   q,
   count,
@@ -90,10 +65,8 @@ export function SearchBox({
 }: {
   q: string;
   count: number;
-  /** More hits exist than the page asked for; the count is a floor, not a total. */
   capped: boolean;
   facets: { tag: string; count: number }[];
-  /** Whether the facets describe these results or stand in for the whole vault. */
   fromResults: boolean;
 }) {
   const router = useRouter();
@@ -101,8 +74,6 @@ export function SearchBox({
   const [syntax, setSyntax] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const timer = useRef<number | null>(null);
-  /** The query this box last put in the URL, so it can tell its own echo from a
-   *  navigation that happened elsewhere. */
   const sent = useRef(q);
 
   const cancel = () => {
@@ -111,10 +82,6 @@ export function SearchBox({
   };
   useEffect(() => () => cancel(), []);
 
-  // Back, forward and a click on a result all move `q` underneath the box, and
-  // the input has to follow. Re-imposing the prop on every render instead would
-  // undo the keystroke that has not been sent yet — hence the guard, and hence
-  // the caret staying exactly where the typist left it.
   useEffect(() => {
     if (q === sent.current) return;
     sent.current = q;
@@ -133,17 +100,11 @@ export function SearchBox({
     timer.current = window.setTimeout(() => send(next), DEBOUNCE);
   };
 
-  /** Enter only settles what is already being typed, so it replaces rather than
-   *  pushes: a query built one keystroke at a time is one destination, and Back
-   *  should leave it, not walk back through it. */
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     send(value);
   };
 
-  /** A query the user picked rather than typed: no debounce, and it earns a
-   *  history entry. Cancelling first matters — a pending keystroke would land
-   *  after the click and quietly put the old query back. */
   const go = (next: string) => {
     cancel();
     const t = next.trim();
@@ -158,18 +119,12 @@ export function SearchBox({
     input.current?.focus();
   };
 
-  /** Every button row below is a GET form whose submitter carries the query it
-   *  would produce, so the no-script path and the click path can only ever
-   *  navigate to the same place. */
   const pick = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const btn = (e.nativeEvent as SubmitEvent).submitter;
     if (btn instanceof HTMLButtonElement) go(btn.value);
   };
 
-  // Read off the box, not off the URL: the chips light up and the unknown-filter
-  // notice appears while the query is still being typed, in step with the input
-  // that produced them. Only the result count belongs to the server.
   const parsed = parseQuery(value);
   const activeTags = new Set(parsed.tags);
 
@@ -227,9 +182,6 @@ export function SearchBox({
             {SYNTAX.map(([example, means]) => (
               <tr key={example}>
                 <td>
-                  {/* Adds the example to whatever is already typed rather than
-                      replacing it: the card is read mid-query, and wiping the
-                      words someone came here with is not help. */}
                   <button type="submit" name="q" value={addTokens(value, example)} title="Add to the query">
                     <code>{example}</code>
                   </button>

@@ -2,16 +2,13 @@ import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { env } from "@repo/config/env";
 
-/** `"Home"` exists because Project has no slug and no detail page to point at. */
 export type PreviewClaims = { type: "Blog"; slug: string } | { type: "Home" };
 
 const ALG = "HS256";
 const TTL = "30m";
 
-// Checked on verify: the second lock if `JWT_SECRET` and `PREVIEW_SECRET` ever match.
 const PURPOSE = "preview";
 
-// Null rather than a fallback to `JWT_SECRET`: no secret means preview is simply off.
 function previewKey(): Uint8Array | null {
   if (!env.PREVIEW_SECRET) return null;
   return new TextEncoder().encode(env.PREVIEW_SECRET);
@@ -28,7 +25,6 @@ export async function createPreviewToken(claims: PreviewClaims): Promise<string 
     .sign(key);
 }
 
-// Null for every failure — telling them apart only helps whoever is guessing.
 export async function verifyPreviewToken(token: string): Promise<PreviewClaims | null> {
   const key = previewKey();
   if (!key) return null;
@@ -51,7 +47,6 @@ export async function verifyPreviewToken(token: string): Promise<PreviewClaims |
 
     return null;
   } catch {
-    // jose throws for expiry and for a bad signature alike; both are "no".
     return null;
   }
 }

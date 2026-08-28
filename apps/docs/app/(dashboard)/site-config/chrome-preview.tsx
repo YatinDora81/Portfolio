@@ -2,18 +2,6 @@
 
 import { DIM, FAINT, MONO } from "@/components/preview/frame";
 
-// ─── Chrome Preview ──────────────────────────────────────────────
-// The two strips this page owns, at preview scale: the floating navbar at the
-// top of every page and the footer that closes it. Deliberately not a Staged*
-// wrapper — no staged entity writes either surface, so a pending-change chip
-// here would permanently read zero while the form above is dirty.
-//
-// Mirrors apps/web/app/components/common/Navbar.tsx and Footer.tsx: the five
-// section links (Blogs only when a post is published), the paw and theme
-// toggles, the breathing ✦ divider, the mono copyright line, and the giant
-// name mark that the footer bleeds off the bottom of the page.
-
-/** Same keys, same order, as Navbar's `allNavItems`. */
 const NAV_ITEMS = [
   { key: "skills", name: "Skills" },
   { key: "experience", name: "Experience" },
@@ -34,11 +22,9 @@ export function ChromePreview({ logo, copyrightName, hasBlogs, sections }: {
   hasBlogs: boolean;
   sections: Record<NavSection, boolean>;
 }) {
-  // Navbar.tsx's rule, kept in its two halves so the preview can name which half dropped a link.
   const items = NAV_ITEMS.filter(i => sections[i.key] && (i.key !== "blogs" || hasBlogs));
   const flaggedOff = NAV_ITEMS.filter(i => !sections[i.key]);
 
-  // `(wordmark || copyrightName || 'PORTFOLIO').toUpperCase()` — Footer.tsx.
   const mark = (copyrightName.trim() || "PORTFOLIO").toUpperCase();
   const year = new Date().getFullYear();
 
@@ -96,7 +82,6 @@ export function ChromePreview({ logo, copyrightName, hasBlogs, sections }: {
           &copy; {year} {copyrightName.trim() || <Unset>no name</Unset>} &mdash; all rights reserved
         </p>
 
-        {/* The name mark — bled off the bottom edge, as on the site. */}
         <div
           aria-hidden="true"
           className="mt-4 text-center font-extrabold leading-none"

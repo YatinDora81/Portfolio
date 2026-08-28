@@ -5,14 +5,13 @@ export interface TemplateVars {
 
 export const TEMPLATE_TOKENS = ["{{name}}", "{{purpose}}"] as const;
 
-/** Substitutes into text, never HTML: `renderReplyEmail` escapes afterwards. */
+// text only, never HTML; renderReplyEmail escapes later
 export function applyVars(text: string, vars: TemplateVars): string {
   return text.replace(/\{\{\s*(name|purpose)\s*\}\}/g, (_match, key: string) =>
     key === "name" ? vars.name : vars.purpose
   );
 }
 
-/** Inverts `escapeHtmlLines`, so a stored template is editable as text in the composer. */
 export function htmlToText(html: string): string {
   return html
     .replace(/<br\s*\/?>/gi, "\n")

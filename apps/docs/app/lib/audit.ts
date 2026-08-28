@@ -1,16 +1,5 @@
 import type { Entity } from "@/lib/actions/staging";
 
-/**
- * The pure half of the audit log: label maps, redaction, and the field diff.
- *
- * Split from `audit-writer.ts` because nothing here imports Prisma and nothing
- * here is a server action, so the history page's client table can import the
- * labels and the badge logic without dragging the Prisma client into a browser
- * bundle. (Types cross the `"use server"` boundary freely — staging.ts already
- * exports `Entity` — but runtime values like these maps cannot, which is the
- * actual reason this module exists.)
- */
-
 export type AuditAction = "SAVE" | "SAVE_AND_PUBLISH" | "PUBLISH";
 export type ChangeKind = "CREATE" | "UPDATE" | "DELETE" | "REORDER";
 export type AuditActor = { userId: string; name: string; email: string; role: string };
@@ -29,11 +18,6 @@ export interface PendingChange {
   truncated: boolean;
 }
 
-/**
- * Where each entity is edited. Lives here rather than in save-bar.tsx so the
- * bar and the history name a change identically — one copy means a new entity
- * cannot be labelled in one place and left unlabelled in the other.
- */
 export const WHERE: Record<Entity, string> = {
   heroTitle: "Hero · titles",
   heroSkillBadge: "Hero · skill badges",
@@ -47,26 +31,14 @@ export const WHERE: Record<Entity, string> = {
   adminUser: "Admin users",
 };
 
-/**
- * Fields whose VALUES must never reach the log. The change is still recorded —
- * you can see that someone changed a password — but both sides are dropped and
- * the row is flagged `redacted`.
- *
- * `contactMessage` is here because a deleted contact message would otherwise
- * preserve the sender's name, email and body in the history forever, which is
- * the opposite of what deleting it means.
- */
 const SECRET: Record<string, Set<string>> = {
   adminUser: new Set(["password", "otp", "otpExpiresAt"]),
 };
 
-/** Columns that are never interesting in a diff. */
 const IGNORED = new Set(["id", "createdAt", "updatedAt"]);
 
-/** Longest field either side of a diff is stored at. */
 export const CAP = 2000;
 
-/** Everything becomes a string, because the log renders text, not JSON. */
 function norm(v: unknown): string | null {
   if (v === null || v === undefined) return null;
   if (v instanceof Date) return v.toISOString();
@@ -75,14 +47,6 @@ function norm(v: unknown): string | null {
   return String(v);
 }
 
-/**
- * A window around the first divergence rather than the head of each side: two
- * 1,800-character blog bodies differing at character 1,500 would otherwise both
- * truncate to identical prefixes and the entry would show no change at all.
- *
- * When one side is null (a create or a delete) there is no divergence point to
- * centre on, so the other side is simply head-truncated.
- */
 export function excerpt(
   before: string | null,
   after: string | null
@@ -107,10 +71,6 @@ export function excerpt(
   return { before: slice(before), after: slice(after), truncated: true };
 }
 
-/**
- * What a row IS in human terms. Read from the row itself so a deleted row stays
- * legible in the history long after it is gone from the table it lived in.
- */
 export function labelOf(entity: string, row: Record<string, unknown> | null): string {
   if (!row) return "";
   const pick = (...keys: string[]) => {
@@ -133,7 +93,6 @@ export function labelOf(entity: string, row: Record<string, unknown> | null): st
   }
 }
 
-/** How the history table renders an event's action and its publish outcome. */
 export function badgeFor(action: string, publishState: string):
   { label: string; tone: "neutral" | "good" | "bad" } {
   if (publishState === "FAILED") return { label: "publish failed", tone: "bad" };
@@ -146,10 +105,6 @@ export function badgeFor(action: string, publishState: string):
   return { label: "saved", tone: "neutral" };
 }
 
-/**
- * An in-memory draft. Nothing reaches the database until `commitAudit` writes
- * it inside the same transaction as the change it describes.
- */
 export class AuditDraft {
   readonly changes: PendingChange[] = [];
   private readonly surfaces = new Set<string>();
@@ -160,7 +115,6 @@ export class AuditDraft {
     readonly actor: AuditActor
   ) {}
 
-  /** One created, updated or deleted row, diffed field by field. */
   row(input: {
     entity: string;
     entityLabel: string;
@@ -175,7 +129,6 @@ export class AuditDraft {
     const after = input.after ?? null;
     const secret = SECRET[entity];
 
-    // An update diffs only what it wrote; a create/delete walks the whole row.
     const keys = kind === "UPDATE"
       ? Object.keys(after ?? {})
       : Object.keys((kind === "CREATE" ? after : before) ?? {});
@@ -184,8 +137,6 @@ export class AuditDraft {
       if (IGNORED.has(key)) continue;
       const b = norm(before?.[key]);
       const a = norm(after?.[key]);
-      // Unchanged fields are not changes. This is what keeps a save that
-      // touched one column from writing a row per column.
       if (b === a) continue;
 
       if (secret?.has(key)) {
@@ -199,11 +150,6 @@ export class AuditDraft {
     }
   }
 
-  /**
-   * A drag, collapsed to ONE row holding both orders as names. A reorder on
-   * /skills can renumber hundreds of rows; recording each would drown every
-   * other change in the event.
-   */
   reorder(input: {
     entity: string;
     entityLabel: string;
@@ -214,7 +160,7 @@ export class AuditDraft {
     const name = (id: string) => input.labels.get(id) || id.slice(0, 8);
     const b = input.before.map(name).join(" → ");
     const a = input.after.map(name).join(" → ");
-    if (b === a) return; // a drag that landed where it started is not a change
+    if (b === a) return;
     const cut = excerpt(b, a);
     this.push({
       entity: input.entity, entityLabel: input.entityLabel, rowId: null, rowLabel: null,
@@ -232,7 +178,6 @@ export class AuditDraft {
     return this.changes.length === 0;
   }
 
-  /** Precomputed so the list page never loads an event's children to render it. */
   get summary(): string {
     const n = this.changes.length;
     const where = [...this.surfaces].join(", ");

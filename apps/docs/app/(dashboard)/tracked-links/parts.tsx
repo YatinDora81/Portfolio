@@ -54,7 +54,7 @@ export function CopyButton({ text, label }: { text: string; label?: string }) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
-      // A blocked clipboard leaves the text on screen to select by hand.
+      // clipboard blocked, the text stays selectable
     }
   };
 
@@ -340,7 +340,6 @@ export function ActiveToggle({
 export function LinkTable({ rows }: { rows: LinkRow[] }) {
   const [channel, setChannel] = useState<string>("");
   const [sort, setSort] = useState<Sort>("clicks");
-  // A toggle has to redraw its own row now, not on the next server render.
   const [flipped, setFlipped] = useState<Record<string, boolean>>({});
   const isLive = (row: LinkRow) => flipped[row.id] ?? row.active;
 

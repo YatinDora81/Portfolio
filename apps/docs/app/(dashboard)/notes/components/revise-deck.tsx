@@ -8,23 +8,6 @@ import { CONF_LABELS } from "@/lib/notes/query";
 import type { ReviseCard } from "@/lib/notes/view-types";
 import { useRate } from "./vault-provider";
 
-/**
- * The revise deck: one question at a time, a veil over the answer, and four
- * ratings that write and move on.
- *
- * The answer is rendered here, on the client, rather than being handed down as
- * a React node from the server page. `ReviseCard` carries the body as source
- * text and this component is what decides which card is on screen — so
- * pre-rendering the queue would serialise sixty element trees into the RSC
- * payload to show one of them, and every tree is markup where the source was
- * smaller. `renderMarkdown` is pure, has no dependencies and returns elements
- * rather than an HTML string, so the escaping guarantee that makes it safe on
- * the server is the same guarantee here; nothing in this file goes near
- * `dangerouslySetInnerHTML`.
- */
-
-/** The scale is CONF_LABELS 1–4, derived rather than retyped: the third button
- *  here and `is:shaky` in the search box have to name the same rating. */
 const SCALE = CONF_LABELS.slice(1).map((label, i) => ({ value: i + 1, label }));
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -38,17 +21,10 @@ interface Failure {
 
 export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
   const router = useRouter();
-  /**
-   * The deck is frozen at mount, and that is the load-bearing decision in this
-   * file. An index into a queue that reorders underneath it would land the user
-   * on a card they have never seen. The queue is a judgement made once, when the
-   * page loaded.
-   */
   const [deck, setDeck] = useState(cards);
   const [i, setI] = useState(0);
   const [shown, setShown] = useState(false);
   const [failed, setFailed] = useState<Failure[]>([]);
-  /** What this sitting said. The queue is re-ranked from it — see "Go again". */
   const [given, setGiven] = useState<ReadonlyMap<string, number>>(new Map());
   const record = useRate();
   const veil = useRef<HTMLButtonElement>(null);
@@ -56,9 +32,6 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
 
   const card = deck[i];
 
-  // Through the vault's own recorder, not `setConfidence` directly: a rating
-  // carries no re-render home, so this is what makes the folder percentages and
-  // the `conf:` filter agree with the sitting the moment it ends.
   const save = useCallback((c: { id: string; title: string }, value: number) => {
     void record(c.id, value)
       .then((r) => {
@@ -76,10 +49,6 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
     (value: number) => {
       const c = deck[i];
       if (!c) return;
-      // The next card is on screen before the write leaves. A rating is one
-      // integer on a row that still exists, so a failure is worth a retry
-      // rather than a wait — and waiting between cards is what turns a drill
-      // into a form.
       setI((n) => n + 1);
       setShown(false);
       setGiven((g) => new Map(g).set(c.id, value));
@@ -98,14 +67,7 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
-      // The tree's filter box and the topbar's palette are on this page too. A
-      // digit typed into either is a query, not a rating.
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-      // The deck shares the page with three surfaces that own the same keys:
-      // the tree grabs a row with Space and cancels the move with Escape, and
-      // the row menu and any modal close on Escape. A key pressed inside one of
-      // them is not a deck key, and handling it here would rate a card or
-      // navigate away underneath whatever the user was actually doing.
       if (t?.closest(".nt-tp, .nt-menu, .modal")) return;
       if (!card) return;
 
@@ -116,9 +78,7 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
       }
       if (e.key === " ") {
         if (shown) return;
-        // A focused <button> already turns Space into a click of its own, and
-        // the veil is a button. Handling it here as well would reveal the card
-        // through one path and rate it through the other.
+        // a focused button already turns space into a click
         if (t?.tagName === "BUTTON") return;
         e.preventDefault();
         setShown(true);
@@ -135,11 +95,6 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
   }, [card, shown, rate, router]);
 
   useEffect(() => {
-    // Focus follows the card. Parking it on the veil makes Space the browser's
-    // own activation rather than a second code path, and stops the rating
-    // button clicked a moment ago from still holding focus when the next
-    // question arrives; on reveal it moves into the answer, so a screen reader
-    // is left where the new text is rather than back at the top of the page.
     if (!card) return;
     const target = shown ? revealed.current : veil.current;
     target?.focus({ preventScroll: true });
@@ -179,18 +134,6 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
             <button
               type="button"
               className="btn"
-              /**
-               * Re-ranked from what was just said, not refetched.
-               *
-               * This used to re-seed from the `cards` prop, which every rating
-               * refreshed — a rating no longer does, deliberately (see `rated()`
-               * in lib/actions/notes.ts), so dealing the prop again would open on
-               * cards the user has just called solid.
-               *
-               * The answer is already in the room: least confident first IS the
-               * order the ratings imply, and `sort` is stable, so cards rated the
-               * same keep the path order the server dealt them in.
-               */
               onClick={() => {
                 setDeck((d) =>
                   [...d].sort(
@@ -222,8 +165,7 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
         </span>
         <span>{card.folder}</span>
       </div>
-      {/* The counter above says this in words, and a progress bar that announces
-          the same fact a second time is noise. */}
+      {/* the counter above already says this */}
       <div className="nt-rev-bar" aria-hidden="true">
         <div className="nt-rev-fill" style={{ width: `${((i + 1) / deck.length) * 100}%` }} />
       </div>
@@ -231,10 +173,6 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
       <h1 className="nt-rev-q">{card.title}</h1>
 
       {shown ? (
-        // Two classes, both doing a job: `.nt-rev-ans` is the box, and the
-        // answer's own spacing — paragraphs, lists, code blocks — lives on
-        // `.nt-answer`'s descendant rules. Without the second class a
-        // three-paragraph answer reveals as one wall of text.
         <div ref={revealed} tabIndex={-1} className="nt-rev-ans nt-answer">
           {answer}
         </div>

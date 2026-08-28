@@ -1,8 +1,6 @@
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
 
-// Maps the app's existing variant names onto the control-room `.btn` modifiers,
-// so every call site keeps working untouched.
 const variants = {
   primary: "pri",
   destructive: "danger",
@@ -10,7 +8,7 @@ const variants = {
   ghost: "ghost",
 };
 
-// `.btn` carries its own padding; sizes only nudge it.
+// `.btn` carries its own padding, sizes only nudge it
 const sizes = {
   sm: "text-[12px] px-[10px] py-[5px]",
   md: "",
@@ -29,7 +27,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = "Button";
 
-/** Bare icon button — the `.ibtn` used in row action clusters. */
 export const IconButton = forwardRef<
   HTMLButtonElement,
   React.ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "default" | "warn" | "amber" }

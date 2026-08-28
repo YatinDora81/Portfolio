@@ -20,9 +20,7 @@ export async function GET(request: NextRequest) {
   const dm = await draftMode();
   dm.enable();
 
-  // Encoded even though we signed the slug: a slug of `/evil.example` would redirect off-site.
   const destination = claims.type === "Blog" ? `/blog/${encodeURIComponent(claims.slug)}` : "/";
 
-  // Must stay outside any try/catch — `redirect()` throws NEXT_REDIRECT.
   redirect(destination);
 }

@@ -19,7 +19,6 @@ interface BlogData {
   id: string; slug: string; title: string; description: string;
   content: string; image: string; imageOrientation: string; color: string;
   status: ContentStatus;
-  /** Stored UTC instant as ISO, or null. */
   publishAtIso: string | null;
 }
 
@@ -27,7 +26,7 @@ export function BlogForm({ blog }: { blog?: BlogData }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<ContentStatus>(blog?.status ?? "DRAFT");
-  // `utcToIstInput`, not `toLocale*`, so the server's HTML and hydration produce the same attribute.
+  // utcToIstInput, not toLocale*, so SSR and hydration match
   const [publishAtIst, setPublishAtIst] = useState(
     blog?.publishAtIso ? utcToIstInput(new Date(blog.publishAtIso)) : ""
   );
@@ -36,15 +35,12 @@ export function BlogForm({ blog }: { blog?: BlogData }) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const isEditing = !!blog;
 
-  // Which submit button was pressed. A ref, not state: the click lands in the
-  // same event as the submit, so state set here would still be stale by the
-  // time the form action reads it.
+  // a ref, not state: the click and submit share one event
   const wantPublish = useRef(false);
 
   const handleSubmit = (formData: FormData) => {
     const publish = wantPublish.current;
 
-    // The action checks this again, because this copy can be skipped.
     const problem = scheduleProblem(status, publishAtIst);
     if (problem) {
       setSaveError(problem);
@@ -64,7 +60,6 @@ export function BlogForm({ blog }: { blog?: BlogData }) {
         if (publish) {
           const pub = await publishSite();
           if (!pub.ok) {
-            // The write already landed; a failed publish never undoes it.
             setPubError(pub.error ?? "Could not reach the site.");
             return;
           }

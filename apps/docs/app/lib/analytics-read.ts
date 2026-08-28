@@ -11,7 +11,6 @@ export type DeviceKey = (typeof DEVICES)[number];
 export type Split = "all" | DeviceKey;
 export const SPLITS: readonly Split[] = ["all", ...DEVICES];
 
-/** Page order, plus approximate section heights used as the attention denominator. */
 export const SECTION_CONFIG = [
   { id: "hero", label: "Hero", heightPx: 860 },
   { id: "about", label: "About", heightPx: 1480 },
@@ -26,7 +25,7 @@ const DIM_TOTAL = "total";
 const DIM_CHANNEL = "channel";
 const DIM_SECTION = "section";
 
-/** The ramp runs out here: a fifth channel colour cannot stay CVD-distinct. */
+// a fifth channel colour cannot stay CVD-distinct
 const CHANNEL_SLOTS = 4;
 
 const TODAY_SESSION_CAP = 20_000;
@@ -51,7 +50,6 @@ export const longDayLabel = (key: string) => utcLongDayFmt.format(dayFromKey(key
 export interface DayPoint {
   key: string;
   label: string;
-  /** `null` is a day the rollup has not reached — the chart shows the gap, not a zero. */
   pageviews: number | null;
   sessions: number | null;
   summarized: boolean;
@@ -74,7 +72,6 @@ export interface ChannelsView {
   labels: string[];
   series: ChannelSeries[];
   totals: ChannelTotal[];
-  /** Real channels past the four the ramp can colour honestly. */
   hidden: number;
 }
 
@@ -84,7 +81,6 @@ export interface SectionRow {
   heightPx: number;
   reached: number;
   sessions: number;
-  /** `null` when nothing was measured — a funnel of 0 over 0 is not 0%. */
   reachPct: number | null;
   medianMs: number | null;
   msPer100px: number | null;
@@ -111,7 +107,6 @@ export interface AnalyticsView {
   days: WindowDays;
   fromKey: string;
   todayKey: string;
-  /** Completed days inside the window that DailyStat has no `total` row for. */
   gapDays: number;
   summarizedThroughKey: string | null;
   daysBehind: number;
@@ -139,7 +134,6 @@ function median(values: number[]): number {
   return Math.round(((s[mid - 1] ?? 0) + (s[mid] ?? 0)) / 2);
 }
 
-/** Median of the daily medians, each day weighted by how many visits it summarised. */
 function weightedMedian(points: { value: number; weight: number }[]): number | null {
   const pts = points.filter((p) => p.weight > 0).sort((a, b) => a.value - b.value);
   const total = pts.reduce((n, p) => n + p.weight, 0);
@@ -156,7 +150,7 @@ function asDevice(value: string | null): DeviceKey | null {
   return value !== null && (DEVICES as readonly string[]).includes(value) ? (value as DeviceKey) : null;
 }
 
-/** `COUNT` is bigint and `PERCENTILE_CONT` is double; both arrive as `unknown`. */
+// count is bigint and percentile is double; both arrive as unknown
 function toInt(value: unknown): number {
   if (value === null || value === undefined) return 0;
   const n = Number(value);
@@ -218,7 +212,6 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
       where: { type: EventType.PAGEVIEW, createdAt: { gte: todayStart } },
     }),
     prisma.analyticsEvent.findMany({
-      // Bounded to sessions started today, so numerator and denominator cover the same visits.
       where: {
         type: EventType.SECTION_DWELL,
         createdAt: { gte: todayStart },
@@ -227,8 +220,6 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
       select: { sessionId: true, section: true, durationMs: true },
       take: TODAY_EVENT_CAP,
     }),
-    // DailyStat never crosses section with device, so the split reads raw events instead.
-    // The inner GROUP BY folds flushes into visits before the percentile runs.
     prisma.$queryRaw<RawSection[]>`
       SELECT t.device                                            AS device,
              t.section                                           AS section,
@@ -298,7 +289,6 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
     todayChannels.set(s.channel, (todayChannels.get(s.channel) ?? 0) + 1);
   }
 
-  // Folds flushes into visits: tab-blur and pagehide are two rows for one stretch of attention.
   const perVisit = new Map<string, { section: string; ms: number }>();
   for (const e of todayDwell) {
     if (!e.section) continue;
@@ -394,7 +384,6 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
         reached += row.reached;
         if (row.medianMs > 0) medians.push({ value: row.medianMs, weight: Math.max(1, row.reached) });
       }
-      // A day with reach but no total row still floors the denominator at its widest section.
       const floor = perSection ? Math.max(0, ...[...perSection.values()].map((s) => s.reached)) : 0;
       denominator += Math.max(overallByDay.get(key)?.sessions ?? 0, floor);
     }

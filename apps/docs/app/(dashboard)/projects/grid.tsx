@@ -11,11 +11,6 @@ import { deleteProject, reorderProjects } from "@/lib/actions/projects";
 import { cdnUrl } from "@/lib/utils";
 import { useSortable } from "@/lib/use-sortable";
 
-/**
- * `FEATURED` in apps/web/app/components/landing/Projects.tsx — the first three
- * cards render open and the rest sit behind the section's own fold. Position is
- * therefore editorial, not cosmetic, so the grid draws the cut.
- */
 const FEATURED = 3;
 
 export interface ProjectCard {
@@ -30,10 +25,6 @@ export interface ProjectCard {
   skills: string[];
 }
 
-/**
- * Cover art fallback: a deterministic hsl tint derived from the card's index,
- * so a project without artwork still gets a stable, distinct cover.
- */
 function tintFor(i: number) {
   const h = (i * 47 + 208) % 360;
   return `linear-gradient(135deg, hsl(${h} 64% 62%), hsl(${(h + 44) % 360} 58% 46%))`;
@@ -79,7 +70,7 @@ export function ProjectGrid({ projects }: { projects: ProjectCard[] }) {
                   : { background: tintFor(i) }
               }
             >
-              {/* Drag from here, not the whole card — the cover holds links. */}
+              {/* drag from here; the cover holds links */}
               <span
                 className="pgrip"
                 title="Drag to reorder"
@@ -143,7 +134,7 @@ export function ProjectGrid({ projects }: { projects: ProjectCard[] }) {
                 </span>
                 <div className="sp" />
 
-                {/* Keyboard path — drag is pointer-only, so order stays reachable. */}
+                {/* drag is pointer-only, so order stays keyboard-reachable */}
                 <button
                   className="ibtn move"
                   aria-label={`Move ${p.title} earlier`}

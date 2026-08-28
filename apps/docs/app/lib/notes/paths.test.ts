@@ -94,8 +94,6 @@ describe("moveError", () => {
     ).toBe("Cannot move a folder into its own descendant");
   });
 
-  // The prefix trap: /dsa-2 shares a string prefix with /dsa without being
-  // anywhere underneath it, so only a separator may count as descent.
   test("a sibling that merely shares a name prefix is not a descendant", () => {
     expect(moveError(dsa, { id: "n6", path: "/dsa-2", kind: "FOLDER" })).toBeNull();
     expect(
@@ -157,8 +155,6 @@ describe("buildTree", () => {
   });
 
   test("surfaces an orphan as a root instead of dropping it", () => {
-    // What a caller filtering to live rows sees when a child outlives the
-    // parent the filter removed.
     const tree = buildTree([
       row({ id: "a" }),
       row({ id: "lost", parentId: "gone", path: "/gone/lost" }),

@@ -1,11 +1,6 @@
 export const SPAM_THRESHOLD = 60;
-// Elapsed is measured from token issue, and the contact section hydrates
-// lazily — so this is "time since #contact neared the viewport", not time
-// since page load. Keep it small: raising it would convict fast-scrolling
-// humans, not just bots.
 export const MIN_ELAPSED_MS = 3_000;
 
-// Low enough that our own defenses failing to run cannot convict on their own.
 export const UNMEASURED_POINTS = 30;
 export const MAX_SUBMISSIONS_PER_HOUR = 3;
 
@@ -59,7 +54,6 @@ const URL_PATTERN = /\b(?:https?:\/\/|www\.)\S+/gi;
 const LATIN_NAME = /^[A-Za-z\s'’.-]+$/;
 const VOWEL = /[aeiouy]/i;
 
-/** `"missing"`: the widget is deployed yet nothing was submitted. `"unknown"`: no signal at all. */
 export type TurnstileState = "ok" | "failed" | "missing" | "unknown";
 
 export type SpamInput = {
@@ -67,9 +61,7 @@ export type SpamInput = {
   email: string;
   body: string;
   honeypot?: string;
-  /** `null` = sent but forged or expired; `"unconfigured"` = no secret; `"absent"` = no field sent. */
   elapsedMs: number | null | "unconfigured" | "absent";
-  /** `"unknown"` is never held against the sender. */
   turnstile: TurnstileState;
   submissionsThisHour: number;
 };
@@ -87,12 +79,11 @@ function countUrls(body: string): number {
   return body.match(URL_PATTERN)?.length ?? 0;
 }
 
-// Scripts without letter case return equal on both sides, so they never trip this.
 function isShouting(name: string): boolean {
   return name.length >= 4 && name === name.toUpperCase() && name !== name.toLowerCase();
 }
 
-// Latin-only: a name in Devanagari or Han has no a-e-i-o-u and is not suspicious.
+// latin-only: a devanagari or han name has no a-e-i-o-u
 function isVowelless(name: string): boolean {
   return name.length > 4 && LATIN_NAME.test(name) && !VOWEL.test(name);
 }
@@ -118,7 +109,6 @@ export function scoreSpam(input: SpamInput): SpamVerdict {
     add(40, "submitted-too-fast");
   }
 
-  // Capped as one signal rather than summed: our own defenses failing to run must not convict a visitor.
   const unmeasured =
     (input.turnstile === "missing" ? 1 : 0) + (input.elapsedMs === "absent" ? 1 : 0);
   if (unmeasured > 0) {

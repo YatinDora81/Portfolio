@@ -4,16 +4,6 @@ import { useEffect, useState } from "react";
 import { IconCheck } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
-/**
- * A hex-only colour field: native swatch, typed hex, and one-tap presets.
- *
- * The empty string is a real value here, not "unfilled" — it means "inherit",
- * and callers that store colours in SiteConfig rely on that to keep a
- * theme-following default. `<input type="color">` has no empty state, so the
- * swatch shows `fallback` while the value is empty and the Default chip is the
- * way back to it.
- */
-
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
 export interface ColorPreset {
@@ -37,14 +27,10 @@ export function ColorField({
   value: string;
   onChange: (value: string) => void;
   presets?: ColorPreset[];
-  /** Shown in the swatch while the value is empty — what "inherit" looks like. */
   fallback?: string;
   defaultLabel?: string;
   defaultHint?: string;
 }) {
-  // The text box holds half-typed hex ("#2", "#22c5"), which is not a value the
-  // parent should ever see. It only commits on a complete match, and re-syncs
-  // whenever the value moves from elsewhere (a preset, Reset, the picker).
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
 
@@ -61,8 +47,6 @@ export function ColorField({
       {label && <label>{label}</label>}
 
       <div className="flex items-center gap-2">
-        {/* `.swatch` carries the well, the transparent picker inside it and the
-            focus ring — see control-room.css. */}
         <span className="swatch" style={{ background: value || fallback }}>
           <input
             type="color"
@@ -82,8 +66,6 @@ export function ColorField({
             setDraft(e.target.value);
             commit(e.target.value);
           }}
-          // A draft left mid-hex on blur snaps back rather than lingering as a
-          // value the field shows but has not saved.
           onBlur={() => setDraft(value)}
         />
       </div>
@@ -129,7 +111,6 @@ export function ColorField({
   );
 }
 
-/** Tick colour for a swatch — luminance, so it stays legible on both ends. */
 function readableInk(hex: string): string {
   const h = hex.replace("#", "");
   const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h.slice(0, 6);

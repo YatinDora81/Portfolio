@@ -12,22 +12,12 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").re
 
 interface PalItem {
   label: string;
-  /** The literal the unsaved-changes guard reads off `.pal-k` — "go" means this
-      row navigates and must be intercepted. Do not reword it. */
   kind: string;
-  /** Group heading, shown as the row's second line so "site" or "page" finds it. */
   where: string | null;
-  /** Sidebar ordinal, so a row in the palette is recognisably the same row. */
   mark?: string;
   icon: React.ComponentType<{ size?: number }>;
-  /** Everything the query is matched against, lowercased once. Notes are
-      matched by Postgres, not here, so their rows carry an empty haystack and
-      are appended rather than filtered. */
   hay: string;
-  /** Pre-segmented title for a note row, so the matched words can be marked
-      without building HTML out of a title somebody typed. */
   parts?: { text: string; hit: boolean }[];
-  /** The one-line answer excerpt under a note row. */
   snippet?: { text: string; hit: boolean }[];
   run: () => void;
 }
@@ -38,8 +28,6 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const [hot, setHot] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Built from NAV_GROUPS rather than the flat list so the palette keeps the
-  // sidebar's order and can say which group a match came from.
   const items: PalItem[] = [
     ...NAV_GROUPS.flatMap((g) =>
       g.items.map((x) => ({
@@ -65,21 +53,10 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const needle = q.trim().toLowerCase();
   const navHits = needle ? items.filter((x) => x.hay.includes(needle)) : items;
 
-  /**
-   * The vault answers for itself.
-   *
-   * The palette cannot filter notes the way it filters nav rows — there is no
-   * in-memory list to filter, and building one would put every answer body in
-   * the bundle of every admin page. So the query goes to the server and comes
-   * back parsed by the same engine the tree filter and the search page use,
-   * which is what makes `tag:redis` mean one thing in all three.
-   */
   const [notes, setNotes] = useState<{ hits: PaletteHit[]; total: number; bad: string[] }>({
     hits: [], total: 0, bad: [],
   });
   useEffect(() => {
-    // Debounced, and guarded against the reply to a keystroke the user has
-    // already typed past arriving after a later one.
     let live = true;
     const t = setTimeout(() => {
       searchNotes(q).then((r) => { if (live) setNotes(r); }).catch(() => {});
@@ -102,10 +79,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
 
   useEffect(() => { setHot(0); }, [q]);
 
-  // The handler below is rebuilt whenever its dependencies change, and `list` is
-  // a fresh array on every render — so it depends on the COUNT instead, and
-  // reaches the row it wants through the DOM. Otherwise every keystroke tears
-  // down and re-adds a window listener.
+  // list is a new array every render, so the handler depends on the count
   const count = list.length;
 
   useEffect(() => {
@@ -113,8 +87,6 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       if (e.key === "Escape") onClose();
       else if (e.key === "ArrowDown") { e.preventDefault(); setHot((i) => Math.min(i + 1, count - 1)); }
       else if (e.key === "ArrowUp") { e.preventDefault(); setHot((i) => Math.max(i - 1, 0)); }
-      // ⌘↵ leaves the palette for the full search page, which is the only place
-      // that can show more than the first twenty and the facets over them.
       else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         router.push(`/notes/search?q=${encodeURIComponent(q)}`);
@@ -122,11 +94,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       }
       else if (e.key === "Enter") {
         e.preventDefault();
-        // Click the highlighted row rather than calling `run()` straight. The
-        // unsaved-changes guard intercepts navigation by listening for clicks,
-        // so calling `run()` here would push the route with no confirm — and
-        // Enter is how a command palette is actually used. Going through the
-        // DOM keeps both paths identical and needs no knowledge of the guard.
+        // click the row so the unsaved-changes guard still sees it
         listRef.current?.querySelectorAll<HTMLButtonElement>(".pal-it")[hot]?.click();
       }
     };
@@ -134,8 +102,6 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", h);
   }, [count, hot, onClose, router, q]);
 
-  // Keeps the keyboard selection inside the scroller — arrowing past the fold
-  // otherwise highlights a row nobody can see.
   useEffect(() => {
     listRef.current?.querySelectorAll<HTMLElement>(".pal-it")[hot]
       ?.scrollIntoView({ block: "nearest" });

@@ -6,36 +6,17 @@ import { HeroSections } from "./sections";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/+$/, "");
 
-/**
- * Everything the hero renders, on one page.
- *
- * It absorbed /links and /social-links — both edited rows the hero draws, from
- * routes that never said "hero" anywhere, and /links additionally shipped a
- * second, weaker social editor that wrote immediately and could race the staged
- * one. Both are `redirect()` stubs now. What survived the fold: the staged
- * social table (drag-reorder, per-version scoping, icon picker) and the résumé
- * form, still on `updateResumeUrl`.
- *
- * One `Promise.all` covers the lot — the same six reads the two folded pages
- * were each doing on their own.
- */
 export default async function HeroPage() {
-  // Both hero versions have rows in these tables, and the query stays unfiltered
-  // so the version tiles can be populated without a second round trip.
   const [titles, badges, socialLinks, content, siteConfigRows, totalSkills] = await Promise.all([
     prisma.heroTitle.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
     prisma.heroSkillBadge.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
     prisma.socialLink.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
     prisma.heroContent.findMany({ orderBy: { version: "asc" } }),
     prisma.siteConfig.findMany(),
-    // The same count apps/web hands the hero, so v2's "+N more" chip previews
-    // the number visitors actually see.
     prisma.skill.count({ where: { show: true } }),
   ]);
 
   const cfg = new Map(siteConfigRows.map((c) => [c.key, c.value]));
-  // Exactly the keys this section owns, and nothing else: ConfigCard posts what
-  // it is handed, so a stray key here would be written from two pages at once.
   const config = Object.fromEntries(
     keysFor("hero").map((k) => [k, cfg.get(k) ?? DEFAULTS[k] ?? ""])
   );
@@ -74,8 +55,6 @@ export default async function HeroPage() {
           sortOrder: l.sortOrder, version: l.version,
         }))}
         config={config}
-        // Not a ConfigCard key on purpose: `resumeUrl` is written by
-        // `updateResumeUrl`, and two writers on one row is the race that avoids.
         resumeUrl={cfg.get("resumeUrl") ?? ""}
         availabilityStatus={cfg.get("availabilityStatus") ?? ""}
         totalSkills={totalSkills}

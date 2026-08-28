@@ -14,27 +14,17 @@ import { applyVars } from "@/(dashboard)/messages/text";
 
 export type MessageResult = { ok: true } | { ok: false; error: string };
 
-/**
- * `"use server"` exports compile to public POST endpoints addressable by action
- * id, so each writer below has to prove the session itself: middleware only
- * checks that the cookie holds a valid JWT, and it never runs for a direct
- * action POST at all.
- *
- * `redirect` rather than a returned `{ ok: false }` so an expired session can
- * never look like a successful write to a caller that ignores the return value.
- */
 async function requireSession() {
   const session = await getSession();
   if (!session) redirect("/login");
   return session;
 }
 
-// The legacy `read` boolean mirrors the enum until it is dropped.
 const readFor = (status: MessageStatus) => status !== "UNREAD";
 
 export async function markMessageRead(id: string): Promise<MessageResult> {
   await requireSession();
-  // Guarded on UNREAD via `updateMany`: opening a REPLIED message must not walk it back to READ.
+  // don't walk a REPLIED row back to READ
   await prisma.contactMessage.updateMany({
     where: { id, status: "UNREAD" },
     data: { status: "READ", read: true, readAt: new Date() },
@@ -90,7 +80,6 @@ export async function bulkUpdateMessages(input: {
 
   if (action === "inbox") {
     const filed = { id: { in: ids }, status: { in: ["ARCHIVED", "SPAM"] as MessageStatus[] } };
-    // Two passes because `updateMany` carries one `data`: an answered message returns as REPLIED.
     const replied = await prisma.contactMessage.updateMany({
       where: { ...filed, repliedAt: { not: null } },
       data: { status: "REPLIED", read: true },
@@ -105,7 +94,6 @@ export async function bulkUpdateMessages(input: {
 
   const next: MessageStatus = action === "archive" ? "ARCHIVED" : action === "spam" ? "SPAM" : "READ";
 
-  // "read" only lifts UNREAD; archive and spam may take a REPLIED row, since `repliedAt` survives.
   const where =
     action === "read"
       ? { id: { in: ids }, status: "UNREAD" as MessageStatus }
@@ -137,7 +125,6 @@ const ReplyInput = z.object({
   templateId: z.string().min(1).optional(),
 });
 
-/** Send-only: the MessageReply row is the whole local record, written even when the send fails. */
 export async function sendMessageReply(input: {
   messageId: string;
   subject: string;
@@ -163,7 +150,7 @@ export async function sendMessageReply(input: {
 
   const { html, text } = renderReplyEmail({ body, recipientName: message.name });
 
-  // Threads onto the notification copy in Gmail; without it the reply starts a second thread.
+  // threads onto the notification copy in gmail
   const thread = message.notificationMessageId
     ? { inReplyTo: message.notificationMessageId, references: message.notificationMessageId }
     : {};

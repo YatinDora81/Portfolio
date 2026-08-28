@@ -3,23 +3,8 @@
 import { GraduationCapIcon, MapPinIcon } from "@repo/ui/icons/brand";
 import { DIM, FAINT, MONO, SectionLabel, renderBold } from "./frame";
 
-// ─── About Preview ───────────────────────────────────────────────
-// Mirrors apps/web/app/components/landing/About.tsx.
-//
-// About is not a column of prose any more: it is a zsh terminal that types
-// `whoami` on scroll and prints the CMS paragraphs as that command's output,
-// followed by a dashed education timeline whose scores are drawn as rings.
-// The terminal is the motif globals.css calls the "terminal voice", so the
-// mono type, the robbyrussell prompt and the traffic lights are the details
-// that make this section recognisable — not the paragraph text itself.
-//
-// Drawn in its RESTING state: the intro has finished, the unlock hint has
-// printed, and the caret is an outline rather than a filled block because
-// nothing is focused (exactly what the real terminal renders un-focused).
-
 const BORDER = "rgba(255,255,255,0.1)";
 
-/** Verbatim from About.tsx — the line printed the moment the prompt unlocks. */
 const UNLOCK_HINT = "# type 'help' to explore — try \"skills\" ⏎";
 
 interface EducationEntry {
@@ -36,14 +21,9 @@ interface EducationEntry {
 interface AboutPreviewProps {
   paragraphs: string[];
   education: EducationEntry[];
-  /** company name (lower-cased) -> logo url, sourced from the Experience rows */
   companyLogos?: Record<string, string>;
 }
 
-/**
- * The default oh-my-zsh (robbyrussell) prompt: `➜` then TWO spaces, then the
- * path. `whitespace-pre` is what keeps that double space from collapsing.
- */
 function Prompt() {
   return (
     <span className="whitespace-pre">
@@ -55,11 +35,6 @@ function Prompt() {
   );
 }
 
-/**
- * The CGPA / percentage ring. On the site the arc sweeps in on scroll; here it
- * is drawn at its final length with a dash offset, since a ring this small
- * animating inside an admin card reads as a glitch rather than a flourish.
- */
 function ScoreRing({ score, scoreTotal, scoreType }: {
   score: string;
   scoreTotal?: string | null;
@@ -67,8 +42,7 @@ function ScoreRing({ score, scoreTotal, scoreType }: {
 }) {
   const value = parseFloat(score);
   const total = scoreType === "CGPA" ? parseFloat(scoreTotal ?? "10") || 10 : 100;
-  // A non-numeric score would make `value / total` NaN, which SVG renders as a
-  // full ring — worse than an empty one, because it silently reads as 100%.
+  // a non-numeric score would render as a full ring
   const pct = Number.isFinite(value) ? Math.max(0, Math.min(1, value / total)) : 0;
   const circumference = 2 * Math.PI * 16.5;
 
@@ -106,12 +80,10 @@ export function AboutPreview({ paragraphs, education, companyLogos }: AboutPrevi
     <div>
       <SectionLabel sub="About" main="Who I am" />
 
-      {/* ── the terminal ── */}
       <div
         className="overflow-hidden rounded-xl border"
         style={{ borderColor: BORDER, background: "#171717" }}
       >
-        {/* title bar */}
         <div
           className="relative flex items-center gap-1 border-b px-2.5 py-2"
           style={{ borderColor: BORDER, background: "rgba(38,38,38,0.5)" }}
@@ -127,18 +99,15 @@ export function AboutPreview({ paragraphs, education, companyLogos }: AboutPrevi
           </span>
         </div>
 
-        {/* body — scrolls exactly like the real one rather than growing the card */}
         <div
           className="max-h-[240px] overflow-y-auto p-3 text-[11px] leading-relaxed"
           style={{ fontFamily: MONO }}
         >
-          {/* the typed command */}
           <div style={{ color: "#fafafa" }}>
             <Prompt />
             whoami
           </div>
 
-          {/* its output: the CMS paragraphs, **bold** runs promoted */}
           <div className="mt-2 space-y-2" style={{ color: DIM }}>
             {paragraphs.map((p, i) => (
               <p key={i} className="m-0 break-words">{renderBold(p, companyLogos)}</p>
@@ -150,9 +119,6 @@ export function AboutPreview({ paragraphs, education, companyLogos }: AboutPrevi
             )}
           </div>
 
-          {/* the hint that prints when the prompt unlocks — About.tsx:412 spells
-              this one out as `text-[#909092]/70`, because `.text-secondary` is a
-              hand-written class and `/70` on it emits no CSS at all */}
           <div
             className="mt-2 whitespace-pre-wrap break-words italic"
             style={{ color: "rgba(144,144,146,0.7)" }}
@@ -160,7 +126,6 @@ export function AboutPreview({ paragraphs, education, companyLogos }: AboutPrevi
             {UNLOCK_HINT}
           </div>
 
-          {/* the live prompt, un-focused: an outlined block caret */}
           <div className="mt-1 flex items-center">
             <span className="shrink-0 whitespace-pre"><Prompt /></span>
             <span
@@ -172,7 +137,6 @@ export function AboutPreview({ paragraphs, education, companyLogos }: AboutPrevi
         </div>
       </div>
 
-      {/* ── education timeline ── */}
       {education.length > 0 && (
         <div className="mt-5">
           <p className="text-[9px] uppercase tracking-[0.2em]" style={{ color: DIM }}>Education</p>

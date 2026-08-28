@@ -1,9 +1,8 @@
-/** No `0`/`O`, no `1`/`l`/`I`: these get typed by hand off a printed résumé. */
 export const SLUG_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
 
 export const SLUG_LENGTH = 7;
 
-// Bytes at or above this would wrap the alphabet and bias the first few letters.
+// bytes above this wrap and bias the first letters
 const UNBIASED_CEILING = 256 - (256 % SLUG_ALPHABET.length);
 
 const SLUG_RE = new RegExp(`^[${SLUG_ALPHABET}]{4,16}$`);
@@ -31,7 +30,6 @@ export function isValidSlug(value: string): boolean {
 const OWN_HOST = "yatindora.in";
 const MAX_DESTINATION_LENGTH = 2048;
 
-/** Open-redirect gate. Backslashes are rejected rather than parsed: browsers fold `/\evil.com` into `//evil.com`. */
 export function safeDestination(raw: string): string | null {
   const value = raw.trim();
   if (!value || value.length > MAX_DESTINATION_LENGTH) return null;

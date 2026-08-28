@@ -74,9 +74,7 @@ export function TopBar({ user, onBurger, onPalette, railed, onRail, toast }: {
         {busy ? <span className="pubbar" aria-hidden="true" /> : null}
         <button className="tb-burger" onClick={onBurger} aria-label="Menu"><IconMenu2 size={18} /></button>
 
-        {/* `aria-expanded` on a control that collapses the nav it sits beside,
-            with `aria-controls` naming it, so the state is announced rather than
-            left to the icon. */}
+        {/* aria-controls names the sidebar this collapses */}
         <button
           className="ibtn rail-btn"
           onClick={onRail}
@@ -88,8 +86,7 @@ export function TopBar({ user, onBurger, onPalette, railed, onRail, toast }: {
           {railed ? <IconLayoutSidebarLeftExpand size={16} /> : <IconLayoutSidebarLeftCollapse size={16} />}
         </button>
 
-        {/* Eyebrow and title both come from nav.ts — the same row the sidebar
-            highlights — so the topbar can never name a page the nav doesn't. */}
+        {/* eyebrow and title come from nav.ts */}
         <div className="tb-crumb" key={pathname}>
           <div className="tb-eyebrow">{nav?.eyebrow ?? "control room"}</div>
           <div className="tb-title">{nav?.label ?? "Admin"}</div>

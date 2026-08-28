@@ -10,7 +10,6 @@ import { getSession } from "@/lib/session";
 import { revalidate } from "@/lib/revalidation";
 import type { RevalidateResult } from "@/lib/revalidation";
 
-/** `ok` is the save and `revalidated` is the flush: the row is already committed by the time the flush runs, so a failed flush must not read as a failed save. */
 type StatusResult = {
   ok: boolean;
   revalidated: boolean;
@@ -40,7 +39,7 @@ const StatusInput = z
         message: "Status must be one of DRAFT, SCHEDULED, PUBLISHED or ARCHIVED.",
       }),
     }),
-    // Absent leaves the column alone, null or "" clears it, a string sets it.
+    // absent leaves the column alone, null or "" clears it
     publishAt: z.string().nullable().optional(),
   })
   .superRefine((value, ctx) => {
@@ -97,7 +96,6 @@ function flushError(result: RevalidateResult): string | undefined {
   );
 }
 
-/** Calls `publishDueContent` directly rather than `maybePublishDue`, so pressing the button skips the "we checked recently" memo. */
 export async function runDuePublish(): Promise<{
   ok: boolean;
   published: number;
@@ -123,12 +121,11 @@ export async function runDuePublish(): Promise<{
   for (const item of items) {
     const itemTags =
       item.type === "Blog"
-        ? // A blog always has its slug here; `slug` is nullable on the type only
-          // because Project has no slug column.
+        ?
           item.slug
           ? blogTags(item.slug)
           : [tags.blogIndex()]
-        : // Projects are tagged by id, never slug — Project has no slug.
+        :
           projectTags(item.id);
 
     const result = await revalidate({
@@ -146,7 +143,6 @@ export async function runDuePublish(): Promise<{
   revalidatePath("/dashboard");
   revalidatePath("/revalidation");
 
-  // `ok` stays true when a flush failed: the rows are committed, and re-running would republish nothing.
   return {
     ok: true,
     published: items.length,
@@ -158,12 +154,10 @@ export async function runDuePublish(): Promise<{
   };
 }
 
-/** Only overwrites a `publishedAt` that sits in the future: it is the editorial date the article prints, and the public filter is `publishedAt <= now`. */
 function blogPublishStamp(current: Date, now: Date): { publishedAt: Date } | Record<string, never> {
   return current.getTime() > now.getTime() ? { publishedAt: now } : {};
 }
 
-/** Project's `publishedAt` is nullable, so a null one has to be stamped as well. */
 function projectPublishStamp(
   current: Date | null,
   now: Date,
@@ -200,7 +194,7 @@ export async function publishBlogNow(id: string): Promise<StatusResult> {
     },
   });
 
-  // `updateMany` guarded on the id rather than a bare `update`: a row deleted between the read and the write is a count of 0, not a thrown P2025.
+  // updateMany, not update: a row deleted between read and write is count 0
   if (updated.count === 0) {
     return { ok: false, revalidated: false, error: "That blog no longer exists." };
   }
@@ -274,7 +268,6 @@ export async function setBlogStatus(input: {
     where: { id },
     data: {
       status,
-      // An omitted `publishAt` leaves the column alone; a stale date is inert because every due query requires `status: "SCHEDULED"` first.
       ...(publishAt === undefined ? {} : { publishAt }),
       ...(status === "PUBLISHED" ? blogPublishStamp(blog.publishedAt, now) : {}),
     },

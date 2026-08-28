@@ -3,20 +3,8 @@ import { IconBrandGithub, IconChartHistogram } from "@tabler/icons-react";
 import { RefreshGithubButton } from "./refresh-github";
 import type { GithubLedger } from "./github-ledger";
 
-/**
- * The contact section's signature object, read back for the admin.
- *
- * The site draws a year of commit activity as one line on the GitHub row of its
- * dial. Nothing on this page can edit it — it is captured from GitHub into an
- * archive in Postgres — but the page that carries the only refresh button in the
- * admin should be able to show what refreshing would be refreshing. Every figure
- * below is the archive's own; nothing is invented, and when there is no archive
- * the card says exactly that rather than drawing a flat year.
- */
 export function GithubTile({ ledger, hasGithubRow }: {
   ledger: GithubLedger | null;
-  /** Without a GitHub SocialLink row the site has no handle to read, so there is
-      nothing for the button to refresh. */
   hasGithubRow: boolean;
 }) {
   return (
@@ -84,12 +72,6 @@ function Fig({ v, k, mono }: { v: string; k: string; mono?: boolean }) {
   );
 }
 
-/**
- * 53 weekly totals, oldest first — the same window the site's line is drawn
- * from, as bars because this is an instrument readout and not the site's stroke.
- * A week the archive cannot vouch for is a gap, never a zero: a zero here would
- * claim a quiet week that may simply never have been captured.
- */
 function Weeks({ weeks, startDate }: { weeks: (number | null)[]; startDate: string }) {
   const known = weeks.filter((w): w is number => w != null);
   const max = Math.max(1, ...known);

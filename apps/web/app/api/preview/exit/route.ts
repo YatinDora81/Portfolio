@@ -7,6 +7,6 @@ export async function GET() {
   const dm = await draftMode();
   dm.disable();
 
-  // Must stay outside any try/catch — `redirect()` throws NEXT_REDIRECT.
+  // redirect() throws NEXT_REDIRECT, must stay outside try/catch
   redirect("/");
 }

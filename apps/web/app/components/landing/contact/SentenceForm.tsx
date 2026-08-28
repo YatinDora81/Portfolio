@@ -1,15 +1,5 @@
 'use client';
 
-/**
- * The form written as one line of prose you finish. The fields carry no labels
- * because the sentence around them is the label, and each blank is sized to
- * what has been typed into it.
- *
- * The scope is driven through its imperative handle, never props — a wave that
- * re-rendered this form at typing speed would cost a render per character in
- * both directions. The receipt is typed into the DOM for the same reason.
- */
-
 import {
   useCallback,
   useEffect,
@@ -27,7 +17,6 @@ import type { ScopeHandle } from './Scope';
 interface ComposerProps {
   purposes: Purpose[];
   contactEmail: string;
-  /** The line beside the button — the CMS's availability detail when it has one. */
   note: string;
   scope: RefObject<ScopeHandle | null>;
   turnstileSiteKey: string | null;
@@ -38,28 +27,19 @@ interface SentenceFormProps extends ComposerProps {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-/** Mirrors the server caps in app/api/contact/route.ts, so an over-long name is
-    stopped in the field instead of coming back as a generic 400. */
 const MAX_NAME = 100;
 const MAX_EMAIL = 254;
-/** Deliberately far under the server's 5000: the count in the transmit row and
-    its warning threshold are one design with this number, and five thousand
-    characters is not a sentence. */
 const MAX_MESSAGE = 1000;
 const MIN_MESSAGE = 10;
 const NEAR = 900;
 
-// Expressions, not JSX string attributes: the mirror measures `input.placeholder`
-// and has to be handed the same glyphs the field shows.
 const PH_NAME = 'your name';
 const PH_EMAIL = 'you@company.com';
 const PH_MSG = 'here’s what’s on my mind…';
 
-// Mirrored from @repo/shared/spam, not imported: that module is the scorer, and it would ship to every visitor.
 const HONEYPOT_FIELD = 'company_website';
 const FORM_TOKEN_FIELD = 'form_token';
 
-// Off-screen, not display:none — a bot skips fields it can tell are unrendered.
 const HONEYPOT: CSSProperties = { position: 'absolute', left: '-9999px', top: 0 };
 
 const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
@@ -70,15 +50,10 @@ declare global {
   }
 }
 
-/** The receipt cannot start typing while the scope is still throwing the message
-    out — chaos runs to 0.32s and the flatline to 0.55s. A fetch that resolves
-    faster than the instrument waits for it. */
 const FLOOR_MS = 950;
 
 const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
 
-/** HH:MM in IST. A runtime without the IANA database drops to the local clock —
-    and drops the label with it, because stamping "IST" on a local time is a lie. */
 function stamp() {
   const now = new Date();
   const hm = { hour12: false, hour: '2-digit', minute: '2-digit' } as const;
@@ -89,14 +64,10 @@ function stamp() {
   }
 }
 
-/** Sizes a blank to its own contents through the hidden mirror beside it, clamped
-    to the line it sits on so a long address cannot push the sentence off screen. */
 function fitBlank(blank: HTMLElement | null) {
   const input = blank?.querySelector('input');
   const mirror = blank?.querySelector<HTMLElement>('.mirror');
   const line = blank?.parentElement;
-  // A section under content-visibility:auto measures 0 until it renders; sizing
-  // to that would collapse every blank to nothing.
   if (!input || !mirror || !line?.clientWidth) return;
   mirror.textContent = input.value || input.placeholder;
   input.style.width = `${Math.min(mirror.offsetWidth + 6, line.clientWidth - 20)}px`;
@@ -108,8 +79,7 @@ function grow(ta: HTMLTextAreaElement | null) {
   ta.style.height = `${ta.scrollHeight}px`;
 }
 
-/** Re-adding the class alone never restarts a running keyframe — the element has
-    to be laid out again between the two writes. */
+// reflow between the writes restarts the keyframe
 function markErr(el: HTMLElement | null) {
   if (!el) return;
   el.classList.remove('err');
@@ -131,7 +101,6 @@ interface AckPart {
   cls?: string;
 }
 
-/** What the receipt offers once it has finished typing. */
 type Tail = 'another' | 'mailto' | null;
 
 function Paused({ contactEmail }: { contactEmail: string }) {
@@ -148,7 +117,6 @@ function Paused({ contactEmail }: { contactEmail: string }) {
   );
 }
 
-/** Guarded in a wrapper so the composer's hooks stay unconditional. */
 export default function SentenceForm({ enabled, ...props }: SentenceFormProps) {
   if (!enabled) return <Paused contactEmail={props.contactEmail} />;
   return <Composer {...props} />;
@@ -170,10 +138,6 @@ function Composer({
   const msgId = `${uid}-message`;
   const hpId = `${uid}-website`;
 
-  // Matched against the CMS rather than hardcoded, so a renamed row cannot post
-  // a label the server will refuse to match. The sentence has no grammatical
-  // room for "no particular reason", so with that row gone it opens on whatever
-  // the CMS lists first instead of on an empty word.
   const openWith =
     purposes.find((p) => /^just saying hi$/i.test(p.label.trim()))?.label ?? purposes[0]?.label ?? '';
 
@@ -184,11 +148,7 @@ function Composer({
   const [railOpen, setRailOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [tail, setTail] = useState<Tail>(null);
-  // Re-keyed rather than re-assigned below: two identical errors in a row leave
-  // the string unchanged, and a live region that does not mutate does not speak.
   const [say, setSay] = useState({ n: 0, text: '' });
-  /** Bumped on a successful send — the fields are cleared through state, so the
-      blanks can only be re-measured on the commit after it. */
   const [sends, setSends] = useState(0);
   const [formToken, setFormToken] = useState<string | null>(null);
 
@@ -216,10 +176,6 @@ function Composer({
     let live = true;
     let w = 0;
 
-    // An observer, not a mount-time read: the first honest width of a section
-    // skipping its contents arrives when it starts rendering, which is neither
-    // mount nor resize. Width only — refitting on height would feed the
-    // observer its own output.
     const ro = new ResizeObserver((entries) => {
       const next = entries[0]?.contentRect.width ?? 0;
       if (next === w) return;
@@ -230,8 +186,6 @@ function Composer({
 
     const onResize = () => refit();
     window.addEventListener('resize', onResize, { passive: true });
-    // A webfont landing after first paint invalidates every width measured
-    // against the fallback.
     document.fonts?.ready.then(() => {
       if (live) refit();
     });
@@ -259,22 +213,12 @@ function Composer({
           setFormToken(body.token);
         }
       } catch {
-        // No token; the form still submits without one.
+        // no token; the form still submits without one
       }
     })();
     return () => ac.abort();
   }, []);
 
-  // Turnstile is fetched when the form is about to be seen or used — not at
-  // mount. The contact section is five screens below the fold, and the script
-  // (27 kB gz, ~280 ms of main thread on a mid-range phone, two blob workers and
-  // an iframe) was loading on every pageview whether or not anyone scrolled
-  // down. `content-visibility: auto` on #contact means an observer on a child
-  // would never fire, so this watches the section itself, then the form's own
-  // focus as a belt-and-braces path for keyboard / find-in-page arrivals.
-  //
-  // No cleanup for the tag once appended: removing it would take the widget it
-  // rendered with it.
   useEffect(() => {
     if (!turnstileSiteKey) return;
     const form = formRef.current;
@@ -318,17 +262,12 @@ function Composer({
     [],
   );
 
-  /** Types the receipt character by character behind a blinking caret. The parts
-      carry their own classes, so "ACK 202" can land green while the rest of the
-      line stays dim. */
   const typeAck = useCallback(
     (parts: AckPart[], ends: Tail = null) => {
       const host = ackRef.current;
       if (!host) return;
       if (typing.current !== null) window.clearInterval(typing.current);
       setTail(null);
-      // Announced whole and at once: a reader should not have to sit through the
-      // typing to hear whether the message went.
       setSay((s) => ({ n: s.n + 1, text: parts.map((p) => p.text).join('') }));
 
       host.textContent = '';
@@ -389,8 +328,6 @@ function Composer({
   const pickPurpose = (label: string) => {
     setPurpose(label);
     setRailOpen(false);
-    // The rail is a disclosure: closing it with focus still inside would drop
-    // the caret onto a button that is no longer visible.
     pkRef.current?.focus();
     scope.current?.poke(0.3);
   };
@@ -424,27 +361,21 @@ function Composer({
     clearAck();
     scope.current?.burst();
 
-    // Built field by field rather than stringifying state, so renaming anything
-    // here cannot silently change the wire format. `purpose` is the CMS label
-    // verbatim — the server matches contactPurpose on it and stores NULL for
-    // anything it does not recognise, with a 200 either way.
     const payload = {
       name: name.trim(),
       email: email.trim(),
       purpose,
       message: message.trim(),
-      // Turnstile's implicit render puts its answer in a hidden input, not in any state we hold.
       turnstileToken:
         formRef.current?.querySelector<HTMLInputElement>('[name="cf-turnstile-response"]')?.value ??
         '',
       [HONEYPOT_FIELD]: hpRef.current?.value ?? '',
-      // Omitted, not empty: an empty string is a token the server cannot verify.
       ...(formToken ? { [FORM_TOKEN_FIELD]: formToken } : {}),
     };
 
     const started = Date.now();
     const settle = async () => {
-      if (reduced) return; // no wave to wait for
+      if (reduced) return;
       await wait(Math.max(0, FLOOR_MS - (Date.now() - started)));
     };
 
@@ -454,7 +385,6 @@ function Composer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      // A Turnstile answer is single-use, and the server may have spent it on a 400 as much as a 200.
       const widget = formRef.current?.querySelector('.cf-turnstile');
       if (widget) window.turnstile?.reset(widget);
       await settle();
@@ -469,8 +399,6 @@ function Composer({
             { text: 'ACK 202 ', cls: 'ok' },
             { text: `· transmission received · ${stamp()}\n` },
             {
-              // Read off the payload, not off state — the fields above have just
-              // been cleared and the receipt would otherwise be blank.
               text: payload.purpose
                 ? `re: ${payload.purpose} · reply lands at ${payload.email} within 24h  `
                 : `reply lands at ${payload.email} within 24h  `,
@@ -479,9 +407,6 @@ function Composer({
           'another',
         );
       } else {
-        // fetch RESOLVES on 4xx/5xx — the catch below never sees a rejected
-        // message, so without this branch the send fails in total silence. The
-        // fields keep everything that was written, and the receipt says so.
         let said = '';
         try {
           const body: unknown = await res.json();
@@ -489,7 +414,7 @@ function Composer({
             said = body.error.trim();
           }
         } catch {
-          // A non-JSON body — a proxy's own 502 page — falls to the line below.
+          // non-json body falls through to the line below
         }
         typeAck(
           [
@@ -500,9 +425,6 @@ function Composer({
         );
       }
     } catch {
-      // Network-level: the request never left the browser. Hand the visitor
-      // their mail client with the message already in it, and do not clear a
-      // thing — nothing has been received and the receipt must not pretend it has.
       openMailtoFallback();
       await settle();
       typeAck([
@@ -547,17 +469,13 @@ function Composer({
             value={name}
             onChange={(e) => {
               setName(e.target.value);
-              // The DOM value is already current inside the handler, so the
-              // blank is measured and resized in the same event as the
-              // keystroke — an effect would do it a painted frame late.
               fitBlank(bNameRef.current);
               bNameRef.current?.classList.remove('err');
               scope.current?.poke(0.2);
             }}
             onFocus={() => scope.current?.poke(0.12)}
           />
-          {/* Written imperatively by fitBlank and never by React, so the two
-              cannot fight over its contents. */}
+
           <span className="mirror" aria-hidden="true" />
         </span>
         {purposes.length > 0 && (
@@ -646,9 +564,7 @@ function Composer({
 
       {purposes.length > 0 && (
         <div className={`chip-rail${railOpen ? ' open' : ''}`} id={railId}>
-          {/* The chips are still in the DOM behind a 0fr row when the rail is
-              shut, and a tab through an invisible button is worse than no
-              disclosure at all. */}
+
           <div role="group" aria-label="Reason for reaching out" inert={!railOpen}>
             {purposes.map((p) => (
               <button
@@ -681,11 +597,7 @@ function Composer({
         </span>
         <span className="tx-note">{note}</span>
         <span className="tx-spacer" />
-        {/* `aria-disabled` rather than `disabled`: a button that becomes
-            disabled is blurred by the browser, so pressing Transmit by keyboard
-            threw focus to <body> mid-send and the receipt announced into
-            nowhere. The guard at the top of `submit` is what actually refuses a
-            second transmission. */}
+
         <button className="tx-btn" type="submit" aria-disabled={sending}>
           <span className="btnwave" aria-hidden="true">
             <i />
@@ -700,9 +612,6 @@ function Composer({
         </button>
       </div>
 
-      {/* Always mounted and empty at rest — a live region that is populated and
-          then unhidden does not reliably announce. The typed line is hidden from
-          the tree so the receipt is spoken once rather than per character. */}
       <p className="ack" role="status" aria-live="polite">
         <span ref={ackRef} aria-hidden="true" />
         {say.text ? (

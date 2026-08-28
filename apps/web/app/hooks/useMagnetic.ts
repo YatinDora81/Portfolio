@@ -4,32 +4,15 @@ import { useEffect, type RefObject } from 'react';
 import { useIsTouch } from './useIsTouch';
 import { useReducedMotion } from './useReducedMotion';
 
-/** Lean, as a fraction of the pointer's offset from the element's centre.
-    Vertical travel reads as heavier than horizontal, so it gets more gain to
-    cover the same fraction of a much shorter box. */
 const PULL_X = 0.14;
 const PULL_Y = 0.224;
-/** Past this the button has stopped feeling attached to the pointer. */
 const MAX = 7;
 
-/** Stiff enough to feel taut, damped just short of critical so the release
-    overshoots by a hair on its way home. */
 const STIFFNESS = 0.24;
 const DAMPING = 0.7;
 
 const clamp = (value: number) => Math.max(-MAX, Math.min(MAX, value));
 
-/**
- * The element leans toward the pointer while it is over it and springs back
- * when it leaves.
- *
- * The offset is written to the independent `translate` property, never to
- * `transform`: `transform` already belongs to the element's own hover and press
- * states, and `translate` composes ahead of it, so the lean stacks on top of
- * them instead of overwriting them. It also keeps the per-frame tracking out of
- * any `transition: transform` the element carries, which would otherwise smear
- * every frame into a 200ms lag.
- */
 export function useMagnetic<T extends HTMLElement>(ref: RefObject<T | null>) {
   const reduceMotion = useReducedMotion();
   const isTouch = useIsTouch();
@@ -64,8 +47,6 @@ export function useMagnetic<T extends HTMLElement>(ref: RefObject<T | null>) {
         vy = 0;
       }
 
-      // Home again: drop the declaration rather than parking a `0px 0px` on the
-      // node, so an untouched button carries no inline style at all.
       if (settled && x === 0 && y === 0) el.style.removeProperty('translate');
       else el.style.translate = `${x.toFixed(2)}px ${y.toFixed(2)}px`;
 
@@ -78,9 +59,7 @@ export function useMagnetic<T extends HTMLElement>(ref: RefObject<T | null>) {
 
     const move = (event: PointerEvent) => {
       const r = el.getBoundingClientRect();
-      // The rect travels with the lean, so back out what is already applied —
-      // measured from the moved box, the pull compounds and the button chases
-      // its own offset.
+      // the rect travels with the lean, so back out what is applied
       const cx = r.left + r.width / 2 - x;
       const cy = r.top + r.height / 2 - y;
       tx = clamp((event.clientX - cx) * PULL_X);

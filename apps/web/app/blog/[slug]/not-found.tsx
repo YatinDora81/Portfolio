@@ -7,7 +7,6 @@ import { getBlogs } from '@/lib/data';
 import { FLAG_KEYS, flagValue } from '@repo/shared/flags';
 
 export default async function BlogNotFound() {
-  // Mirrors the homepage condition exactly — the `#blogs` anchor only exists when both halves hold.
   const [flags, blogs] = await Promise.all([getFlags(), getBlogs()]);
   const showBlogs = flagValue(flags, FLAG_KEYS.SECTION_BLOGS) && blogs.length > 0;
 

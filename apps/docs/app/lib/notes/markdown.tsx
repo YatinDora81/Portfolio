@@ -1,44 +1,5 @@
 import type { ReactNode } from "react";
 
-/**
- * Markdown for answer bodies, rendered into React elements.
- *
- * It used to say "on the server", and the reader was a server component. Both
- * halves of this file now run in the browser as well — the revise deck always
- * did, and the reader joined it when the vault moved into memory. The rule below
- * did not change, and is more load-bearing for the move, not less: elements out,
- * never an HTML string, and never `dangerouslySetInnerHTML`. That is not stylistic — React escapes text nodes
- * for us, so nothing an answer body contains can become markup by accident, and
- * the only place a body can still reach the DOM as anything but text is an
- * `href`. `safeHref` guards it.
- *
- * The dialect is small on purpose: fences, inline code, paragraphs, `-`/`*` and
- * `1.` lists, `#` headings, `>` quotes, `**bold**`, `*italic*` and links.
- *
- * On top of that sit three `:::` containers, which exist because a revision
- * vault is not prose: a question you can answer, an answer you can hide until
- * you have tried, and an aside that should not read as the next sentence.
- *
- *     ::: quiz Which of these is O(log n)?
- *     - Linear search
- *     + Binary search
- *     = It halves the range each step.
- *     :::
- *
- *     ::: details Why does this work?      ::: note Heads up
- *     Any **markdown**, including more     Any markdown. `tip` and `warn`
- *     containers.                          are the other two.
- *     :::                                  :::
- *
- * **None of them ship JavaScript.** The reader is a server component and the
- * revise deck renders the same function on the client, so a block that needed a
- * hook would have to be one or the other. `details`/`summary` is the browser's
- * own accordion, and the quiz marks a choice right or wrong through `:checked`
- * in the stylesheet — which is also why these three are the only blocks here
- * that emit class names. An unknown container word is not a container: it falls
- * through and renders as the literal text, visibly, the same way `safeHref`
- * leaves a refused link as prose.
- */
 export function renderMarkdown(src: string): ReactNode {
   return <>{blocks(src.replace(/\r\n?/g, "\n").split("\n"))}</>;
 }
@@ -49,11 +10,8 @@ const BULLET = /^ {0,3}[-*]\s+(.*)$/;
 const ORDERED = /^ {0,3}(\d{1,9})[.)]\s+(.*)$/;
 const QUOTE = /^ {0,3}>\s?(.*)$/;
 
-/** Only the words below open a container. Anything else after `:::` is prose,
- *  so a typo shows itself instead of swallowing the rest of the note. */
 const OPEN = /^ {0,3}:::[ \t]*(quiz|details|note|tip|warn)\b[ \t]*(.*)$/i;
 const CLOSE = /^ {0,3}:::[ \t]*$/;
-/** Inside a quiz: `+` is a correct choice, `-` a wrong one, `=` the reason. */
 const CHOICE = /^ {0,3}([+-])\s+(.*)$/;
 const BECAUSE = /^ {0,3}=\s?(.*)$/;
 
@@ -61,16 +19,6 @@ const H = ["h1", "h2", "h3", "h4", "h5", "h6"] as const;
 
 const CALLOUT: Record<string, string> = { note: "Note", tip: "Tip", warn: "Careful" };
 
-/**
- * FNV-1a over the block's own text.
- *
- * Two jobs, both of which a positional key cannot do. Radio groups need a `name`
- * no other quiz on the page shares. And the revise deck renders one card after
- * another into the same position, so a key of "the third block" lets React reuse
- * the DOM node — and an uncontrolled radio carries the previous card's tick over
- * with it. Keying on content remounts instead. Deterministic, so the server's
- * markup and the client's first render agree.
- */
 function hash(s: string): string {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
@@ -80,15 +28,9 @@ function hash(s: string): string {
   return (h >>> 0).toString(36);
 }
 
-/** Each level copies the lines below it, so unclosed `:::` nests quadratically. */
+// unclosed ::: nests quadratically
 const MAX_CONTAINER_DEPTH = 16;
 
-/**
- * Blocks are scanned line by line rather than split on blank lines first. A
- * fenced block is allowed to contain a blank line — code usually does — and any
- * splitter that runs before the fences are found tears that block in half and
- * renders the second half as prose.
- */
 function blocks(lines: string[], depth = 0): ReactNode[] {
   const out: ReactNode[] = [];
   let i = 0;
@@ -109,7 +51,7 @@ function blocks(lines: string[], depth = 0): ReactNode[] {
         body.push(lines[i] ?? "");
         i++;
       }
-      i++; // the closing fence — or the end of the body, when the writer forgot it
+      i++;
       out.push(
         <pre key={key}>
           <code>{body.join("\n")}</code>
@@ -125,9 +67,7 @@ function blocks(lines: string[], depth = 0): ReactNode[] {
       const { body, next } = container(lines, i + 1);
       i = next;
       const id = hash(`${kind}${title}${body.join("\n")}`);
-      // At the cap the container is flattened, but it must still be CONSUMED:
-      // `opensBlock` counts `:::` as an opener, so a line left for the paragraph
-      // branch ends that run before it advances `i`, and the scanner spins here.
+      // consume it even at the cap, or the scanner spins
       out.push(
         depth >= MAX_CONTAINER_DEPTH ? (
           <p key={`${key}-${id}`}>{lineRun([line, ...body], `${key}-${id}`)}</p>
@@ -205,14 +145,6 @@ function blocks(lines: string[], depth = 0): ReactNode[] {
   return out;
 }
 
-/**
- * Every predicate here must have a branch in `blocks` that consumes the line.
- * A closing `:::` deliberately is NOT one: `container` reads its own terminator,
- * so a `:::` reaching this point is a stray with nothing to close, and listing
- * it would end the paragraph without anything advancing past it — a loop rather
- * than a rendering bug. Left out, it is ordinary text, which is also what a
- * writer who typed one by accident should see.
- */
 function opensBlock(line: string): boolean {
   return (
     FENCE.test(line) ||
@@ -224,18 +156,6 @@ function opensBlock(line: string): boolean {
   );
 }
 
-/**
- * The lines up to the `:::` that closes this container, and where to carry on.
- *
- * Nesting is counted rather than stopped at the first close, so a `details`
- * inside a `details` survives. Fences are tracked while counting because a code
- * sample is entitled to contain a line of three colons — the same reason
- * `blocks` scans for fences before it splits anything.
- *
- * A container nobody closed runs to the end of the body, which is what the
- * fence handler above does with a missing back-tick: the writer sees their text,
- * laid out oddly, rather than losing it.
- */
 function container(lines: string[], start: number): { body: string[]; next: number } {
   const body: string[] = [];
   let depth = 1;
@@ -261,17 +181,6 @@ function container(lines: string[], start: number): { body: string[]; next: numb
   return { body, next: i };
 }
 
-/**
- * A question you answer by clicking, marked right or wrong by the stylesheet.
- *
- * More than one `+` turns the radios into checkboxes, because a group of radios
- * that wants two answers is a control that cannot express its own rules.
- *
- * The reveal is a `details`, and it NAMES the correct choices rather than
- * relying on the ✓ that `:checked` paints — that mark is decoration, and a
- * quiz whose answer is only reachable by pointing at it is a quiz half the
- * people using it cannot finish.
- */
 function quiz(title: string, lines: string[], key: string, id: string): ReactNode {
   const prompt: string[] = title ? [title] : [];
   const choices: { ok: boolean; text: string }[] = [];
@@ -289,8 +198,6 @@ function quiz(title: string, lines: string[], key: string, id: string): ReactNod
       continue;
     }
     if (!l.trim()) continue;
-    // Before the first choice a loose line is more question; after one it is
-    // more explanation. Either way it is never silently dropped.
     (choices.length ? because : prompt).push(l.trim());
   }
 
@@ -331,8 +238,6 @@ function quiz(title: string, lines: string[], key: string, id: string): ReactNod
   );
 }
 
-/** The browser's own accordion. Its contents are markdown, containers included,
- *  so a long derivation can be folded away one step at a time. */
 function accordion(title: string, body: string[], key: string, depth = 0): ReactNode {
   return (
     <details className="nt-acc" key={key}>
@@ -342,8 +247,6 @@ function accordion(title: string, body: string[], key: string, depth = 0): React
   );
 }
 
-/** An aside that should not read as the next sentence. `aside` rather than a
- *  `div`, because that is exactly what it is. */
 function callout(kind: string, title: string, body: string[], key: string, depth = 0): ReactNode {
   return (
     <aside className={`nt-call ${kind}`} key={key}>
@@ -353,7 +256,6 @@ function callout(kind: string, title: string, body: string[], key: string, depth
   );
 }
 
-/** A run of lines inside one block: single newlines are breaks, not paragraphs. */
 function lineRun(lines: string[], key: string): ReactNode[] {
   const out: ReactNode[] = [];
   lines.forEach((l, n) => {
@@ -363,11 +265,7 @@ function lineRun(lines: string[], key: string): ReactNode[] {
   return out;
 }
 
-/**
- * Ordered alternation, and the order is the parse: code first so a fenced-off
- * `**not bold**` stays literal, then links, then bold before italic so `**x**`
- * is never read as an empty emphasis wrapping `*x*`.
- */
+// bold before italic, so **x** is not empty emphasis
 const INLINE = /(`[^`\n]+`)|(\[[^\]\n]*\]\([^)\n]*\))|(\*\*[^\n]+?\*\*)|(\*[^*\n]+\*)/;
 
 function inline(src: string, key: string): ReactNode[] {
@@ -403,15 +301,6 @@ function link(token: string, key: string): ReactNode {
   );
 }
 
-/**
- * The one security-relevant rule in this file. A body is written by an admin,
- * but "the author is trusted" stops being a model the moment text is pasted in
- * from somewhere else: `javascript:` in an href runs on click, in the admin's
- * own session. Three shapes are allowed to become links — absolute http(s),
- * site-relative, and an in-page fragment — and anything else falls back to the
- * literal markdown text, which is visible and harmless. `//host` is refused with
- * the rest: it looks site-relative and is not.
- */
 function safeHref(url: string): string | null {
   const u = url.trim();
   if (/^https?:\/\//i.test(u)) return u;

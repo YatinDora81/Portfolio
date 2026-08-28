@@ -28,26 +28,18 @@ export function ContactPurposesTable({ purposes }: { purposes: Purpose[] }) {
     isDeleted, isNew, isEdited,
   } = useStaging();
 
-  // Nothing here writes: every dialog, drag and delete lands in the staging
-  // store and the save bar commits the lot. `overlay` folds the pending batch
-  // back over the server rows so a staged change is visible immediately.
   const staged = overlay(ENTITY, purposes, (p) => p.id);
   const { order, handleProps, itemProps } = useSortable(
     staged.map((p) => p.id),
     (ids) => stageReorder(ENTITY, ids)
   );
-  // Sorted BY the drag order rather than mapped THROUGH it: the hook re-seeds in
-  // an effect, so for one render after a create its `order` has no slot for the
-  // new row — mapping through it would blink the row out of existence just as
-  // the dialog closes onto the list.
+  // a new row has no drag slot yet
   const rank = new Map(order.map((id, i) => [id, i] as const));
   const at = (id: string) => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
   const rows = [...staged].sort((a, b) => at(a.id) - at(b.id));
 
   const openNew = () => { setEditing(null); setDialogOpen(true); };
 
-  // Keyboard path for reorder. Ids come from `rows`, so the indices the buttons
-  // carry and the list being reordered share one index space.
   const move = (from: number, to: number) => {
     const ids = rows.map((p) => p.id);
     [ids[from], ids[to]] = [ids[to]!, ids[from]!];
@@ -92,7 +84,6 @@ export function ContactPurposesTable({ purposes }: { purposes: Purpose[] }) {
                 </div>
                 <div className="row-acts">
                   {del ? (
-                    // The row stays put until the save; this is the undo.
                     <IconButton
                       aria-label={`Keep ${p.label}`}
                       title="Undo delete"
@@ -147,7 +138,6 @@ export function ContactPurposesTable({ purposes }: { purposes: Purpose[] }) {
         footer={
           <>
             <Button variant="ghost" type="button" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            {/* Not "Save": the save bar owns that word now, and this only stages. */}
             <Button type="submit" form={FORM_ID}>{editing ? "Update purpose" : "Add purpose"}</Button>
           </>
         }
@@ -155,9 +145,6 @@ export function ContactPurposesTable({ purposes }: { purposes: Purpose[] }) {
         <form
           id={FORM_ID}
           onSubmit={(e) => {
-            // `onSubmit` rather than `action`: the dialog stages and closes, so
-            // there is no server round trip to await. Native validation still
-            // runs first, so `required` below is unaffected.
             e.preventDefault();
             const data = new FormData(e.currentTarget);
             const fields = {

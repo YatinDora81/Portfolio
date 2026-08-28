@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * Carrier — the address riding its own wave. The rule under it is not a border
- * but a live signal, and the whole strip is one button: on a line this wide the
- * run past the end of the address is the largest target here.
- */
-
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useInView, useReducedMotion } from 'motion/react';
 import type { ScopeHandle } from './Scope';
@@ -15,14 +9,11 @@ interface CarrierProps {
   scope: RefObject<ScopeHandle | null>;
 }
 
-/** The weight the letters rest at, and the peak the ripple carries through them. */
 const CBASE = 460;
 const CPEAK = 800;
 
 const gauss = (x: number, mu: number, s: number) => Math.exp(-((x - mu) ** 2) / (2 * s * s));
 
-/** Three sines, no RNG: the wave is the same shape on every machine and on every
-    reload, so nothing here needs seeding. */
 const noise = (x: number) =>
   Math.sin(x * 1.9) * 0.6 + Math.sin(x * 3.7 + 1.1) * 0.28 + Math.sin(x * 6.1 + 3.7) * 0.12;
 
@@ -44,9 +35,6 @@ function CheckMark() {
 }
 
 export default function Carrier({ email, scope }: CarrierProps) {
-  // Guarding here rather than inside CarrierLine keeps every hook unconditional.
-  // No address means no block at all: a button that copies "" and a mailto:
-  // pointing nowhere are both worse than an absent line.
   if (!email) return null;
   return <CarrierLine email={email} scope={scope} />;
 }
@@ -57,19 +45,11 @@ function CarrierLine({ email, scope }: CarrierProps) {
   const addrRef = useRef<HTMLSpanElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // Shared between the two loops below and written by pointer handlers, so a
-  // hover never re-renders React.
   const hovering = useRef(false);
-  /** performance.now() of the last copy; 0 while the wave is idling. */
   const burstAt = useRef(0);
 
-  // Not `once`: an oscilloscope four screens above the fold must not burn a
-  // frame budget, so both loops stop again when the section leaves.
   const inView = useInView(rootRef, { amount: 0 });
 
-  // A counter rather than a flag — copying again while the check is showing has
-  // to restart the 2000ms window, and setting `true` over `true` re-renders
-  // nothing and so never re-runs the timer below.
   const [copies, setCopies] = useState(0);
   const copied = copies > 0;
 
@@ -82,7 +62,6 @@ function CarrierLine({ email, scope }: CarrierProps) {
   const chars = Array.from(email);
   const n = chars.length;
 
-  /* the ripple through the letters */
   useEffect(() => {
     const addr = addrRef.current;
     const btn = btnRef.current;
@@ -91,7 +70,6 @@ function CarrierLine({ email, scope }: CarrierProps) {
     const spans = Array.from(addr.querySelectorAll<HTMLElement>('.cc'));
 
     if (reduced) {
-      // One weight, a shade above rest, and no loop to clean up.
       spans.forEach((s) => s.style.setProperty('--cw', '520'));
       return;
     }
@@ -110,13 +88,11 @@ function CarrierLine({ email, scope }: CarrierProps) {
         s.style.setProperty('--cy', (-2.2 * k).toFixed(2));
         if (k > 0.01) live = true;
       });
-      // Runs on past pointerleave until the pulse has walked off the end —
-      // stopping on the leave itself would freeze the letters mid-swell.
+      // keep running until the pulse walks off the end
       raf = hovering.current || !hoverable || live ? requestAnimationFrame(frame) : null;
     };
 
     if (!hoverable) {
-      // No cursor to chase, so the ripple drifts on its own.
       if (inView) raf = requestAnimationFrame(frame);
       return () => {
         if (raf !== null) cancelAnimationFrame(raf);
@@ -142,7 +118,6 @@ function CarrierLine({ email, scope }: CarrierProps) {
     };
   }, [n, reduced, inView]);
 
-  /* the mini wave that doubles as the underline */
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
@@ -155,16 +130,13 @@ function CarrierLine({ email, scope }: CarrierProps) {
     let raf: number | null = null;
     let ink = '#fafafa';
 
-    // The canvas inherits currentColor, so its own computed colour is the ink —
-    // reading document.body's would miss anything the section re-colours.
     const readInk = () => {
       ink = getComputedStyle(canvas).color.trim() || ink;
     };
     readInk();
 
     const size = () => {
-      // #contact carries content-visibility:auto: while the section is skipped
-      // the canvas measures 0 and every frame drawn into it is thrown away.
+      // clientWidth is 0 while #contact is skipped by content-visibility
       if (!canvas.clientWidth) return false;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       w = canvas.clientWidth;
@@ -183,9 +155,8 @@ function CarrierLine({ email, scope }: CarrierProps) {
           const a = 11 * (1 - el / 0.24);
           return mid + noise(u * 30 + time * 16) * a;
         }
-        if (el < 0.42) return mid; // flatline — the address has left
+        if (el < 0.42) return mid;
         if (el < 1.25) {
-          // double-pulse ACK, travelling left → right
           const p = (el - 0.42) / 0.83;
           const c1 = p * 1.12 - 0.05;
           return mid - (gauss(u, c1, 0.015) + gauss(u, c1 - 0.09, 0.015) * 0.7) * 12;
@@ -212,7 +183,6 @@ function CarrierLine({ email, scope }: CarrierProps) {
       ctx.strokeStyle = ink;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      // Wide and dim first for the phosphor bloom, then the core stroke over it.
       ctx.globalAlpha = 0.14;
       ctx.lineWidth = 4;
       trace();
@@ -222,11 +192,7 @@ function CarrierLine({ email, scope }: CarrierProps) {
       ctx.globalAlpha = 1;
     };
 
-    // Sizing from an observer, not a one-shot read: the first measurement of a
-    // skipped section is 0, and only the observer hears the real one arrive.
     const box = new ResizeObserver(() => {
-      // Resizing the bitmap clears it, so the one static frame has to be laid
-      // down again each time.
       if (size() && reduced) draw(0.6);
     });
     box.observe(canvas);
@@ -257,8 +223,7 @@ function CarrierLine({ email, scope }: CarrierProps) {
     try {
       await navigator.clipboard.writeText(email);
     } catch {
-      // No clipboard permission (or no clipboard at all) — the address is on
-      // screen and selectable either way, and ↗ still opens a mail client.
+      // no clipboard permission; the address is still selectable
     }
     setCopies((c) => c + 1);
     if (!reduced) burstAt.current = performance.now();
@@ -284,12 +249,8 @@ function CarrierLine({ email, scope }: CarrierProps) {
         title="Copy email address"
       >
         <span className="car-top">
-          {/* The per-character spans are hidden and the address is repeated once
-              below them: a screen reader handed 21 spans reads it one letter at
-              a time. */}
           <span className="car-addr" ref={addrRef} aria-hidden="true">
             {chars.map((ch, i) => (
-              // Positional and never reordered — the ripple indexes by position.
               <span key={i} className={ch === '@' ? 'cc at' : 'cc'}>
                 {ch}
               </span>
@@ -301,7 +262,6 @@ function CarrierLine({ email, scope }: CarrierProps) {
             <CheckMark />
           </span>
         </span>
-        {/* the wave IS the underline */}
         <canvas className="car-wave" ref={canvasRef} aria-hidden="true" />
       </button>
 
@@ -311,8 +271,6 @@ function CarrierLine({ email, scope }: CarrierProps) {
         </a>
       </div>
 
-      {/* Always mounted and empty at rest — a live region that is populated and
-          then unhidden does not reliably announce. */}
       <span className="sr-only" role="status" aria-live="polite">
         {copied ? 'Email copied to clipboard' : ''}
       </span>

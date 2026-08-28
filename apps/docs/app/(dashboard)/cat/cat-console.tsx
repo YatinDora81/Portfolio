@@ -8,11 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { PreviewFrame } from "@/components/preview";
 import { CatPreview } from "@/components/preview/cat";
 import { NapStylePicker } from "./nap-style-picker";
-// Taken from the registry rather than re-declared. A second copy of this list
-// drifted from it immediately: it called the ring's seconds "beneath" the dial,
-// which is what this admin's own preview draws, while oneko.js holds them at
-// `opacity: 0` until the cat is hovered. One list, so a label can only be wrong
-// in one place.
 import { NAP_STYLES } from "@/lib/site-config-keys";
 import { updateSiteConfig } from "@/lib/actions/site-config";
 import { publishSite } from "@/lib/actions/publish";
@@ -20,23 +15,7 @@ import {
   IconAlertTriangle, IconArrowBackUp, IconCheck, IconDeviceFloppy, IconWorldUpload, IconZzz,
 } from "@tabler/icons-react";
 
-/**
- * The cat's two configurable rows — `catNapStyle` and `catNapSeconds` — and
- * nothing else.
- *
- * IMPORTANT: this posts ONLY those two keys. `updateSiteConfig` upserts exactly
- * what it is handed, which is the only reason SiteConfig can be split across
- * four pages at all; posting a whole values object read at mount would
- * overwrite whatever Hero, Contact or Site chrome had saved in the meantime.
- *
- * It saves on its own, through the same action the rest of SiteConfig uses —
- * never through the staging save bar, which only carries staged entities.
- */
-
-
-/** The range apps/web clamps to on read (data.ts) and the action clamps to on
-    write (site-config.ts). Mirrored a third time so the box can't show a number
-    the row will not hold. */
+// mirrors the clamps in data.ts and site-config.ts
 const MIN = 3;
 const MAX = 300;
 const FALLBACK = 30;
@@ -47,7 +26,6 @@ function clampSeconds(raw: string) {
   return Math.min(MAX, Math.max(MIN, n));
 }
 
-/** Shortcuts, not a second control — each one writes the same row the box does. */
 const SHORTCUTS = [
   { secs: 10, label: "10s" },
   { secs: 30, label: "30s" },
@@ -66,8 +44,6 @@ function secsLabel(n: number) {
 export function CatConsole({
   napStyle,
   napSeconds,
-  /** The two documentation cards, rendered on the server and dropped in above
-      the preview so the pane stays last on the page. */
   children,
 }: {
   napStyle: string;
@@ -102,10 +78,6 @@ export function CatConsole({
     setPubError(null);
     startTransition(async () => {
       try {
-        // Clamped here as well as on blur, because clicking Save is what blurs
-        // the field — and the action rewrites out-of-range numbers without
-        // reporting back, so anything it would change has to be settled before
-        // it goes, or the box sits there showing 600 under a green "Saved".
         const snapshot = {
           catNapStyle: style,
           catNapSeconds: String(clampSeconds(values["catNapSeconds"] ?? "")),
@@ -116,8 +88,6 @@ export function CatConsole({
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
         if (publish) {
-          // The config is saved. A publish that fails is a separate, retryable
-          // failure — it never undoes the write.
           const res = await publishSite();
           if (!res.ok) setPubError(res.error ?? "Could not reach the site.");
         }
@@ -127,7 +97,6 @@ export function CatConsole({
     });
   };
 
-  /** Amber keyline + an "unsaved" badge, on the card that actually changed. */
   const edge = (on: boolean) => `cat-card${on ? " is-dirty" : ""}`;
   const unsaved = (on: boolean) => (on ? <Badge variant="warning">unsaved</Badge> : undefined);
 
@@ -164,9 +133,7 @@ export function CatConsole({
                 disabled={napsOff}
                 value={values["catNapSeconds"] ?? ""}
                 onChange={e => set("catNapSeconds", e.target.value)}
-                // The action clamps on the way in and does not report back — so
-                // without this the box keeps showing 500 next to a green "Saved"
-                // while the row holds 300, and an emptied box silently becomes 30.
+                // the action clamps silently, so settle the value here
                 onBlur={e => set("catNapSeconds", String(clampSeconds(e.target.value)))}
                 hint={`Seconds, ${MIN}–${MAX}.`}
               />
@@ -186,8 +153,6 @@ export function CatConsole({
               </div>
             </div>
 
-            {/* The one sentence that says what a visitor will actually get. It
-                is the readout for both cards, so it lives under the number. */}
             <p className="cat-say" aria-live="polite">
               {napsOff ? (
                 <>
@@ -213,7 +178,6 @@ export function CatConsole({
           </div>
         )}
 
-        {/* One footer for both cards — never two save rows on one page. */}
         <div className={`cat-foot${dirty ? " is-dirty" : ""}`}>
           <span className="cat-foot-note">
             <IconZzz size={13} stroke={1.7} />
@@ -239,8 +203,6 @@ export function CatConsole({
         {children}
       </div>
 
-      {/* No Staged* wrapper: the cat has no staged entity, so a pending-change
-          chip here would permanently read zero while this form sat dirty. */}
       <PreviewFrame label="Cat — hero ↔ about divider">
         <CatPreview napStyle={style} napSeconds={seconds} />
       </PreviewFrame>

@@ -21,7 +21,6 @@ async function seed() {
   await prisma.siteConfig.deleteMany();
   await prisma.adminUser.deleteMany();
 
-  // ── Hero Titles ──
   // v2 starts at sortOrder 100 so the two versions' ranges don't overlap.
   await prisma.heroTitle.createMany({
     data: [
@@ -35,7 +34,6 @@ async function seed() {
   });
   console.log("Hero titles seeded");
 
-  // ── Hero Skill Badges ──
   await prisma.heroSkillBadge.createMany({
     data: [
       { name: "Next.js", iconKey: "Next.js", sortOrder: 0, version: "v1" },
@@ -46,7 +44,6 @@ async function seed() {
       { name: "Prisma", iconKey: "Prisma", sortOrder: 5, version: "v1" },
       { name: "Python", iconKey: "Python", sortOrder: 6, version: "v1" },
 
-      // Same seven as v1 — the pill row is a different layout, not a different stack.
       { name: "Next.js", iconKey: "Next.js", sortOrder: 100, version: "v2" },
       { name: "Golang", iconKey: "Go", sortOrder: 101, version: "v2" },
       { name: "TypeScript", iconKey: "TypeScript", sortOrder: 102, version: "v2" },
@@ -58,13 +55,11 @@ async function seed() {
   });
   console.log("Hero skill badges seeded");
 
-  // ── Social Links ──
   await prisma.socialLink.createMany({
     data: [
       { name: "LinkedIn", href: "https://www.linkedin.com/in/yatin-dora/", iconKey: "linkedin", detail: "/in/yatin-dora", sortOrder: 0 },
       { name: "GitHub", href: "https://github.com/YatinDora81", iconKey: "github", detail: "@YatinDora81", sortOrder: 1 },
       { name: "LeetCode", href: "https://leetcode.com/yatindora/", iconKey: "leetcode", detail: "@yatindora", sortOrder: 2 },
-      // The only version-scoped link; the rest leave `version` null = shown in both.
       { name: "LeetCode 2", href: "https://leetcode.com/u/Yatin_dora_sde/", iconKey: "leetcode", detail: "@Yatin_dora_sde", sortOrder: 3, version: "v1" },
       { name: "X", href: "https://x.com/YatinDora", iconKey: "x", detail: "@YatinDora", sortOrder: 4 },
       { name: "Email", href: "mailto:yatin.dora81@gmail.com", iconKey: "email", detail: "yatin.dora81@gmail.com", sortOrder: 5 },
@@ -72,7 +67,6 @@ async function seed() {
   });
   console.log("Social links seeded");
 
-  // ── About Paragraphs ──
   await prisma.aboutParagraph.createMany({
     data: [
       {
@@ -89,7 +83,6 @@ async function seed() {
   });
   console.log("About paragraphs seeded");
 
-  // ── Education ──
   await prisma.education.createMany({
     data: [
       {
@@ -107,9 +100,7 @@ async function seed() {
   });
   console.log("Education seeded");
 
-  // ── Skills ──
   const skillsData = [
-    // Shown in Skills section
     { name: "Next.js", iconKey: "Next.js", show: true, sortOrder: 0 },
     { name: "React", iconKey: "React", show: true, sortOrder: 1 },
     { name: "TypeScript", iconKey: "TypeScript", show: true, sortOrder: 2 },
@@ -148,15 +139,12 @@ async function seed() {
     { name: "OOPs", iconKey: "OOPs", show: true, sortOrder: 35 },
     { name: "Git", iconKey: "Git", show: true, sortOrder: 36 },
     { name: "GitHub", iconKey: "GitHub", show: true, sortOrder: 37 },
-    // Promoted out of the hidden block — it's in use at Wiingy, in Grill and in
-    // this repo's own pipeline, so it earns a tile rather than a bare tag.
     { name: "GitHub Actions", iconKey: "GitHub Actions", show: true, sortOrder: 38 },
     { name: "Turborepo", iconKey: "Turborepo", show: true, sortOrder: 39 },
     { name: "Bun", iconKey: "Bun", show: true, sortOrder: 40 },
     { name: "Jest", iconKey: "Jest", show: true, sortOrder: 41 },
     { name: "Selenium", iconKey: "Selenium", show: true, sortOrder: 42 },
     { name: "Jira", iconKey: "Jira", show: true, sortOrder: 43 },
-    // Hidden skills (used in experience/project relations only)
     { name: "Drizzle ORM", iconKey: "Drizzle ORM", show: false, sortOrder: 100 },
     { name: "React.js", iconKey: "React.js", show: false, sortOrder: 102 },
     { name: "WebSocket", iconKey: "WebSocket", show: false, sortOrder: 103 },
@@ -174,7 +162,6 @@ async function seed() {
       .map((n) => ({ id: skillMap.get(n)! }));
   }
 
-  // ── Experiences ──
   await prisma.experience.create({
     data: {
       company: "Wiingy",
@@ -254,7 +241,6 @@ async function seed() {
   });
   console.log("Experiences seeded");
 
-  // ── Projects ──
   await prisma.project.create({
     data: {
       title: "Grill",
@@ -388,7 +374,6 @@ async function seed() {
   });
   console.log("Projects seeded");
 
-  // ── Blogs ──
   const blogsData = [
     {
       slug: "turborepo-monorepo",
@@ -728,7 +713,6 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
   }
   console.log("Blogs seeded");
 
-  // ── Quotes ──
   await prisma.quote.createMany({
     data: [
       { quote: "First, solve the problem. Then, write the code.", author: "John Johnson" },
@@ -745,7 +729,6 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
   });
   console.log("Quotes seeded");
 
-  // ── Contact Purposes ──
   await prisma.contactPurpose.createMany({
     data: [
       { label: "Freelance", emoji: "\uD83D\uDCBC", sortOrder: 0 },
@@ -757,10 +740,6 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
   });
   console.log("Contact purposes seeded");
 
-  // ── Hero Content ──
-  // One row per version, each holding that version's copy. `live` is set
-  // explicitly rather than left to a fallback: every code path coerces an absent
-  // value to v2, while this seed has always shipped v1 as the served hero.
   await prisma.heroContent.createMany({
     data: [
       {
@@ -780,7 +759,6 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
   });
   console.log("Hero content seeded");
 
-  // ── Site Config ──
   await prisma.siteConfig.createMany({
     data: [
       { key: "name", value: "Yatin Dora" },
@@ -791,21 +769,16 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
       { key: "contactEmail", value: "yatin.dora81@gmail.com" },
       { key: "availabilityStatus", value: "Available for opportunities" },
       { key: "availabilityDetail", value: "Open to freelance, full-time & collaborations" },
-      // The hero's status dot. "" = follow --foreground, the look it shipped with.
       { key: "heroDotColor", value: "" },
       { key: "heroDotPulse", value: "on" },
-      // The cat's corner nap. "off" here would leave it draggable but sleepless.
       { key: "catNapStyle", value: "ticks" },
       { key: "catNapSeconds", value: "30" },
-      // Which projects layout ships. "v1" is the work ledger, anything else
-      // the build log — the reader coerces, so a stray value lands on v2.
       { key: "projectsVersion", value: "v2" },
       { key: "copyrightName", value: "Yatin Dora" },
     ],
   });
   console.log("Site config seeded");
 
-  // ── Admin User ──
   const hashedPassword = await bcrypt.hash("admin123", 10);
   await prisma.adminUser.create({
     data: {

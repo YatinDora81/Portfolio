@@ -6,21 +6,6 @@ import { isEmptyQuery, parseQuery, snippetParts, terms, highlightParts } from "@
 import { toPrismaWhere } from "@/lib/notes/query-sql";
 import { hrefFor } from "@/lib/notes/view-types";
 
-/**
- * What ⌘K asks the vault.
- *
- * It is a read, but it is still a `"use server"` export and therefore still a
- * public POST endpoint — so it proves the session like every writer does. A
- * search endpoint that skips the check leaks the same private content as a
- * download endpoint that skips it, one page of results at a time.
- *
- * The palette runs this rather than a matcher of its own, so `tag:redis` and
- * `conf:<=2` mean in the palette exactly what they mean in the tree filter and
- * on the search page — one parser, one set of semantics, three places to type
- * into. Loading the whole vault into the palette would have been the other
- * option and would put every answer body in the bundle of every admin page.
- */
-
 export interface PaletteHit {
   id: string;
   href: string;
@@ -37,8 +22,6 @@ export async function searchNotes(raw: string): Promise<{ hits: PaletteHit[]; to
 
   const q = parseQuery(raw);
 
-  // Nothing typed yet: the palette opens on the revise queue instead of on
-  // nothing, because "what am I worst at" is a better default than a blank list.
   if (isEmptyQuery(q)) {
     const rows = await prisma.noteNode.findMany({
       where: { kind: "QUESTION", deletedAt: null },
@@ -52,8 +35,7 @@ export async function searchNotes(raw: string): Promise<{ hits: PaletteHit[]; to
     return { hits: rows.map((r) => toHit(r, q)), total: rows.length, bad: q.bad };
   }
 
-  // `in:` by folder name is resolved to paths first — toPrismaWhere compiles a
-  // prefix scan and cannot do a lookup of its own.
+  // `in:` names resolve to paths first; toPrismaWhere only compiles a prefix scan
   const extraInPaths = q.in.length
     ? (
         await prisma.noteNode.findMany({
@@ -93,9 +75,7 @@ function toHit(r: Row, q: ReturnType<typeof parseQuery>): PaletteHit {
   return {
     id: r.id,
     href: hrefFor(r.path),
-    // Segmented rather than marked up: the palette renders <mark> elements, and
-    // an HTML string built from an answer body is an XSS in an authenticated
-    // admin session.
+    // segmented rather than marked up: an html string here is an xss
     titleParts: highlightParts(r.title, ts),
     snippet: ts.length ? snippetParts(r.answer?.body ?? "", q) : [],
     folder: r.parent?.title ?? "the vault",

@@ -4,8 +4,6 @@ import { useSyncExternalStore } from 'react';
 
 const query = () => window.matchMedia('(prefers-reduced-motion: reduce)');
 
-/** Live `prefers-reduced-motion`. `false` on the server, so the markup React
-    sends and the markup it hydrates against always agree. */
 export function useReducedMotion(): boolean {
   return useSyncExternalStore(
     (onChange) => {

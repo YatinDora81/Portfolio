@@ -47,7 +47,6 @@ const full = (iso: string) =>
     weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
   });
 
-/** "Today" / "Yesterday" / "12 Mar" — the heading each group sits under. */
 function dayLabel(iso: string): string {
   const d = new Date(iso);
   const today = new Date();
@@ -69,7 +68,6 @@ function initials(name: string): string {
 
 const role = (r: string) => r.toLowerCase().replace("_", " ");
 
-/** One field's before → after, stacked so sentences stay readable. */
 function Diff({ c }: { c: Change }) {
   const val = (v: string | null, tone: "was" | "now") => (
     <div className={`hist-val ${tone}`}>
@@ -99,14 +97,13 @@ function Diff({ c }: { c: Change }) {
 export function HistoryTable({ events, lastPublish, capped }: {
   events: Event[];
   lastPublish: { actorName: string; actorRole: string; publishedAt: string } | null;
-  /** The list hit its cap, so older entries exist but are not shown. */
   capped: boolean;
 }) {
   const [open, setOpen] = useState<Event | null>(null);
   const [changes, setChanges] = useState<Change[] | null>(null);
   const [pending, start] = useTransition();
 
-  // Grouped in render order — the query already sorts newest first.
+  // the query already sorts newest first
   const days = useMemo(() => {
     const out: { label: string; events: Event[] }[] = [];
     for (const e of events) {
@@ -129,8 +126,6 @@ export function HistoryTable({ events, lastPublish, capped }: {
 
   return (
     <>
-      {/* Its own query, not a scan of the list: the most recent successful
-          publish can easily be older than the newest 200 events. */}
       <div className="hist-pub">
         <i><IconWorldUpload size={16} stroke={1.7} /></i>
         {lastPublish ? (

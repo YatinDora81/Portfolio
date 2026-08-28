@@ -13,75 +13,23 @@ import {
   type Entity, type StagedFields, type StagedOp,
 } from "@/lib/actions/staging";
 
-/**
- * The admin's staging store — every edit, toggle, drag and delete lands here
- * instead of in the database, and leaves only when the save bar commits.
- *
- * Three rules keep the store honest:
- *
- * 1. **One op per user-visible change.** Editing a row twice coalesces into the
- *    single update that already exists; editing a row that is itself a pending
- *    create folds into that create. `count` is therefore just `ops.length`, and
- *    the number the bar shows is provably the number of rows the user changed.
- * 2. **A staged create has no server identity.** Deleting one removes the create
- *    outright rather than adding a delete — `applyStagedChanges` would otherwise
- *    be handed a `tmp_` id no table has ever seen and fail the whole batch. That
- *    is also the one staged delete with no undo behind it, which is why
- *    `DeleteButton` still asks first when the row is new (`newRow`).
- * 3. **Tables render through `overlay()`.** Staged state is visible the instant
- *    it is staged, without the round trip that a server write would need.
- *
- * The provider lives in the Shell, above the routed content, so staged changes
- * survive client-side navigation — the bar follows you to the next page rather
- * than silently dropping what you staged.
- */
-
 type Toast = (msg: string, tone?: "good" | "bad") => void;
 
 export interface StagingApi {
-  /** The batch exactly as it will be POSTed. */
   ops: StagedOp[];
-  /** Pending changes, matching what the save bar claims. */
   count: number;
-  /** True while a commit is in flight. */
   saving: boolean;
-  /** Stages a new row and returns the `tempId` it will be keyed by until saved. */
   stageCreate(entity: Entity, fields: StagedFields): string;
-  /** Partial: only the keys passed are written. Coalesces onto any pending op for `id`. */
   stageUpdate(entity: Entity, id: string, fields: StagedFields): void;
   stageDelete(entity: Entity, id: string): void;
-  /**
-   * Removes a pending update — the counterpart `stageUpdate` never had, since it
-   * only ever appends or merges. Without it, an always-mounted field (the hero
-   * copy textareas) that is typed into and then typed back leaves the bar
-   * reading "1 unsaved change" over a change that no longer exists.
-   *
-   * With no `keys` the whole op goes; with `keys`, only those fields, and the op
-   * goes when the bag empties. Deliberately blind to creates — a create's bag is
-   * the row itself, so removing a key from it is not an undo.
-   */
   clearUpdate(entity: Entity, id: string, keys?: string[]): void;
-  /** The row-level undo. */
   unstageDelete(entity: Entity, id: string): void;
-  /** `ids` is the full post-drag order, tempIds included. `version` scopes the
-      op so a drag on one version's tab doesn't discard the other's. */
   stageReorder(entity: Entity, ids: string[], version?: string | null): void;
   discardAll(): void;
   commit(opts: { publish: boolean }): Promise<void>;
   isDeleted(entity: Entity, id: string): boolean;
-  /** This row exists only in the browser so far. */
   isNew(entity: Entity, id: string): boolean;
-  /** This row has a pending edit (a staged create counts as new, not edited). */
   isEdited(entity: Entity, id: string): boolean;
-  /**
-   * Server rows with staged creates, updates and the reorder applied. Staged
-   * deletes stay in the list — flag them with `isDeleted` and render the row
-   * struck through with its undo; dropping them here would take the undo with
-   * them and punch holes in the ids a later reorder has to name.
-   *
-   * `version` must match the one the tab passes to `stageReorder`, or a
-   * version-scoped list picks up the other tab's pending drag instead of its own.
-   */
   overlay<T>(entity: Entity, rows: T[], getId: (r: T) => string, version?: string | null): T[];
 }
 
@@ -93,24 +41,18 @@ export function useStaging(): StagingApi {
   return api;
 }
 
-/** Browser-only row keys. `tmp_` is also how a table tells a new row apart. */
 let seq = 0;
 
 function plural(n: number): string {
   return `${n} change${n === 1 ? "" : "s"}`;
 }
 
-/**
- * Staged fields are an untyped column bag; the row types belong to the caller.
- * Both casts are contained here so no table has to write one.
- */
 function patched<T>(row: T, fields: StagedFields): T {
   return { ...row, ...fields } as T;
 }
 
 function materialise<T>(tempId: string, fields: StagedFields, at: number): T {
-  // `sortOrder` first so a staged field of the same name still wins, `id` last so
-  // the caller's `getId` finds the tempId whatever else the bag contains.
+  // id last so the caller's getId finds the tempId
   return { sortOrder: at, ...fields, id: tempId } as unknown as T;
 }
 
@@ -122,8 +64,6 @@ export function StagingProvider({ toast, children }: {
   const [ops, setOps] = useState<StagedOp[]>([]);
   const [saving, setSaving] = useState(false);
 
-  // `commit` must read the batch and the in-flight flag as they are at click
-  // time, not as they were when the callback was last created.
   const opsRef = useRef<StagedOp[]>(ops);
   opsRef.current = ops;
   const savingRef = useRef(false);
@@ -135,8 +75,6 @@ export function StagingProvider({ toast, children }: {
   }, []);
 
   const stageUpdate = useCallback((entity: Entity, id: string, fields: StagedFields) => {
-    // An update the server recognises nothing in fails the whole batch, so an
-    // empty bag stages nothing at all.
     if (Object.keys(fields).length === 0) return;
     setOps((prev) => {
       const i = prev.findIndex(
@@ -170,9 +108,6 @@ export function StagingProvider({ toast, children }: {
       for (const key of keys) delete fields[key];
       if (Object.keys(fields).length === 0) return prev.filter((op) => op !== target);
 
-      // Rebuilt rather than mutated, like every other path here: `settle` retires
-      // the batch by object identity, so an op edited in place would be retired
-      // along with the version that was actually sent.
       const next = [...prev];
       next[i] = { kind: "update", entity, id, fields };
       return next;
@@ -186,8 +121,6 @@ export function StagingProvider({ toast, children }: {
       );
 
       if (isStagedCreate) {
-        // Never existed server-side: drop the create and the edits folded into
-        // it, and stage NO delete — that id would blow up the batch.
         return prev
           .filter(
             (op) =>
@@ -203,10 +136,6 @@ export function StagingProvider({ toast, children }: {
 
       if (prev.some((op) => op.kind === "delete" && op.entity === entity && op.id === id)) return prev;
 
-      // A pending edit to a row that is on its way out is not a change anyone can
-      // see, so it folds into the delete instead of counting twice. The fields go
-      // WITH the delete rather than into the bin: "undo" means undo the delete,
-      // not undo the delete and the paragraph you rewrote just before it.
       const edit = prev.find(
         (op) => op.kind === "update" && op.entity === entity && op.id === id
       );
@@ -219,12 +148,6 @@ export function StagingProvider({ toast, children }: {
   }, []);
 
   const unstageDelete = useCallback((entity: Entity, id: string) => {
-    // The batch is already on the wire and this row is very likely gone by the
-    // time the click lands. Undoing would re-stage the edit the delete folded
-    // away as a fresh update op — one `settle` will not retire, because it was
-    // never in the batch — and `updateRow` uses a strict `update`, so every
-    // later save dies on P2025 with no row on screen to cancel it from. The
-    // move buttons beside it are already gated on `saving`; this was the gap.
     if (savingRef.current) return;
     setOps((prev) => {
       const gone = prev.find(
@@ -233,8 +156,6 @@ export function StagingProvider({ toast, children }: {
       const rest = prev.filter(
         (op) => !(op.kind === "delete" && op.entity === entity && op.id === id)
       );
-      // Whatever the delete folded away comes back with it, so the row returns
-      // as the user last left it instead of snapping back to the server's copy.
       const restore = gone?.kind === "delete" ? gone.restore : undefined;
       return restore ? [...rest, { kind: "update", entity, id, fields: restore }] : rest;
     });
@@ -242,9 +163,6 @@ export function StagingProvider({ toast, children }: {
 
   const stageReorder = useCallback(
     (entity: Entity, ids: string[], version?: string | null) => {
-      // Only the final order matters, so a second drag replaces the first rather
-      // than stacking a second op onto the count. Compared by version too, or
-      // dragging on the v2 tab would silently discard a pending v1 drag.
       setOps((prev) => [
         ...prev.filter(
           (op) => !(op.kind === "reorder" && op.entity === entity && op.version === version)
@@ -290,22 +208,13 @@ export function StagingProvider({ toast, children }: {
           })
         : [...rows];
 
-      // Note what is NOT here: a staged delete leaves its row in place. It has to
-      // stay on screen for the undo to exist, and leaving it in keeps the reorder
-      // ids whole — the server strips the deleted ones itself.
       for (const op of mine) {
-        // A create materialises under its tempId, so a brand-new row renders,
-        // edits and drags exactly like a saved one.
         if (op.kind === "create") out.push(materialise<T>(op.tempId, op.fields, out.length));
       }
 
-      // Matched on version, not just entity: with a drag pending on both tabs
-      // the unmatched one would otherwise win and render the wrong order here.
       const ro = mine.find((op) => op.kind === "reorder" && op.version === version);
       if (ro?.kind === "reorder") {
         const pos = new Map(ro.ids.map((id, i) => [id, i] as const));
-        // Rows the drag never saw (created since) keep their relative order at
-        // the end rather than colliding on one rank.
         out = out
           .map((r, i) => ({ r, rank: pos.get(getId(r)) ?? ro.ids.length + i }))
           .sort((a, b) => a.rank - b.rank)
@@ -317,22 +226,6 @@ export function StagingProvider({ toast, children }: {
     [ops]
   );
 
-  /**
-   * Retires the batch that just saved — and only that batch.
-   *
-   * Clearing the whole store would be one line, and would silently destroy
-   * anything staged while the request was out. The window is real: the tables
-   * stay interactive during a commit, and `Save & Publish` adds a second network
-   * hop to the live site on top of the save.
-   *
-   * Ops are matched by identity, which is exactly right because coalescing
-   * *replaces* op objects instead of mutating them — an op the user touched
-   * mid-flight is a different object and correctly survives. A create that
-   * survives is one of those: the row now exists, so what is left to apply is an
-   * update against the real id `idMap` just handed back. Every other surviving
-   * op gets the same tempId → real id treatment, or it would name a row the
-   * database has never heard of.
-   */
   const settle = useCallback((batch: StagedOp[], idMap: Record<string, string>) => {
     const done = new Set<StagedOp>(batch);
     const real = (id: string) => idMap[id] ?? id;
@@ -358,8 +251,7 @@ export function StagingProvider({ toast, children }: {
 
   const commit = useCallback(
     async ({ publish }: { publish: boolean }) => {
-      // The ref, not `saving`: a second click lands before React has re-rendered
-      // the disabled buttons, and must find the guard already closed.
+      // ref, not state: clicks land before the buttons disable
       if (savingRef.current) return;
       const batch = opsRef.current;
       if (batch.length === 0) return;
@@ -375,14 +267,7 @@ export function StagingProvider({ toast, children }: {
           return;
         }
         saved = true;
-        // Both inside a transition, and this is load-bearing. Next holds the
-        // whole RSC tree on a transition lane for the duration of a server
-        // action, so a default-priority `setOps` renders on its own: the store
-        // empties while the tree still carries the PRE-save props. Every other
-        // surface hides that — its edits live in a dialog that is already
-        // closed — but the hero copy textareas render straight off `overlay()`,
-        // so they would flip back to the old copy for a whole refresh round
-        // trip and a successful save would look like it had failed.
+        // one transition, or the store empties against pre-save props
         startTransition(() => {
           settle(batch, res.idMap);
           router.refresh();
@@ -393,19 +278,10 @@ export function StagingProvider({ toast, children }: {
           return;
         }
 
-        // Decision 5: the save has already landed. A publish that fails is a
-        // separate, retryable failure — it never rolls the save back.
         const pub = await publishSite({ eventId: res.eventId });
         if (pub.ok) toast(`Saved and published ${plural(n)}.`);
         else toast(`Saved ${plural(n)}, but publishing failed: ${pub.error ?? "unknown error"}`, "bad");
       } catch (e) {
-        // `applyStagedChanges` turns its OWN failures into `{ ok:false }`; a
-        // rejection here is the transport underneath it — the network gone, or
-        // an expired session redirecting the action POST to /login. Without this
-        // the promise dies unhandled: "Saving…" flips back to "Save", nothing is
-        // said, and the user has no idea whether the batch landed. A throw in a
-        // client event handler reaches no error boundary, so this is the only
-        // place it can be reported.
         const why = e instanceof Error && e.message ? e.message : "the server could not be reached";
         toast(
           saved
@@ -415,8 +291,6 @@ export function StagingProvider({ toast, children }: {
         );
       } finally {
         savingRef.current = false;
-        // Same lane as the retirement above, or the inputs re-enable a beat
-        // before the content behind them is real.
         startTransition(() => setSaving(false));
       }
     },
@@ -455,16 +329,6 @@ export function StagingProvider({ toast, children }: {
   );
 }
 
-/**
- * Warns before the user walks away from a dirty page.
- *
- * `beforeunload` covers reloads and closing the tab. In-app navigation is caught
- * in the capture phase at the document, which fires before React's own delegated
- * listener and so beats both a `<Link>` and the command palette's button to the
- * click. "Leave anyway" replays the very same click with the guard bypassed,
- * which is what lets one handler cover every navigation control without knowing
- * where any of them point.
- */
 function LeaveGuard({ count }: { count: number }) {
   const [asking, setAsking] = useState(false);
   const pending = useRef<HTMLElement | null>(null);
@@ -485,7 +349,6 @@ function LeaveGuard({ count }: { count: number }) {
 
     const onClick = (e: MouseEvent) => {
       if (bypass.current || e.defaultPrevented) return;
-      // Modified clicks open a new tab, which loses nothing.
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       if (!(e.target instanceof Element)) return;
 
@@ -496,11 +359,9 @@ function LeaveGuard({ count }: { count: number }) {
         if (el.hasAttribute("download")) return;
         if (el.target && el.target !== "_self") return;
         const url = new URL(el.href, window.location.href);
-        // Off-site and same-page links leave the staged batch exactly where it is.
         if (url.origin !== window.location.origin) return;
         if (url.pathname === window.location.pathname) return;
       } else if (el.querySelector(".pal-k")?.textContent !== "go") {
-        // The palette's non-navigating entries (open the live site) aren't leaving.
         return;
       }
 
@@ -530,8 +391,6 @@ function LeaveGuard({ count }: { count: number }) {
 
   if (!asking) return null;
 
-  // Nothing raises this dialog: `.veil` already outranks `.pal`, so the palette
-  // cannot paint over the question that navigating from it just raised.
   return (
     <Dialog
       open

@@ -15,7 +15,6 @@ const HEALTH_DAYS = 7;
 const LOG_CAP = 100;
 const HEALTHY_RATE = 0.95;
 
-// Formatted server-side with the zone named, so SSR and hydration emit the same text.
 const IST = "Asia/Kolkata";
 const stampFmt = new Intl.DateTimeFormat("en-GB", {
   timeZone: IST, day: "2-digit", month: "short", hourCycle: "h23",
@@ -40,7 +39,6 @@ export default async function RevalidationPage() {
     readTagStates(),
   ]);
 
-  // `actorId` is a plain String, not a relation, so some ids resolve to nobody.
   const actorIds = [...new Set(logs.map((l) => l.actorId).filter((id): id is string => id !== null))];
   const admins = actorIds.length > 0
     ? await prisma.adminUser.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
@@ -49,10 +47,8 @@ export default async function RevalidationPage() {
   for (const a of admins) actors[a.id] = a.name;
 
   const stateByTag = new Map(tagStates.map((s) => [s.tag, s]));
-  // Driven by ALL_KNOWN_TAGS, not TagState: a never-flushed tag has no row.
   const tagRows = ALL_KNOWN_TAGS.map((tag) => {
     const s = stateByTag.get(tag);
-    // A failed first attempt seeds the epoch, so > 0 means "succeeded at least once".
     const succeeded = s !== undefined && s.lastSuccessAt.getTime() > 0;
     return {
       tag,

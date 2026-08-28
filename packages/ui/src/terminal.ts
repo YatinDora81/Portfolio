@@ -1,42 +1,18 @@
-/**
- * THE command table for the About-section terminal.
- *
- * The portfolio drives its real behaviour from this list — `help`, `ls`,
- * Tab-completion and the focus decision all read it — and the admin renders it
- * as a reference page. That's deliberate: a docs page that merely *described*
- * the terminal would go stale the first time a command changed. Because
- * `keepsFocus` is what the Enter handler actually consults, the reference
- * cannot lie about it.
- */
-
 export type CommandKind = "nav" | "info" | "action" | "egg";
 
 export interface TerminalCommand {
   cmd: string;
   kind: CommandKind;
-  /** One line, shown by `help` and in the admin table. */
   summary: string;
-  /** What the visitor actually sees after Enter. */
   output: string;
-  /**
-   * Does the caret stay in the prompt?
-   *
-   * Only commands that MOVE you release it — otherwise you'd be typing at a
-   * prompt scrolled off screen, with the mobile keyboard covering wherever you
-   * just landed. Anything that answers inside the terminal keeps the caret.
-   */
   keepsFocus: boolean;
-  /** Listed by `help`/`ls` and offered by Tab. Easter eggs stay hidden. */
   discoverable: boolean;
-  /** Extra spellings that run the same command. */
   aliases?: string[];
-  /** nav only — the section this jumps to. */
   target?: string;
   label?: string;
 }
 
 export const TERMINAL_COMMANDS: TerminalCommand[] = [
-  // ---- navigation: these move you, so they hand focus back ----
   {
     cmd: "skills", kind: "nav", target: "#skills", label: "Skills",
     summary: "jump to Skills",
@@ -74,7 +50,6 @@ export const TERMINAL_COMMANDS: TerminalCommand[] = [
     keepsFocus: false, discoverable: true,
   },
 
-  // ---- answers in place: caret stays ----
   {
     cmd: "whoami", kind: "info",
     summary: "who is this guy",
@@ -100,7 +75,6 @@ export const TERMINAL_COMMANDS: TerminalCommand[] = [
     keepsFocus: true, discoverable: true,
   },
 
-  // ---- leaves the page ----
   {
     cmd: "resume", kind: "action", aliases: ["cv"],
     summary: "open my resume",
@@ -108,7 +82,6 @@ export const TERMINAL_COMMANDS: TerminalCommand[] = [
     keepsFocus: false, discoverable: true,
   },
 
-  // ---- undocumented on purpose: not in help, ls, or Tab ----
   {
     cmd: "sudo", kind: "egg",
     summary: "nice try",
@@ -123,7 +96,6 @@ export const TERMINAL_COMMANDS: TerminalCommand[] = [
   },
 ];
 
-/** Resolves a typed word to its command, aliases included. */
 export function findCommand(name: string): TerminalCommand | undefined {
   const n = name.trim().toLowerCase();
   return TERMINAL_COMMANDS.find(
@@ -131,10 +103,8 @@ export function findCommand(name: string): TerminalCommand | undefined {
   );
 }
 
-/** Nav entries in display order — the source for `ls` and section jumps. */
 export const NAV_COMMANDS = TERMINAL_COMMANDS.filter(
   (c) => c.kind === "nav"
 ) as (TerminalCommand & { target: string; label: string })[];
 
-/** What an unrecognised word produces. */
 export const NOT_FOUND_OUTPUT = "zsh: command not found: <word>, then a hint pointing at `help`";

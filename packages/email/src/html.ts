@@ -27,7 +27,7 @@ export function escapeHtmlLines(value: string | null | undefined): string {
   return escapeHtml(value).replace(/\r\n|\r|\n/g, "<br />");
 }
 
-// Subjects become a mail header; a CR or LF in one is header injection.
+// subjects become a mail header; crlf is injection
 export function oneLine(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }

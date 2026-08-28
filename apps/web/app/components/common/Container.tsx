@@ -5,7 +5,6 @@ export default function Container({
 }: {
   children: React.ReactNode;
   className?: string;
-  /** Optional anchor target, e.g. the `#about` the hero's scroll cue links to. */
   id?: string;
 }) {
   return (

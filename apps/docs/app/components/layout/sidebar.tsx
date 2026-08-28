@@ -18,9 +18,7 @@ function NavBtn({ x, active, unread, onNavigate }: {
 }) {
   const Icon = x.icon;
   const ord = navMark(x);
-  // The badge sits in exactly the part a 58px rail clips away, and silently
-  // losing "you have mail" is a real regression — so the rail redraws it as a
-  // dot on the glyph, and this class is what tells it there is one to draw.
+  // the rail clips the badge and redraws it as a dot on the glyph
   const flagged = !!x.badge && unread > 0;
   return (
     <Link
@@ -30,8 +28,6 @@ function NavBtn({ x, active, unread, onNavigate }: {
       onClick={onNavigate}
     >
       {ord ? (
-        // Decorative: the accessible name is the label, and a screen reader
-        // announcing "caret dot dot caret, Cat" helps nobody.
         <span className={cn("nav-num", x.mark && "glyph")} aria-hidden="true">{ord}</span>
       ) : null}
       <Icon size={15} className="nav-ic" stroke={1.7} />
@@ -57,13 +53,6 @@ export function Sidebar({ user, unread, railed, open, onNavigate }: {
   const roleLabel = user.role === "SUB_ADMIN" ? "Sub-Admin" : user.role === "OWNER" ? "Owner" : "Admin";
 
   return (
-    /**
-     * Two boxes, and the reason is the whole trick. `.sb-inner` is ALWAYS 254px
-     * and absolutely positioned; railing narrows and clips `.sb` around it.
-     * Nothing inside ever reflows, so collapsing costs one width transition
-     * instead of relaying out eighteen rows, and hover-peek is a pure overflow
-     * and opacity reveal with no layout work at all.
-     */
     <aside id="cr-sidebar" className={cn("sb", open && "open", railed && "rail")}>
      <div className="sb-inner">
       <div className="sb-brand">
@@ -77,9 +66,6 @@ export function Sidebar({ user, unread, railed, open, onNavigate }: {
       <nav className="sb-nav" aria-label="Control room">
         {NAV_GROUPS.map((g, gi) => {
           const labelId = `nav-g${gi}`;
-          // The ordinal rail is drawn only where the ordinals mean something:
-          // the run down the public page. The operational and site groups are
-          // sets, not sequences, and a rail would claim an order they don't have.
           const run = g.items.some((x) => navMark(x));
           return (
             <div

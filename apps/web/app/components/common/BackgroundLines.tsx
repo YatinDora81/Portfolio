@@ -2,11 +2,6 @@
 
 import React, { useEffect, useRef } from 'react';
 
-/**
- * The full line field, drawn once as a single faint path. Fifty strokes, one
- * DOM node. This is the texture; the beams below are the light that runs
- * along it.
- */
 const paths = [
   "M-380 -189C-380 -189 -312 216 152 343C616 470 684 875 684 875",
   "M-373 -197C-373 -197 -305 208 159 335C623 462 691 867 691 867",
@@ -62,17 +57,6 @@ const paths = [
 
 const allPathsD = paths.join('');
 
-/**
- * Which of the fifty lines carry a beam. Every ~3.5th line, so the sweep reads
- * as scattered rather than as a comb — 14 beams is what the old 50 looked like
- * once you subtract the ones that were mid-gap at any moment. Fewer strokes to
- * repaint per frame, and ~290 fewer DOM nodes than 50 beams each with its own
- * five-node gradient.
- *
- * Timing is fixed per beam rather than Math.random() at mount: the server and
- * client must agree on the markup, and a deterministic spread looks identical
- * to a random one.
- */
 const BEAMS: { i: number; dur: number; delay: number }[] = [
   { i: 0, dur: 8.5, delay: 0 },
   { i: 4, dur: 10, delay: 1.1 },
@@ -93,11 +77,6 @@ const BEAMS: { i: number; dur: number; delay: number }[] = [
 export default React.memo(function BackgroundLines() {
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  // The beams sit paused (see .bg-beams in globals.css) until the browser has
-  // nothing better to do. Flipping the attribute directly, rather than through
-  // state, means this component never re-renders: the server markup IS the
-  // final markup, hydration has nothing to reconcile, and the only work here is
-  // one attribute write.
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -105,7 +84,7 @@ export default React.memo(function BackgroundLines() {
     if (window.matchMedia('(max-width: 1024px)').matches) return;
 
     const start = () => el.setAttribute('data-beams', 'on');
-    // Safari has no requestIdleCallback; a plain timeout is the fallback there.
+    // safari has no requestIdleCallback
     const ric: typeof window.requestIdleCallback | undefined = window.requestIdleCallback;
     let idle: number | undefined;
     let timer: number | undefined;
@@ -125,10 +104,6 @@ export default React.memo(function BackgroundLines() {
 
   return (
     <div ref={wrapRef} className="pointer-events-none fixed inset-0 z-0">
-      {/* Two SVGs, not one. The line field below is painted once and never
-          again; the beams are in their own SVG on their own compositor layer
-          (.bg-beams-layer), so a sweep frame repaints fourteen half-pixel
-          strokes and not the fifty underneath them as well. */}
       <svg
         className="absolute inset-0 h-full w-full"
         width="100%"
@@ -159,9 +134,6 @@ export default React.memo(function BackgroundLines() {
           </radialGradient>
         </defs>
       </svg>
-      {/* Desktop only, and hidden under prefers-reduced-motion — both by CSS,
-          which applies before first paint, so there is no flash for exactly
-          the people who asked for none. */}
       <svg
         className="bg-beams-layer absolute inset-0 h-full w-full"
         width="100%"
@@ -185,9 +157,6 @@ export default React.memo(function BackgroundLines() {
           ))}
         </g>
         <defs>
-          {/* One gradient for every beam, laid along the lines' direction of
-              travel in user space, so a dash is cyan at its head and violet at
-              its tail wherever it is on the path. */}
           <linearGradient
             id="bg-beam"
             gradientUnits="userSpaceOnUse"

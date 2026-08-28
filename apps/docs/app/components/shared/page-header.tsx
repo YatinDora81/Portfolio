@@ -1,9 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/**
- * The `.vh` view head — mono eyebrow, display title, one-line rationale.
- * `eyebrow` is optional so existing callers keep rendering unchanged.
- */
 export function PageHeader({ title, description, eyebrow, children, className }: {
   title: string;
   description?: string;

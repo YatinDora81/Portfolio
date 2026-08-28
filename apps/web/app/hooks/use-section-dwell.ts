@@ -18,7 +18,7 @@ export function useSectionDwell(enabled: boolean): void {
   useEffect(() => {
     if (!enabled || optedOut()) return;
 
-    // Observe the `<section>` itself: content-visibility:auto suppresses IntersectionObserver for its children.
+    // observe the section itself: content-visibility hides its children from IO
     const targets: HTMLElement[] = [];
     for (const id of SECTIONS) {
       const el = document.getElementById(id);
@@ -74,7 +74,7 @@ export function useSectionDwell(enabled: boolean): void {
           }
         }
       },
-      // A centre band, not a percentage threshold: a section taller than the viewport never hits one.
+      // centre band: a tall section never crosses a percentage threshold
       { rootMargin: '-40% 0px -40% 0px', threshold: 0 }
     );
 
@@ -88,7 +88,6 @@ export function useSectionDwell(enabled: boolean): void {
         flush();
         return;
       }
-      // Re-observing re-fires only for what is on screen now; restarting the parked timers would not.
       observer.disconnect();
       observeAll();
     };
@@ -96,9 +95,6 @@ export function useSectionDwell(enabled: boolean): void {
     // pagehide, not beforeunload: mobile Safari skips beforeunload.
     const onPageHide = (event: PageTransitionEvent) => {
       if (flushed.current) return;
-      // Only latch when the page is really going away. A bfcache-persisted page
-      // comes back without remounting, so latching here would silently drop
-      // every later flush in that tab.
       if (event.persisted !== true) flushed.current = true;
       flush();
     };

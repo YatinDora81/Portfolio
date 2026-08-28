@@ -115,7 +115,6 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Password Login Form */}
         {mode === "password" && (
           <form onSubmit={handlePasswordSubmit}>
             <Input
@@ -167,7 +166,6 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* OTP Send Form */}
         {mode === "otp-send" && (
           <form onSubmit={handleSendOtp}>
             <Input
@@ -200,7 +198,6 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* OTP Verify Form */}
         {mode === "otp-verify" && (
           <form onSubmit={handleVerifyOtp}>
             <Input

@@ -12,13 +12,7 @@ import ClarityAnalytics from "./components/ClarityAnalytics";
 import UtmTrackerBeacon from "./components/UtmTrackerBeacon";
 import VercelAnalytics from "./components/VercelAnalytics";
 
-// Self-hosted, preloaded, font-display: swap. Exposes --font-inter, which
-// globals.css maps onto --font-sans.
-//
-// `axes: ['opsz']` is not decorative: next/font ships only the wght axis unless
-// asked, so every `font-variation-settings: 'opsz' N` in the display type —
-// the thought quote, the channel title, the carrier address — was being parsed
-// and then silently dropped against a font with no such axis.
+// next/font ships only the wght axis unless opsz is asked for
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
@@ -26,9 +20,6 @@ const inter = Inter({
   axes: ["opsz"],
 });
 
-// Terminal/metadata voice used by `.mono` (availability chip, role line, tenure
-// pills, project hints, the cat-wire divider). Exposes --font-jetbrains-mono,
-// which globals.css maps onto the --font-mono theme token.
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   display: "swap",
@@ -74,9 +65,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // The cat rides in the layout, so its nap settings have to be read here too.
-  // `getSiteConfig` is memoised per request, so the home page reading it again
-  // for everything else costs nothing.
   const [{ catNapStyle, catNapSeconds, background }, flags] = await Promise.all([
     getSiteConfig(),
     getFlags(),
@@ -90,7 +78,6 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Warm up the asset CDN connection ahead of the first image request. */}
         <link rel="preconnect" href="https://cdn.yatindora.in" crossOrigin="anonymous" />
         <script
           dangerouslySetInnerHTML={{
@@ -110,11 +97,6 @@ export default async function RootLayout({
         />
       </head>
       <body>
-        {/* The background config is handed down from here rather than read per
-            page because error.tsx is a client error boundary — it cannot await
-            the database, and a boundary that fell back to the wrong layer would
-            change the page's whole ground at the exact moment something broke.
-            The layout is the one place above it that can still read a row. */}
         <BackgroundProvider value={background}>{children}</BackgroundProvider>
         {easterEggs && <OnekoCat napStyle={catNapStyle} napSeconds={catNapSeconds} />}
         {analytics && <AnalyticsTracker />}

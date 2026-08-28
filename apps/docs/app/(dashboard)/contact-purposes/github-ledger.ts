@@ -1,38 +1,17 @@
 import { prisma } from "db";
 
-/**
- * The contribution tile's numbers, read for the admin.
- *
- * PAIRED FILE — the decoding and the calendar arithmetic below are a deliberate
- * second copy of apps/web/app/lib/github-codec.ts, read the same way
- * apps/web/app/lib/github.ts reads it. The two apps deploy independently and
- * neither imports across the boundary, so this mirrors the parts it needs and
- * nothing else. If the alphabet, the window or the streak rules change there,
- * they must change here or the admin will quietly report different numbers than
- * the site.
- *
- * Read-only in every sense: this file only ever SELECTs. The archive is written
- * by the site, and the one control the admin has over it is the refresh button
- * beside this tile.
- */
-
-/** Index is the count. Digits first: almost every day lands in 0–9. */
 const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_";
 
-/** 53 covers any year plus the partial week it starts on. */
+// covers any year plus the partial week it starts on
 const WEEKS = 53;
 
-/** The site refreshes at most this often, so anything older is worth a nudge. */
+// the site refreshes at most this often
 const REFRESH_AFTER_HOURS = 20;
 
 export interface GithubLedger {
   handle: string;
-  /** Weekly totals, oldest first, always starting on a Sunday. `null` = a week
-      the archive cannot vouch for, so it is drawn as absent rather than zero. */
   weeks: (number | null)[];
-  /** UTC date of weeks[0]'s Sunday. */
   startDate: string;
-  /** Contributions in the past year, verbatim from the API's own number. */
   total: number;
   streak: number;
   best: number;
@@ -45,7 +24,6 @@ function daysInYear(year: number): number {
   return leap ? 366 : 365;
 }
 
-/** `"2026-03-01"` → 59, or 60 in a leap year. Index 0 is January 1. */
 function dayOfYear(date: string): number {
   const [y, m, d] = date.split("-").map(Number);
   if (!y || !m || !d) return -1;
@@ -77,14 +55,10 @@ function decodeYear(stored: { days: string; spikes: string }): number[] {
   return counts;
 }
 
-/** A stored '0' means both "shipped nothing" and "never fetched" — this is where
-    the archive stops being able to speak. */
 function observedIndex(today: number, daysSinceFetch: number): number {
   return Math.min(today, today - Math.max(0, Math.floor(daysSinceFetch)));
 }
 
-/** The GitHub handle the site would use: parsed from the SocialLink row itself,
-    which is why the refresh button never has to be told who to fetch. */
 export function githubHandle(href: string | null | undefined): string | null {
   if (!href) return null;
   return href.match(/github\.com\/([^/?#]+)/i)?.[1] ?? null;
@@ -103,13 +77,8 @@ export async function readGithubLedger(
     prisma.githubProfile.findUnique({ where: { handle } }),
     prisma.githubYear.findMany({ where: { handle, year: { in: [year - 1, year] } } }),
   ]);
-  // Nothing captured yet. The caller says so rather than drawing an empty year,
-  // which would read as "shipped nothing".
   if (!profile || rows.length === 0) return null;
 
-  // Two years laid end to end, because a streak can reach back across New Year.
-  // A missing year contributes NULLS, not zeros: indices stay aligned while the
-  // archive still admits it never saw those days.
   const timeline: (number | null)[] = [];
   for (const y of [year - 1, year]) {
     const row = rows.find((r) => r.year === y);
@@ -136,8 +105,6 @@ export async function readGithubLedger(
     for (let d = 0; d < 7; d++) {
       const i = start + w * 7 + d;
       const count = timeline[i];
-      // Past `observed` no day can be vouched for, which keeps the current week
-      // short instead of padding it with days that haven't happened.
       if (count == null || i > observed) continue;
       sum += count;
       known = true;

@@ -11,7 +11,6 @@ export function Dialog({ open, onClose, title, icon: Icon, children, footer, wid
   title: string;
   icon?: React.ComponentType<{ size?: number; color?: string }>;
   children: React.ReactNode;
-  /** Optional sticky action row. Callers that render their own buttons inline still work. */
   footer?: React.ReactNode;
   wide?: boolean;
   className?: string;
@@ -23,13 +22,7 @@ export function Dialog({ open, onClose, title, icon: Icon, children, footer, wid
     return () => window.removeEventListener("keydown", h);
   }, [open, onClose]);
 
-  // The veil is `position: fixed`, and fixed measures from the nearest ancestor
-  // carrying a transform or a filter — not from the viewport. Callers sit deep:
-  // DeleteButton renders inside a project card, and that card lifts on hover
-  // with the pointer still on it when the dialog opens, so rendered in place the
-  // veil collapses into the card and centres the modal on the card rather than
-  // on the screen. `.cr` is past every such ancestor and still inside the block
-  // the admin's resets, scrollbars and focus rings hang off.
+  // fixed positioning breaks inside a transformed ancestor, so portal out
   const [host, setHost] = useState<Element | null>(null);
   useEffect(() => { setHost(document.querySelector(".cr") ?? document.body); }, []);
 

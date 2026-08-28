@@ -19,7 +19,6 @@ export interface FlagRow {
   enabled: boolean;
   defaultEnabled: boolean;
   note: string | null;
-  /** False when the registry declares this flag but no database row holds it. */
   present: boolean;
   /** Pre-formatted IST, not a Date. */
   changedAt: string | null;
@@ -32,7 +31,6 @@ type Outcome =
   | { kind: "stale"; error: string }
   | { kind: "failed"; error: string };
 
-// Must be caught at every call site: a throw inside a transition reaches no error boundary.
 function transportError(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "The server could not be reached.";
 }
@@ -61,7 +59,6 @@ function Result({ outcome }: { outcome: Outcome }) {
 function lastChanged(row: FlagRow, justSavedBy: string | null): string {
   if (justSavedBy !== null) return `just now · by ${justSavedBy}`;
   if (!row.present) return "never saved — this flag has no row yet";
-  // No author means the seed created it and nobody has touched it since.
   const who = row.changedBy ?? "the seed";
   return `last changed ${row.changedAt} · by ${who}`;
 }
@@ -77,7 +74,6 @@ function FlagCard({ row, actor }: { row: FlagRow; actor: string }) {
 
   const dirty = note.trim() !== savedNote;
 
-  // Optimistic, and deliberately no router.refresh(): arriving props would race the switch mid-flight.
   const save = (next: boolean, nextNote: string | undefined) => {
     const previous = enabled;
     setEnabled(next);
@@ -158,7 +154,6 @@ function FlagCard({ row, actor }: { row: FlagRow; actor: string }) {
 
       <div className="fl-switch">
         {busy ? <IconRefresh size={13} className="spin" /> : null}
-        {/* No note passed, so a half-typed draft cannot be committed by flipping the switch. */}
         <Switch
           checked={enabled}
           disabled={busy}

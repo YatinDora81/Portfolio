@@ -13,10 +13,6 @@ import {
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/$/, "");
 const SITE_HOST = SITE.replace(/^https?:\/\//, "");
 
-/**
- * Titles exist once per hero version, so an unscoped count reads roughly double
- * what the site shows. Only the live version's rows are the health number.
- */
 async function liveHeroTitleCount() {
   const row = await prisma.heroContent.findFirst({ where: { live: "live" }, select: { version: true } });
   return prisma.heroTitle.count({ where: { version: row?.version === "v1" ? "v1" : "v2" } });
@@ -62,7 +58,6 @@ async function getDashboardData() {
   };
 }
 
-/** Compact "3h" / "5d" stamp for the recent-message rows. */
 function ago(date: Date) {
   const mins = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
   if (mins < 1) return "now";

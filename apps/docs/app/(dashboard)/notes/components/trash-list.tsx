@@ -8,23 +8,12 @@ import type { TrashRow } from "@/lib/notes/view-types";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/**
- * The reader's stamp shape ("Aug 3, 2026"), read straight off the ISO string
- * rather than through `Date`.
- *
- * `revisedStamp` in answer-view.tsx can call `toLocaleDateString` because it
- * runs on the server and only ever runs there. This list is server-rendered and
- * then hydrated, and both a locale format and a relative time read the timezone
- * of whichever side is running — so around midnight UTC the two renders
- * disagree and every row is a hydration mismatch. The cost is that the date is
- * UTC, which for "when did I delete this" is close enough.
- */
+// parsed off the ISO string, not `Date`, to avoid a hydration mismatch
 function stamp(iso: string) {
   const [y, m, d] = iso.slice(0, 10).split("-");
   return `${MONTHS[Number(m) - 1] ?? ""} ${Number(d)}, ${y}`;
 }
 
-/** What a confirm is standing in front of. */
 type Ask = { row: TrashRow } | { all: true } | null;
 
 export function TrashList({ rows }: { rows: TrashRow[] }) {
@@ -32,10 +21,6 @@ export function TrashList({ rows }: { rows: TrashRow[] }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Nothing is mirrored locally. Every action here revalidates /notes, so the
-  // list that comes back with the transition is the answer, and there is no
-  // optimistic copy to reconcile against it — unlike the revise deck, where a
-  // wait between cards is the thing worth avoiding.
   const run = (work: () => Promise<{ ok: true } | { ok: false; error: string }>) => {
     setError(null);
     startTransition(async () => {
@@ -114,10 +99,7 @@ export function TrashList({ rows }: { rows: TrashRow[] }) {
         </span>
       </div>
 
-      {/* The admin's own confirm, for the reason `DeleteButton` states next to
-          it: a confirm's job is to stand in front of something the undo cannot
-          reach, and purging is the one gesture in this feature with no undo
-          behind it. Restore has none, because trashing again is the undo. */}
+      {/* purging is the one gesture here with no undo behind it */}
       <Dialog
         open={ask !== null}
         onClose={() => setAsk(null)}

@@ -12,10 +12,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await getSession();
   if (!session) redirect("/login");
 
-  // The scheduled-publish tick. An unhandled throw inside `after()` takes down the
-  // whole invocation, so the try/catch is required, not defensive.
-  // The fallback: /api/collect is the primary trigger now, so this only matters
-  // on a day with no public traffic at all.
+  // an unhandled throw inside after() takes down the whole invocation
   after(async () => {
     try {
       const published = await maybePublishDue();
@@ -31,13 +28,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   });
 
   const [unread, jar] = await Promise.all([
-    // Drives the Inbox badge in the sidebar.
     prisma.contactMessage.count({ where: { status: "UNREAD" } }),
     cookies(),
   ]);
 
-  // Read here, on the server, so a railed sidebar is 58px in the first paint.
-  // Deferring it to the client costs a visible sideways lurch on every load.
   const rail = jar.get(RAIL_COOKIE)?.value;
 
   return (

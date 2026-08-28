@@ -24,12 +24,11 @@ const PRESET_STYLE: React.CSSProperties = { padding: "5px 10px", fontSize: 12 };
 
 const DAY_MS = 86_400_000;
 
-/** Mirrors `MAX_RANGE_DAYS`; a `"use server"` module may only export async functions. */
+// mirrors MAX_RANGE_DAYS in the server module
 const MAX_RUN_DAYS = 14;
 
 const dayTime = (key: string) => Date.parse(`${key}T00:00:00.000Z`);
 
-/** `null` for a cleared or half-typed date box, which must never become a NaN date. */
 function shiftDay(key: string, days: number): string | null {
   const t = dayTime(key);
   return Number.isNaN(t) ? null : new Date(t + days * DAY_MS).toISOString().slice(0, 10);
@@ -50,7 +49,7 @@ function clampKey(value: string, lo: string | null, hi: string | null): string {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-// Must be caught at every call site: a throw inside a transition reaches no error boundary.
+// a throw inside a transition reaches no error boundary
 function transportError(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "The server could not be reached.";
 }
@@ -78,9 +77,7 @@ export interface StatusProps {
   daysBehind: number;
   gapDays: number;
   windowDays: number;
-  /** From the `catchUpRollups()` this page's own load already performed. */
   caughtUp: { processed: number; remaining: number; error: string | null };
-  /** `YYYY-MM-DD`, UTC. The range the Run button starts pre-filled with. */
   suggestedFrom: string;
   suggestedTo: string;
 }
@@ -88,7 +85,6 @@ export interface StatusProps {
 export function SummaryStatus(props: StatusProps) {
   const router = useRouter();
   const [from, setFrom] = useState(props.suggestedFrom);
-  // Trimmed at the far end, so repeated presses walk forward rather than backwards.
   const [to, setTo] = useState(() =>
     clampKey(props.suggestedTo, null, shiftDay(props.suggestedFrom, MAX_RUN_DAYS - 1)),
   );
@@ -99,7 +95,6 @@ export function SummaryStatus(props: StatusProps) {
   const behind = props.summarizedThrough === null || props.daysBehind > 0;
   const span = rangeDays(from, to);
 
-  // Each box drags the other rather than going red, so every reachable range is an accepted one.
   const pickFrom = (next: string) => {
     const capped = clampKey(next, null, props.suggestedTo);
     setFrom(capped);
@@ -153,7 +148,6 @@ export function SummaryStatus(props: StatusProps) {
         };
       }
 
-      // The boxes are the request, so without this "run it again" replays the same days.
       const last = res.results[attempted - 1];
       const resume = res.remaining > 0 && last ? shiftDay(last.date, 1) : null;
       if (resume !== null) setFrom(resume);
@@ -221,7 +215,6 @@ export function SummaryStatus(props: StatusProps) {
                 : <>Nothing to catch up on this load.</>}
         </div>
 
-        {/* A window with nothing summarized in it at all is the line above, not a gap. */}
         {props.gapDays > 0 && props.summarizedThrough !== null ? (
           <div className="an-status-line dim">
             {props.gapDays} of the last {props.windowDays} days{" "}
@@ -340,7 +333,6 @@ function SplitSwitch({
           onClick={() => setSplit(s)}
         >
           {SPLIT_LABEL[s]}
-          {/* A zero only says anything beside a split that has some. */}
           {anyData && !hasData[s] && s !== "all" ? <span className="an-split-z">0</span> : null}
         </button>
       ))}
@@ -348,18 +340,15 @@ function SplitSwitch({
   );
 }
 
-/** One switch drives funnel, dwell and attention: three views of the same visits. */
 export function SectionPanels({ sections, hasData, windowDays }: SectionPanelsProps) {
   const [split, setSplit] = useState<Split>("all");
   const rows = sections[split];
-  // Reach and dwell fail apart: visits that all flushed 0ms leave the funnel a row and the chart nothing.
   const hasDwell = rows.some((r) => r.medianMs !== null);
   const anyData = SPLIT_ORDER.some((s) => hasData[s]);
   const arrival = rows[rows.length - 1]?.reachPct ?? null;
 
   const switchEl = <SplitSwitch split={split} setSplit={setSplit} hasData={hasData} anyData={anyData} />;
 
-  // The rollup never crosses sections with devices, so a per-device funnel comes from raw events.
   const source =
     split === "all" ? (
       <>Completed days from the daily rollup, today from the raw tables.</>
@@ -476,7 +465,6 @@ function Funnel({ rows, split, anyData }: { rows: SectionRow[]; split: Split; an
   );
 }
 
-/** Puts both inputs beside the ratio, so a surprising bar can be blamed without leaving the card. */
 function AttentionTable({ rows }: { rows: SectionRow[] }) {
   const order = [...rows]
     .filter((r) => r.msPer100px !== null)

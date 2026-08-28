@@ -1,9 +1,7 @@
 @import 'tailwindcss';
-/* Control-room design system — tokens + component classes for the whole admin. */
 @import './control-room.css';
 
-/* Same reason as the web app: utilities used only inside the shared package are
-   outside this app's auto-detected source tree, so the icons came out 0×0. */
+/* the shared package sits outside this app's auto-detected source tree */
 @source '../../../packages/ui/src';
 
 @custom-variant dark (&:is(.dark *));
@@ -31,9 +29,6 @@
 }
 
 :root {
-  /* Bridge shadcn-style names onto the control-room design system so
-     Tailwind utilities (bg-background, text-foreground, …) always match
-     the active theme. Never redefine control-room token names here. */
   --primary: var(--pri);
   --primary-foreground: var(--priFg);
   --sidebar: var(--sbg, #0c1222);
@@ -57,7 +52,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Smooth scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -67,8 +61,6 @@ body {
   background: transparent;
 }
 
-/* Only reaches surfaces outside `.cr` (the portalled icon picker). Light keeps
-   its literal so the `--muted-foreground` bridge can't drift a light pixel. */
 ::-webkit-scrollbar-thumb {
   background: #64748b;
   border-radius: 999px;
@@ -83,7 +75,6 @@ body {
   opacity: 0.5;
 }
 
-/* Dialog animation */
 @keyframes dialog-in {
   from {
     opacity: 0;

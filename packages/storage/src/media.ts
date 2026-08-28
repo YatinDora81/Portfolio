@@ -1,6 +1,3 @@
-// Imported by the browser too: no `server-only` and no Node imports here.
-
-// SVG is deliberately absent — it can carry <script> and would run on the image host's origin.
 export const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
@@ -31,7 +28,6 @@ export function extensionFor(mimeType: AllowedImageType): string {
   return EXTENSIONS[mimeType];
 }
 
-// NFKD then dropping marks keeps "señor" one word instead of splitting on the combining character.
 function slug(raw: string, max: number): string {
   return raw
     .normalize("NFKD")
@@ -63,7 +59,6 @@ export function buildStorageKey(
   return `${sanitizeFolder(folder)}/${Date.now()}-${random}-${sanitizeFilename(filename)}.${extensionFor(mimeType)}`;
 }
 
-// A browser-supplied key must match the shape `buildStorageKey` produces, or it names a foreign object.
 export const STORAGE_KEY_RE =
   /^[a-z0-9][a-z0-9-]{0,31}\/\d{13}-[a-f0-9]{6,32}-[a-z0-9][a-z0-9-]{0,63}\.(?:jpg|png|webp|avif|gif)$/;
 

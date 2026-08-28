@@ -11,7 +11,6 @@ export function utcYesterday(now = new Date()): Date {
   return new Date(utcDayStart(now).getTime() - 86_400_000);
 }
 
-/** UTC — for keys and logs, never for display: it can differ from the viewer's date. */
 export function toDateKey(d: Date): string {
   return utcDayStart(d).toISOString().slice(0, 10);
 }

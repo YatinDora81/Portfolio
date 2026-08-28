@@ -20,24 +20,12 @@ import { findSocialIcon } from "@repo/ui/icons/registry";
 
 interface Link {
   id: string; name: string; href: string; iconKey: string; detail: string | null; sortOrder: number;
-  /** Which hero version lists this link. NULL = every version. */
+  /** NULL = every hero version. */
   version: string | null;
 }
 
 const ENTITY: Entity = "socialLink";
 
-/**
- * Card 05 — the hero's icon row. Moved here verbatim from /social-links when
- * that route folded into /hero.
- *
- * This is the editor that WON the fold. /links carried a second one that wrote
- * immediately, with no staging, no drag-reorder and no per-version scoping; it
- * was deleted rather than merged, because keeping either half of it would have
- * meant two writers on one table with only one of them visible in the save bar.
- * Everything that made this the survivor is below: staged create/edit/delete,
- * drag and keyboard reorder, the icon picker, and `version === null` meaning
- * "every hero version".
- */
 export function SocialLinksTable({ links }: { links: Link[] }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Link | null>(null);
@@ -46,24 +34,16 @@ export function SocialLinksTable({ links }: { links: Link[] }) {
     isDeleted, isNew, isEdited,
   } = useStaging();
 
-  // Nothing here writes: every dialog, drag and delete lands in the staging
-  // store and the save bar commits the lot. `overlay` folds the pending batch
-  // back over the server rows so a staged change is visible immediately.
   const staged = overlay(ENTITY, links, (l) => l.id);
   const { order, handleProps, itemProps } = useSortable(
     staged.map((l) => l.id),
     (ids) => stageReorder(ENTITY, ids)
   );
-  // Sorted BY the drag order rather than mapped THROUGH it: the hook re-seeds in
-  // an effect, so for one render after a create its `order` has no slot for the
-  // new row — mapping through it would blink the row out of existence just as
-  // the dialog closes onto the list.
+  // sorted by drag order; the hook re-seeds one render late
   const rank = new Map(order.map((id, i) => [id, i] as const));
   const at = (id: string) => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
   const rows = [...staged].sort((a, b) => at(a.id) - at(b.id));
 
-  // Keyboard path for reorder. Ids come from `rows`, so the indices the buttons
-  // carry and the list being reordered share one index space.
   const move = (from: number, to: number) => {
     const ids = rows.map((l) => l.id);
     [ids[from], ids[to]] = [ids[to]!, ids[from]!];
@@ -112,11 +92,9 @@ export function SocialLinksTable({ links }: { links: Link[] }) {
                     {l.detail ? ` · ${l.detail}` : ""}
                   </div>
                 </div>
-                {/* Only a scoped row is worth a chip — most links are in both. */}
                 {l.version ? <span className="chip off">{l.version} hero only</span> : null}
                 <div className="row-acts">
                   {del ? (
-                    // The row stays put until the save; this is the undo.
                     <IconButton
                       aria-label={`Keep ${l.name}`}
                       title="Undo delete"
@@ -126,10 +104,6 @@ export function SocialLinksTable({ links }: { links: Link[] }) {
                     </IconButton>
                   ) : (
                     <>
-                      {/* Carried over from /links, which had it and /social-links
-                          did not. The row prints the href as text, so without
-                          this the only way to check a link from here is to copy
-                          it out by hand. Résumé, on the card below, kept its. */}
                       <a
                         className="ibtn"
                         href={l.href}
@@ -182,22 +156,14 @@ export function SocialLinksTable({ links }: { links: Link[] }) {
       >
         <form
           onSubmit={(e) => {
-            // `onSubmit` rather than `action`: the dialog stages and closes, so
-            // there is no server round trip to await. Native validation still
-            // runs first, so `required` below is unaffected.
             e.preventDefault();
             const data = new FormData(e.currentTarget);
             const fields = {
               name: String(data.get("name") ?? ""),
               href: String(data.get("href") ?? ""),
               iconKey: String(data.get("iconKey") ?? ""),
-              // Blank clears it, exactly as the old action's `|| null` did.
               detail: String(data.get("detail") ?? ""),
-              // Blank means NULL, which is "every version" — not "no version".
-              // Normalised here rather than only in `versionOpt` on save: both
-              // readers of a staged row test `version === v || version == null`,
-              // and "" satisfies neither, so an un-normalised blank drops the
-              // link out of the hero preview and both version tiles until saved.
+              // blank must be null, not "": readers test `== null`
               version: data.get("version") ? String(data.get("version")) : null,
             };
             if (editing) stageUpdate(ENTITY, editing.id, fields);
@@ -229,7 +195,6 @@ export function SocialLinksTable({ links }: { links: Link[] }) {
           />
           <div className="row-acts" style={{ justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
             <Button variant="ghost" type="button" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            {/* Not "Save": the save bar owns that word now, and this only stages. */}
             <Button type="submit">{editing ? "Update link" : "Add link"}</Button>
           </div>
         </form>

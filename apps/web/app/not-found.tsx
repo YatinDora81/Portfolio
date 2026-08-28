@@ -4,17 +4,6 @@ import { ThemeProvider } from '@/components/common/ThemeProvider';
 import MotionProvider from '@/components/common/MotionProvider';
 import Background from '@/components/common/Background';
 
-/** Without this file an unknown path falls back to Next's built-in 404, which
-    renders its own <title> INSIDE the root layout — two <title> elements in one
-    <head>. The blog's own not-found has always avoided that by owning the page;
-    this is the same thing for the root.
-
-    Design: the sleeping oneko sprite takes the missing page's place — it is the
-    zero in "4 0 4", napping on a desk keyline the way the live cat naps in
-    window corners. Frame coords come from oneko.js (`sleeping: [[-2,0],[-2,-1]]`,
-    32px grid, shown here at 3x = 96px). Everything else follows 404 UX basics:
-    say plainly what happened, keep the site's voice, and give escape routes
-    (home + the three sections people actually come for). */
 export const metadata: Metadata = {
   title: 'Page not found',
   robots: { index: false, follow: false },
@@ -27,11 +16,6 @@ export default function NotFound() {
         <div className="min-h-screen bg-background text-foreground">
           <Background />
 
-          {/* Scoped styles: the sprite crop and the two-frame sleep loop — the
-              sheet's sleeping frames animate their own pixel "z"s, so nothing
-              is layered on top. `step-end` holds each frame; background-position
-              is interpolable, so a default timing function would smear the
-              sheet. Reduced motion gets the static sleeping frame. */}
           <style>{`
             .nf-cat{width:96px;height:96px;background:url('/oneko/oneko.gif') no-repeat -192px 0;background-size:768px 384px;image-rendering:pixelated}
             @media (prefers-reduced-motion: no-preference){
@@ -42,8 +26,6 @@ export default function NotFound() {
 
           <main className="relative z-[2] flex min-h-screen flex-col items-center justify-center px-5">
             <div className="max-w-md text-center">
-              {/* The cat is the zero. Digits stay in the keyline ink so the
-                  sprite is the only thing with weight. */}
               <div className="flex items-end justify-center gap-1 select-none" aria-hidden="true">
                 <span className="text-8xl font-bold leading-none text-border">4</span>
                 <span className="relative -mb-1.5">
@@ -53,13 +35,6 @@ export default function NotFound() {
               </div>
               <div className="mx-auto mt-1 h-px w-56 bg-border" aria-hidden="true" />
 
-              {/* Receipt line, in the site's mono register. The path is filled
-                  in client-side (textContent only) so the page stays static.
-                  suppressHydrationWarning is load-bearing: the script below
-                  rewrites this text during parse, before hydration, and the
-                  span hydrates inside the providers' client boundary — without
-                  it React 19 treats the changed text as a mismatch, re-renders
-                  the page client-side, and reverts it to "this page". */}
               <p className="mt-4 font-mono text-xs text-secondary">
                 GET <span id="nf-path" suppressHydrationWarning className="text-foreground/80">this page</span>{' '}
                 <span aria-hidden="true">→</span> <span className="text-[var(--err)]">404</span> not_found

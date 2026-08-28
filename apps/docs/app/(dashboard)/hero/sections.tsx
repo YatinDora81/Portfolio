@@ -20,23 +20,6 @@ interface Social {
   sortOrder: number; version: string | null;
 }
 
-/**
- * The whole hero on one screen, in the order the section is built:
- *
- *   01 Version · 02 Headline & copy · 03 Identity · 04 Status dot ·
- *   05 Social row · 06 Résumé · preview
- *
- * Three storage layers meet here and each keeps the writer it already had,
- * which is the only reason the consolidation is safe: the tables stage into the
- * save bar, the SiteConfig keys go through ConfigCard's own footer, and the
- * résumé URL keeps `updateResumeUrl` — SiteConfig's one row with a second
- * writer (see lib/actions/links.ts). The numbered strips are what keeps that
- * legible: nobody should have to guess which Save applies to what they typed.
- *
- * One version tab governs the page. Copy, titles and badges belong to the same
- * hero, so letting each table hold its own tab would let you edit v1's titles
- * beside v2's badges and preview a hero that never ships.
- */
 export function HeroSections({
   titles, badges, content, socialLinks, config, resumeUrl, availabilityStatus, totalSkills,
 }: {
@@ -44,31 +27,18 @@ export function HeroSections({
   badges: Badge[];
   content: HeroContentRow[];
   socialLinks: Social[];
-  /** Exactly the SiteConfig keys this section owns — the ConfigCard payload. */
   config: Record<string, string>;
-  /** Written by `updateResumeUrl`, deliberately not a ConfigCard key. */
   resumeUrl: string;
-  /** Owned by Contact. Shown here read-only, and passed to the pane so it draws
-      the pill visitors actually get. */
   availabilityStatus: string;
   totalSkills: number;
 }) {
   const { overlay, isDeleted } = useStaging();
-  // Moves the instant a flip is staged, so "live" tracks what this batch will
-  // publish rather than what the database currently says.
   const liveVersion = useLiveVersion(content);
-  // Seeded once, deliberately: the tab is a view filter, not a second way to
-  // choose which version ships.
   const [version, setVersion] = useState<Version>(liveVersion);
 
-  // The config fields as they are being typed, so the pane at the bottom moves
-  // with them instead of waiting for a save. ConfigCard still owns the values —
-  // this is a copy for drawing, and it is never posted from here.
   const [draft, setDraft] = useState<Record<string, string>>(config);
   const onDraftChange = useCallback((v: Record<string, string>) => setDraft(v), []);
 
-  // Counted off the staged view so a pending create shows up in the tab it was
-  // made on, not only after saving.
   const countIn = (
     entity: "heroTitle" | "heroSkillBadge",
     rows: { id: string; version: string }[],
@@ -76,7 +46,7 @@ export function HeroSections({
   ) => overlay(entity, rows, (r) => r.id, v)
     .filter((r) => r.version === v && !isDeleted(entity, r.id)).length;
 
-  // NULL version means "every hero", so such a row counts for both tiles.
+  // null version means every hero
   const socialCount = (v: Version) =>
     overlay("socialLink", socialLinks, (l) => l.id)
       .filter((l) => (l.version === v || l.version == null) && !isDeleted("socialLink", l.id)).length;
@@ -94,11 +64,6 @@ export function HeroSections({
     },
   };
 
-  // Staging makes the flip atomic with the rows it depends on, but nothing stops
-  // a hero from having no role line at all — either by flipping to a version
-  // nobody has written a title for, or by emptying the titles of the version
-  // already live. Deliberately direction-neutral: the second case is the more
-  // dangerous one, since it needs no flip to reach visitors.
   const blockedReason =
     counts[version].titles === 0
       ? `Add a ${version} role title — the line under your name would be empty.`
@@ -128,7 +93,7 @@ export function HeroSections({
     },
   ];
 
-  // Same comma-split as apps/web/app/lib/data.ts; `cdnUrl` runs inside the pane.
+  // same comma-split as apps/web/app/lib/data.ts
   const photos = (draft["heroPhotos"] ?? "").split(",").map((p) => p.trim()).filter(Boolean);
 
   return (
@@ -181,7 +146,6 @@ export function HeroSections({
   );
 }
 
-/** The page's numbered rhythm: an ordinal, a name, a rule out to the margin. */
 function Block({ n, title, note }: { n: string; title: string; note?: string }) {
   return (
     <div className="hro-blk">

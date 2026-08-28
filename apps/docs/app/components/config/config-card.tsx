@@ -20,35 +20,11 @@ import {
   IconAlertTriangle, IconArrowBackUp, IconCheck, IconDeviceFloppy, IconWorldUpload,
 } from "@tabler/icons-react";
 
-/**
- * The one editor for SiteConfig rows, parameterised by which keys it holds.
- *
- * SiteConfig is split across four section pages (see app/lib/site-config-keys.ts).
- * That split is only safe because of one property of this component, and it is
- * the property to preserve above all others:
- *
- *   IT POSTS ONLY THE KEYS IT WAS GIVEN.
- *
- * `updateSiteConfig` upserts exactly the entries it is handed, so a page that
- * posted its whole `values` object — or worse, every row it happened to read —
- * would overwrite keys another page owns with whatever was in the database when
- * this page mounted. `groups` is therefore the payload, not just the layout.
- *
- * It is also the page's ONE save affordance for config: staged tables commit
- * through the global save bar and show nothing local, while this card commits on
- * its own and says so. Several groups share a single footer for that reason —
- * two Save buttons on one screen is the ambiguity this is avoiding.
- */
-
 export interface ConfigGroup {
-  /** Ordinal for the page's own heading device — passed straight to `heading`. */
   n?: string;
   title: string;
-  /** One line under the heading, in the page's voice. */
   blurb?: string;
-  /** The keys this card holds. Unknown keys are skipped, not invented. */
   keys: string[];
-  /** Rendered at the end of this card's body — borrowed-value rows, notes. */
   slot?: React.ReactNode;
 }
 
@@ -56,7 +32,6 @@ export interface ControlContext {
   value: string;
   set: (next: string) => void;
   def: ConfigKeyDef;
-  /** The whole draft, for controls that read a sibling key. */
   values: Record<string, string>;
   disabled: boolean;
 }
@@ -71,20 +46,11 @@ export function ConfigCard({
   onDraftChange,
 }: {
   groups: ConfigGroup[];
-  /** key → current row value, already defaulted by the page. The payload's shape. */
   values: Record<string, string>;
-  /** Definitions for keys the registry does not know — /site-config's safety
-      net, where a database row no section claims still has to be editable.
-      Merged over `KEYS` locally; the registry itself is never mutated. */
   extraDefs?: Record<string, ConfigKeyDef>;
-  /** Per-key control overrides — how the Cat page injects its nap picker without
-      this file importing a route's component. */
   controls?: Record<string, (ctx: ControlContext) => React.ReactNode>;
-  /** e.g. nap length is dead config once the cat never sleeps. */
   isDisabled?: (key: string, values: Record<string, string>) => boolean;
-  /** The page's own section heading, so this component owns no page identity. */
   heading?: (group: ConfigGroup) => React.ReactNode;
-  /** The live draft, for a preview that should move as the fields are typed. */
   onDraftChange?: (values: Record<string, string>) => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>(initial);
@@ -96,8 +62,7 @@ export function ConfigCard({
 
   const defs = useMemo(() => ({ ...KEYS, ...extraDefs }), [extraDefs]);
 
-  // Only the keys these groups declare, in declaration order — this is the
-  // payload, and nothing outside it may ever reach `updateSiteConfig`.
+  // only the keys these groups declare are ever posted
   const owned = useMemo(
     () => groups.flatMap((g) => g.keys).filter((k) => k in defs),
     [groups, defs]
@@ -115,9 +80,6 @@ export function ConfigCard({
     setPubError(null);
     startTransition(async () => {
       try {
-        // Clamped here as well as on blur, because clicking Save is what blurs
-        // the field — and the action rewrites out-of-range numbers without
-        // reporting back, so the box would sit showing 600 under a green "Saved".
         const snapshot = { ...values };
         for (const key of owned) {
           if (key in NUMBER_RANGE) snapshot[key] = String(clampNumber(key, snapshot[key] ?? ""));
@@ -128,8 +90,6 @@ export function ConfigCard({
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
         if (publish) {
-          // The values are saved. A publish that fails is a separate, retryable
-          // failure — it never undoes the write.
           const res = await publishSite();
           if (!res.ok) setPubError(res.error ?? "Could not reach the site.");
         }
@@ -158,8 +118,6 @@ export function ConfigCard({
             value={value}
             onChange={(v) => set(key, v)}
             presets={DOT_PRESETS}
-            // What the site renders with no colour set: `--foreground`, near-black
-            // on the light theme and near-white on the dark one.
             fallback="#FAFAFA"
             defaultLabel="Theme default"
             defaultHint="Follow the site's text colour — black in light mode, white in dark"
@@ -193,8 +151,7 @@ export function ConfigCard({
             disabled={disabled}
             value={value}
             onChange={(e) => set(key, e.target.value)}
-            // The action clamps on the way in and does not report back, so
-            // without this the box keeps showing 500 next to a green "Saved".
+            // the action clamps silently and does not report back
             onBlur={(e) => set(key, String(clampNumber(key, e.target.value)))}
           />
         );
@@ -221,10 +178,6 @@ export function ConfigCard({
           />
         );
       case "napStyle":
-        // No picker here on purpose — it lives on the Cat route and comes in
-        // through `controls`. This dropdown is the fallback so the key is never
-        // uneditable, and a stored value outside the list shows what the site
-        // actually serves rather than leaving the control blank.
         return (
           <Select
             key={key}
@@ -236,10 +189,6 @@ export function ConfigCard({
           />
         );
       case "versionTiles":
-        // Same arrangement as `napStyle`: the tiles live on the Projects route
-        // and arrive through `controls`. This is the fallback that keeps the row
-        // editable wherever it is drawn without one, so the control and the key
-        // can never get separated.
         return (
           <Select
             key={key}
@@ -265,7 +214,6 @@ export function ConfigCard({
     }
   };
 
-  /** Short fields pair into `.f-row`; long ones break the row and go full width. */
   const FULL_WIDTH = new Set<ConfigControl>(["long", "napStyle", "photoList", "versionTiles"]);
 
   const fields = (keys: string[]) => {
@@ -289,9 +237,6 @@ export function ConfigCard({
     return out;
   };
 
-  // One footer for the whole component, in the last card — several groups on a
-  // page are one save, and two Save buttons on one screen is exactly the
-  // ambiguity the two-affordance rule exists to prevent.
   const footer = (
     <>
       {pubError && (
@@ -335,9 +280,6 @@ export function ConfigCard({
         const groupDirty = keys.some((k) => dirtyKeys.includes(k));
         const last = i === groups.length - 1;
         return (
-          // A Fragment, not a wrapper div: the heading and the card are siblings
-          // in the page's own layout, so they inherit its rhythm instead of
-          // being welded together inside a box this component chose.
           <Fragment key={g.title}>
             {heading?.(g)}
             <Card flush className={groupDirty ? "cfg-dirty" : undefined}>
@@ -350,8 +292,7 @@ export function ConfigCard({
                 {g.blurb && <div className="f-hint" style={{ marginBottom: 13 }}>{g.blurb}</div>}
                 {fields(keys)}
               </div>
-              {/* Borrowed rows and notes ride the card's own keyline rather than
-                  the field padding — they are not fields. */}
+              {/* not a field, rides the card keyline */}
               {g.slot && <div style={{ borderTop: "1px solid var(--line2)" }}>{g.slot}</div>}
               {last && footer}
             </Card>

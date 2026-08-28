@@ -1,8 +1,6 @@
 import { FLAG_DEFINITIONS } from "@repo/shared/flags";
 import { prisma } from "../src/index";
 
-// `update` must never touch `enabled` — re-seeding after a deploy would switch a
-// flag back on that somebody turned off on purpose.
 async function seedFlags() {
   let created = 0;
   let updated = 0;
@@ -36,7 +34,6 @@ async function seedFlags() {
   console.log(`flags: ${created} created, ${updated} refreshed`);
   for (const r of rows) console.log(`  ${r.enabled ? "on " : "off"}  ${r.key}`);
 
-  // Reported, never deleted: a stray row is harmless and may say why it was switched off.
   const known = new Set(FLAG_DEFINITIONS.map((d) => d.key as string));
   const orphans = rows.filter((r) => !known.has(r.key));
   if (orphans.length > 0) {

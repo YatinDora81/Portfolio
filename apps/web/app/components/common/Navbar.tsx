@@ -17,7 +17,6 @@ import {
 
 const MOBILE_MENU_ID = 'mobile-nav-menu';
 
-// `as const` keeps `key` a literal union, so renaming one is a type error at the call site.
 const allNavItems = [
   { key: 'skills', name: 'Skills', link: '#skills' },
   { key: 'experience', name: 'Experience', link: '#experience' },
@@ -30,7 +29,6 @@ type NavSection = (typeof allNavItems)[number]['key'];
 
 interface NavbarProps {
   logo: string;
-  /** Which sections the page actually rendered — a link to a missing section scrolls nowhere. */
   sections: Record<NavSection, boolean>;
 }
 
@@ -42,10 +40,6 @@ export default function Navbar({ logo, sections }: NavbarProps) {
   const navItems = allNavItems.filter((item) => sections[item.key]);
 
   return (
-    // <header>/<nav> rather than bare divs: the logo, the five section links and
-    // the two toggles used to sit outside every landmark, so landmark navigation
-    // (NVDA's D, the VoiceOver rotor) offered only "main" and "contentinfo" and
-    // no way to reach the site navigation at all.
     <header className="relative w-full">
       <NavbarWrapper>
         <NavBody>

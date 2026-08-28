@@ -12,7 +12,6 @@ const ROW_TAG = /^(?:blog|project):[A-Za-z0-9._-]{1,200}$/;
 const MAX_STALE_PER_RUN = 10;
 const STALE_RUN_BUDGET_MS = 20_000;
 
-/** Unknown tags and paths without a leading slash are dropped: `revalidatePath("blog/x")` does not throw, it flushes nothing and reports success. */
 export async function revalidateNow(input: {
   paths?: string[];
   tags?: string[];
@@ -24,7 +23,6 @@ export async function revalidateNow(input: {
   const tags = (input.tags ?? []).filter((t) => knownTags.has(t) || ROW_TAG.test(t));
   const paths = (input.paths ?? []).filter((p) => p.startsWith("/"));
 
-  // An empty set is not forwarded: the public route reads "no paths, no tags" as a full-site flush.
   if (tags.length === 0 && paths.length === 0) {
     return { ok: false, durationMs: 0, error: "Nothing valid to revalidate." };
   }
@@ -40,7 +38,6 @@ export async function revalidateNow(input: {
   return result;
 }
 
-/** Sends no paths and no tags, which /api/revalidate reads as `revalidatePath("/", "layout")` — not the same as sending `["/"]`, which flushes only the homepage's own tag. */
 export async function revalidateWholeSite(): Promise<{
   ok: boolean;
   durationMs: number;
@@ -80,7 +77,6 @@ export async function revalidateBlog(
   return result;
 }
 
-/** Two bounds, not one: the count caps a healthy run, the wall clock caps one where every item burns the full 8s timeout. */
 export async function revalidateAllStale(): Promise<{
   ok: boolean;
   attempted: number;
@@ -99,7 +95,6 @@ export async function revalidateAllStale(): Promise<{
   const started = Date.now();
   let attempted = 0;
   let failed = 0;
-  // Sequential on purpose: `Promise.all` would open one fetch per stale post at the live site at once.
   for (const item of batch) {
     if (Date.now() - started > STALE_RUN_BUDGET_MS) break;
     const result = await revalidate({
@@ -114,7 +109,6 @@ export async function revalidateAllStale(): Promise<{
   }
 
   revalidatePath("/revalidation");
-  // `attempted - failed`: an item whose flush failed is still stale.
   return {
     ok: failed === 0,
     attempted,

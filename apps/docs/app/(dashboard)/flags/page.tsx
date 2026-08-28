@@ -9,7 +9,6 @@ import { FlagBoard, type FlagRow } from "./parts";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// Formatted server-side with the zone named, so SSR and hydration emit the same text.
 const IST = "Asia/Kolkata";
 const dayFmt = new Intl.DateTimeFormat("en-GB", {
   timeZone: IST, day: "2-digit", month: "short", year: "numeric", hourCycle: "h23",
@@ -26,7 +25,6 @@ export default async function FlagsPage() {
 
   const map: FlagMap = Object.fromEntries(stored.map((f) => [f.key, f.enabled]));
 
-  // `updatedById` is a plain String, not a relation, so some ids resolve to nobody.
   const actorIds = [
     ...new Set([
       ...stored.map((f) => f.updatedById).filter((id): id is string => id !== null),
@@ -40,7 +38,6 @@ export default async function FlagsPage() {
   const actors: Record<string, string> = {};
   for (const a of admins) actors[a.id] = a.name;
 
-  // Driven by FLAG_DEFINITIONS, not the table: a flag with no row still needs a line.
   const rows: FlagRow[] = FLAG_DEFINITIONS.map((def) => {
     const row = byKey.get(def.key);
     return {

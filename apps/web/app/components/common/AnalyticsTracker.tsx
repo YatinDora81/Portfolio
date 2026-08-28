@@ -29,12 +29,11 @@ function cleanUrl(url: URL): void {
     }
   }
   if (!stripped) return;
-  // Deferred to a macrotask so sibling mount effects still read the untouched URL.
+  // deferred so sibling mount effects read the untouched url
   const next = `${url.pathname}${url.search}${url.hash}`;
   window.setTimeout(() => window.history.replaceState(null, '', next), 0);
 }
 
-// Captured once per tab: after a client-side navigation `document.referrer` is this site.
 function loadAttribution(): Attribution {
   const url = new URL(window.location.href);
   const stored = readAttribution();
@@ -65,7 +64,7 @@ function loadAttribution(): Attribution {
   try {
     window.sessionStorage.setItem(ATTR_KEY, JSON.stringify(attribution));
   } catch {
-    // A blocked sessionStorage costs attribution on later pageviews, nothing more.
+    // a blocked sessionStorage only costs later attribution
   }
 
   cleanUrl(url);
@@ -80,7 +79,6 @@ export default function AnalyticsTracker() {
 
   useEffect(() => {
     if (optedOut()) return;
-    // Strict Mode runs this twice on mount, and dev points at the live database.
     if (lastSent.current === pathname) return;
     lastSent.current = pathname;
     sendEvents([{ type: 'PAGEVIEW', path: pathname }], loadAttribution());

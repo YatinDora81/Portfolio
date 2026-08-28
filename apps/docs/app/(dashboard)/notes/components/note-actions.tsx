@@ -16,21 +16,6 @@ import { ExportMenu } from "./export-menu";
 import { ImportButton } from "./import-dialog";
 import { NoteLink, useNoteNav } from "./vault-provider";
 
-/**
- * Scroll the tree to the note the reader is showing.
- *
- * The tree lives in the layout, so nothing here holds a reference to it and no
- * props reach across. Scrolling needs none: navigating already expands every
- * ancestor of the open note, so its row is mounted and carries `.sel` — a class
- * both halves are written against — and finding it is one query.
- *
- * Expanding is the part that cannot be done from here, and it is only needed in
- * one case: a folder the user collapsed by hand *after* arriving, which the
- * tree's additive reveal effect deliberately leaves alone. The event is the hook
- * for that case, and note-tree.tsx listens for it — so the button both opens the
- * branch and scrolls to the row, and pressing it twice is idempotent rather than
- * cumulative.
- */
 export function RevealInTree({ path }: { path: string }) {
   return (
     <button
@@ -38,8 +23,7 @@ export function RevealInTree({ path }: { path: string }) {
       className="nt-reveal"
       onClick={() => {
         window.dispatchEvent(new CustomEvent("notes:reveal", { detail: { path } }));
-        // A frame later, so a listener that expands has committed before we aim
-        // at the row. Scrolling first would centre on what is still hidden.
+        // let the expand commit before we aim at the row
         requestAnimationFrame(() =>
           document.querySelector(".nt-scroll .nt-item.sel")?.scrollIntoView({ block: "center" }),
         );
@@ -54,13 +38,9 @@ export interface NoteActionsProps {
   id: string;
   kind: NoteKind;
   title: string;
-  /** The note's own URL. Edit hangs `?edit=1` off it. */
   href: string;
-  /** Where a trash or a rename lands, because neither leaves this URL standing. */
   parentHref: string;
-  /** The right-hand line: revision stamp and materialised path. */
   stamp: string;
-  /** Rendered first inside the row; the folder overview puts its create pair here. */
   children?: ReactNode;
 }
 
@@ -89,12 +69,6 @@ export function NoteActions({
         setRenaming(false);
         return;
       }
-      // `saveAnswer` with only a title IS a rename — it delegates to the same
-      // `renameIn` — and unlike `renameNode` it reports the path the write
-      // landed on. Renaming rewrites this note's URL, so following the reported
-      // path is what keeps the reader on the note instead of dropping it at the
-      // folder above. Guessing the slug would be wrong exactly when
-      // `uniqueSlug` appends `-2`.
       const r = await saveAnswer(id, { title: next });
       if (!r.ok) {
         setError(r.error);
@@ -123,15 +97,9 @@ export function NoteActions({
         setError(r.error);
         return;
       }
-      // Whatever was open is no longer at this URL. Staying is a 404 on a page
-      // the user is already looking at.
       go(parentHref, { replace: true, afterWrite: true });
     });
 
-  // `window.confirm` rather than the admin's Dialog: this section styles itself
-  // entirely out of the `.nt-*` sheet, and the prompt is here to catch a
-  // mis-click, not to explain a loss — trashing is soft and /notes/trash undoes
-  // it. The wording names the cascade, which is the part that surprises people.
   const confirmTrash = () => {
     const what = folder
       ? `Move “${title}” and everything inside it to the trash?`
@@ -208,14 +176,9 @@ export function NoteActions({
               <IconCopy size={13} stroke={1.7} /> Duplicate
             </button>
           )}
-          {/* Every format the route serves, not one guessed here. This used to
-              be a bare anchor at a fixed `format=`, which made JSON unreachable
-              from the reader and flat markdown unreachable from a folder even
-              though /notes/export answers both. */}
+          {/* every format the route serves, not one guessed here */}
           <ExportMenu nodeId={id} kind={kind} title={title} />
-          {/* The inverse of Export, and only where a graft has somewhere to
-              land: a question holds no children, so importing "into" one is not
-              a thing that could mean anything. */}
+          {/* only a folder has somewhere to graft into */}
           {folder ? <ImportButton parentId={id} parentTitle={title} /> : null}
           <button className="btn danger" type="button" disabled={pending} onClick={confirmTrash}>
             <IconTrash size={13} stroke={1.7} /> Trash

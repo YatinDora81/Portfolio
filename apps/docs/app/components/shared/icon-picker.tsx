@@ -9,26 +9,13 @@ import {
 } from "@repo/ui/icons/registry";
 import { cn } from "@/lib/utils";
 
-/**
- * Replaces the free-text "Icon key" field. The author picks a glyph they can
- * actually see; the canonical key still goes over the wire as `name`, so the
- * server actions keep reading `formData.get("iconKey")` unchanged.
- *
- * Two key namespaces exist and they are NOT interchangeable — skill keys are
- * display-cased (`Next.js`), social keys are lowercase slugs (`linkedin`).
- * `kind` picks the right one so the wrong namespace can't be offered.
- */
-
 type Kind = "skill" | "social";
 
 interface Opt {
   key: string;
-  /** What the picker shows under the glyph — the key itself for skills. */
   label: string;
   group: string;
   aliases?: string[];
-  /** Hidden keywords from the registry — matched, never displayed. Omitting
-   *  these silently narrowed the picker vs the /icons page, which passes them. */
   search?: string;
   node: React.ReactNode;
 }
@@ -54,7 +41,6 @@ function toOpts(kind: Kind): Opt[] {
   }));
 }
 
-/** Groups in registry order, so the picker reads the same as the reference page. */
 function groupOrder(kind: Kind): string[] {
   return kind === "social" ? ["Social & contact"] : [...ICON_GROUPS];
 }
@@ -87,7 +73,6 @@ export function IconPicker({
   const opts = useMemo(() => toOpts(kind), [kind]);
   const byKey = useMemo(() => new Map(opts.map((o) => [o.key, o])), [opts]);
 
-  /** Aliases resolve to their canonical entry so legacy rows still show a glyph. */
   const current = useMemo(() => {
     if (!value) return undefined;
     const needle = value.trim().toLowerCase();
@@ -106,10 +91,8 @@ export function IconPicker({
       .filter((g) => g.items.length > 0);
   }, [filtered, kind]);
 
-  /** Flat order matching what's rendered — keyboard indexes into this. */
   const flat = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
-  /** Typing a key the registry doesn't know is still allowed — just deliberate. */
   const customKey = q.trim();
   const showCustom = customKey.length > 0 && !byKey.has(customKey) && flat.length === 0;
 
@@ -134,7 +117,7 @@ export function IconPicker({
   useLayoutEffect(() => {
     if (!open) return;
     position();
-    // `true` catches scrolls inside the dialog body and the page shell alike.
+    // capture phase catches scrolls inside the dialog body too
     const onScroll = () => position();
     window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", onScroll);
@@ -178,15 +161,10 @@ export function IconPicker({
   return (
     <div className="f">
       {label && <label>{label}</label>}
-      {/* The one field the server actually reads. */}
       <input type="hidden" name={name} value={value} />
-      {/* Mirrors the hidden field so browser validation still fires on submit. */}
       {required && (
         <input
           tabIndex={-1}
-          /* Deliberately NOT aria-hidden: constraint validation focuses THIS
-             node to report "please fill out this field", and a hidden target
-             leaves a screen-reader user with an error they can't perceive. */
           aria-label={`${label} — required`}
           required
           value={value}

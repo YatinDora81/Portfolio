@@ -3,12 +3,6 @@ import { findSkillIcon, findSocialIcon, skillIconMap } from "@repo/ui/icons/regi
 import { PageHeader } from "@/components/shared/page-header";
 import { IconLibrary } from "./gallery";
 
-/**
- * The icon reference. Every glyph the portfolio can render, with the exact key
- * to type into an `iconKey` field — plus a read of what the DB actually holds,
- * so keys that resolve to nothing are visible here instead of silently
- * rendering an empty box on the live site.
- */
 export default async function IconsPage() {
   const [skills, badges, links] = await Promise.all([
     prisma.skill.findMany({ select: { name: true, iconKey: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
@@ -16,7 +10,6 @@ export default async function IconsPage() {
     prisma.socialLink.findMany({ select: { name: true, iconKey: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
   ]);
 
-  /** Usage is counted against the CANONICAL key, so aliases roll up together. */
   const skillUse = new Map<string, number>();
   const socialUse = new Map<string, number>();
   const broken: { where: string; row: string; key: string }[] = [];
@@ -33,11 +26,7 @@ export default async function IconsPage() {
     }
   }
 
-  /**
-   * The experience timeline looks skills up by NAME, not `iconKey`
-   * (apps/web/.../Experience.tsx) — so a skill whose name isn't itself a valid
-   * key renders iconless there even when its `iconKey` is perfectly good.
-   */
+  // the experience timeline looks skills up by name, not iconKey
   const nameOnlyGaps = skills
     .filter((s) => s.name !== s.iconKey && !skillIconMap[s.name])
     .map((s) => `${s.name} → ${s.iconKey}`);

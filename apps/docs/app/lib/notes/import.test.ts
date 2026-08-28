@@ -16,17 +16,6 @@ import {
 } from "./import";
 import type { NoteKind } from "./paths";
 
-/**
- * The half of the importer that never touches a database: what a pasted file
- * means, and which files are refused before a transaction is opened at all.
- *
- * Every refusal here is one the user reads, so the assertions check the message
- * and not just the failure — a correct import that says "Something went wrong"
- * is a bug in this file's terms.
- */
-
-/** A vault file, with the format strings written out rather than imported: a
- *  test that reads the constant cannot notice the constant changing. */
 const vault = (nodes: unknown[], extra: Record<string, unknown> = {}) => ({
   format: "yatindora.notes.vault",
   version: 1,
@@ -66,7 +55,6 @@ const err = (raw: unknown) => {
 
 const byTitle = (nodes: VaultNode[], title: string) => nodes.find((n) => n.title === title)!;
 
-/** n levels of folder, each holding the next, with a question at the bottom. */
 const chain = (n: number) => {
   let node: Record<string, unknown> = { title: `level ${n}` };
   for (let i = n - 1; i >= 1; i--) node = { title: `level ${i}`, children: [node] };
@@ -82,7 +70,6 @@ describe("detectShape", () => {
   });
 
   test("a nodes array is a vault even with the format string wrong", () => {
-    // "your format field is wrong" beats "unrecognised" — the file plainly is one.
     expect(detectShape({ format: "something.else", nodes: [] })).toBe("vault");
   });
 
@@ -140,8 +127,6 @@ describe("nested outlines", () => {
     const { nodes } = ok(outline);
     expect(byTitle(nodes, "DSA").kind).toBe("FOLDER");
     expect(byTitle(nodes, "Graphs").kind).toBe("FOLDER");
-    // The only way to say "empty folder", and the case that reads as a question
-    // to anything checking `children?.length`.
     expect(byTitle(nodes, "Dynamic Programming").kind).toBe("FOLDER");
     expect(byTitle(nodes, "Idempotency keys").kind).toBe("QUESTION");
   });
@@ -179,8 +164,6 @@ describe("nested outlines", () => {
   });
 
   test("two siblings with the same title both survive, with their own children", () => {
-    // Slug collisions are core.ts's problem; losing one of them would be this
-    // file's, and a hand-written outline repeats names constantly.
     const { nodes } = ok([
       {
         title: "DSA",
@@ -228,8 +211,6 @@ describe("field coercion", () => {
     ]);
     expect(nodes[0]!.tags).toEqual(["graphs", "shortest-path"]);
     expect(nodes[1]!.tags).toEqual(["a", "b"]);
-    // lowercased, de-duped and emptied — the same normaliser the write uses, so
-    // what the preview lists is what the column will hold.
     expect(nodes[2]!.tags).toEqual(["dsu", "graphs"]);
   });
 
@@ -264,14 +245,10 @@ describe("refusals", () => {
     const message = err(chain(MAX_DEPTH + 1));
     expect(message).toMatch(/levels deep/i);
     expect(message).not.toMatch(/call stack|RangeError/i);
-    // and the level below the cap is fine
     expect(ok(chain(MAX_DEPTH)).nodes).toHaveLength(MAX_DEPTH);
   });
 
   test("a hostile depth is refused rather than crashing the process", () => {
-    // Deep enough that a recursive walk would overflow. parseImport is called on
-    // every keystroke in the dialog, so it must return rather than throw —
-    // whichever layer notices first.
     let thrown: unknown = null;
     let refused = false;
     try {
@@ -302,8 +279,6 @@ describe("refusals", () => {
 
 describe("vault files", () => {
   test("a folder export's top node is a root even though its parentId is not", () => {
-    // The §5 case: a subtree export points at a parent deliberately left out of
-    // the file, and reading that pointer literally drops the whole import.
     const { nodes } = ok(
       vault([
         vnode("top", { parentId: "not-in-this-file", kind: "FOLDER", title: "Graphs" }),
@@ -349,16 +324,12 @@ describe("vault files", () => {
   });
 
   test("slug, path and depth are accepted and then ignored", () => {
-    // They are recomputed by rebuildSubtree against the new parentage; carrying
-    // the file's values forward is how a graft ends up with paths that describe
-    // a tree it is no longer in.
     const { nodes } = ok(vault([vnode("a", { slug: "lies", path: "/nowhere/at/all", depth: 47 })]));
     expect(nodes[0]!.title).toBe("a");
     expect(nodes[0]!.kind).toBe("QUESTION");
   });
 
   test("unknown keys are dropped rather than refused", () => {
-    // A file from a later version of the exporter still imports what it can.
     const { nodes } = ok(vault([vnode("a", { somethingNew: { deeply: ["nested"] } })]));
     expect(nodes[0]).not.toHaveProperty("somethingNew");
   });
@@ -426,8 +397,6 @@ describe("vaultProblems", () => {
 });
 
 describe("planGraft", () => {
-  /** A live vault row. The slug is written out rather than run through
-   *  `slugify`, so a test notices `slugify` changing under it. */
   const row = (
     id: string,
     parentId: string | null,
@@ -436,11 +405,7 @@ describe("planGraft", () => {
   ): LiveNode => ({ id, parentId, slug, kind, sortOrder: 0 });
 
   test("the fixtures below carry real titles", () => {
-    // `flattenNested` writes `title: note.title` and does NOT apply the bare
-    // string shorthand — that lives in NestedNoteSchema. A fixture written
-    // `children: ["AVL rotations"]` therefore builds a question with NO title,
-    // and a test asserting "the name never matches" would pass for the wrong
-    // reason. Test files are excluded from tsc, so nothing else catches this.
+    // flattenNested does not apply the bare-string shorthand
     expect(dsaTreesAvl().map((n) => n.title)).toEqual(["DSA", "Trees", "AVL rotations"]);
   });
 
@@ -454,8 +419,6 @@ describe("planGraft", () => {
     expect(p.foldersReused).toBe(2);
     expect(p.foldersCreated).toBe(0);
     expect(p.questionsCreated).toBe(1);
-    // Both folders point at the rows that already exist, so nothing is built
-    // twice and the note lands inside the folder the user already made.
     expect(p.merged.get(file[0]!.id)).toBe("v-dsa");
     expect(p.merged.get(file[1]!.id)).toBe("v-trees");
     expect(p.merged.has(file[2]!.id)).toBe(false);
@@ -471,8 +434,6 @@ describe("planGraft", () => {
   });
 
   test("a created folder ends the merge for everything beneath it", () => {
-    // "Trees" exists, but not under the destination — it hangs off another
-    // folder entirely. Once "DSA" is built new, nothing below it can match.
     const file = dsaTreesAvl();
     const p = planGraft(file, null, [row("v-other", null, "other"), row("v-trees", "v-other", "trees")], "merge");
 
@@ -486,8 +447,6 @@ describe("planGraft", () => {
     const p = planGraft(file, null, live, "merge");
 
     expect(p.foldersReused).toBe(1);
-    // A second note beside the first, rather than a decision about whose answer
-    // survives. `uniqueSlug` gives it `avl-rotations-2` at write time.
     expect(p.questionsCreated).toBe(1);
     expect(p.merged.has(file[1]!.id)).toBe(false);
   });
@@ -528,9 +487,6 @@ describe("planGraft", () => {
   });
 
   test("a question never lands in a folder that shares its name", () => {
-    // The other side of "folders only": here the live row IS a folder and the
-    // incoming one is a question with exactly its slug. `n.kind === "FOLDER"` is
-    // what has to refuse it, and a note is created beside the folder instead.
     const file = flattenNested([{ title: "Trees" }]);
     const p = planGraft(file, null, [row("v-trees", null, "trees")], "merge");
 

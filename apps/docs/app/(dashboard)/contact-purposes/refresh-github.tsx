@@ -5,20 +5,6 @@ import { Button } from "@/components/ui/button";
 import { IconRefresh, IconCheck, IconAlertTriangle } from "@tabler/icons-react";
 import { refreshGithub } from "@/lib/actions/github";
 
-/**
- * The contribution graph in the contact section is served from an archive in
- * Postgres, topped up automatically about once a day by the site's own render.
- * This is the "do it now" door — for after a burst of commits, or after the
- * mirror has been down and the graph has gone stale.
- *
- * It moved here from /social-links when that route folded into /hero. It is the
- * only manual way to refresh the graph anywhere in the admin, and it belongs
- * beside the tile it refreshes rather than beside a list of links.
- *
- * Deliberately outside the save bar: it stages nothing and edits nothing. It
- * asks the site to go and read GitHub, and a failure leaves the stored history
- * untouched, so there is nothing here to undo or publish.
- */
 export function RefreshGithubButton() {
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<{ ok: boolean; error?: string } | null>(null);

@@ -6,14 +6,6 @@ import { createNode } from "@/lib/actions/notes";
 import { hrefFor, type NoteKind } from "@/lib/notes/view-types";
 import { useNoteNav } from "./vault-provider";
 
-/**
- * The two create buttons, and the one input they open into.
- *
- * `createNode` answers with the path it actually wrote, collision suffix and
- * all, so this is the one write in the section that can navigate to its own
- * result with certainty. Every other path-moving action has to guess or land
- * somewhere it knows exists — see answer-editor.tsx.
- */
 export function NewNoteButtons({ parentId }: { parentId: string | null }) {
   const go = useNoteNav();
   const [pending, start] = useTransition();

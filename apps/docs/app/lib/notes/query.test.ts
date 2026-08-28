@@ -14,7 +14,6 @@ import {
   type Matchable,
 } from "./query";
 
-/** A question that passes every filter, so each test only states its own delta. */
 function q(over: Partial<Matchable> = {}): Matchable {
   return {
     title: "Union find",
@@ -38,10 +37,8 @@ describe("vocabulary", () => {
     expect(CONF_NAME).toEqual({ unrated: 0, again: 1, shaky: 2, good: 3, solid: 4 });
     expect(IS_WORDS).toContain("untagged");
     expect(IS_WORDS).toContain("trashed");
-    // Every confidence label is usable as `is:`, or the chips would lie.
     for (const l of CONF_LABELS) expect(IS_WORDS).toContain(l);
     expect(QUICK_FILTERS).toHaveLength(6);
-    // A quick filter that does not parse is a button that does nothing.
     for (const f of QUICK_FILTERS) expect(parseQuery(f.q).bad).toEqual([]);
     expect(QUICK_FILTERS.map((f) => f.q)).toEqual([
       "conf:<=2", "is:never", "is:untagged", "is:empty", "has:code", "is:solid",
@@ -110,7 +107,6 @@ describe("parseQuery", () => {
   test("an unknown key is reported, never silently dropped", () => {
     expect(parseQuery("banana:x").bad).toEqual(["banana:"]);
     expect(parseQuery("banana:x").text).toEqual([]);
-    // ...including when it has no value, which the reference let through.
     expect(parseQuery("banana:").bad).toEqual(["banana:"]);
   });
 
@@ -200,8 +196,6 @@ describe("matchQuestion", () => {
 
   test("in: also scopes by folder name, using the ancestors the caller supplied", () => {
     expect(hit("in:graphs", q())).toBe(true);
-    // Without ancestors there is nothing but the path to go on, and "graphs"
-    // is not a path prefix here.
     expect(hit("in:graphs", q({ ancestorTitles: undefined }))).toBe(false);
     expect(hit("in:/dsa", q({ ancestorTitles: undefined }))).toBe(true);
   });
@@ -249,7 +243,6 @@ describe("matchQuestion", () => {
     expect(hit("is:untagged", q({ tags: [], deletedAt: new Date() }))).toBe(false);
     expect(hit("is:trashed", dead)).toBe(true);
     expect(hit("union is:trashed", dead)).toBe(true);
-    // ...and a live row is not in the trash view.
     expect(hit("is:trashed", q())).toBe(false);
   });
 
@@ -258,16 +251,8 @@ describe("matchQuestion", () => {
   });
 });
 
-/**
- * The cases where this matcher and `toPrismaWhere` could plausibly disagree, and
- * where a disagreement would be invisible: both engines return rows either way,
- * so nothing fails, the tree filter and the search page just quietly answer the
- * same query differently. Each of these was a real divergence.
- */
 describe("matchQuestion · agreement with the SQL compiler", () => {
   test("a tag matches whole, never by substring", () => {
-    // `tags @> ARRAY['grap']` is false for a tag of "graphs", so this has to be
-    // false here too.
     expect(hit("tag:grap", q())).toBe(false);
     expect(hit("tag:graphs", q())).toBe(true);
     expect(hit("-tag:grap", q())).toBe(true);
@@ -279,9 +264,6 @@ describe("matchQuestion · agreement with the SQL compiler", () => {
   });
 
   test("a phrase does not match across the seam between two fields", () => {
-    // The haystack version concatenated title + body + tags and matched here;
-    // `title contains OR body contains` cannot, and it is the one that runs on
-    // the search page.
     expect(hit('"find disjoint"', q())).toBe(false);
     expect(hit('"union find"', q())).toBe(true);
   });
@@ -290,15 +272,11 @@ describe("matchQuestion · agreement with the SQL compiler", () => {
     const sibling = q({ path: "/dsa-archive/old", ancestorTitles: undefined });
     expect(hit("in:/dsa", sibling)).toBe(false);
     expect(hit("in:/dsa-archive", sibling)).toBe(true);
-    // The folder's own row is inside its own scope.
     expect(hit("in:/dsa", q({ path: "/dsa", ancestorTitles: undefined }))).toBe(true);
     expect(hit("in:/dsa/", q())).toBe(true);
   });
 
   test("a question nobody has answered is unrated, empty, untagged and never revised", () => {
-    // What `answer?.confidence ?? 0` flattens to. The SQL side spells the same
-    // question out as an explicit `answer: null` branch; if these two readings
-    // ever part, `conf:<=2` means different things in the tree and in search.
     const blank = q({ body: "", tags: [], confidence: 0, lastRevisedAt: null });
     expect(hit("conf:<=2", blank)).toBe(true);
     expect(hit("is:unrated", blank)).toBe(true);
@@ -307,7 +285,6 @@ describe("matchQuestion · agreement with the SQL compiler", () => {
     expect(hit("is:never", blank)).toBe(true);
     expect(hit("-is:solid", blank)).toBe(true);
     expect(hit("-tag:redis", blank)).toBe(true);
-    // ...and nothing more than that.
     expect(hit("conf:>2", blank)).toBe(false);
     expect(hit("-is:unrated", blank)).toBe(false);
     expect(hit("is:solid", blank)).toBe(false);
@@ -386,7 +363,6 @@ describe("highlightParts", () => {
       { text: ".", hit: true },
       { text: "y", hit: false },
     ]);
-    // A metacharacter term that would throw if compiled raw.
     expect(() => highlightParts("a(b", ["(b"])).not.toThrow();
   });
 
@@ -405,7 +381,6 @@ describe("highlightParts", () => {
   });
 
   test("a later term never matches inside an earlier term's markup", () => {
-    // The string-replace version painted "hit" inside its own <span class="hit">.
     const parts = highlightParts("span class hit", ["span", "hit"]);
     expect(parts).toHaveLength(3);
     expect(parts.filter((p) => p.hit).map((p) => p.text)).toEqual(["span", "hit"]);

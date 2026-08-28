@@ -22,12 +22,11 @@ export const dynamic = "force-dynamic";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/$/, "");
 
-// Zone named so SSR and hydration emit identical characters.
+// zone named so SSR and hydration emit identical characters
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   timeZone: IST_ZONE, day: "2-digit", month: "short", year: "numeric",
 });
 
-/** Rough reading time, same 200 wpm rule the site uses. */
 const readMins = (content: string) =>
   Math.max(1, Math.round(content.trim().split(/\s+/).filter(Boolean).length / 200));
 
@@ -44,7 +43,7 @@ export default async function BlogsPage({ searchParams }: {
 
   const now = new Date();
 
-  // Both halves of the public filter — must not drift from `publicContentWhere` in db/visibility.
+  // must not drift from publicContentWhere in db/visibility
   const isLive = (b: { status: ContentStatus; publishedAt: Date }) =>
     b.status === "PUBLISHED" && b.publishedAt <= now;
 
@@ -79,8 +78,7 @@ export default async function BlogsPage({ searchParams }: {
             #blogs <IconArrowUpRight className="nudge" size={11} stroke={1.7} />
           </a>
         </div>
-        {/* Blogs is the one section whose emptiness is felt elsewhere: the
-            navbar link and the terminal's `blogs` command are both derived. */}
+
         <div className="sec-reach">
           <span className="chip">also adds or removes the navbar link</span>
           <span className="chip">also the terminal&rsquo;s <code>blogs</code> command</span>
@@ -256,7 +254,6 @@ export default async function BlogsPage({ searchParams }: {
         )}
       </Card>
 
-      {/* Follows the public filter, not the tab above. */}
       <PreviewFrame label={`Blogs Preview — the ${live.length} a visitor can see`}>
         <BlogsPreview
           blogs={live.map(b => ({

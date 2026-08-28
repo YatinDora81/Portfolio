@@ -23,33 +23,10 @@ import { CONF_LABELS } from "@/lib/notes/query";
 import { hrefFor } from "@/lib/notes/view-types";
 import { useNoteNav, useVault } from "./vault-provider";
 
-/**
- * Paste a file, see exactly what it would build, then build it.
- *
- * **A dialog and not a route.** `/notes/import` would be a static segment
- * shadowing the `[[...segments]]` catch-all — the same reason `search`,
- * `revise`, `trash` and `export` are in `RESERVED_ROOT_SLUGS`. A dialog costs
- * nothing and sits where you would want it anyway: scoped to the folder you are
- * already looking at, which is the destination.
- *
- * **The preview is the point.** It calls `parseImport` and `summarise` in the
- * browser — the same functions the server action calls — so the counts, the
- * refusals and the tree below are not a second opinion about the payload, they
- * are the first one. This is the whole reason lib/notes/import.ts is kept free
- * of Prisma, and the price is that zod (~13 KB) joins the /notes client chunk.
- *
- * **No optimism.** The action revalidates /notes and the router follows the path
- * it reports, so there is nothing mirrored locally to reconcile — same posture
- * as trash-list.tsx and new-note-buttons.tsx.
- */
-
 const PREVIEW_ROWS = 150;
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-/** What the undo sentence has to name: the things a graft leaves at the top,
- *  which is only "folders" when the file happens to be all folders. A pasted
- *  list of bare strings makes forty questions and no folder at all. */
 function rootNoun(roots: VaultNode[]): string {
   const folders = roots.filter((r) => r.kind === "FOLDER").length;
   if (folders === roots.length) return plural(roots.length, "folder");
@@ -57,8 +34,6 @@ function rootNoun(roots: VaultNode[]): string {
   return plural(roots.length, "note");
 }
 
-/** Shown under "What can I paste?", and loadable into the box with one click —
- *  the fastest way to learn a format is to import one and look at it. */
 const EXAMPLE = `[
   { "title": "DSA", "children": [
       { "title": "Graphs", "children": [
@@ -74,9 +49,6 @@ const EXAMPLE = `[
   ]}
 ]`;
 
-/** The second half of the lesson: a body is markdown, and markdown here goes
- *  further than prose. Written as one JSON string so the `\\n` escaping — the
- *  part people get wrong — is visible rather than described. */
 const BLOCKS_EXAMPLE = `{
   "title": "Which of these is O(log n)?",
   "body": "::: quiz\\n- Linear search\\n+ Binary search\\n= It halves the range each step.\\n:::\\n\\n::: note Remember\\nThe input has to be sorted.\\n:::"
@@ -87,13 +59,6 @@ type Preview =
   | { ok: false; error: string }
   | null;
 
-/**
- * The shape of the graft, drawn before it exists.
- *
- * `sortOrder` is overwritten with each node's position in `topoOrder`, which is
- * the order `importIn` will insert them in — so the rows here cannot come out in
- * a different order from the tree the transaction builds.
- */
 function PreviewTree({ nodes }: { nodes: VaultNode[] }) {
   const roots = useMemo(
     () =>
@@ -141,7 +106,6 @@ function PreviewTree({ nodes }: { nodes: VaultNode[] }) {
   );
 }
 
-/** What the two shapes are, in the words of the person who has to write one. */
 function Instructions({ onUseExample }: { onUseExample: () => void }) {
   return (
     <details className="nt-imp-help">
@@ -211,43 +175,26 @@ export function ImportButton({
   canRestore = false,
   variant = "btn",
 }: {
-  /** The destination. `null` is the vault root. */
   parentId: string | null;
-  /** Named in the dialog so the destination is never a guess. */
   parentTitle?: string;
-  /** Whether `restore` is worth offering — true only for a completely empty
-   *  vault, since that is the only vault it can succeed against. */
   canRestore?: boolean;
-  /** `icon` is the tree header's glyph gutter, where the label has to live in
-   *  the tooltip because there is no room for it on the button. */
   variant?: "btn" | "pri" | "icon";
 }) {
   const go = useNoteNav();
-  // The live tree, already in the browser — so the preview below can say what
-  // the import will actually do without asking the server anything.
   const { rows } = useVault();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [mode, setMode] = useState<ImportMode>("into");
-  /**
-   * Merging by default, because a duplicate folder is the surprising outcome.
-   * Somebody pasting an outline into a vault they are still building expects the
-   * notes to land in the folders they already made, not beside them.
-   */
   const [folders, setFolders] = useState<FolderMode>("merge");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  // Parsing a megabyte on every keystroke would make the textarea stutter. The
-  // deferred copy keeps typing at full speed and lets the preview arrive late.
   const deferred = useDeferredValue(text);
 
   const preview: Preview = useMemo(() => {
     const t = deferred.trim();
     if (!t) return null;
-    // Bytes, like the action — `t.length` counts UTF-16 units, so a paste of
-    // CJK or emoji would pass a check here and be refused there. Blob measures
-    // the encoding without materialising a second copy of the string.
+    // blob measures bytes; t.length counts utf-16 units
     if (new Blob([t]).size > MAX_JSON_BYTES) return { ok: false, error: "That file is too large to import" };
     let raw: unknown;
     try {
@@ -259,39 +206,15 @@ export function ImportButton({
     return parsed.ok ? { ...parsed, stats: summarise(parsed.nodes) } : parsed;
   }, [deferred]);
 
-  // Offered only where it can work: an empty vault, and a file that carries the
-  // ids there would be something to restore. Anything else is a button that
-  // always errors, so it is disabled with the reason rather than hidden.
   const restorable = canRestore && preview?.ok === true && preview.shape === "vault";
   const effective: ImportMode = restorable && mode === "restore" ? "restore" : "into";
-  // Restore rebuilds an empty vault, so there is nothing there to merge with and
-  // the choice is not offered — but `mode` may still be holding an answer from
-  // before the file changed under it.
   const effectiveFolders: FolderMode = effective === "into" ? folders : "create";
 
-  /**
-   * What the graft will actually do, decided by the function that will do it.
-   *
-   * Not an estimate of the import — it is the import's own plan, run early
-   * against the vault the tree beside it is drawn from. The counts cannot drift
-   * from the write, because there is only one place the rule lives.
-   */
   const plan = useMemo(
     () => (preview?.ok ? planGraft(preview.nodes, parentId, rows, effectiveFolders) : null),
     [preview, parentId, rows, effectiveFolders],
   );
 
-  /**
-   * The roots this import will actually make — which, merging, is not the file's
-   * roots.
-   *
-   * A merged root is a folder that was already here with the user's own notes
-   * inside it. Naming it as something the import "just made" turns the recovery
-   * sentence below into an instruction to trash forty notes nobody imported, and
-   * `trashIn` takes the whole subtree. Read off the plan for the same reason the
-   * counts are: the only description of an import that cannot be wrong is the
-   * one the import itself made.
-   */
   const madeRoots = useMemo(
     () => (preview?.ok && plan ? fileRoots(preview.nodes).filter((r) => !plan.merged.has(r.id)) : []),
     [preview, plan],
@@ -304,7 +227,7 @@ export function ImportButton({
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    // Cleared so picking the same file twice fires a second change event.
+    // cleared so picking the same file again fires change
     e.target.value = "";
     if (!file) return;
     setError(null);
@@ -332,9 +255,6 @@ export function ImportButton({
 
   const count = preview?.ok ? preview.nodes.length : 0;
 
-  // The tooltip is the only label the icon variant gets, so it says what the
-  // button does rather than repeating its name — and it names the destination,
-  // because "Import" alone leaves the one thing you would want to know.
   const what = parentTitle ? `Paste notes into “${parentTitle}”` : "Paste notes into the vault root";
 
   return (
@@ -497,9 +417,7 @@ export function ImportButton({
           </div>
         ) : null}
 
-        {/* The plan, not a description of it — see `plan` above. Worth showing
-            even when nothing merges, because "0 reused" is the answer to the
-            question the toggle just raised. */}
+        {/* shown even when nothing merges */}
         {plan && effective === "into" ? (
           <p className="nt-hint">
             {folders === "merge" ? (

@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 
 export function StatusTabs({ base, active, counts, total }: {
   base: string;
-  /** The status currently filtered on, or null for All. */
   active: ContentStatus | null;
   counts: Record<ContentStatus, number>;
   total: number;

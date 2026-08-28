@@ -19,7 +19,6 @@ export interface MessageRow {
   email: string;
   purpose: string | null;
   snippet: string;
-  /** Pre-formatted on the server — a clock read in the browser would not match SSR. */
   when: string;
   status: MessageStatus;
   starred: boolean;

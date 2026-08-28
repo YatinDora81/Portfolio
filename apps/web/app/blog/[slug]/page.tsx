@@ -11,7 +11,7 @@ import Background from '@/components/common/Background';
 import BlogContent from './BlogContent';
 
 export async function generateStaticParams() {
-  // Public only: this runs at build time, and a preview argument here would prerender a draft into cached HTML.
+  // build time: a preview argument here would prerender a draft
   const blogs = await getBlogs();
   return blogs.map((b) => ({ slug: b.slug }));
 }
@@ -57,7 +57,7 @@ export default async function BlogPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  // Reading `.isEnabled` keeps the route static — only `enable()`/`.disable()` register dynamic usage.
+  // reading .isEnabled keeps the route static
   const { isEnabled: isPreview } = await draftMode();
   const [blog, allBlogs, flags] = await Promise.all([
     getBlogBySlug(slug, isPreview),
@@ -77,7 +77,6 @@ export default async function BlogPage({
         <Background />
 
         <div className="relative z-[2]">
-          {/* Back button */}
           <div className="fixed top-5 left-5 z-10">
             <Link
               href={showBlogs ? '/#blogs' : '/'}
@@ -88,7 +87,6 @@ export default async function BlogPage({
             </Link>
           </div>
 
-          {/* Cover image */}
           <div className="pt-16 px-5 sm:px-8 md:px-12">
             <div className="relative mx-auto max-w-3xl h-48 sm:h-56 md:h-72 rounded-2xl overflow-hidden">
               {blog.image ? (
@@ -107,9 +105,7 @@ export default async function BlogPage({
             </div>
           </div>
 
-          {/* Content area */}
           <div className="relative mx-auto max-w-2xl px-5 sm:px-6 mt-8">
-            {/* Title */}
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight tracking-tight">
               {blog.title}
             </h1>
@@ -122,10 +118,8 @@ export default async function BlogPage({
 
             <hr className="mt-6 mb-8 border-border" />
 
-            {/* Blog content */}
             <BlogContent content={blog.content} />
 
-            {/* More blogs */}
             {moreBlogs.length > 0 && (
               <div className="mt-16 pt-8 border-t border-border">
                 <h2 className="text-lg font-semibold mb-5">More to read</h2>

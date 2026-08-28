@@ -40,19 +40,16 @@ export async function setFlag(input: {
 
   const { key, enabled, note } = parsed.data;
 
-  // The registry check is the authorisation; the `count === 0` check below is the other half, since `updateMany` reports a missing row as a quiet success of zero rows.
   if (!KNOWN_KEYS.has(key)) {
     return { ok: false, revalidated: false, error: "Unknown flag." };
   }
 
-  // `updateMany`, never `upsert`: a key from the client must not be able to create rows.
   const trimmed = note?.trim();
   const updated = await prisma.featureFlag.updateMany({
     where: { key },
     data: {
       enabled,
       updatedById: session.userId,
-      // An omitted note leaves the column alone; an empty string clears it to null, so "no note" is one value rather than two.
       ...(note === undefined ? {} : { note: trimmed ? trimmed : null }),
     },
   });

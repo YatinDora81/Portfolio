@@ -15,8 +15,6 @@ import {
 
 interface Quote { id: string; quote: string; author: string }
 
-/** The day dial. Static by design — the page has no reason to animate a fact,
- *  and a ring that fills on load would be motion for its own sake. */
 function DayDial({ day, days }: { day: number; days: number }) {
   const R = 21;
   const C = 2 * Math.PI * R;
@@ -84,31 +82,18 @@ export function QuotesTable({ quotes, dayOfYear, nextDayOfYear, daysInYear, toda
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Quote | null>(null);
 
-  // Quotes are the one staged entity with no sortOrder, so there is no reorder
-  // op to fold in: the overlay only patches edits and appends pending creates.
   const rows = overlay("quote", quotes, (q) => q.id);
 
-  // Which quote visitors get once this batch lands — `dayOfYear % count`, the
-  // same pick apps/web makes, run over the list the site will actually have.
-  // A staged delete shortens that list and moves the pick, so a server-computed
-  // index would badge a row here while the preview below named another one and
-  // the published site a third. Deleted rows stay visible for their undo but
-  // are out of the rotation, so they can never carry the badge.
   const live = rows.filter((q) => !isDeleted("quote", q.id));
   const todayQuote = live.length > 0 ? live[dayOfYear % live.length] ?? null : null;
   const nextQuote = live.length > 0 ? live[nextDayOfYear % live.length] ?? null : null;
   const todayId = todayQuote?.id ?? null;
-  // With one quote in rotation today and tomorrow are the same row; badging it
-  // twice would read as two different picks.
   const nextId = nextQuote && nextQuote.id !== todayId ? nextQuote.id : null;
 
-  // How long until any given line comes round again, which is the only number
-  // that makes "it rotates by date" concrete.
   const cycle = live.length;
 
   const openNew = () => { setEditing(null); setDialogOpen(true); };
 
-  /** Exactly one diff mark per card: gone beats new beats edited. */
   const mark = (id: string) =>
     isDeleted("quote", id) ? "staged-del"
       : isNew("quote", id) ? "staged-new"
@@ -117,9 +102,6 @@ export function QuotesTable({ quotes, dayOfYear, nextDayOfYear, daysInYear, toda
 
   return (
     <>
-      {/* The rotation rule is the section, so it gets the page's largest object
-          — and it is computed over the staged list, so a pending delete moves
-          the pick here before it is ever written. */}
       <Card flush className="wk-in">
         <CardHead
           title="The rule"
@@ -202,8 +184,6 @@ export function QuotesTable({ quotes, dayOfYear, nextDayOfYear, daysInYear, toda
                     </div>
                     <div className="row-acts">
                       {gone ? (
-                        // The card stays put, struck through, until the bar commits —
-                        // so the undo lives where the delete was.
                         <button
                           className="ibtn"
                           aria-label="Keep this quote"
@@ -245,7 +225,6 @@ export function QuotesTable({ quotes, dayOfYear, nextDayOfYear, daysInYear, toda
             footer={
               <>
                 <Button variant="ghost" type="button" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                {/* Not "Save": this only puts the card in the list. The save bar writes. */}
                 <Button type="submit" form="quote-form">{editing ? "Update quote" : "Add quote"}</Button>
               </>
             }
@@ -253,14 +232,10 @@ export function QuotesTable({ quotes, dayOfYear, nextDayOfYear, daysInYear, toda
             <form
               id="quote-form"
               action={(formData) => {
-                // A staged create has to carry every field the card renders, since
-                // the overlay materialises the pending row out of exactly this bag.
                 const fields = {
                   quote: String(formData.get("quote") ?? ""),
                   author: String(formData.get("author") ?? ""),
                 };
-                // Editing a row that is itself a pending create folds into that
-                // create — the store keys on the id either way, tempId included.
                 if (editing) stageUpdate("quote", editing.id, fields);
                 else stageCreate("quote", fields);
                 setDialogOpen(false);

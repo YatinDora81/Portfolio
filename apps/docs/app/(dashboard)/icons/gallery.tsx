@@ -73,7 +73,7 @@ export function IconLibrary({
     try {
       await navigator.clipboard.writeText(key);
     } catch {
-      // Clipboard is permission-gated; the key is on screen either way.
+      // clipboard is permission-gated; the key is on screen anyway
     }
     setCopied(key);
     if (timer.current) clearTimeout(timer.current);

@@ -13,7 +13,6 @@ export const revalidate = 0;
 const IST_OFFSET_MS = 330 * 60_000;
 const DAY_MS = 86_400_000;
 
-/** IST is UTC+05:30 all year, so today's boundary is arithmetic rather than a lookup. */
 function istMidnight(now = new Date()): Date {
   return new Date(Math.floor((now.getTime() + IST_OFFSET_MS) / DAY_MS) * DAY_MS - IST_OFFSET_MS);
 }

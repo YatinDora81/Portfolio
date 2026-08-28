@@ -6,19 +6,9 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { resolveLifecycle } from "@/lib/lifecycle";
 
-/**
- * `"use server"` exports compile to public POST endpoints addressable by action
- * id, so each writer below has to prove the session itself: middleware only
- * checks that the cookie holds a valid JWT, and it never runs for a direct
- * action POST at all.
- *
- * `redirect` rather than a returned `{ ok: false }` so an expired session can
- * never look like a successful write to a caller that ignores the return value.
- */
 async function requireSession() {
   if (!(await getSession())) redirect("/login");
 }
-
 
 interface ProjectData {
   title: string;
@@ -29,9 +19,7 @@ interface ProjectData {
   images: string[];
   skillIds: string[];
   bullets: { id?: string; content: string; sortOrder: number }[];
-  /** Unparsed on purpose: a server-action argument's type is unenforced on the wire, so `resolveLifecycle` is what decides. */
   status: string;
-  /** "YYYY-MM-DDTHH:mm" in IST, or null. Never an instant — see lib/lifecycle.ts. */
   publishAtIst: string | null;
 }
 
@@ -56,7 +44,6 @@ export async function createProject(data: ProjectData): Promise<Saved> {
       sortOrder: count,
       status: lifecycle.status,
       publishAt: lifecycle.publishAt,
-      // PUBLISHED needs a `publishedAt`: the public filter is `publishedAt <= now`, so a null one would hide the project.
       publishedAt: lifecycle.status === "PUBLISHED" ? new Date() : null,
       skills: { connect: data.skillIds.map((id) => ({ id })) },
       bullets: {
@@ -88,7 +75,7 @@ export async function updateProject(id: string, data: ProjectData): Promise<Save
         images: data.images.filter(Boolean),
         status: lifecycle.status,
         publishAt: lifecycle.publishAt,
-        // First publish only: re-saving must not re-date it, and DRAFT or ARCHIVED keeps the original date.
+        // first publish only, re-saving must not re-date it
         ...(lifecycle.status === "PUBLISHED" && current?.publishedAt == null
           ? { publishedAt: new Date() }
           : {}),
@@ -124,12 +111,6 @@ export async function deleteProject(id: string) {
   revalidatePath("/projects");
 }
 
-/**
- * Rewrites every project's sortOrder from the order of `ids`. The portfolio
- * shows the first three as highlights and folds the rest, so position one is
- * the slot that actually gets read. One transaction, so a half-applied order
- * can't reach the site.
- */
 export async function reorderProjects(ids: string[]) {
   await requireSession();
   await prisma.$transaction(

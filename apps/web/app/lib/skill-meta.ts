@@ -1,8 +1,3 @@
-// Presentation metadata for the "periodic table" Skills section.
-// Each skill maps to an element-style symbol, an accent (brand) colour and a
-// category. Anything not listed here still renders via getSkillMeta()'s
-// fallbacks, so the DB stays the single source of truth for the skill list.
-
 export type SkillCategoryId =
   | 'frontend'
   | 'backend'
@@ -16,7 +11,6 @@ export interface SkillCategory {
   color: string;
 }
 
-// Display order = order of the clusters on screen.
 export const skillCategories: SkillCategory[] = [
   { id: 'frontend', label: 'Frontend', color: '#38BDF8' },
   { id: 'backend', label: 'Backend', color: '#34D399' },
@@ -32,7 +26,6 @@ export interface SkillMeta {
 }
 
 const META: Record<string, SkillMeta> = {
-  // ── Frontend ──────────────────────────────────────────────
   'Next.js': { symbol: 'Nx', color: '#E5E5E5', category: 'frontend' },
   React: { symbol: 'Re', color: '#61DAFB', category: 'frontend' },
   'React.js': { symbol: 'Re', color: '#61DAFB', category: 'frontend' },
@@ -43,7 +36,6 @@ const META: Record<string, SkillMeta> = {
   'Tailwind CSS': { symbol: 'Tw', color: '#38BDF8', category: 'frontend' },
   'HTML/CSS': { symbol: 'Ht', color: '#E34F26', category: 'frontend' },
 
-  // ── Backend ───────────────────────────────────────────────
   'Node.js': { symbol: 'No', color: '#8CC84B', category: 'backend' },
   'Express.js': { symbol: 'Ex', color: '#9CA3AF', category: 'backend' },
   Go: { symbol: 'Go', color: '#00ADD8', category: 'backend' },
@@ -55,11 +47,9 @@ const META: Record<string, SkillMeta> = {
   Java: { symbol: 'Jv', color: '#E76F00', category: 'backend' },
   Python: { symbol: 'Py', color: '#3776AB', category: 'backend' },
   FastAPI: { symbol: 'Fa', color: '#009688', category: 'backend' },
-  // Flask's brand mark is black; it borrows Express's neutral grey so the tile
-  // reads on both surfaces rather than disappearing into the dark one.
+  // flask's brand mark is black, invisible on the dark surface
   Flask: { symbol: 'Fl', color: '#9CA3AF', category: 'backend' },
 
-  // ── Databases ─────────────────────────────────────────────
   PostgreSQL: { symbol: 'Pg', color: '#4F9DDE', category: 'database' },
   MongoDB: { symbol: 'Mo', color: '#47A248', category: 'database' },
   MySQL: { symbol: 'My', color: '#4479A1', category: 'database' },
@@ -69,7 +59,6 @@ const META: Record<string, SkillMeta> = {
   'Drizzle ORM': { symbol: 'Dz', color: '#C5F74F', category: 'database' },
   SQL: { symbol: 'Sq', color: '#38BDF8', category: 'database' },
 
-  // ── DevOps & Cloud ────────────────────────────────────────
   Docker: { symbol: 'Dk', color: '#2496ED', category: 'devops' },
   AWS: { symbol: 'Aw', color: '#FF9900', category: 'devops' },
   'AWS S3': { symbol: 'S3', color: '#E25444', category: 'devops' },
@@ -85,7 +74,6 @@ const META: Record<string, SkillMeta> = {
   Monitoring: { symbol: 'Mn', color: '#F59E0B', category: 'devops' },
   Logging: { symbol: 'Lg', color: '#A3A3A3', category: 'devops' },
 
-  // ── CS & Tooling ──────────────────────────────────────────
   DSA: { symbol: 'Ds', color: '#F472B6', category: 'core' },
   OOPs: { symbol: 'Oo', color: '#C084FC', category: 'core' },
   Git: { symbol: 'Gt', color: '#F05032', category: 'core' },
@@ -107,7 +95,6 @@ const CATEGORY_COLOR: Record<SkillCategoryId, string> = Object.fromEntries(
   skillCategories.map((c) => [c.id, c.color]),
 ) as Record<SkillCategoryId, string>;
 
-/** Derive a two-letter element symbol from an arbitrary skill name. */
 function deriveSymbol(name: string): string {
   const letters = name.replace(/[^a-zA-Z0-9]/g, '');
   if (letters.length === 0) return '??';
@@ -116,7 +103,6 @@ function deriveSymbol(name: string): string {
   return first + second;
 }
 
-/** Always returns usable presentation metadata, even for unmapped skills. */
 export function getSkillMeta(name: string): SkillMeta {
   const hit = META[name];
   if (hit) return hit;

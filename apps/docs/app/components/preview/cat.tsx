@@ -3,25 +3,8 @@
 import { CatSprite, NapStage, NAP_STAGE_CSS, DRAWN_STYLES } from "@/components/cat/nap-stage";
 import { DIM, FAINT, MONO } from "./frame";
 
-/**
- * The cat, where the visitor meets it: the hairline wire between Hero and About
- * with `=^..^=` sitting on it, and — because that is the only part of the cat
- * this page can actually configure — the same cat asleep against a window edge
- * under the selected indicator.
- *
- * Deliberately still. The tiles on /cat are the page's one moving thing; a
- * second animation here would compete with the control it is meant to explain.
- * `NAP_F` is a mid-nap frame: enough clock drawn to read the indicator, enough
- * gone to show it drains.
- *
- * The pane mimics the public site, so the stage is overridden back onto
- * oneko.js's own literals rather than admin tokens — the same reason every
- * other preview in this folder pins #0a0a0a / #fafafa.
- */
-
 const NAP_F = 0.62;
 
-/** oneko.js's own indicator palette, verbatim — see nap-stage.tsx's token list. */
 const SITE_STAGE: React.CSSProperties = {
   ["--nsp-ink" as string]: "#34d399",
   ["--nsp-stage" as string]: "#0a0a0a",
@@ -33,10 +16,8 @@ const SITE_STAGE: React.CSSProperties = {
   ["--nsp-meta" as string]: "#a3a3a3",
 };
 
-/** apps/web `--border` on the dark theme — the wire and the hero's own rules. */
 const WIRE = "rgba(255,255,255,0.1)";
 
-/** apps/web Hero.tsx `Paw`, at the cue's 13px. Opacity and tilt per `.cue i`. */
 function Paw({ o, tilt, dx }: { o: number; tilt: number; dx: number }) {
   return (
     <svg
@@ -63,7 +44,6 @@ function Note({ children }: { children: React.ReactNode }) {
 export function CatPreview({
   napStyle,
   napSeconds,
-  /** false once the visitor has shooed the cat — the wire falls back to a dot. */
   catOn = true,
 }: {
   napStyle: string;
@@ -72,25 +52,18 @@ export function CatPreview({
 }) {
   const secs = `${Math.max(1, Math.ceil(NAP_F * napSeconds))}s`;
   const sleeping = napStyle !== "off";
-  // "random" is a choice, not an indicator — NapStage draws nothing for it, so
-  // the pane showed a sleeping cat with no countdown at all, which is the one
-  // thing a nap never looks like. Stand in the default indicator instead; the
-  // picker above already shows all six and says a random nap takes any of them.
-  // Deterministic, not a real draw: this renders on the server too.
   const drawnStyle = napStyle === "random" ? DRAWN_STYLES[0] : napStyle;
 
   return (
     <div className="nsp" style={SITE_STAGE}>
       <style>{NAP_STAGE_CSS}</style>
 
-      {/* end of the hero — the three paw prints that walk down to About */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, color: DIM, paddingBottom: 20 }}>
         <Paw o={0.3} tilt={-14} dx={-6} />
         <Paw o={0.55} tilt={12} dx={6} />
         <Paw o={0.85} tilt={-8} dx={-4} />
       </div>
 
-      {/* the wire — apps/web Bridge.tsx / `.cw` */}
       <div style={{ display: "flex", alignItems: "center", gap: "1rem", color: DIM }}>
         <span style={{ flex: 1, borderTop: `1px solid ${WIRE}` }} />
         <span
@@ -108,7 +81,6 @@ export function CatPreview({
         <Note>hero ↑ · about ↓ — the paw in the navbar takes the cat off this wire</Note>
       </div>
 
-      {/* the nap: a window corner, the 64px zone, the cat asleep in it */}
       <div style={{ marginTop: 26, borderTop: `1px solid ${WIRE}`, paddingTop: 18 }}>
         <Note>{sleeping ? `dropped within 64px of a window edge · sleeps ${napSeconds}s` : "napping is off · the cat never sleeps"}</Note>
 
@@ -118,7 +90,6 @@ export function CatPreview({
             border: `1px dashed ${WIRE}`, background: "#0a0a0a", overflow: "hidden",
           }}
         >
-          {/* the nap zone: everything below and right of these hairlines */}
           <span style={{ position: "absolute", left: 0, right: 0, bottom: 44, borderTop: `1px dashed rgba(52,211,153,.28)` }} />
           <span style={{ position: "absolute", top: 0, bottom: 0, right: 124, borderLeft: `1px dashed rgba(52,211,153,.28)` }} />
           <span
@@ -130,14 +101,10 @@ export function CatPreview({
             nap zone
           </span>
 
-          {/* far enough in that the widest indicator (the 128px moon arc) still
-              clears the frame, and inside the zone hairlines either way */}
           <div style={{ position: "absolute", right: 64, bottom: 6 }}>
             {sleeping ? (
               <NapStage bare style={drawnStyle} f={NAP_F} secs={secs} catFrame={0} />
             ) : (
-              // Not `NapStage style="off"`: its "never sleeps" caption is a
-              // control-room label, and nothing in this pane may carry one.
               <div className="nsp-stage nsp-stage-bare">
                 <CatSprite frame={0} asleep={false} />
               </div>

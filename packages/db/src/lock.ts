@@ -2,8 +2,6 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { prisma } from "./index";
 
-// Correctness is the atomic `updateMany` WHERE clause — never read then write.
-// The TTL only reclaims a lock whose holder died before releasing it.
 export async function acquireLock(
   key: string,
   ttlMs = 60_000,
@@ -13,7 +11,7 @@ export async function acquireLock(
   const expiresAt = new Date(now.getTime() + ttlMs);
 
   try {
-    // The primary key makes a second concurrent create throw.
+    // the primary key makes a second concurrent create throw
     await prisma.jobLock.create({
       data: { key, lockedAt: now, lockedBy: holder, expiresAt },
     });
@@ -28,7 +26,7 @@ export async function acquireLock(
   }
 }
 
-// Guarded on `lockedBy` so a caller whose lock was stolen cannot release the new holder's.
+// guarded on `lockedBy` so a stolen lock is not released
 async function releaseLock(key: string, holder: string): Promise<void> {
   try {
     await prisma.jobLock.deleteMany({ where: { key, lockedBy: holder } });

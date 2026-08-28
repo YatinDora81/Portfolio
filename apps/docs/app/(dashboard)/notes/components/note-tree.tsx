@@ -37,36 +37,12 @@ import { ImportButton } from "./import-dialog";
 import { TreeMenu, type MenuTarget } from "./tree-menu";
 import { useNoteNav, useVault } from "./vault-provider";
 
-/**
- * The vault's spine: a real ARIA tree, the whole APG keyboard contract, a local
- * filter and a keyboard-only move mode.
- *
- * It renders from the vault the layout loaded and holds no copy of it. Expanded
- * folders, keyboard focus and the filter string are the only client state here;
- * everything about the vault itself is the server's, re-read after each action
- * through `touched()`. That is what lets a rename land in the sidebar, the
- * breadcrumb and the folder overview at once without a store to keep in sync —
- * the three of them are reading the same object.
- *
- * Which is also why the filter can now answer `tag:`, `conf:`, `is:` and `has:`
- * without leaving the browser: that same object carries the answers.
- *
- * The one rule the rest of the file answers to: a half-built `role="tree"` is an
- * accessibility regression, not a step towards one. Announcing levels and
- * positions while ↑ and ↓ do nothing leaves a screen-reader user stranded
- * somewhere a plain list of links would not have. So every key below is wired,
- * or the role comes off.
- */
-
-/** One row, flattened once so lookups and the keyboard never walk the tree. */
 interface Flat {
   node: VaultItem;
-  /** 1-based, and set explicitly on the element — see the render. */
   level: number;
   pos: number;
   size: number;
   parentId: string | null;
-  /** Folder titles above this row, root first. `in:redis` reads these. */
   ancestorTitles: string[];
 }
 
@@ -79,7 +55,6 @@ interface Toast {
 
 let toastSeq = 0;
 
-/** Both action result shapes, so one runner can drive every write below. */
 type Res = { ok: true } | { ok: true; id: string; path: string } | { ok: false; error: string };
 
 const DEFERRED_HINT = "needs the full search";
@@ -94,7 +69,6 @@ function indexByPath(list: VaultItem[], into = new Map<string, VaultItem>()) {
   return into;
 }
 
-/** Every folder above `path`, plus `path` itself when it is one. */
 function revealSet(tree: VaultItem[], path: string): Set<string> {
   const byPath = indexByPath(tree);
   const out = new Set<string>();
@@ -109,22 +83,12 @@ const countBelow = (n: VaultItem): number =>
   n.children.reduce((a, c) => a + 1 + countBelow(c), 0);
 
 export function NoteTree() {
-  // Straight off the layout's one payload rather than through props: the reading
-  // pane is looking at the same object, so a title cannot be current in one and
-  // stale in the other. `vaultEmpty` gates the `restore` mode in the import
-  // dialog, which only an entirely empty vault — trashed rows included — accepts.
   const { tree, trashCount, vaultEmpty, byPath } = useVault();
   const router = useRouter();
   const pathname = usePathname();
   const go = useNoteNav();
   const [pending, startTransition] = useTransition();
 
-  /**
-   * The note's own path, carved off the URL. `/notes` *is* the vault root and a
-   * note's path is its URL beneath it, so no lookup is needed in either
-   * direction — and the sibling routes (/notes/search, /notes/trash) resolve to
-   * null, which is a path nothing in the tree holds.
-   */
   const activePath = useMemo(() => notePathOf(pathname) ?? "", [pathname]);
 
   const [expanded, setExpanded] = useState<Set<string>>(() => revealSet(tree, activePath));
@@ -143,8 +107,6 @@ export function NoteTree() {
   const filterRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  /* ---------- flat index ---------- */
-
   const flat = useMemo(() => {
     const out: Flat[] = [];
     const walk = (list: VaultItem[], level: number, parentId: string | null, titles: string[]) => {
@@ -157,31 +119,11 @@ export function NoteTree() {
     return out;
   }, [tree]);
 
-  // `byId` maps to the flattened record the keyboard walks, so it stays local.
-  // `byPath` is the vault's own index — a second one built from a different
-  // structure is a second thing that can be wrong.
   const byId = useMemo(() => new Map(flat.map((f) => [f.node.id, f])), [flat]);
   const selectedId = byPath.get(activePath)?.id ?? null;
 
-  /* ---------- filter ---------- */
-
   const parsed = useMemo(() => parseQuery(filter), [filter]);
 
-  /**
-   * The one term this box still cannot honestly answer.
-   *
-   * It used to be six of them. The sidebar's query held titles and nothing else,
-   * so `tag:redis` ran against an empty tag list and confidently reported
-   * nothing — and a filter that returns zero when the note exists is what
-   * teaches someone that search is broken. Those terms were lifted out and
-   * handed to /notes/search, which had the columns.
-   *
-   * The payload now carries every body, tag and rating, so the box answers them
-   * itself, in the same frame as the keystroke. What is left is `is:trashed`:
-   * the tree holds live rows only, by construction, and matching zero of them is
-   * an honest answer that reads exactly like a broken one. That still belongs to
-   * the search page.
-   */
   const deferred = useMemo(
     () => [
       ...parsed.is.filter((x) => x === "trashed").map((x) => `is:${x}`),
@@ -227,8 +169,6 @@ export function NoteTree() {
           : matchFolder({ title: n.title, deletedAt: null }, local);
       if (!ok) continue;
       hit.add(n.id);
-      // Never hide a parent to show a child: a match that appears detached from
-      // its branch costs more than the rows it saved.
       for (const p of ancestorPaths(n.path)) {
         const a = byPath.get(p);
         if (a) keep.add(a.id);
@@ -243,24 +183,11 @@ export function NoteTree() {
     return { hidden: hid as ReadonlySet<string>, ancestral: anc as ReadonlySet<string>, matches: hit.size };
   }, [filtering, flat, local, byPath]);
 
-  /**
-   * The children of a folder that survived the filter. Identity-stable when
-   * nothing is filtered, which is the case on every render that is not a
-   * keystroke in the filter box — the whole tree calls this per node.
-   */
   const shownKids = useCallback(
     (node: VaultItem) => (hidden.size ? node.children.filter((c) => !hidden.has(c.id)) : node.children),
     [hidden]
   );
 
-  /**
-   * A folder holding a surviving child opens itself while the filter runs —
-   * otherwise the one row the user is looking for sits inside a collapsed
-   * branch and the filter reads as "no results". Collapsing it back is refused
-   * for the same reason, which is why this is named rather than folded into
-   * `openOf`: ← has to walk to the parent on a folder it cannot close, instead
-   * of becoming a dead key.
-   */
   const heldOpen = useCallback(
     (node: VaultItem) => filtering && shownKids(node).length > 0,
     [filtering, shownKids]
@@ -274,7 +201,6 @@ export function NoteTree() {
     [expanded, heldOpen, shownKids]
   );
 
-  /** Rows the arrow keys may land on, in the order they appear on screen. */
   const visible = useMemo(() => {
     const out: Flat[] = [];
     const walk = (list: VaultItem[]) => {
@@ -289,18 +215,10 @@ export function NoteTree() {
     return out;
   }, [tree, hidden, byId, openOf]);
 
-  /**
-   * Exactly one row is a tab stop and it travels with focus. Without it Tab
-   * walks every node in the vault before it reaches the reader. It falls back
-   * to the first visible row whenever the focused one is trashed, renamed out
-   * from under the filter, or never existed.
-   */
   const rovingId = useMemo(() => {
     if (focusId && visible.some((v) => v.node.id === focusId)) return focusId;
     return visible[0]?.node.id ?? null;
   }, [focusId, visible]);
-
-  /* ---------- focus ---------- */
 
   const focusRow = useCallback((id: string | null | undefined) => {
     if (!id) return;
@@ -310,25 +228,17 @@ export function NoteTree() {
 
   useEffect(() => {
     if (!focusTick || !focusId) return;
-    // An inline input and the row menu hold the keyboard legitimately. Pulling
-    // focus back to the row would close a rename the same frame it opened, or
-    // drop the caret out of a menu that has only just been summoned.
     if (renaming || creating || menu) return;
     const el = treeRef.current?.querySelector<HTMLElement>(`[data-nid="${CSS.escape(focusId)}"]`);
     if (!el) return;
     el.focus({ preventScroll: true });
     el.scrollIntoView({ block: "nearest", inline: "nearest" });
-    // Those three are read, not depended on: this fires on a focus *request*,
-    // not every time an input or a menu opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusTick, focusId]);
-
-  /* ---------- server actions ---------- */
 
   const showToast = useCallback((msg: string, tone: "good" | "bad", undo?: () => void) => {
     clearTimeout(toastTimer.current);
     setToast({ id: ++toastSeq, msg, tone, undo });
-    // An undo has to outlast the moment of realising it is needed.
     toastTimer.current = setTimeout(() => setToast(null), undo ? 9000 : 4000);
   }, []);
 
@@ -339,8 +249,6 @@ export function NoteTree() {
       startTransition(async () => {
         const res = await fn();
         if (!res.ok) {
-          // Never swallowed: a refusal the user cannot see is a tree that
-          // silently disagrees with the database.
           setNotice(res.error);
           showToast(res.error, "bad");
           return;
@@ -351,15 +259,6 @@ export function NoteTree() {
     [showToast]
   );
 
-  /* A rename or a move rewrites `path` while the browser is still parked on the
-     old URL. That used to be followed from here, with a latch and a `!pending`
-     race; note-pane.tsx re-finds the open note by id and corrects the address
-     itself now, which also covers a rename from the editor or the action row.
-     Two mechanisms chasing the same note is one more than can be kept in
-     agreement. */
-
-  /* ---------- expand ---------- */
-
   const toggle = useCallback((id: string, want?: boolean) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -369,7 +268,6 @@ export function NoteTree() {
     });
   }, []);
 
-  /** Open every folder above `path`, touching nothing else. */
   const revealPath = useCallback(
     (path: string) => {
       setExpanded((prev) => {
@@ -388,23 +286,10 @@ export function NoteTree() {
     [byPath]
   );
 
-  // Arriving at a deep note from search, the palette or a bookmark has to reveal
-  // it. Additive on purpose — a navigation opens folders, it never closes one
-  // the user opened by hand.
   useEffect(() => {
     revealPath(activePath);
   }, [activePath, revealPath]);
 
-  /**
-   * The other half of the reader's "reveal in tree" button.
-   *
-   * The effect above only fires when `activePath` changes, so a folder the user
-   * collapsed *after* arriving stays collapsed and the button's scrollIntoView
-   * aims at a row that is no longer mounted. The tree lives in the layout and
-   * the reader in the page, with no prop between them — an event on `window` is
-   * the seam. It re-runs the same reveal for the path it is handed, which is
-   * why pressing the button twice is idempotent rather than cumulative.
-   */
   useEffect(() => {
     const onReveal = (e: Event) => {
       const path = (e as CustomEvent<{ path?: string }>).detail?.path;
@@ -414,22 +299,12 @@ export function NoteTree() {
     return () => window.removeEventListener("notes:reveal", onReveal);
   }, [revealPath]);
 
-  /* ---------- move mode ---------- */
-
-  /**
-   * Where the grabbed row would land if it were dropped now. Derived rather
-   * than stored, so the live region, the amber bar and the `moveNode` call can
-   * never describe three different destinations.
-   */
   const moveInfo = useMemo(() => {
     if (!grab) return null;
     const node = byId.get(grab)?.node;
     if (!node) return null;
     const cursor = over ? byId.get(over) : null;
 
-    // Landing on a folder means "inside it"; landing on a question means
-    // "alongside it", which is the only reading that lets one gesture express
-    // both without a modifier.
     const destId =
       !cursor || cursor.node.id === grab
         ? (byId.get(grab)?.parentId ?? null)
@@ -485,21 +360,15 @@ export function NoteTree() {
       () => {
         if (destId) setExpanded((p) => new Set(p).add(destId));
         setNotice(`“${node.title}” moved to ${dest ? dest.title : "the vault root"}.`);
-        // The whole point of the drop: the row the user was holding is still
-        // the row under their fingers, at its new address.
         focusRow(id);
       }
     );
   };
 
-  /* ---------- row actions ---------- */
-
   const beginCreate = (parentId: string | null, kind: NoteKind) => {
     setMenu(null);
     setRenaming(null);
     setGrab(null);
-    // A new row cannot be typed into a branch the filter is hiding, and the
-    // filter would reject the empty title anyway.
     setFilter("");
     if (parentId) setExpanded((p) => new Set(p).add(parentId));
     setCreating({ parentId, kind });
@@ -562,7 +431,6 @@ export function NoteTree() {
     const { node } = f;
     const inside = countBelow(node);
     const i = visible.findIndex((v) => v.node.id === id);
-    // The next row that is not inside the subtree about to disappear.
     const nextFocus =
       visible.slice(i + 1).find((v) => !v.node.path.startsWith(`${node.path}/`))?.node.id ??
       visible[i - 1]?.node.id ??
@@ -585,8 +453,6 @@ export function NoteTree() {
               }
             )
         );
-        // The reader is showing a note that no longer resolves; leaving it there
-        // would turn the next render into a 404 on a note the user can restore.
         if (wasOpen) go(NOTES_ROOT, { afterWrite: true });
         focusRow(nextFocus);
       }
@@ -604,8 +470,6 @@ export function NoteTree() {
     focusRow(id);
   };
 
-  /* ---------- keyboard ---------- */
-
   const typeAhead = useRef({ buf: "", at: 0 });
 
   const seek = (key: string, from: number): string | undefined => {
@@ -614,16 +478,11 @@ export function NoteTree() {
     ta.buf = now - ta.at > 700 ? key : ta.buf + key;
     ta.at = now;
     const needle = ta.buf.toLowerCase();
-    // A repeated single letter walks successive matches; a longer run refines
-    // in place, which is why the multi-character search includes the current
-    // row and the single-character one does not.
     const start = needle.length > 1 ? from : from + 1;
     const order = [...visible.slice(start), ...visible.slice(0, start)];
     const found = order.find((v) => v.node.title.toLowerCase().startsWith(needle));
     if (found) return found.node.id;
     if (needle.length === 1) return undefined;
-    // The run matched nothing — treat the keystroke as the start of a new one
-    // rather than as a dead key.
     ta.buf = key;
     const fresh = [...visible.slice(from + 1), ...visible.slice(0, from + 1)];
     return fresh.find((v) => v.node.title.toLowerCase().startsWith(key.toLowerCase()))?.node.id;
@@ -638,10 +497,6 @@ export function NoteTree() {
     const i = visible.findIndex((v) => v.node.id === id);
 
     if (grab) {
-      // Anything the browser owns stays the browser's; everything else belongs
-      // to the move. The `stopPropagation` is the load-bearing half — "/" and
-      // ⌘K are listened for on `window`, and either one firing mid-move would
-      // take the caret away and leave a row grabbed with no way to see it.
       if (e.metaKey || e.ctrlKey) return;
       e.preventDefault();
       e.stopPropagation();
@@ -724,8 +579,6 @@ export function NoteTree() {
         break;
       }
       default: {
-        // Shift+F10 is the other half of the platform's menu key, and it is the
-        // only way to the row menu for a keyboard that has no ContextMenu key.
         if (e.key === "F10" && e.shiftKey) {
           e.preventDefault();
           const r = el!.getBoundingClientRect();
@@ -742,18 +595,11 @@ export function NoteTree() {
     }
   };
 
-  // "/" from anywhere in the page, which is where the hand goes first and where
-  // the tree is most often the wrong place to be looking.
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-      // A modal owns the keyboard while it is up. Without this, "/" pressed in
-      // the import dialog — before the caret has been put in the textarea —
-      // moves focus to a filter box behind the veil, where the typing that
-      // follows is invisible and Escape closes the dialog and the paste with it.
-      // Same guard as the command palette (shell.tsx) and the revise deck.
       if (t?.closest(".modal") || document.querySelector(".veil")) return;
       e.preventDefault();
       filterRef.current?.focus();
@@ -765,8 +611,6 @@ export function NoteTree() {
 
   const goSearch = (q: string) =>
     router.push(`${NOTES_ROOT}/search?q=${encodeURIComponent(q.trim())}`);
-
-  /* ---------- count line ---------- */
 
   const lines: { text: string; bad?: boolean }[] = [];
   if (typing) {
@@ -782,17 +626,11 @@ export function NoteTree() {
   }
   const summary = lines.map((l) => l.text).join(" · ");
 
-  // The count is the filter's only feedback, and feedback nobody can hear is a
-  // filter a screen-reader user has to guess at. Debounced rather than made a
-  // live region of its own: per keystroke it would talk over itself, and over
-  // move mode, which shares this region.
   useEffect(() => {
     if (!summary) return;
     const t = setTimeout(() => setNotice(summary), 400);
     return () => clearTimeout(t);
   }, [summary]);
-
-  /* ---------- render ---------- */
 
   const label = (node: VaultItem) => {
     if (!hits.length) return node.title;
@@ -806,13 +644,6 @@ export function NoteTree() {
       ? `${node.title}, folder${node.questions ? `, ${node.questions} question${node.questions === 1 ? "" : "s"}` : ""}`
       : node.title;
 
-  /**
-   * `shown`, not `list`: a row the filter removed is not rendered at all, so it
-   * must not be counted either. `aria-setsize` describing five siblings while
-   * one is present is the kind of half-truth that makes a screen reader's
-   * running commentary useless — the numbers have to describe the tree the
-   * arrow keys can actually reach.
-   */
   const renderChildren = (list: VaultItem[], level: number, parentId: string | null): React.ReactNode => {
     const shown = hidden.size ? list.filter((n) => !hidden.has(n.id)) : list;
     return (
@@ -849,16 +680,11 @@ export function NoteTree() {
         key={node.id}
         data-nid={node.id}
         role="treeitem"
-        // Explicit, all three: browsers are permitted to compute them from the
-        // DOM and several AT combinations simply do not.
         aria-level={level}
         aria-posinset={pos}
         aria-setsize={size}
         aria-selected={node.id === selectedId}
         aria-expanded={folder && kids.length ? open : undefined}
-        // Named here rather than left to name-from-content: the row also holds a
-        // count badge and a labelled kebab, and on a `treeitem` the computation
-        // can reach into the group beneath it.
         aria-label={ariaLabel(node)}
         tabIndex={node.id === rovingId ? 0 : -1}
         className={cn(
@@ -892,9 +718,6 @@ export function NoteTree() {
               }
               go(hrefFor(node.path));
             }}
-            // `setFocusId`, not `focusRow`: the roving tabindex has to land on
-            // this row so closing the menu returns here, but the menu is about
-            // to take the caret and a queued row focus would race it away.
             onContextMenu={(e) => {
               e.preventDefault();
               setFocusId(node.id);
@@ -911,9 +734,6 @@ export function NoteTree() {
             {folder && !open && node.questions ? (
               <span className="nt-n" aria-hidden="true">{node.questions}</span>
             ) : null}
-            {/* A mouse affordance for a menu the keyboard reaches with its own
-                menu key, so it stays out of the tab order the roving tabindex
-                owns — two hundred grips would be two hundred tab stops. */}
             <button
               type="button"
               data-gr
@@ -962,8 +782,6 @@ export function NoteTree() {
         >
           <IconFolderPlus size={15} />
         </button>
-        {/* Beside the two create buttons because it is the third way a note
-            gets into the vault, and the only one that can make more than one. */}
         <ImportButton parentId={null} canRestore={vaultEmpty} variant="icon" />
         <button
           type="button"
@@ -976,8 +794,6 @@ export function NoteTree() {
         </button>
       </div>
 
-      {/* The whole box is the target, not just the 190px of input inside it —
-          clicking the icon or the padding used to land on nothing. */}
       <div
         className={cn("nt-filter", filter && "on")}
         onMouseDown={(e) => {
@@ -1012,8 +828,6 @@ export function NoteTree() {
             }
           }}
         />
-        {/* The `/` hint has done its job once there is something in the box;
-            what you want then is the way out, and Escape is not discoverable. */}
         {filter ? (
           <button
             type="button"
@@ -1069,10 +883,6 @@ export function NoteTree() {
       </div>
 
       <div className="nt-foot">
-        {/* `prefetch={false}` for the same reason the tag pills carry it: /notes/trash
-            is dynamic and runs its query for real, so leaving it on speculates a
-            Postgres round trip on every single page load of the section for a room
-            most sittings never enter. */}
         <Link
           className="btn ghost"
           href={`${NOTES_ROOT}/trash`}
@@ -1131,8 +941,6 @@ export function NoteTree() {
         </div>
       ) : null}
 
-      {/* Move mode is a mode, and a mode with no running commentary is a mode a
-          screen-reader user is trapped in. Every arrow press rewrites this. */}
       <div role="status" aria-live="polite" className="sr-only">
         {moveInfo ? moveText : notice}
       </div>
@@ -1140,16 +948,6 @@ export function NoteTree() {
   );
 }
 
-/**
- * Create and rename happen in the tree, at the row's own indent, because the
- * name being typed is only meaningful next to its siblings — a modal asking for
- * a title hides the six titles that would tell you what to type.
- *
- * Blur commits rather than cancels: clicking away from a name you have finished
- * typing means you are finished typing it, and Escape is right there for the
- * other reading. The `done` latch is what keeps Enter-then-unmount from
- * committing twice.
- */
 function InlineInput({
   kind, initial = "", onCommit, onCancel,
 }: {
@@ -1187,8 +985,6 @@ function InlineInput({
         placeholder={question ? "Question…" : "Folder name…"}
         aria-label={initial ? "Rename" : question ? "New question" : "New folder"}
         autoComplete="off"
-        // The tree's own keydown owns every key on a row; this input owns them
-        // all while it is open, so nothing here is allowed to reach it.
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key === "Enter") { e.preventDefault(); finish(true); }

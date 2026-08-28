@@ -2,18 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/**
- * Drag-to-reorder for short admin lists.
- *
- * Pointer events rather than HTML5 drag-and-drop: `dragstart` never fires on
- * touch, and the admin gets used on a phone. Hit-testing goes through
- * `elementFromPoint` so the same hook drives a vertical row list and a
- * two-dimensional card grid without knowing which it is.
- *
- * The list stays uncontrolled while a drag is in flight — `order` is local
- * preview state, committed once on drop. The chevron buttons remain the
- * keyboard-accessible path; this is a pointer affordance layered on top.
- */
 export function useSortable(
   ids: string[],
   onCommit: (ids: string[]) => void,
@@ -27,10 +15,6 @@ export function useSortable(
   const orderRef = useRef<string[]>(ids);
   orderRef.current = order;
 
-  // Re-seed only when the SERVER order actually changes — not whenever dragId
-  // flips. A drop clears dragId while `ids` is still the pre-drag order, so
-  // keying on dragId threw the drag preview away and snapped the list back for
-  // the whole server round-trip.
   const key = ids.join("\u0000");
   const seededKey = useRef(key);
   useEffect(() => {
@@ -45,9 +29,6 @@ export function useSortable(
     else nodes.current.delete(id);
   }, []);
 
-  // Takes ids, not indices: positions are resolved inside the updater against
-  // the very list being spliced. Computing them outside from a ref that only
-  // advances on render let a fast drag splice a stale index into fresh state.
   const move = useCallback((id: string, overId: string) => {
     setOrder((prev) => {
       const from = prev.indexOf(id);
@@ -76,8 +57,7 @@ export function useSortable(
       if (dragId !== id) return;
       e.preventDefault();
 
-      // The dragged node sits under the cursor, so ignore it and read whatever
-      // row/card the pointer is actually over.
+      // ignore the dragged node itself when hit-testing
       const self = nodes.current.get(id);
       const prevPointerEvents = self?.style.pointerEvents;
       if (self) self.style.pointerEvents = "none";
@@ -102,7 +82,6 @@ export function useSortable(
     onCommit(after);
   }, [dragId, onCommit]);
 
-  /** Spread onto the grip handle. */
   const handleProps = useCallback(
     (id: string) => ({
       onPointerDown: onPointerDown(id),
@@ -114,7 +93,6 @@ export function useSortable(
     [onPointerDown, onPointerMove, end, dragId, disabled]
   );
 
-  /** Spread onto each sortable row/card. */
   const itemProps = useCallback(
     (id: string) => ({
       ref: register(id),

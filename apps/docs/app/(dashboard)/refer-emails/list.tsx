@@ -34,7 +34,6 @@ import { syncReferEmails } from "@/lib/actions/refer-emails";
 
 const AUTO_SYNC_INTERVAL_MS = 40_000;
 
-/** Compact `.sel` sizing for the filter strip — `.sel` is full width by default. */
 const SEL_STYLE: React.CSSProperties = {
   width: "auto",
   minWidth: 128,
@@ -51,7 +50,6 @@ function useAutoSync(fetchedAt: string) {
   const lastFetchRef = useRef(fetchedAt);
   const lastSyncedAtRef = useRef(Date.now());
 
-  // When the server returns a new fetchedAt, reset our local "last synced" anchor.
   useEffect(() => {
     if (lastFetchRef.current !== fetchedAt) {
       lastFetchRef.current = fetchedAt;
@@ -59,7 +57,6 @@ function useAutoSync(fetchedAt: string) {
     }
   }, [fetchedAt]);
 
-  // Tick once a second so the countdown UI stays live.
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(tick);
@@ -72,12 +69,11 @@ function useAutoSync(fetchedAt: string) {
         router.refresh();
         lastSyncedAtRef.current = Date.now();
       } catch {
-        // ignore network errors — next tick will retry
+        // next tick will retry
       }
     });
   };
 
-  // Schedule auto-sync every 40s while the tab is visible.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -226,7 +222,6 @@ function initials(name: string, email: string): string {
   return src.slice(0, 2).toUpperCase();
 }
 
-/** `.chip` modifiers standing in for the old per-status colour themes. */
 const STATUS_THEME: Record<
   ContactStatus,
   { chip: string; style?: React.CSSProperties; label: string; icon: React.ElementType }
@@ -458,7 +453,6 @@ function ContactRow({ c }: { c: SheetContact }) {
         <tr>
           <td colSpan={6} style={{ padding: 0, background: "var(--bg1)" }}>
             <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
-              {/* Generated email preview */}
               {c.generatedSubject || c.generatedBody ? (
                 <div className="card">
                   <div className="card-h">
@@ -499,8 +493,6 @@ function ContactRow({ c }: { c: SheetContact }) {
                       Inbox preview
                     </div>
                     {c.generatedBody ? (
-                      // Deliberately rendered on an email-client surface, not the app surface,
-                      // so the body looks the way the recipient will see it.
                       <div className="rounded-xl border border-slate-200/80 bg-[#f6f7f9] p-1 shadow-inner shadow-slate-900/5 dark:border-slate-700/60 dark:bg-[#0a0f1a] dark:shadow-black/40">
                         <div className="rounded-[10px] bg-white px-6 py-5 shadow-sm ring-1 ring-slate-200/60 dark:bg-[#111827] dark:ring-slate-700/80 dark:shadow-lg dark:shadow-black/30">
                           {isLikelyHtml(c.generatedBody) ? (
@@ -559,7 +551,6 @@ function ContactRow({ c }: { c: SheetContact }) {
                 </div>
               )}
 
-              {/* Send error */}
               {c.error && (
                 <div
                   style={{
@@ -584,7 +575,6 @@ function ContactRow({ c }: { c: SheetContact }) {
                 </div>
               )}
 
-              {/* Metadata */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
                 <Meta icon={IconHash} label="S.No" value={c.sno || "—"} mono />
                 <Meta
@@ -601,7 +591,6 @@ function ContactRow({ c }: { c: SheetContact }) {
                 <Meta icon={IconEye} label="Last portfolio visit" value={timeAgo(c.lastPortfolioVisitedAt ?? null)} />
               </div>
 
-              {/* Actions */}
               {c.email && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <a
@@ -768,7 +757,6 @@ export function ReferEmailsList({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* Stats */}
       <div className="stat-grid even">
         <Stat icon={IconUsers} label="Total" value={stats.total} hint="Contacts in sheet" />
         <Stat icon={IconCircleCheck} label="Sent" value={stats.sent} hint={`${sendRate}% of total`} />
@@ -812,7 +800,6 @@ export function ReferEmailsList({
           }
         />
 
-        {/* Search + sort */}
         <div className="filters" style={{ alignItems: "center" }}>
           <div style={{ position: "relative", flex: "1 1 280px", minWidth: 200 }}>
             <IconSearch
@@ -872,7 +859,6 @@ export function ReferEmailsList({
           </select>
         </div>
 
-        {/* Status filters + top pager */}
         <div className="filters" style={{ alignItems: "center" }}>
           {FILTERS.map((f) => (
             <button
@@ -893,7 +879,6 @@ export function ReferEmailsList({
           </div>
         </div>
 
-        {/* Table */}
         {filtered.length === 0 ? (
           <div className="empty">
             <div className="empty-ic"><IconSearch size={18} stroke={1.5} /></div>
@@ -934,7 +919,6 @@ export function ReferEmailsList({
           </div>
         )}
 
-        {/* Bottom pager */}
         {filtered.length > 0 && (
           <div
             style={{

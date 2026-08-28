@@ -5,13 +5,6 @@ import { NOTES_ROOT, type ResultCard } from "@/lib/notes/view-types";
 
 const SEARCH = `${NOTES_ROOT}/search`;
 
-/**
- * Painted text: the runs `highlightParts` / `snippetParts` marked, and nothing
- * else. The segments exist so a note's own words never reach the DOM as markup
- * — an answer is user content, this page renders inside an authenticated admin
- * session, and `dangerouslySetInnerHTML` here is one stored `<script>` away
- * from handing that session over.
- */
 function Painted({ parts }: { parts: { text: string; hit: boolean }[] }) {
   return (
     <>
@@ -26,15 +19,6 @@ function Painted({ parts }: { parts: { text: string; hit: boolean }[] }) {
   );
 }
 
-/**
- * The results body, grouped by the folder a question lives in.
- *
- * A card is a link, not a button: the whole point of a result is the note behind
- * it, and a link opens in a new tab, copies, and survives the middle mouse
- * button the way anyone reading a list of search results expects. Which is also
- * why the tags on a card are inert — nesting a second control inside a link is
- * invalid, and the facet chips above already exist to search a tag.
- */
 export function SearchResults({ q, cards }: { q: ParsedQuery; cards: ResultCard[] }) {
   if (isEmptyQuery(q)) {
     return (
@@ -82,12 +66,6 @@ export function SearchResults({ q, cards }: { q: ParsedQuery; cards: ResultCard[
   );
 }
 
-/**
- * A dead end is where a search language loses people, so this state carries the
- * way out rather than describing it: one button, pre-loaded with the query
- * minus whatever was doing the narrowing. It is a plain GET form because it has
- * to work in exactly the situation where everything else has failed.
- */
 function NoMatch({ q }: { q: ParsedQuery }) {
   const filtered =
     q.tags.length || q.notTags.length || q.in.length ||

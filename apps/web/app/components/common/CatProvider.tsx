@@ -12,8 +12,6 @@ export function useCat() {
 }
 
 export function CatProvider({ children }: { children: React.ReactNode }) {
-  // Default ON for a new visitor. We only ever persist a preference once the
-  // user explicitly toggles, so a fresh user (no stored value) always starts on.
   const [showCat, setShowCat] = useState(true);
 
   useEffect(() => {
@@ -21,21 +19,11 @@ export function CatProvider({ children }: { children: React.ReactNode }) {
       const stored = localStorage.getItem('showCat');
       if (stored !== null) setShowCat(stored === 'true');
     } catch {
-      // localStorage unavailable (private mode / disabled) — keep the default.
+      // storage unavailable, keep the default
     }
   }, []);
 
-  // The visible cat is the #oneko element injected by /oneko/oneko.js (loaded
-  // from the root layout, outside this provider). Drive its visibility here so
-  // the toggle works no matter when the script finishes creating it.
-  //
-  // `body.cat-on` mirrors the same state for the CSS-only cats — right now the
-  // `=^..^=` sitting on the Hero/About divider wire, which falls back to a plain
-  // interpunct when the cat is shooed away. Runs in an effect, so the server
-  // HTML never carries the class and there's nothing to hydrate-mismatch.
   useEffect(() => {
-    // `toggle` with a force flag still dirties the class list when the state
-    // is already right; guard it so the mount pass is a read, not a write.
     if (document.body.classList.contains('cat-on') !== showCat) {
       document.body.classList.toggle('cat-on', showCat);
     }
@@ -50,7 +38,6 @@ export function CatProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Not created yet — watch for it, apply once, then stop watching.
     const observer = new MutationObserver(() => {
       const el = document.getElementById('oneko');
       if (el) {
@@ -68,7 +55,7 @@ export function CatProvider({ children }: { children: React.ReactNode }) {
       try {
         localStorage.setItem('showCat', String(next));
       } catch {
-        // Ignore storage failures — the toggle still works for this session.
+        // ignore storage failures
       }
       return next;
     });

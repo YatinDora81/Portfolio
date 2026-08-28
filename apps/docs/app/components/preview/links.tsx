@@ -4,39 +4,13 @@ import { useEffect, useState } from "react";
 import { findSocialIcon } from "@repo/ui/icons/registry";
 import { DIM, FAINT, MONO } from "./frame";
 
-// ─── Links Preview ──────────────────────────────────────────────
-// No single counterpart on the site — this one shows every surface an outbound
-// link actually lands on, in the order a visitor meets them:
-//
-//   Hero      — the `.socs` icon pills in the top-right rail, and the
-//               Get in touch + View Resume buttons (`.btn-solid` / `.btn-ghost`).
-//               The hero has two versions and this page has none: it is the
-//               site-wide link list, it shows every row including the ones
-//               scoped to one hero, and its job here is "this is where a link
-//               lands", not a faithful hero. So the buttons are drawn as v2,
-//               the default both the schema column and `data.ts` fall back to.
-//               HeroPreview is the pane that actually branches.
-//   Contact   — the sidebar rows under the availability pulse.
-//   Footer    — nothing. Footer.tsx still ACCEPTS `socialLinks` but renders the
-//               wordmark and the mono copyright only; the socials moved into
-//               Let's Connect. The block stays so that's visible, not guessed.
-
 interface LinksPreviewProps {
   socialLinks: { name: string; href: string; iconKey: string; detail: string | null }[];
   resumeUrl?: string;
   contactEmail?: string;
-  /** Feeds the footer wordmark. Optional — falls back to the same `PORTFOLIO`
-      placeholder Footer.tsx uses when the site config has no name. */
   copyrightName?: string;
 }
 
-/**
- * The year the footer stamps, or null until mounted. Footer.tsx reads
- * `new Date().getFullYear()` during render; doing that here would let the
- * server HTML and the first client render disagree across a New Year boundary,
- * so — same shape as `useMonthNow` in experience.tsx — the year is simply
- * absent from the server pass and appears on hydration.
- */
 function useYearNow(): number | null {
   const [year, setYear] = useState<number | null>(null);
   useEffect(() => { setYear(new Date().getFullYear()); }, []);
@@ -61,18 +35,12 @@ function Rule() {
   return <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }} />;
 }
 
-/**
- * The footer's masthead, shrunk. Same auto-size maths as `NameMark` in
- * Footer.tsx — longer names get a smaller face so `textLength` can still stretch
- * the word edge to edge — and the same three-stop melt, minus the sheen sweep
- * and the pointer spotlight, which say nothing at this size.
- */
 function Wordmark({ text }: { text: string }) {
   const effLen = [...text].reduce((a, ch) => a + (ch === " " ? 0.5 : 1), 0);
   const fs = Math.max(54, Math.min(100, Math.round(665 / Math.max(effLen, 1))));
   const capH = fs * 0.727;
   const y = Math.round(5 + capH);
-  const vbH = Math.round(5 + capH * 0.77); // bottom crop — 77% of cap height
+  const vbH = Math.round(5 + capH * 0.77); // bottom crop, 77% of cap height
 
   return (
     <svg viewBox={`0 0 400 ${vbH}`} className="mt-3 block w-full" role="presentation" focusable="false">
@@ -106,7 +74,6 @@ export function LinksPreview({ socialLinks, resumeUrl, contactEmail, copyrightNa
 
   return (
     <div className="space-y-5">
-      {/* ── Hero ── */}
       <div>
         <SurfaceLabel
           tint="rgba(168,85,247,0.15)"
@@ -117,9 +84,6 @@ export function LinksPreview({ socialLinks, resumeUrl, contactEmail, copyrightNa
 
         {socialLinks.length > 0 ? (
           <div className="flex flex-wrap items-center gap-2">
-            {/* Keyed on the index too: `name` is user-editable and not unique —
-                a personal and a work "GitHub" collide, and two half-filled
-                staged creates both key on "". */}
             {socialLinks.map((l, i) => {
               const icon = findSocialIcon(l.iconKey || l.name);
               return (
@@ -184,7 +148,6 @@ export function LinksPreview({ socialLinks, resumeUrl, contactEmail, copyrightNa
 
       <Rule />
 
-      {/* ── Contact ── */}
       <div>
         <SurfaceLabel
           tint="rgba(244,63,94,0.15)"
@@ -196,8 +159,6 @@ export function LinksPreview({ socialLinks, resumeUrl, contactEmail, copyrightNa
         <div className="space-y-0.5">
           {socialLinks.map((l, i) => {
             const icon = findSocialIcon(l.iconKey || l.name);
-            // The site shows `detail` under the name; for the mail row the
-            // contact address is what that detail is usually spelling out.
             const detail = l.detail || (icon?.key === "email" ? contactEmail : "");
             return (
               <div key={`${l.name}-${i}`} className="flex items-center gap-2 px-1.5 py-1.5">
@@ -232,7 +193,6 @@ export function LinksPreview({ socialLinks, resumeUrl, contactEmail, copyrightNa
 
       <Rule />
 
-      {/* ── Footer ── */}
       <div>
         <SurfaceLabel
           tint="rgba(59,130,246,0.15)"
@@ -242,16 +202,12 @@ export function LinksPreview({ socialLinks, resumeUrl, contactEmail, copyrightNa
         />
 
         <div className="overflow-hidden rounded-xl border border-[rgba(255,255,255,0.08)] px-3 pt-3">
-          {/* the breathing ✦ divider, held still at preview scale */}
           <div aria-hidden className="flex items-center gap-2 text-[8px]" style={{ color: DIM }}>
             <span className="h-px flex-1 bg-[rgba(255,255,255,0.1)]" />
             <span>&#10022;</span>
             <span className="h-px flex-1 bg-[rgba(255,255,255,0.1)]" />
           </div>
 
-          {/* Footer.tsx:195 stamps the year: "© 2026 Yatin Dora — all rights
-              reserved". Omitting it here read as though the shipping line
-              carried no year at all. */}
           <p
             className="mt-3 text-center text-[7px] uppercase tracking-[0.2em]"
             style={{ fontFamily: MONO, color: DIM }}

@@ -14,11 +14,8 @@ import { PreviewFrame, ExperiencePreview } from "@/components/preview";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/$/, "");
 
-/** apps/web/app/components/landing/Experience.tsx — what the site falls back to
- *  when the per-role column predates the fold or has been zeroed out. */
 const DEFAULT_VISIBLE_BULLETS = 4;
 
-/** Bullets are authored with `**highlight**` — render those runs in the ink colour. */
 function renderBullet(text: string) {
   return text.split(/\*\*(.*?)\*\*/g).map((part, i) =>
     i % 2 === 1 ? <b key={i}>{part}</b> : <span key={i}>{part}</span>
@@ -54,9 +51,6 @@ export default async function ExperiencesPage() {
           </a>
         </div>
         <div className="sec-reach">
-          {/* The dependency a strict one-page-per-section split would hide:
-              apps/web/app/page.tsx builds the About terminal's company marks
-              out of these logos, keyed on the lower-cased company name. */}
           <span className="chip">also draws the About terminal&rsquo;s company marks</span>
         </div>
       </div>
@@ -90,8 +84,6 @@ export default async function ExperiencesPage() {
 
           <div className="xp wk-in s1" style={{ marginTop: 14 }}>
             {experiences.map((exp) => {
-              // The same fold the site applies: everything past this index sits
-              // behind the count-labelled toggle rather than in the scan layer.
               const fold = exp.visibleBullets > 0 ? exp.visibleBullets : DEFAULT_VISIBLE_BULLETS;
               const folded = Math.max(0, exp.bullets.length - fold);
 
@@ -99,8 +91,6 @@ export default async function ExperiencesPage() {
                 <div key={exp.id} className={cn("xp-item", exp.isCurrent && "now")}>
                   <Card>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                      {/* The mark itself, not a note about it — this image is
-                          what the About terminal prints beside the company. */}
                       {exp.logoUrl ? (
                         <span className="xpr-mark" title="Company mark — also printed in the About terminal">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -150,8 +140,6 @@ export default async function ExperiencesPage() {
                       </div>
                     </div>
 
-                    {/* Chips above the bullets, as on the site: they describe the
-                        role, and the scan checks the stack before bullet one. */}
                     {exp.skills.length > 0 && (
                       <div className="pskills" style={{ marginTop: 11 }}>
                         {exp.skills.map((s) => (
@@ -170,9 +158,6 @@ export default async function ExperiencesPage() {
                       </ul>
                     )}
 
-                    {/* Where the site cuts. Under the bullets rather than between
-                        them, so the fold reads as a fact about the role instead
-                        of a divider the eye has to step over. */}
                     <div className="wk-cut" style={{ marginBottom: 0 }}>
                       {exp.bullets.length === 0
                         ? <>no bullets <span className="n">· the card is a heading only</span></>
@@ -189,10 +174,6 @@ export default async function ExperiencesPage() {
       )}
 
       <PreviewFrame label="Experience Preview">
-        {/* `visibleBullets` and `logoUrl` are already on every row `findMany`
-            returns — dropping them here made the preview fold at the default 4
-            and draw no company mark, contradicting the site for any role that
-            set its own fold size. */}
         <ExperiencePreview experiences={experiences.map(exp => ({ company: exp.company, position: exp.position, location: exp.location, startDate: exp.startDate, endDate: exp.endDate, isCurrent: exp.isCurrent, bullets: exp.bullets.map(b => b.content), technologies: exp.skills.map(s => s.name), visibleBullets: exp.visibleBullets, logoUrl: exp.logoUrl }))} />
       </PreviewFrame>
     </div>

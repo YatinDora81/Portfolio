@@ -6,11 +6,9 @@ import {
 import type { TooltipContentProps } from "recharts";
 import type { ChannelsView, DayPoint, SectionRow } from "@/lib/analytics-read";
 
-/** The UTM tracer's ramp, so a chart here reads as a sibling of the one on /tracker. */
 const COLORS = ["var(--ch1)", "var(--ch2)", "var(--ch3)", "var(--ch4)"];
 const colorAt = (i: number) => COLORS[i] ?? "var(--dim)";
 
-/** Keyed by position: a channel literally named "day" would shadow the x-axis dataKey. */
 const slot = (i: number) => `s_${i}`;
 
 const AXIS = {
@@ -61,7 +59,6 @@ export function TrafficChart({ timeline }: { timeline: DayPoint[] }) {
           <XAxis dataKey="day" interval="equidistantPreserveStart" minTickGap={14} tickMargin={8} {...AXIS} />
           <YAxis width={38} tickCount={5} allowDecimals={false} {...AXIS} />
           <Tooltip content={Tip} cursor={{ stroke: "var(--tickc)", strokeWidth: 1, strokeDasharray: "3 3" }} />
-          {/* connectNulls off: an unsummarized day is a hole, not a straight line. */}
           <Area
             type="monotone" dataKey="visits" name="visits" connectNulls={false}
             stroke={colorAt(0)} strokeWidth={1.8} strokeLinecap="round"
@@ -150,7 +147,6 @@ export function ChannelLegend({ channels }: { channels: ChannelsView }) {
 
 type Metric = "dwell" | "density";
 
-/** Two scales never share an axis, so these are two charts behind one switch. */
 export function SectionBars({ rows, metric }: { rows: SectionRow[]; metric: Metric }) {
   const data = rows.map((r) => ({
     section: r.label,

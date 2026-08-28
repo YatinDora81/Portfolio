@@ -1,8 +1,5 @@
 @import 'tailwindcss';
 
-/* Auto-detection stops at this app's own tree, so utilities that only ever appear
-   inside the shared package — size-5 on every brand icon, size-full on the rest —
-   were never generated and those SVGs collapsed to 0×0. */
 @source '../../../packages/ui/src';
 
 @custom-variant dark (&:is(.dark *));
@@ -38,27 +35,13 @@
   --accent: #f5f5f5;
   --accent-foreground: #171717;
 
-  /* The keyline ink, shared by THOUGHT OF THE DAY and CONTACT. Two greys
-     declared per theme rather than one alpha-blended into both — no composited
-     value clears 4.5:1 on #fff and on #0a0a0a at once. */
   --lab-dim: #6e6e70;
   --lab-2: #5f5f61;
-  /* The channel's one colour, and its text-safe twin. `--ok` is the dot green:
-     it clears 3:1 for a graphic and no more, which the 12.5px ACK receipt and
-     the "copied ✓" label would fail on white. */
   --ok: #16a34a;
   --ok-ink: #15803d;
   --err: #dc2626;
   --dotgrid: rgba(0, 0, 0, .065);
-  /* The sentence form has no visible labels — the placeholders ARE the field
-     names, so they are content and take the 4.5:1 the keyline greys take. The
-     design's alpha-mixed grey came out at ~2.2:1; weight, not contrast, is what
-     keeps them subordinate to typed text. */
   --ph: #6e6e70;
-  /* The site's secondary ink — every non-heading string that isn't a keyline.
-     Two values per theme rather than one: #909092 reads correctly on #0a0a0a
-     (6.21:1) and fails on #ffffff (3.19:1), and it is carrying real prose —
-     project summaries, experience bullets, the hero intro. */
   --secondary-ink: #6e6e70;
 }
 
@@ -77,8 +60,6 @@
 
   --lab-dim: #8b8b8d;
   --lab-2: #a5a5a7;
-  /* On #0a0a0a the dot green is already 11.4:1, so there is no second value to
-     declare — the twin exists for white, not for the dark theme. */
   --ok: #4ade80;
   --ok-ink: #4ade80;
   --err: #f87171;
@@ -91,8 +72,6 @@
   * {
     border-color: var(--border);
   }
-  /* The hero's scroll cue and the About terminal's navigation commands both
-     jump by hash — glide instead of teleporting. Disabled under reduced motion. */
   html {
     scroll-behavior: smooth;
   }
@@ -100,8 +79,6 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
-    /* Inter is loaded with its optical-size axis (layout.tsx), so display type
-       gets the tighter, higher-contrast letterforms it was drawn with. */
     font-optical-sizing: auto;
     margin: 0;
     -webkit-font-smoothing: antialiased;
@@ -117,26 +94,10 @@
   color: var(--secondary-ink);
 }
 
-/* The "terminal voice" — used by the availability chip, hero role line, socials,
-   tenure pills, project hints/links and the cat-wire divider. Unlayered on
-   purpose so it beats Tailwind's preflight and any utility font-family. */
 .mono {
   font-family: var(--font-mono);
 }
 
-/* Entrance fade.
-   Two keyframe sets on purpose. `fadeIn` only touches opacity + transform, both
-   compositor properties, so a phone GPU does the whole fade and the main thread
-   never repaints. `fadeInBlur` adds the blur and is opted into on wide screens
-   only: a `filter: blur()` transition re-rasterises the element every frame,
-   which on a throttled mobile CPU was ~1.7s of Style & Layout + Rendering in the
-   Lighthouse trace across the ~30 elements that carry this class.
-
-   Timing matters for LCP too: Chrome does not count an element as the Largest
-   Contentful Paint while its opacity is 0. The LCP candidate here is `p.intro`
-   (delay-3), so the old 0.3s delay + 0.6s fade showed up verbatim as "element
-   render delay". The stagger is now 60ms per step over 0.45s — same cascade,
-   about half the wait. */
 @keyframes fadeIn {
   0% {
     opacity: 0;
@@ -179,9 +140,6 @@
 .animate-delay-5 { animation-delay: 0.3s; }
 .animate-delay-6 { animation-delay: 0.36s; }
 
-/* Skip layout/paint for below-the-fold sections until they scroll near the
-   viewport. contain-intrinsic-size reserves an estimated height so the
-   scrollbar doesn't jump; `auto` lets the browser remember the real size. */
 .cv-auto,
 #skills,
 #experience,
@@ -192,26 +150,8 @@
   contain-intrinsic-size: auto 600px;
 }
 
-/* The open channel is one tall column rather than a grid of tiles, so it needs
-   its own estimate — 600px would jump the scrollbar by two thirds of a section
-   on first scroll-in. Measured at the 720px content width, resting state, with
-   the year-in-one-line fold shut. */
 #contact { contain-intrinsic-size: auto 1480px; }
 
-/* ── Background beams ───────────────────────────────────────────────────────
-   The sweep used to be 50 Motion `linearGradient`s each tweening x1/y1/x2/y2
-   from JS, forever: one Motion visual element + projection node per beam at
-   hydration, then a 50-write rAF loop that kept the animation chunk on the
-   main thread for ~5s of every Lighthouse trace and never let TTI settle.
-
-   Now each beam is a plain <path pathLength="1"> with a dash that travels its
-   length via a CSS `stroke-dashoffset` keyframe. The gradient is one shared
-   userSpaceOnUse ramp, so the head of a beam is cyan and the tail violet the
-   way it always was. Zero JS per frame; React never re-renders for it.
-
-   The group starts paused. BackgroundLines flips `data-beams="on"` from a
-   requestIdleCallback after load, so the sweep is not competing with
-   hydration or the LCP paint — it is decorative, it can wait 1–2s. */
 .bg-beams path {
   stroke-dasharray: 0.22 1.78; /* one dash, then a long gap before the next */
   stroke-dashoffset: 2;
@@ -225,25 +165,11 @@
   to { stroke-dashoffset: 0; }
 }
 
-/* No beams below the desktop breakpoint. A `stroke-dashoffset` sweep cannot
-   run on the compositor, so each beam is a main-thread paint per frame; on a
-   throttled phone CPU that was ~4s of Layerize/Commit/Paint across the trace
-   for half-pixel lines at 40% opacity under a 50% overlay — decoration the
-   viewer can barely see and the battery can definitely feel. The static line
-   field still gives the texture. */
 @media (max-width: 1024px) {
   .bg-beams-layer { display: none; }
 }
-/* Own compositor layer: a beam frame invalidates this SVG only, never the
-   static field or the overlay sitting on top of it. */
 .bg-beams-layer { will-change: transform; }
 
-/* ── Navbar ─────────────────────────────────────────────────────────────────
-   The docked/undocked states were Motion springs on `width`, `backdrop-filter`
-   and `box-shadow` — three properties that force layout + paint per frame, plus
-   a forced-reflow read of each on mount. They are CSS transitions now, driven by
-   a `data-visible` attribute from a passive scroll listener. Same motion, none
-   of the per-frame JS. */
 .rn-body,
 .rn-mobile {
   transition:
@@ -275,10 +201,6 @@
 .rn-mobile { width: 100%; padding-left: 0; padding-right: 0; }
 .rn-mobile[data-visible="true"] { width: 90%; padding-left: 12px; padding-right: 12px; }
 
-/* The hover pill that used to be a `layoutId` shared-layout element — the one
-   feature on the whole site that needed Motion's `domMax` bundle (~110 kB of
-   projection code) instead of `domAnimation`. It is one absolutely-positioned
-   <span> now, moved with a transform transition from measured link offsets. */
 .rn-pill {
   position: absolute;
   top: 0;
@@ -293,8 +215,6 @@
 }
 .rn-pill.on { opacity: 1; }
 
-/* The mobile menu panel: a CSS entrance instead of AnimatePresence. It is only
-   in the DOM while open, so there is nothing to animate out. */
 .rn-menu { animation: rnMenuIn 0.18s ease-out; }
 @keyframes rnMenuIn { from { opacity: 0; transform: translateY(-4px); } }
 
@@ -360,23 +280,16 @@
   background-clip: text;
 }
 
-/* ── Selection: visual mode ────────────────────────────────────────────
-   Inverse video, like a terminal. One rule covers both themes — the pair
-   flips with the vars. */
 ::selection {
   background: var(--foreground);
   color: var(--background);
 }
 
-/* Gradient-clipped type paints its fill from the background image, so a
-   selection over it renders nothing — re-assert the fill inside ::selection
-   or the name disappears the moment someone grabs it. */
 .title-gradient::selection {
   background: var(--foreground);
   -webkit-text-fill-color: var(--background);
 }
 
-/* Navbar cat toggle — playful paw */
 @keyframes pawWiggle {
   0%, 100% { transform: rotate(0deg) scale(1); }
   20% { transform: rotate(-16deg) scale(1.08); }
@@ -389,13 +302,6 @@
   70% { transform: scale(0.92) rotate(4deg); }
   100% { transform: scale(1); }
 }
-/* The glow pulses `opacity` on a soft radial behind the paw, not
-   `filter: drop-shadow()` on the paw itself. A filter animation re-rasterises
-   the element on the main thread every frame, and since the cat is on by
-   default this one ran for the life of every page view — the navbar was
-   repainting at 60fps forever, which kept a main-thread frame loop alive
-   for the whole Lighthouse trace. Opacity is composited: zero main-thread
-   frames. */
 @keyframes pawGlow {
   0%, 100% { opacity: 0.25; }
   50% { opacity: 1; }
@@ -415,8 +321,6 @@
   background: radial-gradient(circle, rgba(245, 158, 11, 0.55) 0%, rgba(245, 158, 11, 0.18) 45%, transparent 72%);
   opacity: 0;
   pointer-events: none;
-  /* Behind the icon, not washed over it; .paw's own stacking context keeps
-     the negative z-index from dropping it behind the page. */
   z-index: -1;
 }
 .paw-btn:hover .paw { animation: pawWiggle 0.55s ease; }
@@ -425,16 +329,6 @@
 .paw-btn.on .paw::before { animation: pawGlow 2.4s ease-in-out infinite; }
 .paw-btn.on:hover .paw { animation: pawWiggle 0.55s ease; }
 
-/* Deliberately UNLAYERED: Tailwind's preflight is in `@layer base`, and
-   unlayered rules beat layered ones regardless of order — wrapping any of this
-   in @layer would let `img { height: auto }` collapse `.peek-stack img`.
-   Reduced-motion overrides all live in the single block at the end. */
-
-/* ───────────────────────────────────────────────────────────────────────────
-   HERO — "The Title Card"
-   ─────────────────────────────────────────────────────────────────────────── */
-
-/* sizing: the false-floor fix — the next section peeks above the fold */
 .hero {
   position: relative;
   display: flex;
@@ -460,7 +354,6 @@
   }
 }
 
-/* top row — availability left, socials + location right */
 .toprow {
   display: flex;
   flex-wrap: wrap;
@@ -486,13 +379,9 @@
   text-transform: uppercase;
   color: var(--secondary-ink);
 }
-/* The line failed in the field at 11px grey: too small, too thin, too tracked.
-   "BASED IN" keeps the quiet ink; the pin + city step up to full foreground
-   (~19:1 in both themes) at 600 so the information itself carries the line. */
 .loc-line svg { width: 12px; height: 12px; flex: none; color: var(--foreground); }
 .loc-city { color: var(--foreground); font-weight: 600; }
 
-/* availability — quiet monochrome pulse */
 .avail {
   display: inline-flex;
   align-items: center;
@@ -507,12 +396,9 @@
   width: 7px;
   height: 7px;
   border-radius: 9999px;
-  /* `--avail-dot` is set inline from siteConfig `heroDotColor`; unset keeps the
-     monochrome dot that follows the theme. */
   background: var(--avail-dot, var(--foreground));
   flex: none;
 }
-/* siteConfig `heroDotPulse` off — the dot stays, the ripple goes. */
 .avail.still i::after { display: none; }
 .avail i::after {
   content: "";
@@ -527,7 +413,6 @@
   70%, 100% { transform: scale(3.2); opacity: 0; }
 }
 
-/* socials — icon pill that reveals its label on hover */
 .socs {
   display: flex;
   flex-wrap: wrap;
@@ -550,8 +435,6 @@
   border-color: color-mix(in srgb, var(--foreground) 25%, transparent);
 }
 .soc svg { width: 16px; height: 16px; }
-/* max-width sits just above the longest label so the curve maps onto visible
-   motion instead of running past the clip. */
 .soc .lbl {
   max-width: 0;
   overflow: hidden;
@@ -574,7 +457,6 @@
     opacity 0.45s ease 0.15s;
 }
 
-/* the nameplate — one solid masthead; hover it and the photo peeks out */
 .namewrap { position: relative; margin-top: 2.75rem; }
 .hero h1 {
   margin: 0;
@@ -588,7 +470,6 @@
 }
 .hero h1 .dot { color: var(--secondary-ink); }
 
-/* the photo that trails the cursor across the letters */
 .peek {
   position: absolute;
   top: 0;
@@ -616,14 +497,9 @@
     font-size: 11px;
     letter-spacing: 0.08em;
     margin-left: 0.75rem;
-    /* No opacity: this is the only thing telling anyone the nameplate has a
-       photo behind it, and fading the secondary ink another 20% put it at
-       2.43:1 — the people most likely to miss the interaction were the ones
-       who could not read the invitation. */
   }
 }
 
-/* touch / reduced-motion fallback: a static fanned deck instead of the trail */
 .peek-stack {
   display: none;
   position: relative;
@@ -647,13 +523,11 @@
 html.no-peek .peek,
 html.no-peek .peek-hint { display: none; }
 html.no-peek .peek-stack { display: block; }
-/* no-JS / pre-hydration fallback for touch devices (html.no-peek is set by JS) */
 @media (hover: none), (pointer: coarse) {
   .peek-stack { display: block; }
   .peek { display: none; }
 }
 
-/* role line — "//" + the rotating title + terminal caret */
 .roleline {
   display: flex;
   align-items: center;
@@ -678,7 +552,6 @@ html.no-peek .peek-stack { display: block; }
 @keyframes heroCaret {
   50% { opacity: 0; }
 }
-/* the rotation itself: 400ms cross-fade, matching the previous hero */
 .roleword {
   display: inline-block;
   transition: opacity 0.4s ease-in-out, filter 0.4s ease-in-out, transform 0.4s ease-in-out;
@@ -689,7 +562,6 @@ html.no-peek .peek-stack { display: block; }
   transform: translateY(-0.5rem);
 }
 
-/* intro sentence, the voice line under it, and the hero pill row's chips */
 .intro {
   margin: 1.75rem 0 0;
   max-width: 42rem;
@@ -720,7 +592,6 @@ html.no-peek .peek-stack { display: block; }
 .chip .ci { width: 16px; height: 16px; flex-shrink: 0; display: inline-flex; }
 .chip .ci svg { width: 100%; height: 100%; }
 
-/* voice line — the personal tagline under the intro, quieter and in italics */
 .voice {
   margin: 0.9rem 0 0;
   max-width: 42rem;
@@ -729,9 +600,6 @@ html.no-peek .peek-stack { display: block; }
   color: var(--secondary-ink);
 }
 
-/* hero pill row — the curated stack + the "+30 more" doorway to #skills.
-   Sits after the .chip base on purpose: .chip-more has the same specificity,
-   so only source order lets it win the background/border/colour it overrides. */
 .heropills {
   display: flex;
   flex-wrap: wrap;
@@ -752,7 +620,6 @@ html.no-peek .peek-stack { display: block; }
   color: var(--foreground);
 }
 
-/* actions */
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -772,10 +639,6 @@ html.no-peek .peek-stack { display: block; }
 }
 .btn:hover { transform: translateY(-2px); }
 .btn:active { transform: translateY(0); }
-/* The magnetic lean (useMagnetic) writes the independent `translate` property,
-   which composes ahead of `transform` — so the lift and the press above keep
-   their own transforms, and the per-frame tracking stays out of the transition
-   declared on this rule. Nothing here needs to know about it. */
 .btn svg {
   width: 16px;
   height: 16px;
@@ -788,7 +651,6 @@ html.no-peek .peek-stack { display: block; }
 .btn-solid:hover { opacity: 0.9; }
 .btn-solid:hover svg { transform: translateX(4px); }
 
-/* scroll cue — paw prints leading down to the cat on the wire */
 .cue {
   align-self: center;
   display: flex;
@@ -805,7 +667,6 @@ html.no-peek .peek-stack { display: block; }
 .cue i:nth-child(1) { --o: 0.3; transform: translateX(-6px) rotate(-14deg); }
 .cue i:nth-child(2) { --o: 0.55; transform: translateX(6px) rotate(12deg); }
 .cue i:nth-child(3) { --o: 0.85; transform: translateX(-4px) rotate(-8deg); }
-/* gentle "walking" pulse — opacity only, zero movement */
 @keyframes pawStep {
   0%, 55%, 100% { opacity: var(--o); }
   18% { opacity: 1; }
@@ -814,8 +675,6 @@ html.no-peek .peek-stack { display: block; }
 .cue i:nth-child(2) { animation-delay: 0.35s; }
 .cue i:nth-child(3) { animation-delay: 0.7s; }
 
-/* BRIDGE — the cat-on-a-wire divider. `body.cat-on` is toggled by CatProvider,
-   so shooing the cat also takes it off the wire. */
 #bridge { margin-top: 2.5rem; }
 .cw {
   display: flex;
@@ -844,9 +703,6 @@ body.cat-on .cw .dot { display: none; }
   .cw:hover .cat { animation: pawWiggle 0.55s ease; }
 }
 
-/* ───────────────────────────────────────────────────────────────────────────
-   EXPERIENCE — timeline
-   ─────────────────────────────────────────────────────────────────────────── */
 .xp-list {
   margin-top: 1.5rem;
   position: relative;
@@ -867,7 +723,6 @@ body.cat-on .cw .dot { display: none; }
 
 .xp-card { position: relative; }
 
-/* borderless spotlight glow — hugs the card without touching the layout */
 .xp-card::before {
   content: "";
   position: absolute;
@@ -886,9 +741,7 @@ body.cat-on .cw .dot { display: none; }
 @media (hover: hover) {
   .xp-card { transition: opacity 0.3s ease; }
   .xp-card:hover::before { opacity: 1; }
-  /* hover one role → the others step back */
   .xp-list:has(.xp-card:hover) .xp-card:not(:hover) { opacity: 0.5; }
-  /* the node grows gently with its card */
   .xp-node { transition: transform 0.25s ease; }
   .xp-card:hover .xp-node { transform: scale(1.35); }
 }
@@ -945,8 +798,6 @@ body.cat-on .cw .dot { display: none; }
   flex-shrink: 0;
 }
 
-/* Reference always renders the company as a link. Real data has a nullable
-   `website`, so .xp-name is the non-linked <h3> fallback, styled identically. */
 .xp-co a,
 .xp-co .xp-name {
   font-size: 1.125rem;
@@ -1032,8 +883,6 @@ body.cat-on .cw .dot { display: none; }
 
 .xp-when svg { width: 12px; height: 12px; }
 
-/* ── the log: em-dash markers + scan-line leads + metric anchors ──
-   (Experience only; Projects keeps .bullets) */
 .xp-log {
   margin: 1rem 0 0;
   padding: 0;
@@ -1047,9 +896,6 @@ body.cat-on .cw .dot { display: none; }
 
 .xp-log li { display: grid; grid-template-columns: 24px 1fr; column-gap: 0.7rem; }
 
-/* One text line tall, dash centred inside it — pinning the height to the log's
-   own line-height keeps the marker on the first line's midline without
-   depending on the font's baseline metrics. */
 .xp-ln {
   display: flex;
   justify-content: flex-end;
@@ -1077,8 +923,6 @@ body.cat-on .cw .dot { display: none; }
   .xp-log li:hover > span:last-child { transform: translateX(2px); }
 }
 
-/* quantified wins hold recruiter gaze ~2x longer — numbers get the
-   terminal voice so they anchor the scan */
 .xp-metric {
   font-style: normal;
   font-weight: 500;
@@ -1088,17 +932,9 @@ body.cat-on .cw .dot { display: none; }
   letter-spacing: -0.01em;
 }
 
-/* entrance: bullets cascade once when the card scrolls into view
-   (same fadeInBlur DNA as the hero) */
 .xp-card .xp-log li { opacity: 0; transform: translateY(6px); filter: blur(4px); }
 
-/* The `.in` class that reveals them is added by an IntersectionObserver, so
-   without JS every bullet would stay at opacity 0. Show them outright, and
-   unfold the overflow too — the toggle can't run either. */
 @media (scripting: none) {
-  /* Motion renders the About intro at inline opacity:0 and only animates it
-     to visible on mount, so with scripting off the whole bio stays blank even
-     though it IS in the HTML. !important is required to beat the inline style. */
   .js-reveal {
     opacity: 1 !important;
     transform: none !important;
@@ -1112,23 +948,13 @@ body.cat-on .cw .dot { display: none; }
     filter: none !important;
   }
   .xp-fold { grid-template-rows: 1fr; }
-  /* `!important` because `.xp-more`/`.show-more` declare `display:flex` later in
-     the file at the same specificity, and a media query adds none — without it
-     these hide-the-dead-control rules are silently overridden. */
   .xp-veil,
   .xp-more { display: none !important; }
 
-  /* Hide only what genuinely stops working without JS: an oscilloscope that
-     never draws is an empty ruled box, and a clock frozen at `--:--:--` beside
-     a live dot is a claim the page cannot make. */
   #contact .scope,
   #contact .car-wave,
   #contact .ct-now { display: none; }
   #contact .car-btn { cursor: text; }
-  /* The form has no `action`, so without JS the submit is a GET that reloads the
-     page with the visitor's name, email and message in the query string — into
-     the URL bar, history and the access log, and the message itself is dropped.
-     The address beside it is a working mailto, so the channel stays open. */
   #contact .tx-btn { display: none !important; }
 }
 
@@ -1140,7 +966,6 @@ body.cat-on .cw .dot { display: none; }
   transition-delay: calc(var(--i) * 0.06s);
 }
 
-/* ── the fold: bullets 4..n stay in the DOM, height animates 0fr→1fr ── */
 .xp-fold {
   display: grid;
   grid-template-rows: 0fr;
@@ -1151,7 +976,6 @@ body.cat-on .cw .dot { display: none; }
 .xp-fold .xp-log { margin-top: 0.75rem; }
 .xp-card.open .xp-fold { grid-template-rows: 1fr; }
 
-/* folded bullets skip the entrance cascade; they stagger in on expand */
 .xp-fold .xp-log li { opacity: 0; transform: translateY(6px); filter: blur(4px); transition: none; }
 
 .xp-card.open .xp-fold .xp-log li {
@@ -1162,7 +986,6 @@ body.cat-on .cw .dot { display: none; }
   transition-delay: calc(0.12s + var(--i) * 0.05s);
 }
 
-/* truncation affordance: last visible line dissolves into the page */
 .xp-veil {
   height: 30px;
   margin-top: -30px;
@@ -1180,7 +1003,6 @@ body.cat-on .cw .dot { display: none; }
 
 .xp-card.open .xp-veil { opacity: 0; }
 
-/* toggle — hairline divider, same flanking-line language as .pj-div */
 .xp-more {
   margin: 0.55rem 0 0;
   width: 100%;
@@ -1216,8 +1038,6 @@ body.cat-on .cw .dot { display: none; }
   background: color-mix(in srgb, var(--foreground) 25%, transparent);
 }
 
-/* 70%, not 40%: a focus indicator has to clear 3:1 against what it sits on,
-   and the 40% mix came out at 2.71:1 on white. */
 .xp-more:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--foreground) 70%, transparent);
   outline-offset: 2px;
@@ -1226,7 +1046,6 @@ body.cat-on .cw .dot { display: none; }
 
 .xp-card.open .xp-more svg { transform: rotate(180deg); }
 
-/* ── shared by Experience + Projects: bullet list ── */
 .bullets {
   margin: 1rem 0 0;
   padding: 0;
@@ -1252,9 +1071,6 @@ body.cat-on .cw .dot { display: none; }
 .bullets li span { color: var(--secondary-ink); }
 .bullets li b { font-weight: 500; color: var(--foreground); }
 
-/* ── Experience: tech badges ──
-   Metadata about the role, so they sit under the position line and above the
-   log — compact, and no top divider now that nothing precedes them. */
 .xp-badges {
   display: flex;
   flex-wrap: wrap;
@@ -1288,104 +1104,52 @@ body.cat-on .cw .dot { display: none; }
 
 .badge .bi svg { width: 100%; height: 100%; }
 
-/* ───────────────────────────────────────────────────────────────────────────
-   PROJECTS — two layouts, one section. The admin panel picks which, and the
-   pick arrives as a class on the section root:
-     .pj-v1  "the work ledger" — hairline rows, mono index, active-line gutter
-     .pj-v2  "the build log"   — deployment records under a keyline header
-   Only one is ever mounted, so every rule is scoped by version except the
-   handful marked SHARED, which both layouts render.
-   ─────────────────────────────────────────────────────────────────────────── */
-
-/* ── SHARED: the sub-line under the heading ── */
 .pj-note{margin:.6rem 0 0;color:var(--secondary-ink)}
-/* v1's is a paragraph and takes a measure; v2's is a one-line cursor hint. */
 #projects.pj-v1 .pj-note{font-size:.875rem;line-height:1.6;max-width:52ch}
 #projects.pj-v2 .pj-note{margin-top:.7rem;font-size:.78rem}
-/* the ⌖ marker beside the sentence, a notch down so it reads as a glyph
-   rather than a character of the line */
 #projects.pj-v2 .pj-note .mono{font-size:.72rem}
 
-/* ── SHARED: the live dot ──
-   `pjPing`, not `ping`: globals already carries heroPing / xpPing / ctPing /
-   ghlnPing — the same ring on a different clock, named per section. */
 .pj-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);position:relative;flex-shrink:0}
 .pj-dot::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:1px solid var(--ok);opacity:0;animation:pjPing 2.2s cubic-bezier(0,0,.2,1) infinite}
 @keyframes pjPing{0%{transform:scale(.6);opacity:.7}70%,100%{transform:scale(1.6);opacity:0}}
 
-/* ── SHARED: the "more builds" fold ──
-   Rows 4..n stay in the DOM — they used to mount only on "show more", which
-   kept them out of the served markup. `min-height:0` because a flex item's
-   automatic minimum size would floor the fold at its content height. */
 .pj-fold{display:grid;grid-template-rows:0fr;min-height:0;transition:grid-template-rows .525s cubic-bezier(.22,1,.36,1)}
 .pj-fold>div{overflow:hidden;min-height:0}
 .pj-fold.open{grid-template-rows:1fr}
 .pj-more svg{transition:transform .3s ease}
 .pj-more.open svg{transform:rotate(180deg)}
-/* v2's entries already carry 1.9rem of their own bottom padding, so the shared
-   2rem above the button lands as nearly 4rem of air. The preview cut it back. */
 #projects.pj-v2 .pj-more{margin-top:1.6rem}
 
-/* ── SHARED: the fold's label rule ──
-   v1 leads with the label and trails one rule, so the line reads as the
-   ledger continuing; v2 centres it between two, the way its own end line and
-   the contact dividers do. */
 .pj-div{display:flex;align-items:center;gap:1rem;font-family:var(--font-mono);color:var(--secondary-ink);font-size:10px;letter-spacing:.25em;text-transform:uppercase}
 .pj-div::after{content:"";height:1px;background:var(--border);flex:1}
 #projects.pj-v1 .pj-div{padding:1.5rem 0 .5rem}
 #projects.pj-v2 .pj-div{margin:.4rem 0 1.4rem}
 #projects.pj-v2 .pj-div::before{content:"";height:1px;background:var(--border);flex:1}
 
-/* ── SHARED: the highlight cascade ──
-   Parked state only. Which selector releases it is the version's business,
-   because the two hang the `open` class on different elements. */
 .rv-stagger li{opacity:0;transform:translateY(6px);transition:opacity .4s ease,transform .4s ease}
 
 @media(scripting:none){
-  /* Only the dead control goes. The fold is NOT forced open here: `inert` is on
-     the collapsed rows and no CSS lifts it, so serving them visible would paint
-     content that is excluded from the accessibility tree and skipped by
-     find-in-page. They are in the served HTML either way, which is what the
-     crawler needed. */
   .pj-more{display:none !important}
-  /* v2's entries are parked at opacity:0 waiting on an observer that will never
-     run — without this the whole section reads as blank. */
   #projects.pj-v2 .pjb-entry{opacity:1;filter:none;transform:none}
 }
 
-/* ───────────────────────────────────────────────────────────────────────────
-   v1 — "the work ledger"
-   No hover card and no fill, ever. The structure is permanent hairlines plus
-   a mono index; the feedback lives inside the content — image zoom, underline
-   sweep, arrow slide, sibling dim, and a 2px active-line bar in the gutter.
-   ─────────────────────────────────────────────────────────────────────────── */
 #projects.pj-v1 .pj-list{margin-top:2.4rem;display:flex;flex-direction:column;border-bottom:1px solid var(--border)}
-/* The preview drew this on an 872px measure; `Container` is max-w-3xl, so the
-   real one is ~736px. The columns are re-cut to hold the preview's proportions
-   (media ~34%, prose ~52%) rather than its pixel values — carrying 300px across
-   would have spent the difference entirely out of the prose column. */
 #projects.pj-v1 .pj-row{position:relative;display:grid;grid-template-columns:3.4rem minmax(0,252px) minmax(0,1fr);gap:1.4rem;align-items:start;padding:2rem .25rem 2rem 1rem;border-top:1px solid var(--border);transition:opacity .35s ease}
 #projects.pj-v1 .pj-row.expand{cursor:pointer}
 
-/* the editor's active-line bar — the row's only chrome */
 #projects.pj-v1 .pj-row::before{content:"";position:absolute;left:0;top:1.9rem;bottom:1.9rem;width:2px;background:var(--foreground);transform:scaleY(0);transform-origin:top;transition:transform .5s cubic-bezier(.22,1,.36,1)}
 #projects.pj-v1 .pj-row.open::before,
 #projects.pj-v1 .pj-row.expand:focus-within::before{transform:scaleY(1)}
 @media(hover:hover){
   #projects.pj-v1 .pj-row:hover::before{transform:scaleY(1)}
-  /* Spotlight by subtraction. Hung off the section rather than the list so the
-     dim carries into the fold instead of stopping at its edge. */
   #projects.pj-v1:has(.pj-row:hover) .pj-row:not(:hover){opacity:.38}
 }
-/* the fold's rows close with the same hairline the list does */
 #projects.pj-v1 .pj-fold-list{border-bottom:1px solid var(--border)}
 
-/* index — ranked order, featured first */
 #projects.pj-v1 .pj-idx{font-family:var(--font-mono);font-size:.8rem;color:var(--secondary-ink);padding-top:.35rem;letter-spacing:.05em;transition:color .3s}
 #projects.pj-v1 .pj-row:hover .pj-idx,
 #projects.pj-v1 .pj-row.open .pj-idx{color:var(--foreground)}
 
-/* media — clipped zoom inside a hairline ring, no translate jump */
 #projects.pj-v1 .pj-media{position:relative;display:block;border-radius:.6rem;overflow:hidden;aspect-ratio:16/10;background:var(--muted)}
 #projects.pj-v1 .pj-media::after{content:"";position:absolute;inset:0;border:1px solid var(--border);border-radius:inherit;pointer-events:none;transition:border-color .35s}
 #projects.pj-v1 .pj-media img{display:block;width:100%;height:100%;object-fit:cover;object-position:top;filter:saturate(.9) brightness(.96);transition:transform .65s cubic-bezier(.25,.46,.45,.94),filter .5s ease}
@@ -1393,12 +1157,9 @@ body.cat-on .cw .dot { display: none; }
 #projects.pj-v1 .pj-row:focus-within .pj-media img{transform:scale(1.045);filter:none}
 #projects.pj-v1 .pj-row:hover .pj-media::after{border-color:color-mix(in srgb,var(--foreground) 26%,transparent)}
 
-/* header line — logo · title · hint */
 #projects.pj-v1 .pj-head{display:flex;align-items:center;gap:.55rem;min-width:0}
 #projects.pj-v1 .pj-head .pl{height:20px;width:auto;max-width:40px;border-radius:4px;object-fit:contain;flex-shrink:0}
 #projects.pj-v1 .pj-title{position:relative;display:inline-flex;align-items:center;gap:.45rem;font-size:1.3rem;font-weight:680;letter-spacing:-.02em;line-height:1.2}
-/* the sweep stops short of the arrow so the underline reads as the word's, not
-   the whole flex line's */
 #projects.pj-v1 .pj-title::after{content:"";position:absolute;left:0;right:1.35rem;bottom:-4px;height:1px;background:currentColor;transform:scaleX(0);transform-origin:left;transition:transform .45s cubic-bezier(.22,1,.36,1)}
 #projects.pj-v1 .pj-row:hover .pj-title::after,
 #projects.pj-v1 .pj-title:focus-visible::after{transform:scaleX(1)}
@@ -1411,7 +1172,6 @@ body.cat-on .cw .dot { display: none; }
 
 #projects.pj-v1 .pj-sum{margin:.55rem 0 0;font-size:.885rem;line-height:1.65;color:var(--secondary-ink);max-width:58ch}
 
-/* highlights — grid-rows 0fr→1fr @525ms, the site's canonical expand */
 #projects.pj-v1 .pj-x{display:grid;grid-template-rows:0fr;transition:grid-template-rows .525s cubic-bezier(.22,1,.36,1)}
 #projects.pj-v1 .pj-xin{overflow:hidden;min-height:0;opacity:0;transform:translateY(-4px);transition:opacity .37s ease,transform .37s ease}
 #projects.pj-v1 .pj-row.open .pj-x,
@@ -1423,21 +1183,17 @@ body.cat-on .cw .dot { display: none; }
   #projects.pj-v1 .pj-row.expand:hover .pj-xin{opacity:1;transform:none;transition-delay:.09s}
 }
 
-/* `.bullets` is Experience's list too — every override here stays inside
-   `#projects` or the commit log picks up a mono `+` marker it never asked for. */
 #projects.pj-v1 .bullets{margin:.95rem 0 0;gap:.6rem;font-size:.835rem;line-height:1.66}
 #projects.pj-v1 .bullets li{display:grid;grid-template-columns:14px 1fr;gap:.5rem;color:var(--secondary-ink)}
 #projects.pj-v1 .bullets li i{margin:0;width:auto;height:auto;border-radius:0;background:none;font-style:normal;font-family:var(--font-mono);font-size:.75rem;padding-top:.1rem;color:var(--secondary-ink)}
 #projects.pj-v1 .bullets li i::before{content:"+"}
 #projects.pj-v1 .bullets b{color:var(--foreground);font-weight:620}
-/* 120ms apart, starting once the fold is already moving */
 #projects.pj-v1 .pj-row.open .rv-stagger li,
 #projects.pj-v1 .pj-row.expand:focus-within .rv-stagger li{opacity:1;transform:none;transition-delay:calc(.09s + var(--i)*.12s)}
 @media(hover:hover){
   #projects.pj-v1 .pj-row.expand:hover .rv-stagger li{opacity:1;transform:none;transition-delay:calc(.09s + var(--i)*.12s)}
 }
 
-/* stack — one quiet mono line instead of a pile of pills */
 #projects.pj-v1 .pj-stack{margin:1rem 0 0;font-family:var(--font-mono);font-size:.72rem;letter-spacing:.03em;color:var(--secondary-ink);line-height:1.9}
 #projects.pj-v1 .pj-stack em{font-style:normal;opacity:.55;padding:0 .1rem}
 
@@ -1446,45 +1202,26 @@ body.cat-on .cw .dot { display: none; }
 #projects.pj-v1 .pj-links a:hover{color:var(--foreground)}
 #projects.pj-v1 .pj-links svg{width:13px;height:13px}
 
-/* 768px, not the preview's 860: below the container's own max-width the measure
-   starts shrinking with the viewport, and that is the point the media column has
-   to start giving ground. At 860 the container is still capped, so the step fired
-   while nothing had moved — and widened the prose column as the window narrowed. */
 @media(max-width:768px){
   #projects.pj-v1 .pj-row{grid-template-columns:2.4rem minmax(0,208px) minmax(0,1fr);gap:1.1rem}
 }
 @media(max-width:720px){
-  /* one column: the index and the hover hint are both desktop affordances */
   #projects.pj-v1 .pj-row{grid-template-columns:minmax(0,1fr);gap:1rem;padding-left:.9rem}
   #projects.pj-v1 .pj-idx{display:none}
   #projects.pj-v1 .pj-media{max-width:420px}
   #projects.pj-v1 .pj-hint{display:none}
 }
 
-/* ───────────────────────────────────────────────────────────────────────────
-   v2 — "the build log"
-   Each project is a deployment record. The keyline header
-   (number — domain ——— ● live) borrows the contact section's frequency-row
-   grammar; the badges, arrow slide, thumb lift and hover-expand highlights
-   are the site's own moves. No hover card, no fill.
-   ─────────────────────────────────────────────────────────────────────────── */
 #projects.pj-v2 .pjb-log{margin-top:2.1rem}
 
-/* the record header */
 #projects.pj-v2 .pjb-dep{display:flex;align-items:center;gap:.85rem;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.16em;color:var(--lab-dim);min-width:0}
 #projects.pj-v2 .pjb-n{flex-shrink:0;transition:color .25s}
 #projects.pj-v2 .pjb-d{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:52%;transition:color .25s}
-/* `pjbBlink`/`pjbFlow`: globals already defines a bare `blink` for the hero
-   caret, and `flow` is far too generic to leave unclaimed. */
 #projects.pj-v2 .pjb-caret{display:inline-block;width:.55em;animation:pjbBlink 1s steps(1) infinite}
 @keyframes pjbBlink{50%{opacity:0}}
 #projects.pj-v2 .pjb-dep i{flex:1;height:1px;background:var(--border);min-width:1.5rem;position:relative;overflow:hidden}
-/* the scan line — `--fd` staggers the records so the log breathes out of sync */
 #projects.pj-v2 .pjb-dep i::after{content:"";position:absolute;top:0;left:-28px;width:26px;height:1px;background:linear-gradient(90deg,transparent,var(--foreground),transparent);opacity:.55;animation:pjbFlow 6.5s linear infinite;animation-delay:var(--fd,0s)}
 @keyframes pjbFlow{from{left:-28px}to{left:100%}}
-/* Green is a claim, not a decoration: it means "this is running". Only the row
-   that earned the dot gets it — a repo-only entry reads `source` in the keyline's
-   own ink, or the status word says one thing and its colour says another. */
 #projects.pj-v2 .pjb-s{flex-shrink:0;display:inline-flex;align-items:center;gap:.45rem;color:var(--lab-dim)}
 #projects.pj-v2 .pjb-s:has(.pj-dot){color:var(--ok-ink)}
 
@@ -1497,10 +1234,8 @@ body.cat-on .cw .dot { display: none; }
 
 #projects.pj-v2 .pjb-grid{margin-top:.95rem;display:grid;grid-template-columns:292px minmax(0,1fr);gap:1.35rem;align-items:start}
 
-/* media — the screenshot mounted on the site's dotgrid, zoom clipped inside */
 #projects.pj-v2 .pjb-pad{position:relative;padding:.6rem;border:1px solid var(--border);border-radius:.65rem;background-image:radial-gradient(var(--dotgrid) 1px,transparent 1px);background-size:12px 12px;transition:border-color .25s,transform .25s}
 #projects.pj-v2 .pjb-entry:hover .pjb-pad{border-color:color-mix(in srgb,var(--foreground) 26%,transparent);transform:translateY(-2px)}
-/* notched into the pad's border, so it paints the page ground behind itself */
 #projects.pj-v2 .pjb-prod{position:absolute;top:-.55rem;right:.7rem;padding:0 .4rem;background:var(--background);font-size:9px;letter-spacing:.16em;color:var(--secondary-ink);display:flex;align-items:center;gap:.3rem;transition:color .25s}
 #projects.pj-v2 .pjb-entry:hover .pjb-prod{color:var(--foreground)}
 #projects.pj-v2 .pjb-thumb{display:block;border-radius:.45rem;overflow:hidden;background:var(--muted);aspect-ratio:16/10}
@@ -1530,7 +1265,6 @@ body.cat-on .cw .dot { display: none; }
   #projects.pj-v2 .pjb-entry:hover .pjb-xin{opacity:1;transform:none;transition-delay:.09s}
 }
 
-/* scoped for the same reason v1's are — Experience shares `.bullets` */
 #projects.pj-v2 .bullets{margin:.8rem 0 0;gap:.55rem;font-size:.83rem;line-height:1.65}
 #projects.pj-v2 .bullets li{display:grid;grid-template-columns:13px 1fr;gap:.45rem;color:var(--secondary-ink)}
 #projects.pj-v2 .bullets li i{margin:0;width:auto;height:auto;border-radius:0;background:none;font-style:normal;font-family:var(--font-mono);font-size:.72rem;padding-top:.12rem}
@@ -1542,7 +1276,6 @@ body.cat-on .cw .dot { display: none; }
   #projects.pj-v2 .pjb-entry:hover .rv-stagger li{opacity:1;transform:none;transition-delay:calc(.09s + var(--i)*.12s)}
 }
 
-/* the site's badge pills, at the compact size Experience uses */
 #projects.pj-v2 .pjb-chips{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.85rem}
 #projects.pj-v2 .pjb-chips .badge{font-size:.72rem;padding:2px 9px;gap:5px}
 #projects.pj-v2 .pjb-chips .badge .bi{width:12px;height:12px}
@@ -1552,7 +1285,6 @@ body.cat-on .cw .dot { display: none; }
 #projects.pj-v2 .pjb-links a:hover{color:var(--foreground)}
 #projects.pj-v2 .pjb-links svg{width:13px;height:13px}
 
-/* end line — the log signs off the way the contact section does */
 #projects.pj-v2 .pjb-eol{margin-top:2.6rem;display:flex;align-items:center;gap:1rem;font-family:var(--font-mono);font-size:10px;letter-spacing:.2em;color:var(--lab-dim)}
 #projects.pj-v2 .pjb-eol::before,
 #projects.pj-v2 .pjb-eol::after{content:"";height:1px;background:var(--border);flex:1}
@@ -1564,19 +1296,14 @@ body.cat-on .cw .dot { display: none; }
   #projects.pj-v2 .pjb-hint{display:none}
 }
 
-/* shared: "Show More" button (Projects + Blogs) */
 .show-more{margin:2rem auto 0;display:flex;align-items:center;gap:.5rem;border-radius:.5rem;border:1px solid var(--border);background:transparent;padding:10px 20px;font-size:.875rem;font-weight:500;color:var(--secondary-ink);cursor:pointer;transition:border-color .2s,color .2s}
 .show-more:hover{border-color:color-mix(in srgb,var(--foreground) 30%,transparent);color:var(--foreground)}
 .show-more svg{width:16px;height:16px}
 
-/* SHARED — the keyline. Both sections below open with one, so the ink comes
-   through `--lab-*` rather than a token either of them owns. */
 .lab {
   display: flex;
   align-items: center;
   gap: 12px;
-  /* Every call site writes a bare `class="lab"` — the mono is the unit's, not
-     the caller's. */
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
@@ -1586,10 +1313,7 @@ body.cat-on .cw .dot { display: none; }
   color: var(--lab-dim);
 }
 .lab i { flex: 1; border-top: 1px solid var(--border); }
-/* Letter-spacing trails the last glyph: .18em at 11px pushes the hairline ~2px
-   past where `gap: 12px` says it is. Take it back for a true 12px. */
 .lab > span:first-child { margin-right: -.18em; }
-/* subordination is lighter, not tighter — and lowercase takes no tracking */
 .lab .hint {
   font-weight: 400;
   letter-spacing: 0;
@@ -1597,25 +1321,11 @@ body.cat-on .cw .dot { display: none; }
   color: var(--lab-2);
 }
 
-/* CONTACT — the open channel.
-
-   Scoped under `#contact` throughout: the names are short and generic
-   (`.chip`, `.caret`, `.bars`) and several already mean something else on this
-   page — `.chip` is the hero's pill row, `.caret` its typing cursor.
-
-   Monochrome except `--ok`. `--ok-ink` is its text-safe twin: the graphic green
-   clears 3:1 on white and no more, and the ACK receipt is 12.5px type. */
-
 #contact {
   position: relative;
-  /* 130px above the keyline in the design; 80 of it already arrives as the
-     Container's own `mt-20`, so only the remainder is declared here. */
   padding: 50px 0 110px;
-  /* The dot grid is inset:0 and the error nudge travels ±3px inside the
-     measure, so nothing should overhang — this is the guarantee, not a fix. */
   overflow-x: clip;
 }
-/* faint instrument dot-grid, masked so it breathes out at the edges */
 #contact::before {
   content: "";
   position: absolute;
@@ -1669,8 +1379,6 @@ body.cat-on .cw .dot { display: none; }
   70%, 100% { transform: scale(1.9); opacity: 0; }
 }
 
-/* ── the instrument ──────────────────────────────────────────────────────── */
-
 #contact .scope {
   position: relative;
   margin-top: 34px;
@@ -1705,8 +1413,6 @@ body.cat-on .cw .dot { display: none; }
   text-transform: uppercase;
   color: var(--lab-dim);
 }
-
-/* ── the sentence form ───────────────────────────────────────────────────── */
 
 #contact .sent-form { margin-top: 44px; }
 #contact .sentence {
@@ -1749,8 +1455,6 @@ body.cat-on .cw .dot { display: none; }
   25% { transform: translateX(-3px); }
   75% { transform: translateX(3px); }
 }
-/* The width oracle: the field is sized from a copy of its own value set in the
-   same metrics, so it grows with the sentence instead of sitting in a box. */
 #contact .blank .mirror {
   position: absolute;
   left: -9999px;
@@ -1762,7 +1466,6 @@ body.cat-on .cw .dot { display: none; }
   padding: 0 .1em;
 }
 
-/* purpose — an inline word that opens a chip rail */
 #contact .pk {
   font: inherit;
   color: var(--foreground);
@@ -1821,7 +1524,6 @@ body.cat-on .cw .dot { display: none; }
   border-color: var(--foreground);
 }
 
-/* message — the long blank gets its own line */
 #contact .msg-line { display: block; margin-top: 6px; }
 #contact .msg-line textarea {
   display: block;
@@ -1848,7 +1550,6 @@ body.cat-on .cw .dot { display: none; }
 #contact .msg-line textarea:focus { border-bottom-color: var(--foreground); }
 #contact .msg-line.err textarea { border-bottom-color: var(--err); animation: nudge .3s ease; }
 
-/* transmit row */
 #contact .tx-row {
   display: flex;
   align-items: center;
@@ -1885,14 +1586,10 @@ body.cat-on .cw .dot { display: none; }
 }
 #contact .tx-btn:hover { transform: translateY(-2px); }
 #contact .tx-btn:active { transform: translateY(0) scale(.98); }
-/* `aria-disabled`, not `disabled`: the browser blurs an element the moment it
-   becomes disabled, dropping a keyboard visitor to <body> mid-send. Ordered
-   after :hover so the lift is cancelled while in flight. */
 #contact .tx-btn[aria-disabled='true'] { opacity: .55; cursor: wait; transform: none; }
 #contact .tx-btn .up { display: inline-flex; transition: transform .3s cubic-bezier(.22, 1, .36, 1); }
 #contact .tx-btn:hover .up { transform: translateY(-3px); }
 #contact .tx-btn svg { width: 15px; height: 15px; }
-/* a tiny waveform lives inside the button */
 #contact .tx-btn .btnwave { display: inline-flex; align-items: center; gap: 2.5px; height: 14px; }
 #contact .tx-btn .btnwave i { width: 2px; border-radius: 1px; background: currentColor; height: 4px; opacity: .85; }
 #contact .tx-btn:hover .btnwave i { animation: eq .7s ease-in-out infinite alternate; }
@@ -1912,7 +1609,6 @@ body.cat-on .cw .dot { display: none; }
 }
 @keyframes rot { to { transform: rotate(360deg); } }
 
-/* the typed ACK receipt */
 #contact .ack {
   margin-top: 26px;
   min-height: 22px;
@@ -1923,9 +1619,6 @@ body.cat-on .cw .dot { display: none; }
   white-space: pre-wrap;
 }
 #contact .ack .ok { color: var(--ok-ink); }
-/* `opacity` and `transform` are reset, not inherited-away: the hero's own
-   `.caret` sets both, and a rule that only names the box would leave this one
-   at 85% and a tenth of an em low. */
 #contact .ack .caret {
   display: inline-block;
   width: .55em;
@@ -1948,8 +1641,6 @@ body.cat-on .cw .dot { display: none; }
   padding: 0;
 }
 
-/* ── carrier line (email): one button, the address riding its wave ───────── */
-
 #contact .carrier { margin-top: 76px; }
 #contact .car-copied {
   font-weight: 400;
@@ -1961,8 +1652,6 @@ body.cat-on .cw .dot { display: none; }
   transition: opacity .3s ease, transform .3s ease;
 }
 #contact .car-copied.on { opacity: 1; transform: none; }
-/* THE RULE IS THE AFFORDANCE — the whole strip is the button, including the run
-   past the end of the address, which is the largest target in the section. */
 #contact .car-btn {
   display: block;
   width: 100%;
@@ -2018,7 +1707,6 @@ body.cat-on .cw .dot { display: none; }
 #contact .car-btn.copied .car-ic { border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
 #contact .car-btn.copied .car-ic .ic-copy { display: none; }
 #contact .car-btn.copied .car-ic .ic-check { display: block; }
-/* the wave IS the underline */
 #contact .car-wave { display: block; width: 100%; height: 30px; margin-top: 2px; }
 #contact .car-sub { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
 #contact .car-open {
@@ -2030,8 +1718,6 @@ body.cat-on .cw .dot { display: none; }
   transition: color .2s;
 }
 #contact .car-open:hover { color: var(--foreground); }
-
-/* ── the dial ────────────────────────────────────────────────────────────── */
 
 #contact .freqs { margin-top: 56px; }
 #contact .fq-list { margin-top: 6px; }
@@ -2096,14 +1782,8 @@ body.cat-on .cw .dot { display: none; }
   text-transform: uppercase;
   color: var(--lab-dim);
 }
-/* Same call as the hero location line: 10.5px of tracked-out grey mono was too
-   faint to read. The line steps up to the 12px floor, the coordinates keep the
-   quiet ink, and the city takes full foreground via .loc-city. */
 #contact .ct-close .coord { letter-spacing: .06em; text-transform: none; color: var(--lab-2); }
 
-/* Entrances. `backwards` fill with no resting `opacity: 0` is the whole no-JS
-   story: `.in` is added by an IntersectionObserver, so without scripting it
-   never lands, nothing runs, and every block is simply there. */
 #contact .ct.in .rv { animation: rise .65s cubic-bezier(.22, 1, .36, 1) var(--d, 0s) backwards; }
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
 
@@ -2113,9 +1793,6 @@ body.cat-on .cw .dot { display: none; }
   #contact .sentence { line-height: 1.95; }
 }
 
-/* 88.1 · GITHUB — the year in one line. Hover or keyboard focus unfolds it on
-   the same contract as the site's other folds: grid 0fr→1fr, `:focus-visible`
-   opens, touch is always open. */
 #contact .fqx { position: relative; }
 #contact .ghv {
   font-family: var(--font-mono);
@@ -2138,10 +1815,6 @@ body.cat-on .cw .dot { display: none; }
   transform: translateY(-4px);
   transition: opacity .3s ease, transform .3s ease;
 }
-/* 22px of headroom, not 14: the scrub readout moved off the plot onto its own
-   rail above it, and that rail has to clear both the row's keyline and the peak
-   label under it — 5px above, 3px below. `.ghln-in` clips at this element's
-   border box, so anything the padding doesn't pay for is simply cut. */
 #contact .ghln-body { position: relative; padding: 22px 2px 16px; border-bottom: 1px solid var(--border); }
 #contact .fqx:hover .ghln,
 #contact .fqx:has(.fq:focus-visible) .ghln {
@@ -2153,7 +1826,6 @@ body.cat-on .cw .dot { display: none; }
 #contact .ghln-stage { position: relative; cursor: crosshair; touch-action: pan-y; }
 #contact .ghln-stage svg { display: block; width: 100%; height: 60px; overflow: visible; }
 
-/* one ink. the gradient is time: the past at a whisper, now at full. */
 #contact .ghln stop { stop-color: currentColor; }
 #contact .ghln .stroke {
   fill: none;
@@ -2173,9 +1845,6 @@ body.cat-on .cw .dot { display: none; }
   pointer-events: none;
   font-family: var(--font-mono);
   font-size: 8.5px;
-  /* Stated, not inherited: this box's height is what holds it off the readout's
-     rail, and preflight's 1.5 would make that distance a function of whichever
-     mono actually loaded. */
   line-height: 12px;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -2184,7 +1853,6 @@ body.cat-on .cw .dot { display: none; }
   opacity: 0;
 }
 
-/* the live end — the only green on the line */
 #contact .ghln-dot {
   position: absolute;
   width: 5px;
@@ -2208,7 +1876,6 @@ body.cat-on .cw .dot { display: none; }
   70%, 100% { transform: scale(1.9); opacity: 0; }
 }
 
-/* scrub: a hairline, a dot on the curve, a whispered readout */
 #contact .ghln .cur {
   stroke: color-mix(in srgb, var(--foreground) 45%, transparent);
   stroke-width: 1;
@@ -2228,13 +1895,6 @@ body.cat-on .cw .dot { display: none; }
 #contact .ghln-stage:hover .curdot,
 #contact .ghln-stage:active .cur,
 #contact .ghln-stage:active .curdot { opacity: 1; }
-/* Two labels, two rails. Both used to sit in the same 12px band — `peak 42`
-   centred on its point, this one right-anchored and up to 220px long — so past
-   about a third of the year their baselines landed ~1px apart and the peak's
-   number read as noise inside the readout's. Nothing is ever drawn above y=16,
-   so the readout takes the empty rail above the plot and the peak keeps the one
-   over its own dot. Both state a 12px line box rather than inheriting 1.5, so
-   the two rails stay a fixed distance apart whatever font actually loads. */
 #contact .ghln-ro {
   position: absolute;
   top: -17px;
@@ -2246,9 +1906,6 @@ body.cat-on .cw .dot { display: none; }
   letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--foreground);
-  /* It only fits on one rail if it stays on one line: the longest string runs
-     220px against a 284px stage at the narrowest, and a wrap would drop the
-     second line straight back onto the peak. */
   white-space: nowrap;
   opacity: 0;
   transition: opacity .15s;
@@ -2257,16 +1914,6 @@ body.cat-on .cw .dot { display: none; }
 #contact .ghln-stage:hover .ghln-ro,
 #contact .ghln-stage:active .ghln-ro { opacity: 1; }
 
-/* the line writes itself each time the fold opens */
-/* `pathLength="1"` normalises the dash against the curve's length in USER
-   space, but `non-scaling-stroke` lays that dash down in DEVICE pixels — so a
-   dash of 1 covers `device length / user length` of the line, never all of it.
-   That ratio is the viewBox's stretch times the display's pixel ratio, which is
-   two different unknowns at author time: a hard-coded 1.15 drew the whole year
-   on a 1x monitor and stopped it barely past halfway on a retina one. GhLine
-   measures the ratio and sets `--draw`; the fallback here is only what shows if
-   that never runs, and it errs long, because a dash that overshoots finishes
-   drawing early and one that falls short never finishes at all. */
 #contact .ghln .stroke { stroke-dasharray: var(--draw, 3.2); stroke-dashoffset: var(--draw, 3.2); }
 #contact .fqx:hover .stroke,
 #contact .fqx:has(.fq:focus-visible) .stroke {
@@ -2280,8 +1927,6 @@ body.cat-on .cw .dot { display: none; }
 #contact .fqx:hover .ghln-pk,
 #contact .fqx:has(.fq:focus-visible) .ghln-pk { transition: opacity .5s ease 1.55s; opacity: 1; }
 
-/* no pointer, no dwell to spend: on touch the panel is open from first paint
-   and the line draws when it scrolls into view. */
 @media (hover: none) {
   #contact .ghv { display: none; }
   #contact .ghln { grid-template-rows: 1fr; }
@@ -2292,7 +1937,6 @@ body.cat-on .cw .dot { display: none; }
   #contact .ghln.in .ghln-pk { transition: opacity .5s ease 1.7s; opacity: 1; }
 }
 
-/* one caption line — the label and the ledger share it */
 #contact .ghln-cap {
   margin: 10px 0 0;
   font-family: var(--font-mono);
@@ -2303,17 +1947,7 @@ body.cat-on .cw .dot { display: none; }
 }
 #contact .ghln-cap b { font-weight: 500; color: var(--lab-2); }
 
-/* THOUGHT OF THE DAY — living type.
-
-   Two rungs, one measure: `ch` scales with the type, so both caps land at
-   roughly the same ~620px of column while holding a different number of
-   characters a line. Which rung a quote gets is decided server-side from its
-   length (`rung()` in ThoughtOfTheDay.tsx); that and these two caps are the
-   whole tuning surface. Nothing steps UP. */
-
 .thought {
-  /* 72px above the keyline in the design, all of which arrives as the
-     Container's own `mt-20` — only the tail is declared here. */
   padding: 0 0 8px;
 }
 .thought .th-wrap {
@@ -2321,8 +1955,6 @@ body.cat-on .cw .dot { display: none; }
   --q-size: clamp(30px, 6.4vw, 52px);
   --q-cap: 19ch;
 }
-/* Past 90 characters the block has stopped being an aphorism. Same column,
-   smaller type, more of it a line. */
 .thought .th-wrap[data-len='long'] {
   --q-size: clamp(24px, 4.4vw, 38px);
   --q-cap: 26ch;
@@ -2338,40 +1970,22 @@ body.cat-on .cw .dot { display: none; }
   cursor: default;
 }
 .thought .th-quote p { margin: 0; text-wrap: balance; }
-/* The trailing space lives INSIDE each span and `pre` is what keeps it — an
-   inline-block would otherwise collapse it and fuse every word to the next. */
 .thought .th-quote .w {
   display: inline-block;
-  /* `pre-wrap`, not `pre`: each span carries its own trailing space and both
-     values preserve it, but `pre` also forbids breaking inside the span — one
-     unbroken 100-character token in a CMS quote then ran the whole page off the
-     side on a phone. `anywhere` is what actually breaks it. */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-variation-settings: 'wght' var(--w, 250), 'opsz' 32;
   will-change: font-variation-settings;
 }
-/* Pinned by ThoughtEntry to the word's resting width, so a swell can no longer
-   rewrap the line under the cursor. The extra weight has to leave the box
-   rather than fold inside it, and `pre` is the one value that forbids every
-   break — `pre-wrap` would take the trailing space as its opportunity and drop
-   an empty second line under the word. Safe here and nowhere else: `.w-pin`
-   only ever lands on a span that already fit on one line, and both values
-   measure the box identically. Centring sends the spill both ways, so the word
-   grows around its own middle. */
 .thought .th-quote .w.w-pin {
   white-space: pre;
   text-align: center;
 }
-/* `backwards` fill with no resting `opacity: 0` is the whole no-JS story: `.in`
-   arrives from an IntersectionObserver, so without scripting nothing runs and
-   the quote is simply there, at its resting weight. */
 .thought .th-wrap.in .th-quote .w {
   animation: wIn .7s cubic-bezier(.22, 1, .36, 1) var(--d, 0s) backwards;
 }
 @keyframes wIn { from { opacity: 0; transform: translateY(.35em); filter: blur(6px); } }
 
-/* The instruction is only true where there is a cursor to move. */
 .thought .th-hintline {
   margin-top: 8px;
   font-size: 10.5px;
@@ -2383,8 +1997,6 @@ body.cat-on .cw .dot { display: none; }
 .thought .th-wrap.in .th-hintline { opacity: .75; }
 @media (hover: none) { .thought .th-hintline { display: none; } }
 
-/* The close: rule first, name flush right on the quote's own measure. The rule
-   running into the name IS the attribution dash. */
 .thought .th-foot {
   display: flex;
   align-items: center;
@@ -2395,8 +2007,6 @@ body.cat-on .cw .dot { display: none; }
 }
 .thought .th-wrap.in .th-foot { animation: footIn .6s ease .55s backwards; }
 @keyframes footIn { from { opacity: 0; transform: translateY(8px); } }
-/* Without a floor a long name squeezes `flex: 1` to nothing and the section's
-   only ornament disappears on exactly the rows where it works hardest. */
 .thought .th-foot i { flex: 1; min-width: 24px; border-top: 1px solid var(--border); }
 .thought .th-author { font-size: 13px; line-height: 20px; color: var(--lab-2); overflow-wrap: anywhere; }
 
@@ -2406,9 +2016,6 @@ body.cat-on .cw .dot { display: none; }
   .paw-btn.on .paw,
   .paw-btn.on .paw::before { animation: none; }
 
-  /* Entrance blur/translate fades can trigger vestibular discomfort — show
-     content immediately instead. opacity:1 also guards against the base
-     opacity:0 ever stranding content if animations are otherwise suppressed. */
   .animate-fade-in-blur {
     animation: none;
     opacity: 1;
@@ -2420,29 +2027,18 @@ body.cat-on .cw .dot { display: none; }
   .animate-delay-5,
   .animate-delay-6 { animation-delay: 0s; }
 
-  /* Stop the infinite hero-title gradient sweep. */
   .title-gradient,
   .dark .title-gradient { animation: none; }
 
-  /* The background beam sweep. Hidden here rather than only in the component,
-     because that gate runs in a passive effect after the hydration paint —
-     CSS applies before first paint, so there is no flash to remove. */
   .bg-beams-layer { display: none; }
 
-  /* Navbar dock/undock, hover pill and menu panel: snap, don't glide. */
   .rn-body,
   .rn-mobile,
   .rn-pill { transition: none; }
   .rn-menu { animation: none; }
 
-  /* ── section additions (spec §5) ─────────────────────────────────────── */
-
-  /* Hash jumps land instantly instead of gliding. */
   html { scroll-behavior: auto; }
 
-  /* Every looping animation the new sections add: the availability ripple,
-     the terminal caret, the walking paw cue, the cat on the wire, the "now"
-     ping ring and its pulsing dot. */
   .avail i::after,
   .caret,
   .cue i,
@@ -2450,8 +2046,6 @@ body.cat-on .cw .dot { display: none; }
   .xp-cur i,
   .xp-node.live::after { animation: none !important; }
 
-  /* Experience "commit history": no spotlight, no sibling dim, no cascade —
-     the fold still opens, it just snaps instead of sliding. */
   .xp-card,
   .xp-node,
   .xp-log li > span:last-child,
@@ -2470,12 +2064,9 @@ body.cat-on .cw .dot { display: none; }
     transition: none !important;
   }
 
-  /* The cursor-trailing hero photo is pure motion — swap in the static deck. */
   .peek { display: none !important; }
   .peek-stack { display: block; }
 
-  /* Hover/expand choreography collapses to instant state changes; project
-     bullets are shown outright rather than cascading in. */
   .roleword,
   .chip,
   .btn:hover,
@@ -2487,8 +2078,6 @@ body.cat-on .cw .dot { display: none; }
   .pj-xin,
   .pjb-x,
   .pjb-xin { transition: none !important; }
-  /* useMagnetic never attaches under this preference, so this only catches a
-     lean left mid-flight by a preference flipped while the pointer was down. */
   .btn { translate: none !important; }
   .rv-stagger li {
     opacity: 1 !important;
@@ -2496,14 +2085,9 @@ body.cat-on .cw .dot { display: none; }
     transition: none !important;
   }
 
-  /* The "more builds" fold still opens — it carries content, not decoration —
-     it just arrives instead of travelling. Same for the highlights above. */
   .pj-fold,
   .pj-more svg { transition: none; }
 
-  /* Projects, either layout. v2's records are parked at opacity:0 until an
-     observer marks them `in`; park them at their natural state instead so the
-     scroll never has to earn them. */
   #projects.pj-v2 .pjb-entry {
     opacity: 1;
     filter: none;
@@ -2511,14 +2095,10 @@ body.cat-on .cw .dot { display: none; }
     transition: none !important;
   }
 
-  /* The loops: the scan line crossing each keyline, the domain's typing caret
-     and the live dot's ping ring. */
   #projects.pj-v2 .pjb-dep i::after { display: none; }
   #projects.pj-v2 .pjb-caret,
   .pj-dot::after { animation: none !important; }
 
-  /* Hover choreography collapses to state: no zoom, no sibling dim, and the
-     gutter bar snaps in rather than wiping down the row. */
   #projects.pj-v1 .pj-media img,
   #projects.pj-v2 .pjb-thumb img { transform: none !important; transition: none !important; }
   #projects.pj-v1 .pj-row,
@@ -2526,30 +2106,19 @@ body.cat-on .cw .dot { display: none; }
   #projects.pj-v1 .pj-title::after { transition: none !important; }
   #projects.pj-v1:has(.pj-row:hover) .pj-row:not(:hover) { opacity: 1; }
 
-  /* Contact and thought both arrive already there. Every entrance in the two
-     sections is `backwards`-filled off a keyframe rather than parked at
-     `opacity: 0`, so dropping the animation leaves the natural state and no
-     `!important` reset is needed to rescue the content. */
   #contact .ct.in .rv,
   .thought .th-wrap.in .th-quote .w,
   .thought .th-wrap.in .th-foot { animation: none !important; }
 
-  /* The loops: the signal dot's ping, the transmit button's equaliser, the
-     dial's bars, and the live end of the year line. The instrument itself goes
-     quiet in Scope.tsx and Carrier.tsx, which draw one static frame instead. */
   #contact .sig-dot::after,
   #contact .tx-btn:hover .btnwave i,
   #contact .fq:hover .bars i { animation: none !important; }
   #contact .ghln-dot::after { animation: none; opacity: 0; }
 
-  /* Neither carries meaning on its own: the red rule marks the field, the ACK
-     names it, and the button says "Transmitting" in words. */
   #contact .blank.err input,
   #contact .msg-line.err textarea,
   #contact .spin { animation: none !important; }
 
-  /* Lift and travel go; every state stays reachable — the ACK still types, the
-     copy still confirms, the chip rail and the year still open. */
   #contact .tx-btn:hover,
   #contact .tx-btn:hover .up,
   #contact .car-btn:hover .car-ic,
@@ -2559,8 +2128,6 @@ body.cat-on .cw .dot { display: none; }
   #contact .ghln-in { transition-duration: .01ms !important; }
   .thought .th-hintline { transition: none; }
 
-  /* The year in one line is drawn rather than written: without the dash the
-     stroke is simply present the moment the fold opens. */
   #contact .ghln .stroke {
     stroke-dasharray: none;
     stroke-dashoffset: 0;

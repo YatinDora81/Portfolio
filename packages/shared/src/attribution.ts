@@ -14,7 +14,6 @@ export const CHANNELS = [
 
 export type Channel = (typeof CHANNELS)[number];
 
-// Without `lnkd.in` and `t.co`, every link posted on LinkedIn or X arrives as its own channel.
 const HOST_CHANNELS: Record<string, Channel> = {
   "linkedin.com": "linkedin",
   "m.linkedin.com": "linkedin",
@@ -40,7 +39,6 @@ const HOST_CHANNELS: Record<string, Channel> = {
   "startpage.com": "search",
   "baidu.com": "search",
   "yandex.com": "search",
-  // Answer engines are search from the visitor's side: they asked, they clicked through.
   "chatgpt.com": "search",
   "chat.openai.com": "search",
   "perplexity.ai": "search",
@@ -104,7 +102,6 @@ function hostOf(value: string): string | null {
   }
 }
 
-/** Accepts a full referrer URL or a bare host; returns the host with `www.` stripped. */
 export function normalizeHost(referrer: string | null | undefined): string | null {
   const raw = referrer?.trim();
   if (!raw) return null;
@@ -114,7 +111,6 @@ export function normalizeHost(referrer: string | null | undefined): string | nul
   return host.startsWith("www.") ? host.slice(4) : host;
 }
 
-// Walks the labels so `gist.github.com` resolves without an entry of its own, stopping before the TLD.
 function channelForHost(host: string | null): Channel | null {
   if (!host) return null;
 
@@ -128,7 +124,6 @@ function channelForHost(host: string | null): Channel | null {
   return null;
 }
 
-// In-app browsers strip the referrer; Meta has no channel of its own, but "other" beats a false "direct".
 function inAppChannel(userAgent: string | null | undefined): Channel | null {
   const ua = userAgent?.trim();
   if (!ua) return null;
@@ -148,7 +143,7 @@ function bounded(value: string | null | undefined): string | null {
   return trimmed || null;
 }
 
-/** First match wins; the last rungs catch referrals that would otherwise pile into "direct". */
+/** First match wins. */
 export function resolveAttribution(input: AttributionInput): Attribution {
   const raw = {
     rawSource: bounded(input.utmSource),
@@ -159,7 +154,6 @@ export function resolveAttribution(input: AttributionInput): Attribution {
   const host = normalizeHost(input.referrer);
   const ownHost = normalizeHost(input.ownHost);
   const selfReferred = host !== null && host === ownHost;
-  // Our own pages are not a source; counting them would dilute every channel.
   const referrerHost = selfReferred ? null : host;
   const decided = (channel: Channel): Attribution => ({ channel, referrerHost, ...raw });
 
@@ -180,7 +174,7 @@ export function resolveAttribution(input: AttributionInput): Attribution {
   if (inApp) return decided(inApp);
 
   const site = input.secFetchSite?.trim().toLowerCase();
-  // "cross-site" with no referrer means the referrer was stripped, not absent.
+  // cross-site with no referrer means it was stripped, not absent
   if (site === "cross-site") return decided("unknown-referred");
 
   const internalNav = selfReferred || site === "same-origin" || site === "same-site";

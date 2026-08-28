@@ -6,22 +6,11 @@ import {
   IconArrowNarrowDown, IconArrowUpRight, IconPaw, IconTerminal2,
 } from "@tabler/icons-react";
 
-/**
- * The cat.
- *
- * Two SiteConfig rows are the whole of what an editor can change — `catNapStyle`
- * and `catNapSeconds`. Everything else the cat does lives in apps/web code, so
- * the rest of this page documents rather than pretends: no control here drives
- * anything it cannot actually write.
- */
-
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/+$/, "");
 
-/** apps/web falls back to exactly these when the row is missing, so a blank
-    database still shows what the site is really serving. */
+// apps/web falls back to these when the row is missing
 const DEFAULTS = { catNapStyle: "ticks", catNapSeconds: "30" };
 
-/** The four cat surfaces with nothing behind them to edit. */
 const SURFACES = [
   {
     glyph: <IconPaw size={15} stroke={1.7} />,
@@ -49,7 +38,6 @@ const SURFACES = [
   },
 ];
 
-/** Facts that stop this page overstating its own reach. */
 const FACTS = [
   {
     k: "desktop only",

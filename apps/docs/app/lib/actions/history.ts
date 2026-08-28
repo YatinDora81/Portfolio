@@ -3,14 +3,6 @@
 import { prisma } from "db";
 import { getSession } from "@/lib/session";
 
-/**
- * The per-event field diffs, fetched only when a row is opened.
- *
- * Its own session check, because `"use server"` exports compile to public POST
- * endpoints and the history is the one table that quotes other people's work
- * verbatim. The list page is deliberately children-free — one reorder can carry
- * hundreds of these — so this is where the before/after text actually loads.
- */
 export async function historyDetail(eventId: string): Promise<{
   ok: boolean;
   changes?: {

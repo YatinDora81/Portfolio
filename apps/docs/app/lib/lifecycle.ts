@@ -1,8 +1,6 @@
 import type { ContentStatus } from "db";
 
-// Imported by client forms and by server actions, so no `server-only` here and nothing that pulls one in.
-
-// Declared order, not alphabetical: this drives the filter tabs and the selector.
+// declared order, not alphabetical: this drives the filter tabs
 export const CONTENT_STATUSES = ["DRAFT", "SCHEDULED", "PUBLISHED", "ARCHIVED"] as const;
 
 export const STATUS_LABEL: Record<ContentStatus, string> = {
@@ -27,15 +25,13 @@ export function statusChip(status: ContentStatus): string {
   return `chip st-${status.toLowerCase()}`;
 }
 
-// IST is UTC+05:30 year-round, which is what lets these conversions be arithmetic instead of a timezone-database lookup.
-
+// IST is UTC+05:30 year-round
 const IST_OFFSET_MINUTES = 330;
 const MINUTE_MS = 60_000;
 const IST_OFFSET_MS = IST_OFFSET_MINUTES * MINUTE_MS;
 
 export const IST_ZONE = "Asia/Kolkata";
 
-/** IST in, UTC out. `new Date("2026-09-01T10:30")` would resolve in the runtime's own zone; `Date.UTC` minus the offset is zone-independent. Null on anything unparseable. */
 export function istInputToUtc(value: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2})?$/.exec(value.trim());
   if (!m) return null;
@@ -46,7 +42,7 @@ export function istInputToUtc(value: string): Date | null {
   const hour = Number(m[4]);
   const minute = Number(m[5]);
 
-  // Range-checked before `Date.UTC`, which silently rolls 31 February over into March rather than refusing it.
+  // Date.UTC silently rolls 31 February over into March
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
   if (hour > 23 || minute > 59) return null;
 
@@ -54,16 +50,13 @@ export function istInputToUtc(value: string): Date | null {
   if (Number.isNaN(utcMs)) return null;
 
   const when = new Date(utcMs);
-  // Round-trip guard for the rollovers the range check cannot see (31 Apr, 29 Feb in a common year).
   return utcToIstInput(when) === `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}` ? when : null;
 }
 
-/** UTC in, IST out. `toISOString` because it is the one formatter that never consults the runtime's zone, so server and client emit the same characters. */
 export function utcToIstInput(instant: Date): string {
   return new Date(instant.getTime() + IST_OFFSET_MS).toISOString().slice(0, 16);
 }
 
-/** The zone is named so both render passes format identically. */
 const istFormat = new Intl.DateTimeFormat("en-GB", {
   timeZone: IST_ZONE,
   day: "2-digit", month: "short", year: "numeric",
@@ -93,7 +86,6 @@ export type ResolvedLifecycle =
   | { ok: true; status: ContentStatus; publishAt: Date | null }
   | { ok: false; error: string };
 
-/** Refuses a status it does not recognise rather than defaulting to one, and returns the refusal rather than throwing, because a throw inside a server action reaches production as an opaque digest. */
 export function resolveLifecycle(
   rawStatus: unknown,
   rawPublishAtIst: unknown,
@@ -107,7 +99,6 @@ export function resolveLifecycle(
   }
 
   if (rawStatus !== "SCHEDULED") {
-    // Cleared on purpose: a `publishAt` left on a non-scheduled row would arrive already overdue if the row ever returns to SCHEDULED.
     return { ok: true, status: rawStatus, publishAt: null };
   }
 

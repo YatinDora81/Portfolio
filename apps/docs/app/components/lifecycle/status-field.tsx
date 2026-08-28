@@ -9,7 +9,6 @@ import {
 } from "@/lib/lifecycle";
 import { IconAlertTriangle, IconClock } from "@tabler/icons-react";
 
-// The field is named `publishAtIst` because <input type="datetime-local"> hands back a bare wall clock.
 export function StatusField({ noun, status, onStatus, publishAtIst, onPublishAt, error }: {
   noun: string;
   status: ContentStatus;
@@ -19,7 +18,7 @@ export function StatusField({ noun, status, onStatus, publishAtIst, onPublishAt,
   onPublishAt: (next: string) => void;
   error?: string | null;
 }) {
-  // Gated on mount: Date.now() differs between server and browser and would break hydration.
+  // date.now() differs on the server and would break hydration
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -35,7 +34,6 @@ export function StatusField({ noun, status, onStatus, publishAtIst, onPublishAt,
         value={status}
         onChange={(e) => {
           const next = e.target.value;
-          // Narrowed, never defaulted: falling back to DRAFT would silently unpublish.
           if (isContentStatus(next)) onStatus(next);
         }}
         options={CONTENT_STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s] }))}

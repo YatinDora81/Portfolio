@@ -1,16 +1,5 @@
 'use client';
 
-/**
- * Skills — "Periodic Table v2.4"
- *
- * v2.4: light mode glow-up — bright brand colors (JS yellow, Linux yellow,
- *       Next.js near-white…) auto-darken on white via a luminance check, and
- *       cards get a soft resting elevation shadow (dark mode is untouched).
- * v2.3: skills with no icon in icon-map fall back to their element symbol.
- * v2.2: clicking anywhere outside the chips/cards resets the filter to "all".
- * v2.1 fix: the stagger animation lives on a WRAPPER div, not the card.
- */
-
 import { useEffect, useMemo, useState } from 'react';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
@@ -49,12 +38,6 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-/**
- * Brand colors are picked for dark backgrounds; on white, bright ones
- * (yellows, cyans, near-whites) wash out. In light mode, darken any color
- * whose luminance is too high — proportionally, so mid-tones keep their hue.
- * Dark mode returns the color untouched.
- */
 function tune(hex: string, isDark: boolean): string {
   if (isDark) return hex;
   const h = hex.replace('#', '');
@@ -97,8 +80,7 @@ function ElementCard({
   const c = tune(skill.color, isDark);
 
   return (
-    // Animation wrapper — entry stagger ONLY. Never put the entry animation on
-    // the interactive card itself: `forwards` fill overrides hover transforms.
+    // stagger goes on the wrapper, not the card
     <div
       className="animate-fade-in-blur"
       style={{ animationDelay: `${Math.min(index * 18, 500)}ms` }}
@@ -107,10 +89,6 @@ function ElementCard({
         type="button"
         data-skills-control="card"
         aria-label={skill.name}
-        // Out of the tab order while dimmed, alongside the pointer-events
-        // removal. `opacity` composites the focus ring's own box-shadow, so a
-        // dimmed card at opacity-15 takes a 3:1 ring down to 1.26:1 — a tab
-        // stop with no visible focus position at all.
         tabIndex={dimmed ? -1 : 0}
         onMouseEnter={() => onHover(skill.number)}
         onMouseLeave={() => onHover(null)}
@@ -134,7 +112,6 @@ function ElementCard({
             : 'hover:-translate-y-0.5 hover:bg-foreground/[0.03]',
         ].join(' ')}
       >
-        {/* category accent hairline */}
         <span
           aria-hidden
           className="pointer-events-none absolute inset-x-2.5 top-0 h-[2px] rounded-b-full transition-[background,box-shadow] duration-300"
@@ -144,23 +121,11 @@ function ElementCard({
           }}
         />
 
-        {/* atomic number + element symbol */}
         <span className="flex w-full items-start justify-between pt-1">
-          {/* <span className="font-mono text-[8px] leading-none text-secondary">
-            {pad(skill.number)}
-          </span>
-          <span
-            className="font-mono text-[8px] font-semibold leading-none transition-colors duration-300"
-            style={{ color: hovered ? c : hexToRgba(c, 0.6) }}
-          >
-            {skill.symbol}
-          </span> */}
         </span>
 
         <span className="flex size-6 items-center justify-center self-center transition-transform duration-300 group-hover/card:scale-110 sm:size-7">
           {icon ?? (
-            // No icon in the icon-map? Show the element symbol instead —
-            // every card always looks intentional, never an empty hole.
             <span
               className="text-[13px] font-extrabold leading-none tracking-tight"
               style={{ color: c }}
@@ -174,7 +139,6 @@ function ElementCard({
           {skill.name}
         </span>
 
-        {/* brand-colored spotlight */}
         <span
           aria-hidden
           className="pointer-events-none absolute inset-0 rounded-lg opacity-0 transition-opacity duration-300 group-hover/card:opacity-100"
@@ -196,8 +160,6 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  // A filter is active → clicking anywhere that ISN'T a chip or a skill card
-  // (empty space, other sections, even a dimmed card) resets back to "all".
   useEffect(() => {
     if (filter === null) return;
     const onDocClick = (e: MouseEvent) => {
@@ -243,9 +205,6 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
     {
       id: null as SkillCategoryId | null,
       label: 'All',
-      // `tune()` only darkens above a luminance of 160 and this grey sits at
-      // 144, so it passes through untouched — which left the light theme at
-      // 3.19:1. The two values are the `--secondary-ink` pair.
       color: isDark ? '#909092' : '#6e6e70',
       count: enriched.length,
     },
@@ -272,7 +231,6 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
           a category to filter, hover any element to bring it to life.
         </p>
 
-        {/* Category filter chips — on top, with counts */}
         <div className="mt-7 flex flex-wrap items-center gap-2">
           {chips.map((chip) => {
             const selected = filter === chip.id;
@@ -317,7 +275,6 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
           })}
         </div>
 
-        {/* The table — one continuous grid, original order intact */}
         <div className="mt-6 flex flex-wrap justify-center gap-1.5 sm:gap-2">
           {enriched.map((skill, i) => {
             const dimmed = filter !== null && filter !== skill.category;
@@ -335,7 +292,6 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
           })}
         </div>
 
-        {/* Live readout — stable height, shows the hovered element */}
         <div className="mt-6 flex h-5 items-center justify-center gap-2 font-mono text-[11px] text-secondary">
           {hoveredSkill && (
             <>

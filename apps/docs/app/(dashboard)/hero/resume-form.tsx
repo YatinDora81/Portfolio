@@ -12,29 +12,14 @@ import {
   IconAlertTriangle, IconArrowUpRight, IconCheck, IconDeviceFloppy, IconWorldUpload,
 } from "@tabler/icons-react";
 
-/**
- * Card 06 — moved here from /links when that route folded into the hero.
- *
- * It keeps `updateResumeUrl`, and that is not an oversight to tidy up later:
- * `resumeUrl` is the one SiteConfig row not in the shared key registry, because
- * putting it there would give one row two writers — this form and ConfigCard —
- * racing each other on a page where both are on screen at once.
- *
- * Same save affordance as ConfigCard (`.cfg-*`), because it is the same promise:
- * this card writes on its own and does not go through the save bar.
- */
 export function ResumeForm({ resumeUrl }: { resumeUrl: string }) {
   const [url, setUrl] = useState(resumeUrl);
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [saved, setSaved] = useState(false);
   const [pubError, setPubError] = useState<string | null>(null);
-  /** Distinct from `pubError`: nothing was written at all. */
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Saving stopped publishing when `revalidatePortfolio()` left the actions, so
-  // without this button the hero's résumé button keeps the old link until
-  // someone independently finds Publish in the topbar.
   const handleSave = (publish: boolean) => {
     setBusy(publish ? "publish" : "save");
     setPubError(null);
@@ -49,8 +34,6 @@ export function ResumeForm({ resumeUrl }: { resumeUrl: string }) {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
         if (publish) {
-          // The URL is saved. A publish that fails is a separate, retryable
-          // failure — it never undoes the write.
           const res = await publishSite();
           if (!res.ok) setPubError(res.error ?? "Could not reach the site.");
         }

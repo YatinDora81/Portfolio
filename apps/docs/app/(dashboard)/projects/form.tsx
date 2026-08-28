@@ -22,7 +22,6 @@ interface ProjectData {
   github: string | null; live: string | null; logoUrl: string | null; images: string[];
   skillIds: string[]; bullets: Bullet[];
   status: ContentStatus;
-  /** Stored UTC instant as ISO, or null. */
   publishAtIso: string | null;
 }
 
@@ -43,7 +42,6 @@ export function ProjectForm({ project, allSkills }: {
   const [selectedSkills, setSelectedSkills] = useState<string[]>(project?.skillIds || []);
   const [bullets, setBullets] = useState<Bullet[]>(project?.bullets || [{ content: "", sortOrder: 0 }]);
   const [status, setStatus] = useState<ContentStatus>(project?.status ?? "DRAFT");
-  // `utcToIstInput`, not `toLocale*`, so the server's HTML and hydration produce the same attribute.
   const [publishAtIst, setPublishAtIst] = useState(
     project?.publishAtIso ? utcToIstInput(new Date(project.publishAtIso)) : ""
   );
@@ -51,16 +49,13 @@ export function ProjectForm({ project, allSkills }: {
   const [pubError, setPubError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Which submit button was pressed. A ref, not state: the click lands in the
-  // same event as the submit, so state set here would still be stale by the
-  // time the handler reads it.
+  // a ref, not state: submit would read a stale value
   const wantPublish = useRef(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const publish = wantPublish.current;
 
-    // The action checks this again, because this copy can be skipped.
     const problem = scheduleProblem(status, publishAtIst);
     if (problem) {
       setSaveError(problem);
@@ -78,7 +73,6 @@ export function ProjectForm({ project, allSkills }: {
       skillIds: selectedSkills,
       bullets: bullets.map((b, i) => ({ ...b, sortOrder: i })),
       status,
-      // The IST wall clock, not an instant — the action converts it.
       publishAtIst: publishAtIst || null,
     };
     startTransition(async () => {
@@ -92,7 +86,6 @@ export function ProjectForm({ project, allSkills }: {
         if (publish) {
           const pub = await publishSite();
           if (!pub.ok) {
-            // The write already landed; a failed publish never undoes it.
             setPubError(pub.error ?? "Could not reach the site.");
             return;
           }
@@ -118,8 +111,6 @@ export function ProjectForm({ project, allSkills }: {
         description="Title and summary are what the card shows; bullets open up underneath it."
       />
 
-      {/* A real <form>: without one, the `required` attributes below were inert
-          and a blank title reached the server action. */}
       <form onSubmit={handleSubmit}>
       <Card>
         <Input label="Title" value={title} onChange={e => setTitle(e.target.value)} required />
@@ -146,7 +137,6 @@ export function ProjectForm({ project, allSkills }: {
           hint="Optional. Shown as the mark on the project cover."
         />
 
-        {/* ---- images ---- */}
         <div className="f">
           <label>Image URLs</label>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -183,7 +173,6 @@ export function ProjectForm({ project, allSkills }: {
           <div className="f-hint">The first image becomes the card cover.</div>
         </div>
 
-        {/* ---- skills ---- */}
         <div className="f">
           <label>Skills</label>
           <div className="pskills">
@@ -210,7 +199,6 @@ export function ProjectForm({ project, allSkills }: {
           </div>
         </div>
 
-        {/* ---- bullets ---- */}
         <div className="f">
           <label>Bullet points</label>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

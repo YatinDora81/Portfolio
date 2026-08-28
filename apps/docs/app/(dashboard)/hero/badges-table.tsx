@@ -24,7 +24,6 @@ const FORM_ID = "hero-badge-form";
 
 export function HeroSkillBadgesTable({ badges, version }: {
   badges: Badge[];
-  /** Owned by HeroSections — titles and badges always edit the same hero. */
   version: Version;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -34,30 +33,21 @@ export function HeroSkillBadgesTable({ badges, version }: {
     isDeleted, isNew, isEdited, saving,
   } = useStaging();
 
-  // Nothing here writes to the database — every action stages, and the page
-  // renders the staged view so the change is on screen before it is saved.
-  // The version scopes the reorder lookup as well: `stageReorder` keeps one
-  // pending drag per tab, so an unscoped overlay would apply the other tab's.
   const staged = overlay("heroSkillBadge", badges, (b) => b.id, version);
 
-  // After the overlay, never before: a staged create only carries a version
-  // once `overlay` has materialised it, so filtering first strands new rows.
+  // filter after the overlay, or staged creates get stranded
   const mine = staged.filter((b) => b.version === version);
 
   const { order, handleProps, itemProps } = useSortable(
     mine.map((b) => b.id),
-    // sortOrder is dense within a version, so the drag belongs to this tab alone.
     (ids) => stageReorder("heroSkillBadge", ids, version),
     { disabled: saving }
   );
 
   const byId = new Map(mine.map((b) => [b.id, b] as const));
   const seen = new Set(order);
-  // `order` is the drag preview and only re-seeds after a render, so a row
-  // staged this tick is appended rather than dropped for a frame.
   const rows = [...order.flatMap((id) => byId.get(id) ?? []), ...mine.filter((b) => !seen.has(b.id))];
 
-  /** One mark per row: on its way out, brand new, or edited. */
   const mark = (id: string) =>
     isDeleted("heroSkillBadge", id) ? "staged-del"
       : isNew("heroSkillBadge", id) ? "staged-new"
@@ -66,12 +56,6 @@ export function HeroSkillBadgesTable({ badges, version }: {
 
   const openNew = () => { setEditing(null); setDialogOpen(true); };
 
-  /**
-   * Swap a badge with its neighbour and stage the whole order. Indices are
-   * `rows` indices, and `rows` drops ids that no longer exist in `badges` — so
-   * it is NOT positionally aligned with `order`. Building the payload from
-   * `rows` keeps one index space and can't stage a stale id.
-   */
   const move = (from: number, to: number) => {
     const ids = rows.map((b) => b.id);
     [ids[from], ids[to]] = [ids[to]!, ids[from]!];
@@ -180,18 +164,13 @@ export function HeroSkillBadgesTable({ badges, version }: {
           action={(formData) => {
             const name = String(formData.get("name") ?? "").trim();
             const iconKey = String(formData.get("iconKey") ?? "").trim();
-            // The server trims too; trimming here keeps the staged preview and
-            // the saved row identical. A blank name would fail the whole batch.
             if (!name) return;
             if (editing) stageUpdate("heroSkillBadge", editing.id, { name, iconKey });
-            // The column is NOT NULL and the server rejects a create without it.
             else stageCreate("heroSkillBadge", { name, iconKey, version });
             setDialogOpen(false);
           }}
         >
           <Input name="name" label="Name" defaultValue={editing?.name || ""} required />
-          {/* Hero badges have no name-fallback on the site — an unknown key here
-              renders a blank gap mid-sentence, so pick rather than type. */}
           <IconPicker
             key={editing?.id ?? "new"}
             kind="skill"
