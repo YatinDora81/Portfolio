@@ -32,6 +32,7 @@ interface ProjectData {
   live: string | null;
   logoUrl: string | null;
   images: string[];
+  health?: { status: 'up' | 'down' | 'unknown'; ms: number | null };
 }
 
 interface Endpoint {
@@ -337,7 +338,21 @@ function LogEntry({
         <div className="pjb-pad">
           {/* prod tab only where there is a live url */}
           {endpoint?.status === 'live' && (
-            <span className="pjb-prod mono" aria-hidden="true">&#9650; prod</span>
+            <span className="pjb-prod mono" aria-hidden="true">
+              &#9650; prod
+              {project.health && project.health.status !== 'unknown' && (
+                <>
+                  {' · '}
+                  <span className={project.health.status === 'up' ? 'up' : 'down'}>{project.health.status}</span>
+                  {project.health.ms !== null && (
+                    <>
+                      {' · '}
+                      <span className="ms">{project.health.ms} ms</span>
+                    </>
+                  )}
+                </>
+              )}
+            </span>
           )}
           {cover && link ? (
             <a className="pjb-thumb" href={link} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true">
@@ -414,6 +429,8 @@ function ProjectsBuildLog({ projects }: { projects: ProjectData[] }) {
   const endpoints = projects.map(endpointOf);
   const liveCount = endpoints.filter((e) => e?.status === 'live').length;
   const allLive = projects.length > 0 && liveCount === projects.length;
+  const timings = projects.map((p) => p.health?.ms).filter((ms): ms is number => typeof ms === 'number');
+  const avgMs = timings.length ? Math.round(timings.reduce((a, b) => a + b, 0) / timings.length) : null;
 
   const featured = projects.slice(0, FEATURED);
   const rest = projects.slice(FEATURED);
@@ -455,7 +472,10 @@ function ProjectsBuildLog({ projects }: { projects: ProjectData[] }) {
         )}
 
         {projects.length > 0 && (
-          <p className="pjb-eol mono">end of build log &middot; {liveCount}/{projects.length} live</p>
+          <p className="pjb-eol mono">
+            end of build log &middot; {liveCount}/{projects.length} live
+            {avgMs !== null && <> &middot; <span className="text-foreground">avg {avgMs} ms</span></>}
+          </p>
         )}
       </Container>
     </section>

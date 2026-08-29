@@ -207,6 +207,33 @@ export async function getExperiences() {
   }));
 }
 
+export interface BuildHealth {
+  status: "up" | "down" | "unknown";
+  ms: number | null;
+}
+
+const PROBE_TIMEOUT_MS = 5000;
+
+async function probeLive(url: string | null): Promise<BuildHealth> {
+  if (!url) return { status: "unknown", ms: null };
+  const attempt = async (method: "HEAD" | "GET") => {
+    const started = performance.now();
+    const res = await fetch(url, {
+      method,
+      redirect: "follow",
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+    return { res, ms: Math.round(performance.now() - started) };
+  };
+  try {
+    let { res, ms } = await attempt("HEAD");
+    if (res.status === 405 || res.status === 501) ({ res, ms } = await attempt("GET"));
+    return { status: res.ok ? "up" : "down", ms };
+  } catch {
+    return { status: "down", ms: null };
+  }
+}
+
 async function readProjects(isPreview: boolean) {
   const projects = await prisma.project.findMany({
     where: contentWhere(isPreview),
@@ -216,7 +243,8 @@ async function readProjects(isPreview: boolean) {
       skills: { select: { name: true, iconKey: true } },
     },
   });
-  return projects.map((p) => ({
+  const health = await Promise.all(projects.map((p) => probeLive(p.live)));
+  return projects.map((p, i) => ({
     title: p.title,
     summary: p.summary,
     github: p.github,
@@ -225,6 +253,7 @@ async function readProjects(isPreview: boolean) {
     images: p.images.map((img) => cdnUrl(img)),
     bullets: p.bullets.map((b) => b.content),
     technologies: p.skills.map((s) => ({ name: s.name, iconKey: s.iconKey })),
+    health: health[i] ?? { status: "unknown" as const, ms: null },
   }));
 }
 

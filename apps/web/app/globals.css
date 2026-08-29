@@ -2272,3 +2272,7 @@ body.cat-on .cw .dot { display: none; }
 @supports (animation-timeline: scroll()) { .read-line { animation: read-grow linear both; animation-timeline: scroll(root); } }
 @keyframes read-grow { to { transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) { .read-line { display: none; } }
+
+.pjb-prod .up { color: var(--ok-ink); }
+.pjb-prod .down { color: var(--err); }
+.pjb-prod .ms { color: var(--foreground); font-variant-numeric: tabular-nums; }
