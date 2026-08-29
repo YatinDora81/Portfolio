@@ -91,8 +91,8 @@ export const NavBody = ({ children, className, visible }: NavBodyProps) => {
         minWidth: 'min(800px, 100%)',
       }}
       className={cn(
-        'rn-body relative z-[60] mx-auto hidden max-w-7xl flex-row items-center justify-between self-start bg-transparent px-4 py-2 lg:flex dark:bg-transparent',
-        visible && 'bg-white/80 dark:bg-neutral-950/80',
+        'rn-body relative z-[60] mx-auto hidden max-w-7xl flex-row items-center justify-between self-start bg-transparent px-4 py-2 lg:flex',
+        visible && 'bg-background/80',
         className,
       )}
     >
@@ -108,7 +108,6 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
   const moveTo = (el: HTMLElement) => {
     const pill = pillRef.current;
     if (!pill) return;
-    // first show must snap, not glide in from the corner
     const first = !pill.classList.contains('on');
     if (first) pill.style.transition = 'opacity 0.18s ease';
     pill.style.setProperty('--pill-x', `${el.offsetLeft}px`);
@@ -129,18 +128,18 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
       aria-label="Main"
       onMouseLeave={hide}
       className={cn(
-        'absolute inset-0 hidden flex-1 flex-row items-center justify-center space-x-2 text-sm font-medium text-zinc-600 transition duration-200 hover:text-zinc-800 lg:flex lg:space-x-2',
+        'absolute inset-0 hidden flex-1 flex-row items-center justify-center space-x-2 text-sm font-medium text-secondary-ink transition duration-200 hover:text-foreground lg:flex lg:space-x-2',
         className,
       )}
     >
-      <span ref={pillRef} className="rn-pill bg-gray-100 dark:bg-neutral-800" aria-hidden="true" />
+      <span ref={pillRef} className="rn-pill bg-muted" aria-hidden="true" />
       {items.map((item, idx) => (
         <a
           onMouseEnter={(e) => moveTo(e.currentTarget)}
           onFocus={(e) => moveTo(e.currentTarget)}
           onBlur={hide}
           onClick={onItemClick}
-          className="relative px-4 py-2 text-neutral-600 dark:text-neutral-300"
+          className="relative px-4 py-2 text-secondary-ink"
           key={`link-${idx}`}
           href={item.link}
         >
@@ -157,7 +156,7 @@ export const MobileNav = ({ children, className, visible }: MobileNavProps) => {
       data-visible={visible ? 'true' : 'false'}
       className={cn(
         'rn-mobile relative z-50 mx-auto flex max-w-[calc(100vw-2rem)] flex-col items-center justify-between bg-transparent px-4 py-2 lg:hidden',
-        visible && 'bg-white/80 dark:bg-neutral-950/80',
+        visible && 'bg-background/80',
         className,
       )}
     >
@@ -194,7 +193,7 @@ export const MobileNavMenu = ({
       id={id}
       aria-label="Site"
       className={cn(
-        'rn-menu absolute right-4 top-16 z-50 flex min-w-[160px] flex-col items-start justify-start gap-4 rounded-lg bg-white px-4 py-8 shadow-[0_0_24px_rgba(34,_42,_53,_0.06),_0_1px_1px_rgba(0,_0,_0,_0.05),_0_0_0_1px_rgba(34,_42,_53,_0.04),_0_0_4px_rgba(34,_42,_53,_0.08),_0_16px_68px_rgba(47,_48,_55,_0.05),_0_1px_0_rgba(255,_255,_255,_0.1)_inset] dark:bg-neutral-950',
+        'rn-menu absolute right-4 top-16 z-50 flex min-w-[160px] flex-col items-start justify-start gap-4 rounded-lg bg-background px-4 py-8 shadow-[0_0_24px_rgba(34,_42,_53,_0.06),_0_1px_1px_rgba(0,_0,_0,_0.05),_0_0_0_1px_rgba(34,_42,_53,_0.04),_0_0_4px_rgba(34,_42,_53,_0.08),_0_16px_68px_rgba(47,_48,_55,_0.05),_0_1px_0_rgba(255,_255,_255,_0.1)_inset]',
         className,
       )}
     >
