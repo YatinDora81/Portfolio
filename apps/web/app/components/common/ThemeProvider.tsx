@@ -3,10 +3,13 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark';
+export interface SweepOrigin { x: number; y: number }
+
+type StartViewTransition = (update: () => void) => { ready: Promise<unknown> };
 
 const ThemeContext = createContext<{
   theme: Theme;
-  toggleTheme: () => void;
+  toggleTheme: (origin?: SweepOrigin) => void;
 }>({ theme: 'dark', toggleTheme: () => {} });
 
 export function useTheme() {
@@ -34,10 +37,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // don't clobber the inline script's class before adopting it
     if (!ready) return;
     const root = document.documentElement;
-    // re-adding the same class re-resolves every element's styles
     if (root.classList.contains(theme)) return;
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
@@ -54,16 +55,36 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener('change', follow);
   }, [ready]);
 
-  const toggleTheme = () =>
-    setTheme((prev) => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('theme', next);
-      return next;
-    });
+  const toggleTheme = (origin?: SweepOrigin) => {
+    const next: Theme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
 
-  return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+    const commit = () => {
+      const root = document.documentElement;
+      root.classList.remove('light', 'dark');
+      root.classList.add(next);
+      localStorage.setItem('theme', next);
+      setTheme(next);
+    };
+
+    const start = (document as unknown as { startViewTransition?: StartViewTransition }).startViewTransition;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!origin || reduce || typeof start !== 'function') {
+      commit();
+      return;
+    }
+
+    const { x, y } = origin;
+    const transition = start.call(document, commit);
+    transition.ready
+      .then(() => {
+        const r = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+        document.documentElement.animate(
+          { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${r}px at ${x}px ${y}px)`] },
+          { duration: 450, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', pseudoElement: '::view-transition-new(root)' },
+        );
+      })
+      .catch(() => undefined);
+  };
+
+  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
 }

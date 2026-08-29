@@ -5,6 +5,7 @@ import { ThemeProvider } from './components/common/ThemeProvider';
 import { CatProvider } from './components/common/CatProvider';
 import MotionProvider from './components/common/MotionProvider';
 import Navbar from './components/common/Navbar';
+import CommandMenu from './components/common/CommandMenu';
 import Bridge from './components/common/Bridge';
 import Hero from './components/landing/Hero';
 import About from './components/landing/About';
@@ -135,6 +136,12 @@ export default async function Home() {
         <Background />
         <div className="relative z-[2]">
           <Navbar logo={siteConfig.navbarLogo} sections={show} />
+          <CommandMenu
+            sections={show}
+            contactEmail={siteConfig.contactEmail}
+            resumeUrl={siteConfig.resumeUrl}
+            builds={projects.map((p) => ({ title: p.title, live: p.live }))}
+          />
           <main>
             <Hero
               version={siteConfig.heroVersion}
