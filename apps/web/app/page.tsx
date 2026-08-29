@@ -6,6 +6,7 @@ import { CatProvider } from './components/common/CatProvider';
 import MotionProvider from './components/common/MotionProvider';
 import Navbar from './components/common/Navbar';
 import CommandMenu from './components/common/CommandMenu';
+import Tuner from './components/common/Tuner';
 import Bridge from './components/common/Bridge';
 import Hero from './components/landing/Hero';
 import About from './components/landing/About';
@@ -142,6 +143,7 @@ export default async function Home() {
             resumeUrl={siteConfig.resumeUrl}
             builds={projects.map((p) => ({ title: p.title, live: p.live }))}
           />
+          <Tuner sections={show} />
           <main>
             <Hero
               version={siteConfig.heroVersion}
