@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 export default function BlogContent({ content }: { content: string }) {
   const lines = content.split('\n');
   const elements: React.ReactNode[] = [];
@@ -28,17 +30,7 @@ export default function BlogContent({ content }: { content: string }) {
         i++;
       }
       i++;
-      elements.push(
-        <pre
-          key={elements.length}
-          className="my-4 overflow-x-auto rounded-lg border border-border bg-card p-4 text-[13px] leading-relaxed"
-        >
-          {lang && (
-            <div className="mb-2 text-[11px] uppercase tracking-wider text-secondary">{lang}</div>
-          )}
-          <code>{codeLines.join('\n')}</code>
-        </pre>
-      );
+      elements.push(<CodeBlock key={elements.length} lang={lang} code={codeLines.join('\n')} />);
       continue;
     }
 
@@ -141,4 +133,34 @@ function InlineMarkdown({ text }: { text: string }) {
   }
 
   return <>{parts}</>;
+}
+
+function CodeBlock({ lang, code }: { lang: string; code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = () => {
+    navigator.clipboard
+      .writeText(code)
+      .then(() => {
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1600);
+      })
+      .catch(() => undefined);
+  };
+
+  return (
+    <pre className="relative my-4 overflow-x-auto rounded-lg border border-border bg-card p-4 pt-8 text-[13px] leading-relaxed">
+      <span className="absolute right-3 top-2 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.16em] text-secondary">
+        {lang && <span>{lang}</span>}
+        <button
+          type="button"
+          onClick={copy}
+          className={`cursor-pointer bg-transparent transition-colors hover:text-foreground ${copied ? 'text-[var(--ok-ink)]' : ''}`}
+        >
+          {copied ? 'copied ✓' : 'copy'}
+        </button>
+      </span>
+      <code>{code}</code>
+    </pre>
+  );
 }
