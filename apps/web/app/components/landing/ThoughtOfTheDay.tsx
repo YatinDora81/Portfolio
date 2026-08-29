@@ -15,7 +15,6 @@ interface ThoughtProps {
   days: number;
 }
 
-// pairs with the two ch caps in the stylesheet
 function rung(len: number): 'short' | 'long' {
   return len > 90 ? 'long' : 'short';
 }
@@ -26,21 +25,17 @@ export default function ThoughtOfTheDay({ quote, date, iso, day, days }: Thought
   if (!body) return null;
 
   const words = body.split(' ');
+  const progress = days > 0 ? Math.min(100, Math.max(0, (day / days) * 100)) : 0;
 
   return (
     <section className="thought">
-      <Container className="mt-20 animate-fade-in-blur animate-delay-5">
-
+      <Container className="animate-fade-in-blur animate-delay-5">
         <h2 className="sr-only">Thought of the day</h2>
 
         <ThoughtEntry len={rung(body.length)}>
-
           <div className="lab">
             <span>thought of the day</span>
             <i aria-hidden="true" />
-            <span className="hint mono">
-              day {day} / {days}
-            </span>
             {iso ? (
               <time className="hint mono" dateTime={iso}>
                 {date}
@@ -53,7 +48,6 @@ export default function ThoughtOfTheDay({ quote, date, iso, day, days }: Thought
           <blockquote className="th-quote">
             <p>
               {words.map((w, i) => (
-                // the trailing space must stay inside the span
                 <span
                   key={i}
                   className="w"
@@ -75,6 +69,14 @@ export default function ThoughtOfTheDay({ quote, date, iso, day, days }: Thought
               <span className="th-author">— {author}</span>
             </footer>
           )}
+
+          <div className="th-year mono" role="img" aria-label={`Day ${day} of ${days}`}>
+            <span>jan 01</span>
+            <i style={{ '--x': `${progress.toFixed(2)}%` } as CSSProperties}>
+              <b data-l={`day ${day}`} />
+            </i>
+            <span>dec 31</span>
+          </div>
         </ThoughtEntry>
       </Container>
     </section>

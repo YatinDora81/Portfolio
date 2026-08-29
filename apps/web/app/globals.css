@@ -1933,9 +1933,7 @@ body.cat-on .cw .dot { display: none; }
 }
 #contact .ghln-cap b { font-weight: 500; color: var(--lab-2); }
 
-.thought {
-  padding: 0 0 8px;
-}
+.thought { padding: var(--sp-interlude) 0 0; }
 .thought .th-wrap {
   position: relative;
   --q-size: clamp(30px, 6.4vw, 52px);
@@ -2218,4 +2216,19 @@ body.cat-on .cw .dot { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .tune-needle { animation: none; transform: translateY(calc(var(--p) * var(--rail-h))); }
   .tune-stop i, .tune-stop span { transition: none; }
+}
+
+.th-year { margin-top: 44px; display: flex; align-items: center; gap: 14px; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lab-dim); opacity: 0; }
+.thought .th-wrap.in .th-year { animation: footIn 0.6s ease 0.9s backwards; opacity: 1; }
+.th-year i { flex: 1; position: relative; height: 1px; background: var(--border); font-style: normal; }
+.th-year i::before { content: ''; position: absolute; left: 0; top: 0; height: 1px; width: 0; background: color-mix(in srgb, var(--foreground) 55%, transparent); transition: width 1.3s var(--ease-std) 1.05s; }
+.thought .th-wrap.in .th-year i::before { width: var(--x); }
+.th-year i b { position: absolute; left: var(--x); top: 50%; translate: -50% -50%; width: 1px; height: 10px; background: var(--foreground); opacity: 0; transition: opacity 0.3s ease 2.3s; }
+.thought .th-wrap.in .th-year i b { opacity: 1; }
+.th-year i b::after { content: attr(data-l); position: absolute; top: -17px; left: 50%; translate: -50% 0; font-weight: 500; font-size: 9px; line-height: 12px; letter-spacing: 0.14em; color: var(--foreground); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  .th-year, .thought .th-wrap.in .th-year { animation: none; opacity: 1; }
+  .th-year i::before, .th-year i b { transition: none; }
+  .th-year i::before { width: var(--x); }
+  .th-year i b { opacity: 1; }
 }
