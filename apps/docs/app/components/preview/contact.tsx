@@ -162,7 +162,7 @@ export function ContactPreview({
 
   return (
     <div className="@container">
-      <Lab>contact &mdash; ch.01</Lab>
+      <Lab>contact &mdash; ch.06</Lab>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <h3 className="text-[20px] font-bold text-[#fafafa]" style={{ letterSpacing: "-0.03em", lineHeight: 1.08 }}>
