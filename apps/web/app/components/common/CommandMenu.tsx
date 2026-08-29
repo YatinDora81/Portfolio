@@ -205,10 +205,18 @@ export default function CommandMenu({ sections, contactEmail, resumeUrl, builds 
     setSel(0);
     setCopied(false);
     const prev = document.body.style.overflow;
+    const prevPad = document.body.style.paddingRight;
+    const gap = window.innerWidth - document.documentElement.clientWidth;
     document.body.style.overflow = 'hidden';
+    if (gap > 0) {
+      document.body.style.paddingRight = `${gap}px`;
+      document.documentElement.style.setProperty('--sbw', `${gap}px`);
+    }
     inputRef.current?.focus();
     return () => {
       document.body.style.overflow = prev;
+      document.body.style.paddingRight = prevPad;
+      document.documentElement.style.removeProperty('--sbw');
     };
   }, [open]);
 

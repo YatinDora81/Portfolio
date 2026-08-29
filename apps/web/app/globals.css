@@ -197,6 +197,7 @@
 }
 .bg-beams-layer { will-change: transform; }
 
+.rn-fixed { padding-right: var(--sbw, 0px); }
 .rn-body,
 .rn-mobile {
   transition:
@@ -2225,7 +2226,7 @@ body.cat-on .cw .dot { display: none; }
 .cmdk-foot i { flex: 1; }
 
 .tune {
-  position: fixed; right: 18px; top: 50%; translate: 0 -50%; z-index: 30;
+  position: fixed; right: calc(18px + var(--sbw, 0px)); top: 50%; translate: 0 -50%; z-index: 30;
   display: none; --rail-h: 40vh; --p: 0;
   opacity: 0; pointer-events: none; transition: opacity 0.4s var(--ease-house);
 }

@@ -70,7 +70,7 @@ export const Navbar = ({ children, className }: NavbarProps) => {
   const visible = useDocked();
 
   return (
-    <div className={cn('fixed inset-x-0 top-0 z-40 w-full', className)}>
+    <div className={cn('rn-fixed fixed inset-x-0 top-0 z-40 w-full', className)}>
       {React.Children.map(children, (child) =>
         React.isValidElement(child)
           ? React.cloneElement(
