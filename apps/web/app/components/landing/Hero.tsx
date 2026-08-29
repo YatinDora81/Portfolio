@@ -1,12 +1,11 @@
 'use client';
 
-// aliased so the peek effect can still reach the DOM's own Image
 import NextImage from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { skillIconMap, socialIconMap } from '@repo/ui/icons/registry';
 import MagneticLink from '../interactions/MagneticLink';
 
-const PEEK_W = 384; // .peek renders at 164 css px, this covers 2x
+const PEEK_W = 384;
 const optimized = (src: string, w: number) =>
   `/_next/image?url=${encodeURIComponent(src)}&w=${w}&q=75`;
 
@@ -186,7 +185,6 @@ function RotatingRole({ titles }: { titles: string[] }) {
   const [visible, setVisible] = useState(true);
   const [animate, setAnimate] = useState(false);
 
-  // read the motion preference after mount, or it desyncs from the server html
   useEffect(() => {
     if (titles.length < 2) return;
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -383,19 +381,31 @@ export default function Hero({
 
         <div className="namewrap animate-fade-in-blur animate-delay-1">
           <h1 ref={nameRef}>
-            {name.trim().split(/\s+/).join(' ')}
-            <span className="dot">.</span>
+            <span className="nm">
+              {name.trim().split(/\s+/).join(' ')}
+              <span className="dot">.</span>
+              {deck.length > 0 && (
+                <span className="peek-slot" aria-hidden="true">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    className="peek-tab"
+                    src={optimized((deck[1] ?? deck[0]) as string, 128)}
+                    alt=""
+                    width={51}
+                    height={64}
+                    decoding="async"
+                    draggable={false}
+                  />
+                </span>
+              )}
+            </span>
           </h1>
         </div>
 
-        <p className="roleline mono animate-fade-in-blur animate-delay-2">
-          <span className="slash" aria-hidden="true">
-            {'//'}
-          </span>
-          <RotatingRole titles={titles} />
-          <span className="caret" aria-hidden="true" />
-          <span className="peek-hint" aria-hidden="true">
-            &larr; hover my name
+        <p className="roleline animate-fade-in-blur animate-delay-2">
+          <span className="rule" aria-hidden="true" />
+          <span className="rolelabel">
+            <RotatingRole titles={titles} />
           </span>
         </p>
         <span
