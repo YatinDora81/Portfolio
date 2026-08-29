@@ -225,7 +225,12 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
   return (
     <section id="skills">
       <Container className="mt-20 animate-fade-in-blur animate-delay-4">
-        <SectionHeading subHeading="Technical" heading="Skills" />
+        <SectionHeading
+          channel="02"
+          label="skills"
+          title="Periodic table."
+          hint={`${skills.length} elements`}
+        />
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-secondary">
           my periodic table of code — everything i build with, in one place. tap
           a category to filter, hover any element to bring it to life.

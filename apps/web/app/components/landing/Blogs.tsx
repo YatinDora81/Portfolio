@@ -75,7 +75,7 @@ export default function Blogs({ blogs }: { blogs: BlogPost[] }) {
   return (
     <section id="blogs">
       <Container className="mt-20 animate-fade-in-blur animate-delay-5">
-        <SectionHeading subHeading="Writing" heading="Blogs" />
+        <SectionHeading channel="05" label="writing" title="Index." hint={`${blogs.length} posts`} />
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="flex flex-col gap-4">
             {col1.map((blog, i) => (

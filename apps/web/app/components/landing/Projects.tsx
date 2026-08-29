@@ -237,7 +237,7 @@ function ProjectsLedger({ projects }: { projects: ProjectData[] }) {
   return (
     <section id="projects" className="pj-v1">
       <Container className="mt-20 animate-fade-in-blur animate-delay-3">
-        <SectionHeading subHeading="Work" heading="Projects" />
+        <SectionHeading channel="04" label="projects" title="Build log." hint={`${projects.length} builds`} />
         {projects.length > 0 && (
           <p className="pj-note">
             {projects.length} {projects.length === 1 ? 'thing' : 'things'} shipped end to end — hover
@@ -433,7 +433,7 @@ function ProjectsBuildLog({ projects }: { projects: ProjectData[] }) {
   return (
     <section id="projects" className="pj-v2">
       <Container className="mt-20 animate-fade-in-blur animate-delay-3">
-        <SectionHeading subHeading="Work" heading="Projects" />
+        <SectionHeading channel="04" label="projects" title="Build log." hint={`${projects.length} builds`} />
         <p className="pj-note">
           <span className="mono" aria-hidden="true">&#8982;</span>{' '}
           {allLive && 'every build below is deployed & running — '}

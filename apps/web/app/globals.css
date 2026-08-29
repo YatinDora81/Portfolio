@@ -2121,3 +2121,17 @@ body.cat-on .cw .dot { display: none; }
   #contact .ghln-dot { opacity: 1 !important; transition: none !important; }
   #contact .ghv { transition: none; }
 }
+
+.sec-title {
+  margin: 14px 0 0;
+  font-size: clamp(26px, 4.8vw, 34px);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+  font-variation-settings: 'opsz' 32;
+}
+.lab .decode { transition: color var(--t-slow) var(--ease-house); }
+.lab .decode.locked { color: var(--foreground); }
+@media (prefers-reduced-motion: reduce) {
+  .lab .decode { transition: none; }
+}

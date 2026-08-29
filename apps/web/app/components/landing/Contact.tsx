@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useInView, useReducedMotion } from 'motion/react';
 import Container from '../common/Container';
+import DecodeLabel from '../common/DecodeLabel';
 import type { GithubActivity } from '../../lib/github';
 import Scope, { type ScopeHandle } from './contact/Scope';
 import SentenceForm from './contact/SentenceForm';
@@ -99,7 +100,7 @@ export default function Contact({
         <div className={`ct${inView ? ' in' : ''}`}>
           <div className="rv" style={rise('0s')}>
             <div className="lab">
-              <span>contact — ch.01</span>
+              <DecodeLabel text="contact — ch.06" />
               <i aria-hidden="true" />
             </div>
             <div className="ct-head">

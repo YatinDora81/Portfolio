@@ -254,7 +254,12 @@ export default function Experience({ experiences }: { experiences: ExperienceDat
   return (
     <section id="experience">
       <Container className="mt-20 animate-fade-in-blur animate-delay-2">
-        <SectionHeading subHeading="Career" heading="Experience" />
+        <SectionHeading
+          channel="03"
+          label="experience"
+          title="Where I've shipped."
+          hint={`${experiences.length} entries · ${experiences.filter((e) => e.isCurrent).length} live`}
+        />
         <div className="xp-list">
           <span className="xp-rail" aria-hidden />
           {experiences.map((exp) => (

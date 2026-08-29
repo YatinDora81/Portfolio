@@ -538,7 +538,7 @@ export default function About({ paragraphs, education, resumeUrl, companyLogos }
 
   return (
     <Container id="about" className="cv-auto mt-11 animate-fade-in-blur animate-delay-1">
-      <SectionHeading subHeading="About" heading="Who I am" />
+      <SectionHeading channel="01" label="about" title="Who I am." hint="whoami" />
 
       <Terminal
         paragraphs={paragraphs}
