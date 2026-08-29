@@ -8,6 +8,7 @@ import { FLAG_KEYS, flagValue } from '@repo/shared/flags';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
 import MotionProvider from '@/components/common/MotionProvider';
 import Background from '@/components/common/Background';
+import VT from '@/components/common/VT';
 import BlogContent from './BlogContent';
 
 export async function generateStaticParams() {
@@ -77,6 +78,8 @@ export default async function BlogPage({
         <Background />
 
         <div className="relative z-[2]">
+          <div className="read-line" aria-hidden="true" />
+
           <div className="fixed top-5 left-5 z-10">
             <Link
               href={showBlogs ? '/#blogs' : '/'}
@@ -88,27 +91,31 @@ export default async function BlogPage({
           </div>
 
           <div className="pt-16 px-5 sm:px-8 md:px-12">
-            <div className="relative mx-auto max-w-3xl h-48 sm:h-56 md:h-72 rounded-2xl overflow-hidden">
-              {blog.image ? (
-                <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={blog.image}
-                    alt={blog.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                </>
-              ) : (
-                <div className={`w-full h-full bg-gradient-to-br ${blog.color}`} />
-              )}
-            </div>
+            <VT name={`post-${slug}-cover`}>
+              <div className="relative mx-auto max-w-3xl h-48 sm:h-56 md:h-72 rounded-2xl overflow-hidden">
+                {blog.image ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={blog.image}
+                      alt={blog.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                  </>
+                ) : (
+                  <div className={`w-full h-full bg-gradient-to-br ${blog.color}`} />
+                )}
+              </div>
+            </VT>
           </div>
 
           <div className="relative mx-auto max-w-2xl px-5 sm:px-6 mt-8">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight tracking-tight">
-              {blog.title}
-            </h1>
+            <VT name={`post-${slug}-title`}>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight tracking-tight">
+                {blog.title}
+              </h1>
+            </VT>
 
             {blog.description && (
               <p className="mt-3 text-base text-secondary leading-relaxed">
@@ -128,7 +135,7 @@ export default async function BlogPage({
                     <Link
                       key={b.slug}
                       href={`/blog/${b.slug}`}
-                      className="group rounded-xl border border-border bg-card overflow-hidden transition-all duration-300 hover:border-foreground/20 hover:shadow-lg"
+                      className="group rounded-xl border border-border bg-card overflow-hidden transition-all duration-300 hover:border-foreground/20"
                     >
                       <div className="relative h-28 overflow-hidden">
                         {b.image ? (

@@ -44,6 +44,7 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["db", "@repo/ui", "@repo/shared", "@repo/config", "@repo/email"],
+  experimental: { viewTransition: true },
   async headers() {
     return [
       {

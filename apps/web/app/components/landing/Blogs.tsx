@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
+import VT from '../common/VT';
 
 interface BlogPost {
   slug: string;
@@ -12,93 +13,151 @@ interface BlogPost {
   image: string;
   imageOrientation: string;
   color: string;
+  publishedAt?: string | Date | null;
 }
 
-const imageHeightMap: Record<string, string[]> = {
-  LANDSCAPE: ['h-44', 'h-28', 'h-36'],
-  PORTRAIT: ['h-52', 'h-48'],
-  SQUARE: ['h-32', 'h-40'],
-};
+const INITIAL_BLOGS = 6;
 
-function getImageHeight(orientation: string, index: number): string {
-  const heights = imageHeightMap[orientation] || imageHeightMap.LANDSCAPE!;
-  return heights[index % heights.length]!;
+function formatDate(value: string | Date | null | undefined) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toLowerCase();
 }
 
-function BlogCard({ blog, index }: { blog: BlogPost; index: number }) {
-  const imageHeight = getImageHeight(blog.imageOrientation, index);
-  return (
-    <Link
-      href={`/blog/${blog.slug}`}
-      className="group block w-full text-left rounded-xl border border-border bg-card overflow-hidden transition-all duration-300 hover:border-foreground/20 hover:shadow-lg cursor-pointer"
-    >
-      <div className={`relative overflow-hidden ${imageHeight}`}>
-        {blog.image ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={blog.image}
-              alt={blog.title}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-          </>
-        ) : (
-          <div className={`w-full h-full bg-gradient-to-br ${blog.color}`} />
-        )}
-      </div>
-      <div className="p-4">
-        <h3 className="font-semibold text-sm leading-snug group-hover:text-foreground transition-colors">
-          {blog.title}
-        </h3>
-        <p className="mt-1.5 text-xs text-secondary leading-relaxed">
-          {blog.description}
-        </p>
-        <span className="mt-2.5 inline-flex items-center gap-1 text-[11px] text-secondary group-hover:text-foreground transition-colors font-medium">
-          Read article
-          <svg className="size-3 transition-transform duration-200 group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </span>
-      </div>
-    </Link>
-  );
+function Cover({ blog }: { blog: BlogPost }) {
+  if (blog.image) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={blog.image} alt="" loading="lazy" decoding="async" />;
+  }
+  return <div className={`bg-gradient-to-br ${blog.color}`} />;
 }
-
-const INITIAL_BLOGS = 4;
 
 export default function Blogs({ blogs }: { blogs: BlogPost[] }) {
   const [showAll, setShowAll] = useState(false);
+  const [active, setActive] = useState<BlogPost | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const peekRef = useRef<HTMLDivElement>(null);
+
   const visible = showAll ? blogs : blogs.slice(0, INITIAL_BLOGS);
 
-  const col1 = visible.filter((_, i) => i % 2 === 0);
-  const col2 = visible.filter((_, i) => i % 2 === 1);
+  useEffect(() => {
+    const list = listRef.current;
+    const peek = peekRef.current;
+    if (!list || !peek) return;
+    const canPeek =
+      window.matchMedia('(hover: hover) and (pointer: fine)').matches &&
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!canPeek) return;
+
+    let tx = 0;
+    let ty = 0;
+    let x = 0;
+    let y = 0;
+    let s = 0.7;
+    let vis = false;
+    let slug: string | null = null;
+    let raf: number | null = null;
+
+    const frame = () => {
+      x += (tx - x) * 0.16;
+      y += (ty - y) * 0.16;
+      s += ((vis ? 1 : 0.7) - s) * 0.18;
+      const tilt = Math.max(-8, Math.min(8, (tx - x) * 0.1));
+      peek.style.transform = `translate(${x}px,${y}px) translate(22px,-115%) rotate(${tilt}deg) scale(${s})`;
+      raf = vis || Math.abs(tx - x) > 0.4 || s > 0.72 ? requestAnimationFrame(frame) : null;
+    };
+    const kick = () => {
+      if (raf === null) raf = requestAnimationFrame(frame);
+    };
+
+    const onMove = (e: PointerEvent) => {
+      const r = list.getBoundingClientRect();
+      tx = e.clientX - r.left;
+      ty = e.clientY - r.top;
+      const row = e.target instanceof Element ? e.target.closest<HTMLElement>('.wr') : null;
+      const next = row?.dataset.slug ?? null;
+      if (next && next !== slug) {
+        slug = next;
+        setActive(blogs.find((b) => b.slug === next) ?? null);
+        s = Math.max(0.84, s - 0.12);
+      }
+      if (next && !vis) {
+        vis = true;
+        x = tx;
+        y = ty;
+        peek.classList.add('on');
+      }
+      if (!next && vis) {
+        vis = false;
+        peek.classList.remove('on');
+      }
+      kick();
+    };
+    const onLeave = () => {
+      vis = false;
+      slug = null;
+      peek.classList.remove('on');
+      kick();
+    };
+
+    list.addEventListener('pointermove', onMove);
+    list.addEventListener('pointerleave', onLeave);
+    return () => {
+      list.removeEventListener('pointermove', onMove);
+      list.removeEventListener('pointerleave', onLeave);
+      if (raf !== null) cancelAnimationFrame(raf);
+    };
+  }, [blogs]);
 
   return (
     <section id="blogs">
       <Container className="mt-20 animate-fade-in-blur animate-delay-5">
         <SectionHeading channel="05" label="writing" title="Index." hint={`${blogs.length} posts`} />
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="flex flex-col gap-4">
-            {col1.map((blog, i) => (
-              <div key={blog.slug} className={showAll && i >= INITIAL_BLOGS / 2 ? 'animate-fade-in-blur' : ''} style={showAll && i >= INITIAL_BLOGS / 2 ? { animationDelay: `${(i - INITIAL_BLOGS / 2) * 120}ms` } : {}}>
-                <BlogCard blog={blog} index={i * 2} />
-              </div>
-            ))}
+
+        <div className="wi" ref={listRef}>
+          <div className="wpeek" ref={peekRef} aria-hidden="true">
+            {active && (
+              <VT name={`post-${active.slug}-cover`}>
+                <span className="wpeek-img">
+                  <Cover blog={active} />
+                </span>
+              </VT>
+            )}
           </div>
-          <div className="flex flex-col gap-4">
-            {col2.map((blog, i) => (
-              <div key={blog.slug} className={showAll && i >= INITIAL_BLOGS / 2 ? 'animate-fade-in-blur' : ''} style={showAll && i >= INITIAL_BLOGS / 2 ? { animationDelay: `${(i - INITIAL_BLOGS / 2) * 120 + 60}ms` } : {}}>
-                <BlogCard blog={blog} index={i * 2 + 1} />
-              </div>
-            ))}
-          </div>
+
+          {visible.map((blog) => {
+            const date = formatDate(blog.publishedAt);
+            return (
+              <Link key={blog.slug} href={`/blog/${blog.slug}`} className="wr" data-slug={blog.slug}>
+                <span className="dt mono">{date ?? ''}</span>
+                <span>
+                  <VT name={`post-${blog.slug}-title`}>
+                    <span className="t">{blog.title}</span>
+                  </VT>
+                  {blog.description && <span className="meta mono">{blog.description}</span>}
+                </span>
+                <span className="arr mono" aria-hidden="true">
+                  ↗
+                </span>
+                <span className="icov" aria-hidden="true">
+                  <Cover blog={blog} />
+                </span>
+              </Link>
+            );
+          })}
         </div>
+
+        <p className="eol mono">
+          end of index · {blogs.length} {blogs.length === 1 ? 'post' : 'posts'}
+        </p>
+
         {!showAll && blogs.length > INITIAL_BLOGS && (
-          <button
-            onClick={() => setShowAll(true)}
-            className="mt-6 mx-auto flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-secondary transition-all duration-200 hover:border-foreground/30 hover:text-foreground cursor-pointer"
-          >
-            Show More Blogs
-            <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          <button type="button" className="show-more" onClick={() => setShowAll(true)}>
+            Show more posts
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
           </button>
         )}
       </Container>
