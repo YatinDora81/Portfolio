@@ -70,7 +70,7 @@ function SearchButton() {
   return (
     <button
       type="button"
-      className="kbtn hidden items-center gap-1.5 lg:inline-flex"
+      className="kbtn relative z-20 hidden items-center gap-1.5 lg:inline-flex"
       onClick={() => window.dispatchEvent(new CustomEvent(OPEN_EVENT))}
       aria-label="Open command menu (⌘K)"
     >
