@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
 import { useTheme } from '../common/ThemeProvider';
@@ -80,7 +80,6 @@ function ElementCard({
   const c = tune(skill.color, isDark);
 
   return (
-    // stagger goes on the wrapper, not the card
     <div
       className="animate-fade-in-blur"
       style={{ animationDelay: `${Math.min(index * 18, 500)}ms` }}
@@ -222,6 +221,45 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
     hovered !== null ? enriched.find((s) => s.number === hovered) : undefined;
   const hoveredColor = hoveredSkill ? tune(hoveredSkill.color, isDark) : '';
 
+  const onGridKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const keys = [
+      'ArrowRight',
+      'ArrowLeft',
+      'ArrowDown',
+      'ArrowUp',
+      'Home',
+      'End',
+    ];
+    if (!keys.includes(e.key)) return;
+    const grid = e.currentTarget;
+    const cards = Array.from(
+      grid.querySelectorAll<HTMLButtonElement>(
+        'button[data-skills-control="card"]:not([tabindex="-1"])',
+      ),
+    );
+    const current =
+      document.activeElement instanceof HTMLButtonElement
+        ? cards.indexOf(document.activeElement)
+        : -1;
+    if (current < 0) return;
+    e.preventDefault();
+    const first = cards[0];
+    const perRow = first
+      ? Math.max(1, Math.round(grid.clientWidth / (first.offsetWidth + 8)))
+      : 1;
+    const moves: Record<string, number> = {
+      ArrowRight: current + 1,
+      ArrowLeft: current - 1,
+      ArrowDown: current + perRow,
+      ArrowUp: current - perRow,
+      Home: 0,
+      End: cards.length - 1,
+    };
+    const target = moves[e.key];
+    if (target === undefined) return;
+    cards[Math.min(cards.length - 1, Math.max(0, target))]?.focus();
+  };
+
   return (
     <section id="skills">
       <Container className="mt-20 animate-fade-in-blur animate-delay-4">
@@ -280,7 +318,12 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
           })}
         </div>
 
-        <div className="mt-6 flex flex-wrap justify-center gap-1.5 sm:gap-2">
+        <div
+          className="mt-6 flex flex-wrap justify-center gap-1.5 sm:gap-2"
+          role="group"
+          aria-label="Skills"
+          onKeyDown={onGridKeyDown}
+        >
           {enriched.map((skill, i) => {
             const dimmed = filter !== null && filter !== skill.category;
             return (
@@ -297,7 +340,10 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
           })}
         </div>
 
-        <div className="mt-6 flex h-5 items-center justify-center gap-2 font-mono text-[11px] text-secondary">
+        <div
+          aria-live="polite"
+          className="mt-6 flex h-5 items-center justify-center gap-2 font-mono text-[11px] text-secondary"
+        >
           {hoveredSkill && (
             <>
               <span
