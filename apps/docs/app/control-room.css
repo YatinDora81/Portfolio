@@ -1616,7 +1616,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-imp-help[open] > summary::before { transform: rotate(90deg) }
 .nt-imp-help > summary:hover { color: var(--ink) }
 .nt-imp-p { padding: 0 12px; margin-bottom: 9px; font-size: 12.5px; line-height: 1.65; color: var(--dim) }
-/* tailwind preflight resets every list to none */
 .nt-imp-ul { padding: 0 12px 0 30px; margin-bottom: 11px; font-size: 12.5px; line-height: 1.7; color: var(--dim); list-style: disc }
 .nt-imp-ul li::marker { color: var(--faint) }
 .nt-imp-p code, .nt-imp-ul code { font-family: var(--mono); font-size: 11.5px; background: var(--bg2); border-radius: 4px; padding: 1px 4px }
@@ -2135,7 +2134,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .tl-line-n { font-size: 11.5px; line-height: 1.6; color: var(--faint); margin-top: 6px }
 .tl-line-n code, .tl-line-n b { font-family: var(--mono); font-size: 11px; color: var(--dim) }
 
-/* fixed white: tinted or inverted qr modules stop scanning */
 .tl-qr {
   flex: none; width: 168px; padding: 10px; border: 1px solid var(--line2);
   border-radius: var(--r2); background: #fff; text-align: center
@@ -2258,7 +2256,6 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 }
 .sld-in::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: var(--bg3) }
 .sld-in::-moz-range-track { height: 4px; border-radius: 99px; background: var(--bg3) }
-/* webkit lays the thumb out from the track's top edge */
 .sld-in::-webkit-slider-thumb {
   -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 99px;
   background: var(--c1); box-shadow: 0 1px 3px rgba(23, 30, 48, .3)
