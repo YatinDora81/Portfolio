@@ -1616,6 +1616,7 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-imp-help[open] > summary::before { transform: rotate(90deg) }
 .nt-imp-help > summary:hover { color: var(--ink) }
 .nt-imp-p { padding: 0 12px; margin-bottom: 9px; font-size: 12.5px; line-height: 1.65; color: var(--dim) }
+
 .nt-imp-ul { padding: 0 12px 0 30px; margin-bottom: 11px; font-size: 12.5px; line-height: 1.7; color: var(--dim); list-style: disc }
 .nt-imp-ul li::marker { color: var(--faint) }
 .nt-imp-p code, .nt-imp-ul code { font-family: var(--mono); font-size: 11.5px; background: var(--bg2); border-radius: 4px; padding: 1px 4px }
@@ -2256,6 +2257,7 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 }
 .sld-in::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: var(--bg3) }
 .sld-in::-moz-range-track { height: 4px; border-radius: 99px; background: var(--bg3) }
+
 .sld-in::-webkit-slider-thumb {
   -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 99px;
   background: var(--c1); box-shadow: 0 1px 3px rgba(23, 30, 48, .3)
@@ -2277,3 +2279,174 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .sld-in:disabled { cursor: default }
 .sld-in:disabled::-webkit-slider-thumb { background: var(--bg4); box-shadow: none }
 .sld-in:disabled::-moz-range-thumb { background: var(--bg4); box-shadow: none }
+
+.mdb {
+  display: grid; grid-template-columns: 216px minmax(0, 1fr) 326px;
+  height: clamp(440px, calc(100vh - 214px), 780px)
+}
+.mdb > * { min-width: 0; min-height: 0 }
+.mdb-main { display: flex; flex-direction: column; min-width: 0; min-height: 0 }
+.mdb-body { flex: 1; min-height: 0; overflow-y: auto; position: relative }
+.mdb-body::-webkit-scrollbar, .mdb-rail-s::-webkit-scrollbar, .mdb-side-b::-webkit-scrollbar { width: 9px; height: 9px }
+.mdb-body::-webkit-scrollbar-thumb, .mdb-rail-s::-webkit-scrollbar-thumb, .mdb-side-b::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 99px }
+.mdb-body::-webkit-scrollbar-track, .mdb-rail-s::-webkit-scrollbar-track, .mdb-side-b::-webkit-scrollbar-track { background: transparent }
+
+.mdb-rail { display: flex; flex-direction: column; border-right: 1px solid var(--line2); background: var(--bg1) }
+.mdb-rail-h { flex: none; display: flex; align-items: center; gap: 6px; padding: 9px 8px 8px 12px; border-bottom: 1px solid var(--line2) }
+.mdb-rail-h .sp { flex: 1 }
+.mdb-rail-k { font-family: var(--mono); font-size: 9px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint) }
+.mdb-rail-s { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 7px 16px }
+.mdb-rail .nt-row { font-size: 12.5px; padding: 4px 7px }
+.mdb-rail .nt-group { margin-left: 12px }
+.mdb-slug { padding: 2px 8px 5px 32px; font-family: var(--mono); font-size: 10px; color: var(--faint) }
+.mdb-slug b { color: var(--accT); font-weight: 400 }
+.mdb-rail-foot { flex: none; padding: 7px 8px; border-top: 1px solid var(--line2) }
+
+.mdb-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; min-width: 0; font-family: var(--mono); font-size: 11px; color: var(--faint) }
+.mdb-crumb {
+  display: inline-flex; align-items: center; gap: 5px; max-width: 22ch; padding: 3px 7px; border-radius: 6px;
+  font-family: var(--mono); font-size: 11px; font-weight: 400; color: var(--dim); cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: background .13s, color .13s
+}
+.mdb-crumb:hover { background: var(--bg2); color: var(--accT) }
+.mdb-crumb.on { color: var(--ink); font-weight: 600; cursor: default }
+.mdb-crumb.on:hover { background: none; color: var(--ink) }
+.mdb-crumb.drop { background: var(--good-soft); color: var(--goodT); box-shadow: inset 0 0 0 1px var(--good) }
+.mdb-crumb-sep { flex: none; opacity: .45 }
+.mdb-scope {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 12px;
+  border-bottom: 1px solid var(--line2); font-family: var(--mono); font-size: 10px; color: var(--faint)
+}
+.mdb-scope .sp { flex: 1 }
+.mdb-scope b { color: var(--dim); font-weight: 500 }
+
+.mdb-cell { position: relative; cursor: pointer }
+.mdb-hit { position: absolute; inset: 0; z-index: 1; border-radius: var(--r3) }
+.mdb-hit:focus-visible { outline: 2px solid var(--c1); outline-offset: -2px; border-radius: var(--r3) }
+.mdb-ck {
+  position: absolute; top: 8px; left: 8px; z-index: 2; display: inline-flex; align-items: center;
+  padding: 4px; border-radius: 7px; background: var(--chipG); border: 1px solid var(--line2);
+  backdrop-filter: blur(6px); opacity: 0; transition: opacity .15s
+}
+.mdb-ck input { display: block; width: 14px; height: 14px; accent-color: var(--c1); cursor: pointer }
+.mdb-kebab {
+  position: absolute; top: 8px; right: 8px; z-index: 2; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 8px; color: var(--ink); background: var(--chipG);
+  border: 1px solid var(--line2); backdrop-filter: blur(6px); opacity: 0; transition: opacity .15s
+}
+.mdb-kebab:hover { border-color: var(--c1); color: var(--accT) }
+.mdb-cell:hover .mdb-ck, .mdb-cell:hover .mdb-kebab,
+.mdb-cell:focus-within .mdb-ck, .mdb-cell:focus-within .mdb-kebab,
+.mdb-cell.picked .mdb-ck, .mdb-cell.picked .mdb-kebab { opacity: 1 }
+.mdb-cell.picked { border-color: var(--c1); background: var(--accS) }
+.mdb-cell.picked .md-name { color: var(--accT) }
+.mdb-cell.kfoc { outline: 2px solid var(--c1); outline-offset: -2px; z-index: 1 }
+.mdb-cell.drop { border-color: var(--good); background: var(--good-soft); box-shadow: inset 0 0 0 1px var(--good) }
+.mdb-cell.grab { opacity: .5 }
+.mdb-cell.gone { border-style: dashed }
+.mdb-cell.gone .md-name { color: var(--faint) }
+.mdb-cell .md-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+
+.mdb-ic {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  height: 128px; background: var(--bg1); border-bottom: 1px solid var(--line2); color: var(--dim)
+}
+.mdb-ic b { font-family: var(--mono); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint) }
+.mdb-ic.fold { background: var(--accS); color: var(--c1) }
+.mdb-ic.fold b { color: var(--accT); opacity: .8 }
+.mdb-ic.gone { background: var(--bad-soft); color: var(--bad) }
+.mdb-ic.gone b { color: var(--bad); opacity: .8 }
+.mdb-cell.picked .mdb-ic { background: var(--card) }
+
+.mdb-veil {
+  position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 8px; pointer-events: none; text-align: center;
+  border: 1px dashed var(--c1); border-radius: var(--r3); background: var(--accS); color: var(--accT)
+}
+.mdb-veil b { font-size: 13.5px; font-weight: 600 }
+.mdb-veil span { font-family: var(--mono); font-size: 10.5px; opacity: .8 }
+
+.mdb-rows .tbl-scroll { overflow: visible }
+.mdb-rows .tbl { min-width: 520px }
+.mdb-rows .tbl td { padding: 8px 14px }
+.tbl .mdb-r { cursor: pointer }
+.tbl .mdb-r.picked > td { background: var(--accS) }
+.tbl .mdb-r.picked > td:first-child { box-shadow: inset 2px 0 0 var(--c1) }
+.tbl .mdb-r.drop > td { background: var(--good-soft); box-shadow: inset 0 0 0 1px var(--good) }
+.tbl .mdb-r.grab > td { opacity: .5 }
+.tbl .mdb-r.kfoc > td { outline: 2px solid var(--c1); outline-offset: -2px }
+.mdb-rt { display: block; width: 30px; height: 30px; flex: none; object-fit: cover; border-radius: 6px; border: 1px solid var(--line2); background: var(--bg2) }
+.mdb-rt.fold, .mdb-rt.doc { display: grid; place-items: center; color: var(--dim); background: var(--bg1) }
+.mdb-rt.fold { color: var(--c1); background: var(--accS) }
+.mdb-rn { display: flex; align-items: center; gap: 9px; min-width: 0 }
+.mdb-rn span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.mdb-rck { width: 1%; white-space: nowrap }
+.mdb-rck input { display: block; width: 14px; height: 14px; accent-color: var(--c1); cursor: pointer }
+
+.mdb-tray {
+  flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px;
+  border-top: 1px solid var(--line2); background: var(--bg1); font-size: 12px; color: var(--dim)
+}
+.mdb-tray .sp { flex: 1 }
+.mdb-tray-t { flex: none; width: 116px; height: 3px; border-radius: 99px; background: var(--bg3); overflow: hidden }
+.mdb-tray-f { display: block; height: 100%; border-radius: 99px; background: var(--c1); transition: width .18s linear }
+.mdb-tray-m { font-family: var(--mono); font-size: 10px; color: var(--faint) }
+
+.mdb-side { display: flex; flex-direction: column; border-left: 1px solid var(--line2); background: var(--bg1) }
+.mdb-side-h { flex: none; display: flex; align-items: center; gap: 8px; padding: 9px 8px 9px 13px; border-bottom: 1px solid var(--line2) }
+.mdb-side-t { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.mdb-side-b { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 13px 24px }
+.mdb-side .md-det { gap: 13px }
+.mdb-side .md-det-img { background: var(--card) }
+.mdb-side .md-det-img img { max-height: 190px }
+.mdb-side .md-det-facts { grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)) }
+.mdb-side .md-det-path { background: var(--card) }
+.mdb-side-none {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  padding: 32px 20px; text-align: center; font-size: 12px; line-height: 1.65; color: var(--faint)
+}
+.mdb-side-acts { display: flex; flex-wrap: wrap; gap: 7px }
+.mdb-side-k { font-family: var(--mono); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px }
+.mdb-side-sum { display: flex; flex-direction: column; gap: 4px; font-family: var(--mono); font-size: 11.5px; color: var(--dim) }
+
+.mdb-blank { margin: 14px; padding: 30px 20px; border: 1px dashed var(--line2); border-radius: var(--r3); background: var(--bg1) }
+.mdb-blank .empty { padding: 0 }
+.mdb-blank.over { border-style: solid; border-color: var(--c1); background: var(--accS) }
+.mdb-blocked {
+  max-height: 188px; overflow-y: auto; padding: 9px 11px; margin-top: 4px;
+  border: 1px solid var(--line2); border-radius: var(--r2); background: var(--bg1);
+  font-family: var(--mono); font-size: 11px; line-height: 1.7; color: var(--dim)
+}
+.mdb-blocked b { display: block; color: var(--ink); font-weight: 500; overflow-wrap: anywhere }
+.mdb-blocked span { color: var(--faint) }
+.mdb-mhead { padding: 6px 10px 5px; font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint) }
+.chip.acc { border-color: var(--c1); color: var(--accT); background: var(--accS) }
+
+@media (max-width: 1180px) {
+  .mdb { grid-template-columns: 200px minmax(0, 1fr); height: auto }
+  .mdb-body { max-height: 66vh }
+  .mdb-main { min-height: 360px }
+  .mdb-side { grid-column: 1 / -1; border-left: none; border-top: 1px solid var(--line2) }
+  .mdb-side-b { overflow-y: visible }
+  .mdb-side .md-det-facts { grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)) }
+}
+@media (max-width: 900px) {
+  .mdb { grid-template-columns: minmax(0, 1fr) }
+  .mdb-rail { display: flex; grid-column: 1 / -1; border-right: none; border-bottom: 1px solid var(--line2) }
+  .mdb-rail-s { max-height: 148px }
+  .mdb-body { max-height: none }
+  .mdb-crumb { max-width: 14ch }
+  .mdb-tray-t { width: 84px }
+}
+@media (max-width: 720px) {
+  .mdb-ic { height: 96px }
+  .mdb-blank { margin: 10px; padding: 22px 14px }
+  .mdb-scope { font-size: 9.5px }
+}
+@media (hover: none) {
+  .mdb-ck, .mdb-kebab { opacity: 1 }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mdb *, .mdb-tray-f { transition: none !important }
+  .mdb-cell:hover { transform: none }
+}
