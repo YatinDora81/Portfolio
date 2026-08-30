@@ -1,15 +1,18 @@
 import "server-only";
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
+  paginateListObjectsV2,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "@repo/config/env";
 import { err, ok, type Result } from "@repo/shared/result";
 
-export type StorageCode = "NOT_CONFIGURED" | "NOT_FOUND" | "STORAGE_ERROR";
+export type StorageCode = "NOT_CONFIGURED" | "NOT_FOUND" | "PARTIAL" | "STORAGE_ERROR";
 
 export const REQUIRED_R2_VARS = [
   "R2_ACCOUNT_ID",
@@ -127,6 +130,170 @@ export async function headObject(key: string): Promise<Result<ObjectHead>> {
   }
 }
 
+const LIST_PAGE_SIZE = 1000;
+
+function isFolderMarker(key: string): boolean {
+  return key.endsWith("/");
+}
+
+export interface ListedObject {
+  key: string;
+  bytes: number;
+  lastModified: string | null;
+  etag: string | null;
+}
+
+export interface FolderListing {
+  prefixes: string[];
+  objects: ListedObject[];
+  cursor: string | null;
+  complete: boolean;
+}
+
+export interface ListFolderOptions {
+  cursor?: string | null;
+  limit?: number;
+}
+
+export async function listFolder(
+  prefix: string,
+  opts: ListFolderOptions = {},
+): Promise<Result<FolderListing>> {
+  const conn = connect();
+  if (!conn) return notConfigured<FolderListing>();
+
+  try {
+    const res = await conn.client.send(
+      new ListObjectsV2Command({
+        Bucket: conn.bucket,
+        Prefix: prefix,
+        Delimiter: "/",
+        MaxKeys: opts.limit ?? LIST_PAGE_SIZE,
+        ContinuationToken: opts.cursor ?? undefined,
+      }),
+    );
+
+    const prefixes: string[] = [];
+    for (const entry of res.CommonPrefixes ?? []) {
+      const value = entry.Prefix;
+      if (!value || value === prefix) continue;
+      prefixes.push(value);
+    }
+
+    const objects: ListedObject[] = [];
+    for (const entry of res.Contents ?? []) {
+      const key = entry.Key;
+      if (!key || key === prefix || isFolderMarker(key)) continue;
+      objects.push({
+        key,
+        bytes: entry.Size ?? 0,
+        lastModified: entry.LastModified?.toISOString() ?? null,
+        etag: entry.ETag ?? null,
+      });
+    }
+
+    const truncated = res.IsTruncated === true;
+    return ok({
+      prefixes,
+      objects,
+      cursor: truncated ? (res.NextContinuationToken ?? null) : null,
+      complete: !truncated,
+    });
+  } catch (e) {
+    return err<FolderListing>(reason(e), "STORAGE_ERROR");
+  }
+}
+
+export interface KeyListing {
+  keys: string[];
+  truncated: boolean;
+  partial: boolean;
+}
+
+export async function listKeys(
+  prefix: string,
+  limit = LIST_PAGE_SIZE,
+): Promise<Result<KeyListing>> {
+  const conn = connect();
+  if (!conn) return notConfigured<KeyListing>();
+
+  const keys: string[] = [];
+  let truncated = false;
+
+  try {
+    const pages = paginateListObjectsV2(
+      { client: conn.client, pageSize: Math.min(limit, LIST_PAGE_SIZE) },
+      { Bucket: conn.bucket, Prefix: prefix },
+    );
+
+    for await (const page of pages) {
+      for (const entry of page.Contents ?? []) {
+        const key = entry.Key;
+        if (!key) continue;
+        if (keys.length >= limit) {
+          truncated = true;
+          break;
+        }
+        keys.push(key);
+      }
+      if (truncated) break;
+    }
+
+    return ok({ keys, truncated, partial: false });
+  } catch (e) {
+    if (keys.length === 0) return err<KeyListing>(reason(e), "STORAGE_ERROR");
+    return ok({ keys, truncated: true, partial: true });
+  }
+}
+
+export async function putFolderMarker(prefix: string): Promise<Result<null>> {
+  const conn = connect();
+  if (!conn) return notConfigured<null>();
+
+  try {
+    await conn.client.send(
+      new PutObjectCommand({
+        Bucket: conn.bucket,
+        Key: prefix,
+        Body: "",
+        ContentLength: 0,
+        ContentType: "application/x-directory",
+      }),
+    );
+    return ok(null);
+  } catch (e) {
+    return err<null>(reason(e), "STORAGE_ERROR");
+  }
+}
+
+function encodePathSegments(key: string): string {
+  return key.split("/").map(encodeURIComponent).join("/");
+}
+
+export async function copyObject(from: string, to: string): Promise<Result<null>> {
+  const conn = connect();
+  if (!conn) return notConfigured<null>();
+
+  const source = encodePathSegments(from);
+
+  try {
+    await conn.client.send(
+      new CopyObjectCommand({
+        Bucket: conn.bucket,
+        Key: to,
+        CopySource: `${conn.bucket}/${source}`,
+      }),
+    );
+    return ok(null);
+  } catch (e) {
+    const name = e instanceof Error ? e.name : "";
+    if (name === "NotFound" || name === "NoSuchKey") {
+      return err<null>("No object exists at that key.", "NOT_FOUND");
+    }
+    return err<null>(reason(e), "STORAGE_ERROR");
+  }
+}
+
 export async function deleteObject(key: string): Promise<Result<null>> {
   const conn = connect();
   if (!conn) return notConfigured<null>();
@@ -137,4 +304,48 @@ export async function deleteObject(key: string): Promise<Result<null>> {
   } catch (e) {
     return err<null>(reason(e), "STORAGE_ERROR");
   }
+}
+
+export interface DeleteReport {
+  ok: boolean;
+  done: boolean;
+  deleted: string[];
+  failed: { key: string; error: string }[];
+  remaining: number;
+}
+
+export async function deleteMany(
+  keys: string[],
+  concurrency = 6,
+): Promise<Result<DeleteReport>> {
+  const conn = connect();
+  if (!conn) return notConfigured<DeleteReport>();
+
+  const deleted: string[] = [];
+  const failed: DeleteReport["failed"] = [];
+  let next = 0;
+
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const key = keys[next++];
+      if (key === undefined) return;
+      try {
+        await conn.client.send(new DeleteObjectCommand({ Bucket: conn.bucket, Key: key }));
+        deleted.push(key);
+      } catch (e) {
+        failed.push({ key, error: reason(e) });
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, keys.length) }, worker));
+
+  const remaining = Math.max(0, keys.length - deleted.length - failed.length);
+  return ok({
+    ok: failed.length === 0,
+    done: remaining === 0 && failed.length === 0,
+    deleted,
+    failed,
+    remaining,
+  });
 }
