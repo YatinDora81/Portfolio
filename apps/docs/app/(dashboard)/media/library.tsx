@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ALT_ISSUE_LABEL,
   MIN_ALT_LENGTH,
   altTextIssue,
+  folderOfKey,
   formatBytes,
+  sanitizeFolder,
   type AltIssue,
   type MediaAssetDto,
 } from "@repo/storage/media";
@@ -27,14 +29,20 @@ import {
   IconTrash,
   IconUnlink,
 } from "@tabler/icons-react";
-import { Uploader } from "./uploader";
+import { MediaBrowser, type BucketChange } from "./browser";
+import { Uploader, type UploaderHandle } from "./uploader";
 
 export interface MediaRow extends MediaAssetDto {
   createdLabel: string;
   usedIn: string[];
 }
 
-type View = "all" | "alt" | "orphans";
+type View = "files" | "all" | "alt" | "orphans";
+
+interface Blocked {
+  key: string;
+  usedIn: string[];
+}
 
 function transportError(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "The server could not be reached.";
@@ -42,6 +50,10 @@ function transportError(e: unknown): string {
 
 function issueOf(row: MediaRow): AltIssue | null {
   return altTextIssue(row.altText);
+}
+
+function relocate(url: string, from: string, to: string): string {
+  return url.endsWith(from) ? `${url.slice(0, url.length - from.length)}${to}` : url;
 }
 
 function emptyTitle(view: View, total: number, audited: number, orphans: number): string {
@@ -66,19 +78,31 @@ export function MediaLibrary({
   rows: initial,
   storage,
   scanned,
+  initialPrefix,
 }: {
   rows: MediaRow[];
   storage: { configured: boolean; missing: string[] };
   scanned: number;
+  initialPrefix: string;
 }) {
   const [rows, setRows] = useState<MediaRow[]>(initial);
-  const [view, setView] = useState<View>("all");
+  const [view, setView] = useState<View>("files");
   const [folder, setFolder] = useState<string>("all");
   const [q, setQ] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [uploadFolder, setUploadFolder] = useState("uploads");
-  // snapshotted so a saved row stays in the audit list
   const [auditIds, setAuditIds] = useState<ReadonlySet<string>>(new Set());
+  const [bucketPrefix, setBucketPrefix] = useState(initialPrefix);
+  const [reloadKey, setReloadKey] = useState(0);
+  const uploader = useRef<UploaderHandle>(null);
+  const settle = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (settle.current !== null) window.clearTimeout(settle.current);
+    },
+    [],
+  );
 
   const folders = useMemo(
     () => [...new Set(rows.map((r) => r.folder))].sort((a, b) => a.localeCompare(b)),
@@ -129,6 +153,50 @@ export function MediaLibrary({
     setOpenId(null);
   };
 
+  const rereadBucket = () => {
+    if (settle.current !== null) window.clearTimeout(settle.current);
+    settle.current = window.setTimeout(() => setReloadKey((n) => n + 1), 700);
+  };
+
+  const onBucketChange = (change: BucketChange) => {
+    setRows((prev) => {
+      let next = prev;
+      if (change.removed && change.removed.length > 0) {
+        const gone = new Set(change.removed);
+        next = next.filter((r) => !gone.has(r.key));
+      }
+      if (change.moved && change.moved.length > 0) {
+        const moves = new Map(change.moved.map((m) => [m.from, m.to] as const));
+        next = next.map((r) => {
+          const to = moves.get(r.key);
+          if (to === undefined) return r;
+          return { ...r, key: to, url: relocate(r.url, r.key, to), folder: folderOfKey(to) };
+        });
+      }
+      if (change.altered && change.altered.length > 0) {
+        const described = new Map(change.altered.map((a) => [a.key, a.altText] as const));
+        next = next.map((r) => ({ ...r, altText: described.get(r.key) ?? r.altText }));
+      }
+      if (change.renamed && change.renamed.length > 0) {
+        const named = new Map(change.renamed.map((n) => [n.id, n.filename] as const));
+        next = next.map((r) => ({ ...r, filename: named.get(r.id) ?? r.filename }));
+      }
+      if (change.upserted && change.upserted.length > 0) {
+        const ids = new Set(change.upserted.map((a) => a.id));
+        const adopted = change.upserted.map((asset) => {
+          const had = next.find((r) => r.key === asset.key);
+          return {
+            ...asset,
+            createdLabel: had?.createdLabel ?? "just now",
+            usedIn: had?.usedIn ?? [],
+          };
+        });
+        next = [...adopted, ...next.filter((r) => !ids.has(r.id))];
+      }
+      return next;
+    });
+  };
+
   return (
     <>
       {!storage.configured ? (
@@ -149,10 +217,10 @@ export function MediaLibrary({
       <div className="stat-grid even">
         <div className="stat">
           <div className="stat-k">
-            <IconPhoto size={11} /> assets
+            <IconPhoto size={11} /> library rows
           </div>
           <div className="stat-v">{rows.length}</div>
-          <div className="stat-m">{formatBytes(totalBytes)} stored</div>
+          <div className="stat-m">{formatBytes(totalBytes)} tracked · the bucket may hold more</div>
         </div>
         <div className="stat">
           <div className="stat-k">
@@ -168,7 +236,7 @@ export function MediaLibrary({
             <IconUnlink size={11} /> unused
           </div>
           <div className="stat-v">{orphans.length}</div>
-          <div className="stat-m">nothing found pointing at them</div>
+          <div className="stat-m">library-wide, nothing found pointing at them</div>
         </div>
         <div className="stat">
           <div className="stat-k">
@@ -183,11 +251,15 @@ export function MediaLibrary({
         <CardHead title="Upload" />
         <div className="card-b">
           <Uploader
+            ref={uploader}
+            prefix={`${sanitizeFolder(uploadFolder)}/`}
             folder={uploadFolder}
             onFolderChange={setUploadFolder}
             configured={storage.configured}
             missing={storage.missing}
             onSaved={onSaved}
+            onLanded={rereadBucket}
+            onDiscarded={rereadBucket}
           />
         </div>
       </Card>
@@ -195,6 +267,12 @@ export function MediaLibrary({
       <Card flush className="md-card">
         <div className="md-bar">
           <div className="md-tabs">
+            <button
+              className={`filt${view === "files" ? " on" : ""}`}
+              onClick={() => setView("files")}
+            >
+              files
+            </button>
             <button className={`filt${view === "all" ? " on" : ""}`} onClick={() => setView("all")}>
               library · {rows.length}
             </button>
@@ -209,18 +287,20 @@ export function MediaLibrary({
             </button>
           </div>
           <span className="sp" />
-          <div className="md-search">
-            <IconSearch size={14} stroke={1.7} />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="filename, alt text or key"
-              aria-label="Search the library"
-            />
-          </div>
+          {view === "files" ? null : (
+            <div className="md-search">
+              <IconSearch size={14} stroke={1.7} />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="filename, alt text or key"
+                aria-label="Search the library"
+              />
+            </div>
+          )}
         </div>
 
-        {folders.length > 1 ? (
+        {folders.length > 1 && view !== "files" ? (
           <div className="filters">
             <button
               className={`filt${folder === "all" ? " on" : ""}`}
@@ -251,7 +331,21 @@ export function MediaLibrary({
           </div>
         ) : null}
 
-        {visible.length === 0 ? (
+        {view === "files" ? (
+          <MediaBrowser
+            initialPrefix={bucketPrefix}
+            storage={storage}
+            reloadKey={reloadKey}
+            onNavigate={(next) => {
+              setBucketPrefix(next);
+              setUploadFolder(next === "" ? "" : next.slice(0, -1));
+            }}
+            onEnqueue={(files, root) => uploader.current?.enqueueDropped(files, root)}
+            onPickFiles={(root) => uploader.current?.pickFiles(root)}
+            onPickFolder={(root) => uploader.current?.pickFolder(root)}
+            onLibraryChanged={onBucketChange}
+          />
+        ) : visible.length === 0 ? (
           <div className="empty">
             <div className="empty-ic">
               <IconPhoto size={18} stroke={1.5} />
@@ -413,6 +507,7 @@ function Detail({
   const [copied, setCopied] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [blocked, setBlocked] = useState<Blocked[]>([]);
 
   const trimmed = value.trim();
   const dirty = trimmed !== row.altText.trim();
@@ -436,14 +531,19 @@ function Detail({
     }
   };
 
-  const remove = async () => {
+  const remove = async (allowReferenced: boolean) => {
     setRemoving(true);
     setError(null);
     try {
-      const res = await deleteAsset({ id: row.id });
+      const res = await deleteAsset({
+        id: row.id,
+        ...(allowReferenced ? { allowReferenced: [row.key] } : {}),
+      });
       if (!res.ok) {
+        const still = res.blocked ?? [];
+        setBlocked(still);
+        if (still.length === 0) setConfirming(false);
         setError(res.error ?? "That asset was not deleted.");
-        setConfirming(false);
         return;
       }
       onDeleted(row.id);
@@ -453,6 +553,14 @@ function Detail({
       setRemoving(false);
     }
   };
+
+  const keep = () => {
+    setBlocked([]);
+    setConfirming(false);
+    setError(null);
+  };
+
+  const breakages = blocked.reduce((sum, item) => sum + item.usedIn.length, 0);
 
   const copy = () => {
     void navigator.clipboard.writeText(row.url).then(() => {
@@ -568,8 +676,36 @@ function Detail({
 
         {error ? <div className="rv-err">{error}</div> : null}
 
+        {blocked.length > 0 ? (
+          <div className="md-det-use">
+            <div className="md-det-k">still pointed at, read just now</div>
+            <div className="mdb-blocked">
+              {blocked.map((item) => (
+                <div key={item.key}>
+                  <b>{item.key}</b>
+                  <span>{item.usedIn.join(" · ")}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="md-det-danger">
-          {confirming ? (
+          {blocked.length > 0 ? (
+            <>
+              <span>
+                Deleting anyway leaves{" "}
+                {breakages === 1 ? "that place" : `those ${breakages} places`} pointing at a file
+                that is no longer there. Fix the reference first if you can.
+              </span>
+              <Button variant="ghost" onClick={keep} disabled={removing}>
+                Keep it
+              </Button>
+              <Button variant="destructive" onClick={() => void remove(true)} disabled={removing}>
+                <IconTrash size={13} /> {removing ? "Deleting…" : "Delete anyway"}
+              </Button>
+            </>
+          ) : confirming ? (
             <>
               <span>
                 Delete the object and the row? There is no undo, and any page still pointing at it
@@ -578,7 +714,7 @@ function Detail({
               <Button variant="ghost" onClick={() => setConfirming(false)} disabled={removing}>
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={() => void remove()} disabled={removing}>
+              <Button variant="destructive" onClick={() => void remove(false)} disabled={removing}>
                 <IconTrash size={13} /> {removing ? "Deleting…" : "Yes, delete"}
               </Button>
             </>

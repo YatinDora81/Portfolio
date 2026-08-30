@@ -1,5 +1,6 @@
 import { prisma } from "db";
 import { redirect } from "next/navigation";
+import { isBucketPrefix } from "@repo/storage/media";
 import { isStorageConfigured, missingStorageVars } from "@repo/storage/r2";
 import { PageHeader } from "@/components/shared/page-header";
 import { referenceSources } from "@/lib/media-references";
@@ -16,9 +17,17 @@ const stamp = new Intl.DateTimeFormat("en-GB", {
   year: "numeric",
 });
 
-export default async function MediaPage() {
+export default async function MediaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ path?: string | string[] }>;
+}) {
   const session = await getSession();
   if (!session) redirect("/login");
+
+  const sp = await searchParams;
+  const raw = (Array.isArray(sp.path) ? sp.path.at(-1) : sp.path) ?? "";
+  const prefix = isBucketPrefix(raw) ? raw : "";
 
   const [assets, sources] = await Promise.all([
     prisma.mediaAsset.findMany({ orderBy: { createdAt: "desc" } }),
@@ -43,7 +52,7 @@ export default async function MediaPage() {
   }));
 
   return (
-    <div className="view">
+    <div className="view wide">
       <PageHeader
         eyebrow="library · images"
         title="Media"
@@ -54,6 +63,7 @@ export default async function MediaPage() {
         rows={rows}
         storage={{ configured: isStorageConfigured(), missing: missingStorageVars() }}
         scanned={sources.length}
+        initialPrefix={prefix}
       />
     </div>
   );
