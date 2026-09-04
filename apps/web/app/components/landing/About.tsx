@@ -60,7 +60,7 @@ function BoldText({ text, logos }: { text: string; logos?: Record<string, string
   );
 }
 
-const UNLOCK_HINT = "# type 'help' to explore — try \"skills\" ⏎";
+const UNLOCK_HINT = "# type 'help' to explore — or tap a command below ⏎";
 
 const TAB_WIDTH = 4;
 
@@ -69,6 +69,9 @@ const TYPE_START = 0.2;
 const TYPE_SPEED = 0.055;
 const OUTPUT_START = TYPE_START + CMD.length * TYPE_SPEED + 0.3;
 const OUTPUT_STAGGER = 0.22;
+
+const TRY_ORDER = ['whoami', 'skills', 'experience', 'projects', 'contact', 'resume', 'help'] as const;
+const TRY_NAV: readonly string[] = ['skills', 'experience', 'projects', 'contact'];
 
 const NAV_COMMANDS = ALL_NAV_COMMANDS.map((c) => ({
   cmd: c.cmd, target: c.target, label: c.label,
@@ -118,7 +121,20 @@ function Terminal({
   const [hist, setHist] = useState<string[]>([]);
   const [histIdx, setHistIdx] = useState<number | null>(null);
   const [navCmds, setNavCmds] = useState(NAV_COMMANDS);
+  const [typing, setTyping] = useState(false);
+  const [lastTry, setLastTry] = useState<string | null>(null);
   const interacted = useRef(false);
+  const typeTimers = useRef<number[]>([]);
+  const refocus = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => () => typeTimers.current.forEach((t) => window.clearTimeout(t)), []);
+
+  useEffect(() => {
+    if (typing) return;
+    const el = refocus.current;
+    refocus.current = null;
+    el?.focus({ preventScroll: true });
+  }, [typing]);
 
   useEffect(() => {
     if (!inView) return;
@@ -144,6 +160,12 @@ function Terminal({
     ...navCmds.map((c) => c.cmd),
     ...TERMINAL_COMMANDS.filter((c) => c.kind !== 'nav' && c.discoverable).map((c) => c.cmd),
   ];
+
+  const navSet = new Set(navCmds.map((c) => c.cmd));
+  const tryCmds = TRY_ORDER.filter((c) => !TRY_NAV.includes(c) || navSet.has(c)).map((cmd) => ({
+    cmd,
+    kind: navSet.has(cmd) ? 'nav' : cmd === 'resume' ? 'action' : 'info',
+  }));
 
   const suggestion =
     value.length > 0
@@ -246,8 +268,43 @@ function Terminal({
     return null;
   };
 
+  const typeAndRun = (cmd: string, btn: HTMLButtonElement) => {
+    if (!ready || typing) return;
+    typeTimers.current.forEach((t) => window.clearTimeout(t));
+    typeTimers.current = [];
+    interacted.current = true;
+    if (findCommand(cmd)?.keepsFocus) inputRef.current?.focus({ preventScroll: true });
+    setLastTry(cmd);
+
+    const finish = () => {
+      typeTimers.current = [];
+      const c = run(cmd);
+      setBuffer('');
+      setTyping(false);
+      if (c?.keepsFocus) return;
+      inputRef.current?.blur();
+      if (btn.disabled) refocus.current = btn;
+      else btn.focus({ preventScroll: true });
+    };
+
+    if (reduceMotion) {
+      setBuffer(cmd);
+      finish();
+      return;
+    }
+
+    setTyping(true);
+    setBuffer('');
+    const ms = TYPE_SPEED * 1000;
+    typeTimers.current = cmd
+      .split('')
+      .map((_, i) => window.setTimeout(() => setBuffer(cmd.slice(0, i + 1)), i * ms));
+    typeTimers.current.push(window.setTimeout(finish, cmd.length * ms + 120));
+  };
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
+      if (typing) return;
       const cmd = run(value);
       setBuffer('');
       if (cmd && !cmd.keepsFocus) inputRef.current?.blur();
@@ -340,7 +397,8 @@ function Terminal({
       ref={wrapRef}
       initial={reduceMotion ? false : 'hidden'}
       animate={inView || reduceMotion ? 'show' : 'hidden'}
-      onClick={() => {
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest('[data-term-try]')) return;
         const sel = window.getSelection();
         if (sel && !sel.isCollapsed && sel.toString().trim()) return;
         inputRef.current?.focus();
@@ -481,6 +539,28 @@ function Terminal({
               aria-label="Terminal input — type help for commands, Escape or Shift+Tab to leave"
             />
           </span>
+        </div>
+      </div>
+
+      <div className="term-try" data-term-try>
+        <span className="k">try</span>
+        <div className="cmds">
+          {tryCmds.map(({ cmd, kind }) => (
+            <button
+              key={cmd}
+              type="button"
+              className={`tcmd${lastTry === cmd ? ' on' : ''}`}
+              data-kind={kind}
+              disabled={!ready || typing}
+              onClick={(e) => {
+                e.stopPropagation();
+                typeAndRun(cmd, e.currentTarget);
+              }}
+              aria-label={`Run ${cmd}`}
+            >
+              {cmd}
+            </button>
+          ))}
         </div>
       </div>
     </motion.div>
