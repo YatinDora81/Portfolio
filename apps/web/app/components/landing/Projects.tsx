@@ -15,6 +15,7 @@ import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
 import { GithubIcon, ExternalLinkIcon } from '@repo/ui/icons/brand';
 import { skillIconMap } from '@repo/ui/icons/registry';
+import { slugify } from '@/lib/utils';
 
 type ProjectsVersion = 'v1' | 'v2';
 
@@ -67,7 +68,7 @@ function endpointOf(project: ProjectData): Endpoint | null {
 const FEATURED = 3;
 const FOLD_ID = 'pj-more-builds';
 
-function useOpenSet() {
+function useOpenSet(projects: ProjectData[], setExpanded: (value: boolean) => void) {
   const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set<number>());
   const toggle = (index: number) =>
     setOpen((prev) => {
@@ -76,6 +77,28 @@ function useOpenSet() {
       else next.add(index);
       return next;
     });
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const openFromHash = () => {
+      const slug = window.location.hash.slice(1);
+      const index = projects.findIndex((p) => `pj-${slugify(p.title)}` === slug);
+      if (index < 0) return;
+      setOpen((prev) => (prev.has(index) ? prev : new Set(prev).add(index)));
+      if (index < FEATURED) return;
+      setExpanded(true);
+      timer = setTimeout(() => {
+        document.getElementById(slug)?.scrollIntoView({ block: 'start' });
+      }, 560);
+    };
+    openFromHash();
+    window.addEventListener('hashchange', openFromHash);
+    return () => {
+      window.removeEventListener('hashchange', openFromHash);
+      clearTimeout(timer);
+    };
+  }, [projects, setExpanded]);
+
   return [open, toggle] as const;
 }
 
@@ -152,7 +175,11 @@ function LedgerRow({
   const cover = project.images[0];
 
   return (
-    <article className={`pj-row expand${isOpen ? ' open' : ''}`} onClick={tapToggle(onToggle)}>
+    <article
+      id={`pj-${slugify(project.title)}`}
+      className={`pj-row expand scroll-mt-24${isOpen ? ' open' : ''}`}
+      onClick={tapToggle(onToggle)}
+    >
       <span className="pj-idx mono" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
 
       {cover && link ? (
@@ -220,7 +247,7 @@ function LedgerRow({
 
 function ProjectsLedger({ projects }: { projects: ProjectData[] }) {
   const [expanded, setExpanded] = useState(false);
-  const [open, toggle] = useOpenSet();
+  const [open, toggle] = useOpenSet(projects, setExpanded);
 
   const featured = projects.slice(0, FEATURED);
   const rest = projects.slice(FEATURED);
@@ -318,7 +345,8 @@ function LogEntry({
   return (
     <article
       ref={ref}
-      className={`pjb-entry${shown ? ' in' : ''}${isOpen ? ' open' : ''}`}
+      id={`pj-${slugify(project.title)}`}
+      className={`pjb-entry scroll-mt-24${shown ? ' in' : ''}${isOpen ? ' open' : ''}`}
       onClick={tapToggle(onToggle)}
     >
       <div className="pjb-dep mono">
@@ -423,7 +451,7 @@ function LogEntry({
 
 function ProjectsBuildLog({ projects }: { projects: ProjectData[] }) {
   const [expanded, setExpanded] = useState(false);
-  const [open, toggle] = useOpenSet();
+  const [open, toggle] = useOpenSet(projects, setExpanded);
   const reduced = useReducedMotion() ?? false;
 
   const endpoints = projects.map(endpointOf);

@@ -6,6 +6,7 @@ import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
 import { MapPinIcon } from '@repo/ui/icons/brand';
 import { skillIconMap } from '@repo/ui/icons/registry';
+import { slugify } from '@/lib/utils';
 
 export interface ExperienceData {
   company: string;
@@ -138,8 +139,9 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
   return (
     <div
       ref={cardRef}
+      id={`xp-${slugify(exp.company)}`}
       onMouseMove={onMouseMove}
-      className={`xp-card${inView ? ' in' : ''}${open ? ' open' : ''}`}
+      className={`xp-card scroll-mt-24${inView ? ' in' : ''}${open ? ' open' : ''}`}
     >
       <span className={exp.isCurrent ? 'xp-node live' : 'xp-node'} aria-hidden />
 

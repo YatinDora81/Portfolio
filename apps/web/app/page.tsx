@@ -11,6 +11,7 @@ import Bridge from './components/common/Bridge';
 import Hero from './components/landing/Hero';
 import About from './components/landing/About';
 import Skills from './components/landing/Skills';
+import type { UsedIn, UsedInMap } from './components/landing/Skills';
 import Experience from './components/landing/Experience';
 import Projects from './components/landing/Projects';
 import Blogs from './components/landing/Blogs';
@@ -35,6 +36,7 @@ import { FLAG_KEYS, flagValue } from '@repo/shared/flags';
 import { env } from '@repo/config/env';
 import { githubHandle, readGithubActivity } from './lib/github';
 import { SITE_URL, SITE_NAME, absoluteUrl } from './lib/site';
+import { canonicalSkill, slugify } from './lib/utils';
 
 function thoughtOfDay(quotes: { quote: string; author: string }[]) {
   const now = new Date();
@@ -87,6 +89,30 @@ export default async function Home() {
       .filter((e) => e.logoUrl)
       .map((e) => [e.company.trim().toLowerCase(), e.logoUrl as string])
   );
+
+  const usedIn: UsedInMap = {};
+  const add = (skill: string, entry: UsedIn) => {
+    const list = (usedIn[canonicalSkill(skill)] ??= []);
+    if (!list.some((u) => u.href === entry.href)) list.push(entry);
+  };
+  if (show.experience)
+    for (const e of experiences)
+      for (const t of e.technologies)
+        add(t, {
+          name: e.company,
+          href: `#xp-${slugify(e.company)}`,
+          logoUrl: e.logoUrl,
+          kind: 'job',
+        });
+  if (show.projects)
+    for (const p of projects)
+      for (const t of p.technologies)
+        add(t.name, {
+          name: p.title,
+          href: `#pj-${slugify(p.title)}`,
+          logoUrl: p.logoUrl,
+          kind: 'build',
+        });
 
   const thought = thoughtOfDay(quotes);
 
@@ -180,7 +206,7 @@ export default async function Home() {
             {show.skills && (
               <Suspense fallback={null}>
                 <HydrateWhenVisible id="hy-skills">
-                <Skills skills={skills} />
+                <Skills skills={skills} usedIn={usedIn} />
                 </HydrateWhenVisible>
               </Suspense>
             )}

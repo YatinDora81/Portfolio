@@ -1,6 +1,12 @@
 'use client';
 
-import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import {
+  type KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import Container from '../common/Container';
 import SectionHeading from '../common/SectionHeading';
 import { useTheme } from '../common/ThemeProvider';
@@ -10,6 +16,7 @@ import {
   skillCategories,
   type SkillCategoryId,
 } from '@/lib/skill-meta';
+import { canonicalSkill } from '@/lib/utils';
 
 interface SkillEntry {
   name: string;
@@ -22,6 +29,15 @@ interface EnrichedSkill extends SkillEntry {
   category: SkillCategoryId;
   number: number;
 }
+
+export interface UsedIn {
+  name: string;
+  href: string;
+  logoUrl: string | null;
+  kind: 'job' | 'build';
+}
+
+export type UsedInMap = Record<string, UsedIn[]>;
 
 function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace('#', '');
@@ -66,15 +82,19 @@ function ElementCard({
   index,
   dimmed,
   hovered,
+  pinned,
   isDark,
   onHover,
+  onSelect,
 }: {
   skill: EnrichedSkill;
   index: number;
   dimmed: boolean;
   hovered: boolean;
+  pinned: boolean;
   isDark: boolean;
   onHover: (n: number | null) => void;
+  onSelect: (n: number) => void;
 }) {
   const icon = skillIconMap[skill.iconKey] || skillIconMap[skill.name];
   const c = tune(skill.color, isDark);
@@ -88,11 +108,14 @@ function ElementCard({
         type="button"
         data-skills-control="card"
         aria-label={skill.name}
+        aria-pressed={pinned}
         tabIndex={dimmed ? -1 : 0}
         onMouseEnter={() => onHover(skill.number)}
-        onMouseLeave={() => onHover(null)}
         onFocus={() => onHover(skill.number)}
-        onBlur={() => onHover(null)}
+        onBlur={(e) => {
+          if (!e.relatedTarget?.closest('.sk-live')) onHover(null);
+        }}
+        onClick={() => onSelect(skill.number)}
         style={
           hovered
             ? {
@@ -153,22 +176,51 @@ function ElementCard({
   );
 }
 
-export default function Skills({ skills }: { skills: SkillEntry[] }) {
+export default function Skills({
+  skills,
+  usedIn = {},
+}: {
+  skills: SkillEntry[];
+  usedIn?: UsedInMap;
+}) {
   const [filter, setFilter] = useState<SkillCategoryId | null>(null);
   const [hovered, setHovered] = useState<number | null>(null);
+  const [pinned, setPinned] = useState<number | null>(null);
+  const [stuck, setStuck] = useState(false);
+  const liveRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
   useEffect(() => {
-    if (filter === null) return;
+    if (filter === null && pinned === null) return;
     const onDocClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
-      if (target && target.closest('[data-skills-control]')) return;
+      if (target && target.closest('[data-skills-control], .sk-live')) return;
       setFilter(null);
+      setPinned(null);
+      setHovered(null);
     };
     document.addEventListener('click', onDocClick);
     return () => document.removeEventListener('click', onDocClick);
-  }, [filter]);
+  }, [filter, pinned]);
+
+  useEffect(() => {
+    const el = liveRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const e = entries[0];
+        if (!e) return;
+        setStuck(
+          e.intersectionRatio < 1 &&
+            e.boundingClientRect.bottom >= window.innerHeight - 16,
+        );
+      },
+      { threshold: [1], rootMargin: '0px 0px -16px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   const enriched: EnrichedSkill[] = useMemo(
     () =>
@@ -217,9 +269,13 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
       })),
   ];
 
-  const hoveredSkill =
-    hovered !== null ? enriched.find((s) => s.number === hovered) : undefined;
-  const hoveredColor = hoveredSkill ? tune(hoveredSkill.color, isDark) : '';
+  const active = hovered ?? pinned;
+  const activeSkill =
+    active !== null ? enriched.find((s) => s.number === active) : undefined;
+  const activeColor = activeSkill ? tune(activeSkill.color, isDark) : '';
+  const activeUses = activeSkill
+    ? (usedIn[canonicalSkill(activeSkill.name)] ?? [])
+    : [];
 
   const onGridKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const keys = [
@@ -263,101 +319,134 @@ export default function Skills({ skills }: { skills: SkillEntry[] }) {
   return (
     <section id="skills">
       <Container className="mt-20 animate-fade-in-blur animate-delay-4">
-        <SectionHeading
-          channel="02"
-          label="skills"
-          title="Periodic table."
-          hint={`${skills.length} elements`}
-        />
-        <p className="mt-3 max-w-xl text-sm leading-relaxed text-secondary">
-          my periodic table of code — everything i build with, in one place. tap
-          a category to filter, hover any element to bring it to life.
-        </p>
+        <div onMouseLeave={() => setHovered(null)}>
+          <SectionHeading
+            channel="02"
+            label="skills"
+            title="Periodic table."
+            hint={`${skills.length} elements`}
+          />
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-secondary">
+            my periodic table of code — everything i build with, in one place.
+            tap a category to filter, hover any element to bring it to life —
+            and see where i&apos;ve actually used it.
+          </p>
 
-        <div className="mt-7 flex flex-wrap items-center gap-2">
-          {chips.map((chip) => {
-            const selected = filter === chip.id;
-            const cc = tune(chip.color, isDark);
-            return (
-              <button
-                key={chip.label}
-                type="button"
-                data-skills-control="chip"
-                aria-pressed={selected}
-                onClick={() => setFilter(chip.id)}
-                style={
-                  selected
-                    ? {
-                        borderColor: hexToRgba(cc, 0.6),
-                        background: hexToRgba(cc, 0.12),
-                        color: cc,
-                      }
-                    : undefined
-                }
-                className={[
-                  'flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5',
-                  'text-xs transition-[color,background-color,border-color] duration-200',
-                  selected
-                    ? 'font-medium'
-                    : 'text-secondary hover:border-foreground/20 hover:text-foreground',
-                ].join(' ')}
-              >
+          <div className="mt-7 flex flex-wrap items-center gap-2">
+            {chips.map((chip) => {
+              const selected = filter === chip.id;
+              const cc = tune(chip.color, isDark);
+              return (
+                <button
+                  key={chip.label}
+                  type="button"
+                  data-skills-control="chip"
+                  aria-pressed={selected}
+                  onClick={() => {
+                    setFilter(chip.id);
+                    setPinned(null);
+                    setHovered(null);
+                  }}
+                  style={
+                    selected
+                      ? {
+                          borderColor: hexToRgba(cc, 0.6),
+                          background: hexToRgba(cc, 0.12),
+                          color: cc,
+                        }
+                      : undefined
+                  }
+                  className={[
+                    'flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5',
+                    'text-xs transition-[color,background-color,border-color] duration-200',
+                    selected
+                      ? 'font-medium'
+                      : 'text-secondary hover:border-foreground/20 hover:text-foreground',
+                  ].join(' ')}
+                >
+                  <span
+                    className="size-1.5 rounded-full transition-transform duration-200"
+                    style={{
+                      background: cc,
+                      transform: selected ? 'scale(1.4)' : 'scale(1)',
+                    }}
+                  />
+                  {chip.label}
+                  {selected && chip.id !== null && (
+                    <span className="font-mono text-[10px]">{chip.count}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div
+            className="mt-6 flex flex-wrap justify-center gap-1.5 sm:gap-2"
+            role="group"
+            aria-label="Skills"
+            onKeyDown={onGridKeyDown}
+          >
+            {enriched.map((skill, i) => {
+              const dimmed = filter !== null && filter !== skill.category;
+              return (
+                <ElementCard
+                  key={skill.name}
+                  skill={skill}
+                  index={i}
+                  dimmed={dimmed}
+                  hovered={active === skill.number && !dimmed}
+                  pinned={pinned === skill.number}
+                  isDark={isDark}
+                  onHover={setHovered}
+                  onSelect={(n) => setPinned((p) => (p === n ? null : n))}
+                />
+              );
+            })}
+          </div>
+
+          <div
+            ref={liveRef}
+            aria-live="polite"
+            onBlur={(e) => {
+              if (!e.relatedTarget?.closest('[data-skills-control], .sk-live'))
+                setHovered(null);
+            }}
+            className={`sk-live${activeSkill ? ' on' : ''}${stuck ? ' stuck' : ''}`}
+          >
+            {activeSkill && (
+              <>
                 <span
-                  className="size-1.5 rounded-full transition-transform duration-200"
+                  className="dot"
                   style={{
-                    background: cc,
-                    transform: selected ? 'scale(1.4)' : 'scale(1)',
+                    background: activeColor,
+                    boxShadow: `0 0 8px ${hexToRgba(activeColor, 0.8)}`,
                   }}
                 />
-                {chip.label}
-                {selected && chip.id !== null && (
-                  <span className="font-mono text-[10px]">{chip.count}</span>
+                <span className="name">{activeSkill.name}</span>
+                <span className="sep" aria-hidden>
+                  —
+                </span>
+                <span>{categoryLabel[activeSkill.category]}</span>
+                {activeUses.length > 0 && (
+                  <>
+                    <span className="sep" aria-hidden>
+                      ·
+                    </span>
+                    <span className="k">used in</span>
+                    {activeUses.map((u) => (
+                      <a key={u.href} href={u.href}>
+                        {u.logoUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={u.logoUrl} alt="" width={13} height={13} />
+                        )}
+                        {u.name}
+                      </a>
+                    ))}
+                  </>
                 )}
-              </button>
-            );
-          })}
-        </div>
-
-        <div
-          className="mt-6 flex flex-wrap justify-center gap-1.5 sm:gap-2"
-          role="group"
-          aria-label="Skills"
-          onKeyDown={onGridKeyDown}
-        >
-          {enriched.map((skill, i) => {
-            const dimmed = filter !== null && filter !== skill.category;
-            return (
-              <ElementCard
-                key={skill.name}
-                skill={skill}
-                index={i}
-                dimmed={dimmed}
-                hovered={hovered === skill.number && !dimmed}
-                isDark={isDark}
-                onHover={setHovered}
-              />
-            );
-          })}
-        </div>
-
-        <div
-          aria-live="polite"
-          className="mt-6 flex h-5 items-center justify-center gap-2 font-mono text-[11px] text-secondary"
-        >
-          {hoveredSkill && (
-            <>
-              <span
-                className="size-1.5 shrink-0 rounded-full"
-                style={{
-                  background: hoveredColor,
-                  boxShadow: `0 0 8px ${hexToRgba(hoveredColor, 0.8)}`,
-                }}
-              />
-              <span className="text-foreground">{hoveredSkill.name}</span>
-              <span aria-hidden>—</span>
-              <span>{categoryLabel[hoveredSkill.category]}</span>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
       </Container>
     </section>
