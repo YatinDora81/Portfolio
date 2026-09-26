@@ -76,8 +76,7 @@ the caching strategy here.
 | `/api/revalidate` | POST | On-demand ISR. Secret in the `x-revalidate-secret` header or a `secret` body field, compared with `safeEqual`. Body takes `paths[]` and `tags[]` (≤100 entries, ≤512 chars each); an empty body revalidates `revalidatePath("/", "layout")` — the whole site. |
 | `/api/contact` | POST | Contact form intake: Zod validation, spam heuristics, timing token, optional Turnstile, then a notification email. |
 | `/api/contact/token` | GET | Issues the HMAC timing token the form posts back. |
-| `/api/collect` | POST | First-party analytics beacon. Drops bot user-agents, batches events. |
-| `/api/track/utm` | POST | Records UTM attribution for a visit. |
+| `/api/collect` | POST | First-party analytics beacon. Drops bot user-agents, batches events, and records the session's UTM attribution on the first hit. |
 | `/api/blogs/[slug]` | GET | Blog post JSON. |
 | `/api/github/refresh` | POST | Refreshes the cached GitHub profile and contribution years. |
 | `/api/preview` · `/api/preview/exit` | GET | Draft Mode in and out, gated on a signed preview token. |
@@ -163,26 +162,32 @@ alias `@/*` to `./app/*`.
 
 ## Database
 
-40 models, grouped roughly:
+43 models, grouped roughly:
 
-- **Site content** — `HeroContent`, `HeroTitle`, `HeroSkillBadge`, `AboutParagraph`, `Education`,
-  `Skill`, `Experience`, `ExperienceBullet`, `Project`, `ProjectBullet`, `Blog`, `Quote`,
-  `SocialLink`, `SiteConfig`
+- **Site content** — `SiteSettings`, `HeroContent`, `HeroTitle`, `HeroSkillBadge`,
+  `AboutParagraph`, `Education`, `Skill`, `Experience`, `ExperienceBullet`, `ExperienceSkill`,
+  `Project`, `ProjectBullet`, `ProjectSkill`, `ProjectImage`, `ProjectHealth`, `Blog`, `Quote`,
+  `SocialLink`
 - **Contact** — `ContactPurpose`, `ContactMessage`, `MessageReply`, `ReplyTemplate`
 - **Analytics** — `AnalyticsSalt`, `AnalyticsSession`, `AnalyticsEvent`, `DailyStat`, `RollupRun`,
-  `UtmTracker`, `TrackedLink`, `LinkClick`
+  `TrackedLink`, `LinkClick`
 - **Notes** — `NoteNode`, `NoteAnswer`
 - **Media** — `MediaAsset`
 - **Admin & ops** — `AdminUser`, `AuditEvent`, `AuditChange`, `FeatureFlag`, `RevalidationLog`,
   `TagState`, `JobLock`, `MaintenanceState`, `RateLimitBucket`
 - **Integrations** — `GithubProfile`, `GithubYear`
 
-**Enums:** `AdminRole`, `ContentStatus`, `MessageStatus`, `NoteKind`, `ScoreType`,
-`ImageOrientation`, `EventType`, `RevalidationTrigger`, `RevalidationStatus`.
+**Enums:** `SiteVersion`, `CatNapStyle`, `ScoreType`, `LiveProbeStatus`, `ContentStatus`,
+`ImageOrientation`, `MessageStatus`, `AdminRole`, `AuditAction`, `AuditSurface`, `PublishState`,
+`AuditChangeKind`, `NoteKind`, `RevalidationScope`, `RevalidationTrigger`, `RevalidationStatus`,
+`EventType`.
 
-**Relationships:** Skill ↔ Experience and Skill ↔ Project are many-to-many; `ExperienceBullet`,
-`ProjectBullet` and `NoteAnswer` cascade from their parents; `NoteNode` is a self-relation
-(`NoteTree`) that cascades down the subtree.
+**Relationships:** `SiteSettings` is a single row at `id = 1`, one typed column per setting.
+Skill ↔ Experience and Skill ↔ Project go through the explicit `ExperienceSkill` and `ProjectSkill`
+join models, each carrying its own `sortOrder`; `ExperienceBullet`, `ProjectBullet`, `ProjectImage`,
+`ProjectHealth` and `NoteAnswer` cascade from their parents; `HeroSkillBadge` points at a `Skill`
+with `onDelete: Restrict`; `NoteNode` is a self-relation (`NoteTree`) that cascades down the
+subtree.
 
 ## How a change reaches the site
 

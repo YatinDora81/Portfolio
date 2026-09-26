@@ -1,0 +1,195 @@
+### OLD SCHEMA COLUMNS (production, authoritative)
+AboutParagraph: id, content, sortOrder
+AdminUser: id, email, password, name, role, createdAt, updatedAt, username, failedAttempts, otp, otpExpiresAt
+AnalyticsEvent: id, sessionId, type, path, section, label, durationMs, meta, createdAt
+AnalyticsSalt: dateKey, salt, createdAt
+AnalyticsSession: id, sessionHash, visitorHash, channel, rawSource, rawMedium, rawCampaign, referrerHost, landingPath, linkSlug, country, region, city, deviceType, browser, os, startedAt, lastSeenAt, pageviews
+AuditChange: id, eventId, seq, kind, entity, entityLabel, rowId, rowLabel, field, before, after, redacted, truncated
+AuditEvent: id, action, surface, createdAt, actorId, actorName, actorEmail, actorRole, publishState, publishedAt, publishError, changeCount, summary
+Blog: id, slug, title, description, content, image, imageOrientation, color, sortOrder, publishedAt, updatedAt, show, status, publishAt
+ContactMessage: id, name, email, purpose, message, read, createdAt, status, starred, spamScore, spamReasons, country, deviceType, browser, referrer, notificationMessageId, readAt, repliedAt, updatedAt
+ContactPurpose: id, label, emoji, sortOrder
+DailyStat: id, date, dimension, key, pageviews, uniques, sessions, avgDurationMs, medianMs, reachedCount, computedAt
+Education: id, institution, location, degree, scoreType, score, scoreTotal, startYear, endYear, sortOrder
+Experience: id, company, position, location, startDate, endDate, isCurrent, website, sortOrder, logoUrl, visibleBullets
+ExperienceBullet: id, content, sortOrder, experienceId
+FeatureFlag: key, label, description, enabled, note, updatedById, updatedAt, createdAt
+GithubProfile: id, handle, total, fetchedAt
+GithubYear: id, handle, year, days, spikes
+HeroContent: id, version, intro, tagline, live
+HeroSkillBadge: id, name, iconKey, sortOrder, version
+HeroTitle: id, title, sortOrder, version
+JobLock: key, lockedAt, lockedBy, expiresAt
+LinkClick: id, linkId, visitorHash, country, deviceType, referrerHost, createdAt
+MaintenanceState: key, lastRunAt, lastResult
+MediaAsset: id, key, url, filename, mimeType, bytes, width, height, blurDataUrl, altText, folder, uploadedById, createdAt, updatedAt
+MessageReply: id, messageId, subject, bodyHtml, bodyText, sentById, sentAt, outboundMessageId, deliveryOk, deliveryError
+NoteAnswer: nodeId, body, tags, confidence, lastRevisedAt, updatedAt
+NoteNode: id, parentId, kind, title, slug, path, depth, sortOrder, deletedAt, trashRoot, createdAt, updatedAt
+Project: id, title, summary, github, live, sortOrder, images, logoUrl, status, publishAt, publishedAt, updatedAt
+ProjectBullet: id, content, sortOrder, projectId
+Quote: id, quote, author
+RateLimitBucket: key, count, windowAt
+ReplyTemplate: id, name, subject, bodyHtml, useCount, createdAt, updatedAt
+RevalidationLog: id, paths, tags, trigger, entityType, entityId, actorId, status, httpStatus, durationMs, error, createdAt
+RollupRun: id, date, status, rowsWritten, durationMs, error, triggeredBy, createdAt
+SiteConfig: id, key, value
+Skill: id, name, iconKey, show, sortOrder, createdAt, updatedAt
+SocialLink: id, name, href, iconKey, detail, sortOrder, version
+TagState: tag, lastSuccessAt, lastAttemptAt, consecutiveFails
+TrackedLink: id, slug, label, channel, campaign, destination, notes, clickCount, lastClickAt, active, createdById, createdAt, updatedAt
+UtmTracker: id, source, medium, campaign, content, term, messageId, path, referrer, userAgent, visitedAt
+_ExperienceToSkill: A, B
+_ProjectToSkill: A, B
+_prisma_migrations: id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count
+
+### SiteConfig (26 rows) key -> value
+  'availabilityDetail' = 'Open to freelance, full-time & collaborations'
+  'availabilityStatus' = 'Available for opportunities'
+  'avatarUrl' = '/mine/avatar.png'
+  'backgroundVersion' = 'v2'
+  'catNapSeconds' = '45'
+  'catNapStyle' = 'moon'
+  'contactEmail' = 'yatin.dora81@gmail.com'
+  'copyrightName' = 'Yatin Dora'
+  'heroDotColor' = '#22C55E'
+  'heroDotPulse' = 'on'
+  'heroPhotos' = '/mine/avatar.png,/mine/avatar2.jpeg'
+  'heroVersion' = 'v1'
+  'intro' = 'I build scalable web apps using'
+  'name' = 'Yatin Dora'
+  'navbarLogo' = 'Yatin.Dora'
+  'projectsVersion' = 'v2'
+  'resumeUrl' = 'https://drive.google.com/file/d/16xisMxquk1njqUeEQFN8Mi6E6vwJF6sr/view?usp=sharing'
+  'tagline' = "Ship it, scale it, make it smarter, keep learning — that's the loop I live in."
+  'terrainCell' = '16'
+  'terrainChannel' = 'on'
+  'terrainInteractive' = 'on'
+  'terrainLevels' = '15'
+  'terrainMajor' = '51'
+  'terrainMinor' = '18'
+  'terrainStrength' = '45'
+  'terrainVeil' = '52'
+
+### Experience date strings
+  company='Wiingy' startDate='July 2025' endDate='Present' isCurrent=True logoUrl='/logos/wiingy.png'
+  company='Nykaa' startDate='January 2025' endDate='July 2025' isCurrent=False logoUrl='/logos/nykaa.png'
+
+### Education year strings
+  startYear='2021' endYear='2025'
+
+### Skill names (47)
+   ['Next.js', 'JavaScript', 'Go', 'TypeScript', 'Redux', 'Express.js', 'Node.js', 'Java', 'Cloudflare R2', 'DSA', 'Python', 'FastAPI', 'React.js', 'WebSocket', 'OOPs', 'Git', 'GitHub', 'Turborepo', 'Jest', 'Selenium', 'Jira', 'WebSockets', 'Gemini', 'PostgreSQL', 'MongoDB', 'MySQL', 'Redis', 'Prisma', 'Drizzle', 'SQL', 'Docker', 'AWS', 'AWS S3', 'AWS EC2', 'Cloudflare', 'Monitoring', 'Logging', 'Bun', 'Drizzle ORM', 'GitHub Actions', 'Flask', 'React', 'REST APIs', 'Kafka', 'CI/CD', 'Jenkins', 'Nginx']
+  show=false: ['React.js', 'WebSocket']
+  lower() duplicates: none
+
+### HeroSkillBadge -> Skill match check
+  v=v1 name='Next.js' iconKey='Next.js' -> 'Next.js'
+  v=v1 name='Golang' iconKey='Go' -> None   <<< NO MATCH
+  v=v1 name='TypeScript' iconKey='TypeScript' -> 'TypeScript'
+  v=v1 name='Node.js' iconKey='Node.js' -> 'Node.js'
+  v=v1 name='React' iconKey='React' -> 'React'
+  v=v1 name='Prisma' iconKey='Prisma' -> 'Prisma'
+  v=v1 name='Python' iconKey='Python' -> 'Python'
+  v=v2 name='Next.js' iconKey='Next.js' -> 'Next.js'
+  v=v2 name='Golang' iconKey='Go' -> None   <<< NO MATCH
+  v=v2 name='TypeScript' iconKey='TypeScript' -> 'TypeScript'
+  v=v2 name='Node.js' iconKey='Node.js' -> 'Node.js'
+  v=v2 name='React' iconKey='React' -> 'React'
+  v=v2 name='Prisma' iconKey='Prisma' -> 'Prisma'
+  v=v2 name='Python' iconKey='Python' -> 'Python'
+
+### Project.images / logoUrl
+  'Draw Sheet' images=['/projects/drawsheet.png'] logoUrl='/logos/drawsheet.png' status=PUBLISHED publishedAt=2026-08-21T18:53:06.003
+  'Connect' images=['/projects/connect.png'] logoUrl='/logos/connect.png' status=PUBLISHED publishedAt=2026-08-21T18:53:06.003
+  'Netflix-GPT' images=['/projects/netflix-gpt.png'] logoUrl='/logos/netflix-gpt.png' status=PUBLISHED publishedAt=2026-08-21T18:53:06.003
+  'Trimrr' images=['/projects/trimrr.png'] logoUrl='/logos/trimrr.png' status=PUBLISHED publishedAt=2026-08-21T18:53:06.003
+  'NextMoveApp' images=['/projects/nextmove_v1.png'] logoUrl='/logos/nextmove.png' status=PUBLISHED publishedAt=2026-08-21T18:53:06.003
+  'Grill' images=['/projects/grill_v1.png'] logoUrl='/logos/grill_v1.svg' status=PUBLISHED publishedAt=2026-08-21T18:53:06.003
+
+### Blog.image / orientation / lifecycle
+  'turborepo-monorepo' image='https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&h=400&fit=crop' orient=LANDSCAPE status=DRAFT show=False publishedAt=2026-03-08T07:24:25.397 publishAt=None
+  'websocket-scaling' image='https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=600&h=400&fit=crop' orient=LANDSCAPE status=DRAFT show=False publishedAt=2026-03-08T07:24:25.462 publishAt=None
+  'nextjs-app-router' image='https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=600&h=400&fit=crop' orient=LANDSCAPE status=DRAFT show=False publishedAt=2026-03-08T07:24:25.662 publishAt=None
+  'drizzle-vs-prisma' image='https://images.unsplash.com/photo-1633356122102-3fe601e05bd2?w=600&h=400&fit=crop' orient=SQUARE status=DRAFT show=False publishedAt=2026-03-08T07:24:25.528 publishAt=None
+  'redis-caching-patterns' image='https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=600&h=400&fit=crop' orient=SQUARE status=DRAFT show=False publishedAt=2026-03-08T07:24:25.732 publishAt=None
+  'cicd-github-actions' image='https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=600&h=400&fit=crop' orient=LANDSCAPE status=DRAFT show=False publishedAt=2026-03-08T07:24:25.793 publishAt=None
+  'docker-dev-setup' image='https://images.unsplash.com/photo-1605745341112-85968b19335b?w=600&h=400&fit=crop' orient=PORTRAIT status=DRAFT show=False publishedAt=2026-03-08T07:24:25.598 publishAt=None
+  'typescript-tricks' image='https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=600&h=400&fit=crop' orient=PORTRAIT status=DRAFT show=False publishedAt=2026-03-08T07:24:25.855 publishAt=None
+  'jwt-auth-patterns' image='https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?w=600&h=400&fit=crop' orient=SQUARE status=DRAFT show=False publishedAt=2026-03-08T07:24:25.918 publishAt=None
+  'postgres-performance' image='https://images.unsplash.com/photo-1489875347897-49f64b51c1f8?w=600&h=400&fit=crop' orient=LANDSCAPE status=DRAFT show=False publishedAt=2026-03-08T07:24:25.981 publishAt=None
+
+### MediaAsset (2)
+  key='suite-one/1787423289561-c10a7a05-senor-avatar-final-v2.png' url='/suite-one/1787423289561-c10a7a05-senor-avatar-final-v2.png' folder='suite-one' uploadedById='2a88a037-dcf0-42a1-bac2-6e72b2932487'
+  key='uploads/1788024018255-e15fe177-download-3.jpg' url='/uploads/1788024018255-e15fe177-download-3.jpg' folder='uploads' uploadedById='2a88a037-dcf0-42a1-bac2-6e72b2932487'
+
+### distinct values on columns becoming enums / CHECKs
+  AuditEvent.action: ['PUBLISH', 'SAVE', 'SAVE_AND_PUBLISH']
+  AuditEvent.surface: ['publish', 'script', 'staging']
+  AuditEvent.publishState: ['NONE', 'OK']
+  AuditEvent.actorRole: ['OWNER']
+  AuditChange.kind: ['UPDATE']
+  AnalyticsEvent.type: ['PAGEVIEW', 'SECTION_DWELL']
+  AnalyticsSession.channel: ['direct', 'linkedin', 'other', 'search', 'unknown-shared']
+  DailyStat.dimension: ['channel', 'country', 'device', 'path', 'referrer', 'section', 'total']
+  RollupRun.status: ['ok']
+  RollupRun.triggeredBy: ['catch-up']
+  RevalidationLog.trigger: ['CONTENT_SAVE', 'FLAG_CHANGE', 'MANUAL']
+  RevalidationLog.status: ['SUCCESS']
+  HeroContent.version: ['v1', 'v2']
+  HeroTitle.version: ['v1', 'v2']
+  HeroSkillBadge.version: ['v1', 'v2']
+  SocialLink.version: ['None']
+  ContactMessage.status: ['READ', 'REPLIED', 'UNREAD']
+  Blog.status: ['DRAFT']
+  Project.status: ['PUBLISHED']
+  AdminUser.role: ['OWNER', 'SUB_ADMIN']
+
+### AuditChange.entity distinct
+   ['aboutParagraph', 'adminUser', 'heroContent']
+
+### analytics slimming checks
+  AnalyticsEvent.label non-null: 0
+  AnalyticsEvent.meta non-null: 0
+  UtmTracker total: 1461 withContent: 455
+  DailyStat rows: 414 distinct(date,dimension,key): 414
+
+### misc
+  quotes: 28
+  purposes: ['Freelance', 'Job Opportunity', 'Collaboration', 'Consultation', 'Just Saying Hi']
+  ContactMessage read=true: 9 readAt null & status<>UNREAD: 0
+  NoteNode: 881 roots: 18 maxdepth: 4 parentId=id: 0
+  NoteAnswer confidence out of range: 0
+  GithubYear orphans: none days len: [365, 365] years: [2025, 2026]
+  MediaAsset.uploadedById: 1 distinct, orphans=none
+  TrackedLink.createdById: 0 distinct, orphans=none
+  FeatureFlag.updatedById: 1 distinct, orphans=none
+  MessageReply.sentById: 1 distinct, orphans=none
+  RevalidationLog.actorId: 1 distinct, orphans=none
+  AuditEvent.actorId: 1 distinct, orphans=none
+
+### _prisma_migrations applied
+   20260818120000_add_projects_version
+   20260307195336_init
+   20260308070152_add_site_config
+   20260822120000_add_analytics_core
+   20260308072119_add_admin_user
+   20260821120000_add_job_lock
+   20260308073000_rename_password_field
+   20260308175836_add_blog_show_field
+   20260528140143_baseline_drift_reconcile
+   20260528143528_add_utm_table
+   20260722190000_add_logo_url
+   20260821130000_add_revalidation_log
+   20260727120000_add_experience_visible_bullets
+   20260728120000_add_hero_version
+   20260728140000_add_hero_content
+   20260821140000_add_feature_flags
+   20260728150000_add_audit_log
+   20260730120000_add_github_activity
+   20260822130000_add_links_rollup_media
+   20260803120000_add_notes
+   20260822100000_add_content_status_nullable
+   20260822100100_backfill_content_status
+   20260822100200_require_content_status
+   20260822110000_add_inbox_workflow
