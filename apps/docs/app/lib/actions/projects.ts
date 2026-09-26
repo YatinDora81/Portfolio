@@ -31,6 +31,7 @@ export async function createProject(data: ProjectData): Promise<Saved> {
   const lifecycle = resolveLifecycle(data.status, data.publishAtIst);
   if (!lifecycle.ok) return { ok: false, error: lifecycle.error };
 
+  const images = data.images.filter(Boolean);
   const { _max } = await prisma.project.aggregate({ _max: { sortOrder: true } });
   const count = (_max.sortOrder ?? -1) + 1;
   await prisma.project.create({
@@ -40,12 +41,16 @@ export async function createProject(data: ProjectData): Promise<Saved> {
       github: data.github || null,
       live: data.live || null,
       logoUrl: data.logoUrl || null,
-      images: data.images.filter(Boolean),
       sortOrder: count,
       status: lifecycle.status,
       publishAt: lifecycle.publishAt,
       publishedAt: lifecycle.status === "PUBLISHED" ? new Date() : null,
-      skills: { connect: data.skillIds.map((id) => ({ id })) },
+      gallery: {
+        create: images.map((externalUrl, sortOrder) => ({ externalUrl, sortOrder })),
+      },
+      skills: {
+        create: data.skillIds.map((skillId, sortOrder) => ({ skillId, sortOrder })),
+      },
       bullets: {
         create: data.bullets.map((b) => ({ content: b.content, sortOrder: b.sortOrder })),
       },
@@ -61,6 +66,8 @@ export async function updateProject(id: string, data: ProjectData): Promise<Save
   const lifecycle = resolveLifecycle(data.status, data.publishAtIst);
   if (!lifecycle.ok) return { ok: false, error: lifecycle.error };
 
+  const images = data.images.filter(Boolean);
+
   await prisma.$transaction(async (tx) => {
     const current = await tx.project.findUnique({ where: { id }, select: { publishedAt: true } });
 
@@ -72,16 +79,27 @@ export async function updateProject(id: string, data: ProjectData): Promise<Save
         github: data.github || null,
         live: data.live || null,
         logoUrl: data.logoUrl || null,
-        images: data.images.filter(Boolean),
         status: lifecycle.status,
         publishAt: lifecycle.publishAt,
-        // first publish only, re-saving must not re-date it
         ...(lifecycle.status === "PUBLISHED" && current?.publishedAt == null
           ? { publishedAt: new Date() }
           : {}),
-        skills: { set: data.skillIds.map((sid) => ({ id: sid })) },
       },
     });
+
+    await tx.projectImage.deleteMany({ where: { projectId: id } });
+    if (images.length) {
+      await tx.projectImage.createMany({
+        data: images.map((externalUrl, sortOrder) => ({ projectId: id, externalUrl, sortOrder })),
+      });
+    }
+
+    await tx.projectSkill.deleteMany({ where: { projectId: id } });
+    if (data.skillIds.length) {
+      await tx.projectSkill.createMany({
+        data: data.skillIds.map((skillId, sortOrder) => ({ projectId: id, skillId, sortOrder })),
+      });
+    }
 
     const existingIds = data.bullets.filter((b) => b.id).map((b) => b.id!);
     await tx.projectBullet.deleteMany({

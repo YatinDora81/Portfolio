@@ -18,6 +18,7 @@ const CAMPAIGN_PARAMS = [
   'utm_term',
   'utm_content',
   'ref',
+  'mid',
 ];
 
 function cleanUrl(url: URL): void {
@@ -46,17 +47,23 @@ function loadAttribution(): Attribution {
   const source = params.get('utm_source');
   const medium = params.get('utm_medium');
   const campaign = params.get('utm_campaign');
+  const content = params.get('utm_content');
+  const term = params.get('utm_term');
   const linkSlug = params.get('ref');
+  const messageId = params.get('mid');
 
   const utm = {
     ...(source ? { source } : {}),
     ...(medium ? { medium } : {}),
     ...(campaign ? { campaign } : {}),
+    ...(content ? { content } : {}),
+    ...(term ? { term } : {}),
   };
 
   const attribution: Attribution = {
     ...(Object.keys(utm).length > 0 ? { utm } : {}),
     ...(linkSlug ? { linkSlug } : {}),
+    ...(messageId ? { messageId } : {}),
     referrer: document.referrer || null,
     landingPath: url.pathname,
   };

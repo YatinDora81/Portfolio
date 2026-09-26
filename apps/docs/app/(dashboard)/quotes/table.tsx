@@ -3,17 +3,19 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Card, CardHead } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog } from "@/components/ui/dialog";
 import { DeleteButton } from "@/components/shared/delete-button";
 import { useStaging } from "@/components/staging/staging-provider";
+import { useSortable } from "@/lib/use-sortable";
 import {
   IconPlus, IconPencil, IconQuote, IconArrowBackUp, IconAlertTriangle, IconClock,
+  IconGripVertical, IconChevronUp, IconChevronDown,
 } from "@tabler/icons-react";
 
-interface Quote { id: string; quote: string; author: string }
+interface Quote { id: string; quote: string; author: string; sortOrder: number }
 
 function DayDial({ day, days }: { day: number; days: number }) {
   const R = 21;
@@ -76,13 +78,29 @@ export function QuotesTable({ quotes, dayOfYear, nextDayOfYear, daysInYear, toda
   nextLabel: string;
 }) {
   const {
-    overlay, stageCreate, stageUpdate, stageDelete, unstageDelete,
-    isDeleted, isNew, isEdited,
+    overlay, stageCreate, stageUpdate, stageDelete, unstageDelete, stageReorder,
+    isDeleted, isNew, isEdited, saving,
   } = useStaging();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Quote | null>(null);
 
-  const rows = overlay("quote", quotes, (q) => q.id);
+  const staged = overlay("quote", quotes, (q) => q.id);
+
+  const { order, handleProps, itemProps } = useSortable(
+    staged.map((q) => q.id),
+    (ids) => stageReorder("quote", ids),
+    { disabled: saving }
+  );
+
+  const rank = new Map(order.map((id, i) => [id, i] as const));
+  const at = (id: string) => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
+  const rows = [...staged].sort((a, b) => at(a.id) - at(b.id));
+
+  const move = (from: number, to: number) => {
+    const ids = rows.map((q) => q.id);
+    [ids[from], ids[to]] = [ids[to]!, ids[from]!];
+    stageReorder("quote", ids);
+  };
 
   const live = rows.filter((q) => !isDeleted("quote", q.id));
   const todayQuote = live.length > 0 ? live[dayOfYear % live.length] ?? null : null;
@@ -121,7 +139,7 @@ export function QuotesTable({ quotes, dayOfYear, nextDayOfYear, daysInYear, toda
             <IconQuote size={13} style={{ flex: "none", marginTop: 2 }} />
             <span>
               The site picks <code style={{ fontFamily: "var(--mono)" }}>day-of-year % {cycle || "count"}</code>{" "}
-              over this list in id order — so adding or deleting a line reshuffles every
+              over this list in the order below — so adding or deleting a line reshuffles every
               future day, not just the next one.
             </span>
           </span>
@@ -165,8 +183,12 @@ export function QuotesTable({ quotes, dayOfYear, nextDayOfYear, daysInYear, toda
                 return (
                   <div
                     key={q.id}
-                    className={cn("qcard", q.id === todayId && "today", q.id === nextId && "tod-next", mark(q.id))}
+                    className={cn("qcard sortable", q.id === todayId && "today", q.id === nextId && "tod-next", mark(q.id))}
+                    {...itemProps(q.id)}
                   >
+                    <span className="row-grip" title="Drag to reorder" {...handleProps(q.id)}>
+                      <IconGripVertical size={14} />
+                    </span>
                     <span className="row-i" style={{ marginTop: 4 }}>
                       {String(i + 1).padStart(2, "0")}
                     </span>
@@ -194,6 +216,22 @@ export function QuotesTable({ quotes, dayOfYear, nextDayOfYear, daysInYear, toda
                         </button>
                       ) : (
                         <>
+                          <IconButton
+                            className="move"
+                            aria-label={`Move the quote by ${q.author} earlier`}
+                            disabled={i === 0 || saving}
+                            onClick={() => move(i, i - 1)}
+                          >
+                            <IconChevronUp size={13} stroke={1.6} />
+                          </IconButton>
+                          <IconButton
+                            className="move"
+                            aria-label={`Move the quote by ${q.author} later`}
+                            disabled={i === rows.length - 1 || saving}
+                            onClick={() => move(i, i + 1)}
+                          >
+                            <IconChevronDown size={13} stroke={1.6} />
+                          </IconButton>
                           <button
                             className="ibtn"
                             aria-label={`Edit quote by ${q.author}`}

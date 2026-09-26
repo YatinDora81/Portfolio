@@ -8,7 +8,6 @@ import {
   IconPlus, IconFolderCode, IconGripVertical, IconArrowUpRight, IconAlertTriangle,
   IconClock, IconPencil,
 } from "@tabler/icons-react";
-import { DEFAULTS, keysFor, toProjectsVersion } from "@/lib/site-config-keys";
 import { previewLinkBlockedReason } from "@/lib/actions/preview-link";
 import { StatusBadge } from "@/components/lifecycle/status-badge";
 import { StatusTabs } from "@/components/lifecycle/status-tabs";
@@ -23,23 +22,34 @@ export const dynamic = "force-dynamic";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/$/, "");
 
+function galleryUrls(gallery: { externalUrl: string | null; asset: { url: string } | null }[]): string[] {
+  return gallery.map((img) => img.externalUrl ?? img.asset?.url ?? "").filter(Boolean);
+}
+
 export default async function ProjectsPage({ searchParams }: {
   searchParams: Promise<{ status?: string }>;
 }) {
   const { status: requested } = await searchParams;
   const active: ContentStatus | null = isContentStatus(requested) ? requested : null;
 
-  const [projects, siteConfigRows, previewBlocked] = await Promise.all([
+  const [projects, settings, previewBlocked] = await Promise.all([
     prisma.project.findMany({
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-      include: { bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }, skills: { select: { name: true } } },
+      include: {
+        bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+        skills: { orderBy: { sortOrder: "asc" }, include: { skill: true } },
+        gallery: {
+          orderBy: { sortOrder: "asc" },
+          select: { externalUrl: true, asset: { select: { url: true } } },
+        },
+        health: { select: { status: true, latencyMs: true, checkedAt: true } },
+      },
     }),
-    prisma.siteConfig.findMany({ where: { key: { in: keysFor("projects") } } }),
+    prisma.siteSettings.findUniqueOrThrow({ where: { id: 1 }, select: { projectsVersion: true } }),
     previewLinkBlockedReason(),
   ]);
 
-  const cfg = new Map(siteConfigRows.map((c) => [c.key, c.value]));
-  const version = toProjectsVersion(cfg.get("projectsVersion") ?? DEFAULTS["projectsVersion"]);
+  const version = settings.projectsVersion;
 
   const now = new Date();
 
@@ -58,7 +68,7 @@ export default async function ProjectsPage({ searchParams }: {
 
   const rows = active === null ? projects : projects.filter((p) => p.status === active);
 
-  const withCover = projects.filter(p => p.images.length > 0).length;
+  const withCover = projects.filter(p => p.gallery.length > 0).length;
   const withDemo = projects.filter(p => p.live).length;
 
   return (
@@ -91,8 +101,8 @@ export default async function ProjectsPage({ searchParams }: {
           github: p.github,
           live: p.live,
           bullets: p.bullets.map(b => b.content),
-          technologies: p.skills.map(s => s.name),
-          images: p.images,
+          technologies: p.skills.map(s => s.skill.name),
+          images: galleryUrls(p.gallery),
           logoUrl: p.logoUrl,
         }))}
       >
@@ -259,9 +269,16 @@ export default async function ProjectsPage({ searchParams }: {
               github: p.github,
               live: p.live,
               logoUrl: p.logoUrl,
-              images: p.images,
+              cover: galleryUrls(p.gallery)[0] ?? null,
+              health: p.health?.status
+                ? {
+                    status: p.health.status,
+                    latencyMs: p.health.latencyMs,
+                    probedAt: p.health.checkedAt ? istLabel(p.health.checkedAt) : null,
+                  }
+                : null,
               bulletCount: p.bullets.length,
-              skills: p.skills.map((s) => s.name),
+              skills: p.skills.map((s) => s.skill.name),
             }))}
           />
         </div>

@@ -1,12 +1,11 @@
+import type { AdminRole, AuditAction, AuditChangeKind, AuditSurface } from "db";
 import type { Entity } from "@/lib/actions/staging";
 
-export type AuditAction = "SAVE" | "SAVE_AND_PUBLISH" | "PUBLISH";
-export type ChangeKind = "CREATE" | "UPDATE" | "DELETE" | "REORDER";
-export type AuditActor = { userId: string; name: string; email: string; role: string };
+export type AuditActor = { userId: string; name: string; email: string; role: AdminRole };
 
 export interface PendingChange {
   seq: number;
-  kind: ChangeKind;
+  kind: AuditChangeKind;
   entity: string;
   entityLabel: string;
   rowId: string | null;
@@ -82,6 +81,7 @@ export function labelOf(entity: string, row: Record<string, unknown> | null): st
   };
   switch (entity) {
     case "heroTitle": return pick("title");
+    case "heroSkillBadge": return pick("label", "skillName");
     case "heroContent": return `${pick("version") || "hero"} copy`;
     case "aboutParagraph": return pick("content").slice(0, 60);
     case "education": return pick("institution", "degree");
@@ -111,7 +111,7 @@ export class AuditDraft {
 
   constructor(
     readonly action: AuditAction,
-    readonly surface: string,
+    readonly surface: AuditSurface,
     readonly actor: AuditActor
   ) {}
 
@@ -120,7 +120,7 @@ export class AuditDraft {
     entityLabel: string;
     rowId: string;
     rowLabel: string;
-    kind: "CREATE" | "UPDATE" | "DELETE";
+    kind: Exclude<AuditChangeKind, "REORDER">;
     before?: Record<string, unknown> | null;
     after?: Record<string, unknown> | null;
   }): void {
@@ -186,6 +186,6 @@ export class AuditDraft {
   }
 }
 
-export function draft(action: AuditAction, surface: string, actor: AuditActor): AuditDraft {
+export function draft(action: AuditAction, surface: AuditSurface, actor: AuditActor): AuditDraft {
   return new AuditDraft(action, surface, actor);
 }

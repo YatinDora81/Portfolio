@@ -17,7 +17,7 @@ import { IconAlertTriangle } from "@tabler/icons-react";
 
 interface BlogData {
   id: string; slug: string; title: string; description: string;
-  content: string; image: string; imageOrientation: string; color: string;
+  content: string; image: string | null; imageOrientation: string; color: string;
   status: ContentStatus;
   publishAtIso: string | null;
 }
@@ -116,8 +116,8 @@ export function BlogForm({ blog }: { blog?: BlogData }) {
               label="Image URL"
               mono
               defaultValue={blog?.image || ""}
-              required
               placeholder="/blogs/cover.png"
+              hint="Optional — with no cover the card falls back to the colour below."
             />
 
             <div className="f-row">
@@ -161,10 +161,9 @@ export function BlogForm({ blog }: { blog?: BlogData }) {
             />
 
             <div className="lc-note lc-after-field">
-              This replaces the old <b>Show on portfolio</b> switch. That switch wrote a boolean
-              the site has stopped reading — the column is still in the database so the lifecycle
-              can be rolled back, but nothing reads it any more, and Status is now the only thing
-              that decides whether a post is reachable.
+              Status is the only thing that decides whether a post is reachable — the old{" "}
+              <b>Show on portfolio</b> switch and the column behind it are gone. A post takes its
+              printed date the first time it reaches Published, and keeps it from then on.
             </div>
 
             <div

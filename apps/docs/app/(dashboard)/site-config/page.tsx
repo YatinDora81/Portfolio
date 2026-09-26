@@ -1,8 +1,11 @@
 import { prisma } from "db";
+import { publicContentWhere } from "db/visibility";
 import { FLAG_KEYS, flagValue, type FlagMap } from "@repo/shared/flags";
 import { PageHeader } from "@/components/shared/page-header";
 import { SiteChromeForm } from "./form";
-import { KEYS, DEFAULTS, keysFor, isUnclaimed, type ConfigOwner } from "@/lib/site-config-keys";
+import {
+  KEYS, configValues, keysFor, type ConfigColumn, type ConfigOwner,
+} from "@/lib/site-config-keys";
 
 const OWNERS: Record<Exclude<ConfigOwner, "chrome">, { label: string; href: string }> = {
   background: { label: "Background", href: "/background" },
@@ -13,9 +16,9 @@ const OWNERS: Record<Exclude<ConfigOwner, "chrome">, { label: string; href: stri
 };
 
 export default async function SiteConfigPage() {
-  const [configs, visibleBlogs, flagRows] = await Promise.all([
-    prisma.siteConfig.findMany(),
-    prisma.blog.count({ where: { show: true } }),
+  const [settings, visibleBlogs, flagRows] = await Promise.all([
+    prisma.siteSettings.findUniqueOrThrow({ where: { id: 1 } }),
+    prisma.blog.count({ where: publicContentWhere() }),
     prisma.featureFlag.findMany(),
   ]);
 
@@ -28,13 +31,10 @@ export default async function SiteConfigPage() {
     contact: flagValue(flags, FLAG_KEYS.SECTION_CONTACT),
   };
 
-  const configMap = Object.fromEntries(configs.map(c => [c.key, c.value]));
+  const configMap = configValues(settings);
   const chromeKeys = keysFor("chrome");
-  const unclaimedKeys = configs.map(c => c.key).filter(isUnclaimed).sort();
 
-  const values = Object.fromEntries(
-    [...chromeKeys, ...unclaimedKeys].map(k => [k, configMap[k] ?? DEFAULTS[k] ?? ""])
-  );
+  const values = Object.fromEntries(chromeKeys.map(k => [k, configMap[k]]));
 
   return (
     <div className="view">
@@ -45,16 +45,15 @@ export default async function SiteConfigPage() {
       />
       <SiteChromeForm
         chromeKeys={chromeKeys}
-        unclaimedKeys={unclaimedKeys}
         values={values}
-        moved={Object.entries(KEYS)
-          .filter(([, def]) => def.owner !== "chrome" && !def.legacy)
+        moved={(Object.entries(KEYS) as [ConfigColumn, (typeof KEYS)[ConfigColumn]][])
+          .filter(([, def]) => def.owner !== "chrome")
           .map(([key, def]) => {
             const at = OWNERS[def.owner as Exclude<ConfigOwner, "chrome">];
             return {
               key,
               label: def.label,
-              value: configMap[key] ?? DEFAULTS[key] ?? "",
+              value: configMap[key],
               owner: at.label,
               href: at.href,
             };

@@ -178,8 +178,6 @@ export async function POST(request: Request) {
         purpose: safePurpose,
         message,
         status: verdict.isSpam ? MessageStatus.SPAM : MessageStatus.UNREAD,
-        // legacy column, drives the unread badge
-        read: verdict.isSpam,
         spamScore: verdict.score,
         spamReasons: verdict.reasons,
         country,

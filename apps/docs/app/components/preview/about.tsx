@@ -14,8 +14,8 @@ interface EducationEntry {
   scoreType?: string | null;
   score?: string | null;
   scoreTotal?: string | null;
-  startYear: string;
-  endYear: string;
+  startYear: number;
+  endYear: number | null;
 }
 
 interface AboutPreviewProps {
@@ -171,7 +171,7 @@ export function AboutPreview({ paragraphs, education, companyLogos }: AboutPrevi
                         className="inline-flex h-5 items-center rounded-md border border-dashed px-1.5 text-[9px] font-medium"
                         style={{ borderColor: BORDER, background: "#0a0a0a", color: DIM }}
                       >
-                        {edu.startYear} — {edu.endYear}
+                        {edu.startYear} — {edu.endYear ?? "Present"}
                       </span>
                     </div>
 

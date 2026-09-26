@@ -6,6 +6,16 @@ const INTRO_V2 =
   "Hand me an idea, I'll hand you back a product. Fast backends, clean frontends, and pipelines that do their job so quietly you forget they exist.";
 const TAGLINE_V2 = "Ship it, scale it, make it smarter — that's the loop I live in.";
 
+const BADGES_V2 = [
+  { skill: "Next.js", label: null, sortOrder: 100 },
+  { skill: "Go", label: "Golang", sortOrder: 101 },
+  { skill: "TypeScript", label: null, sortOrder: 102 },
+  { skill: "Node.js", label: null, sortOrder: 103 },
+  { skill: "React", label: null, sortOrder: 104 },
+  { skill: "Prisma", label: null, sortOrder: 105 },
+  { skill: "Python", label: null, sortOrder: 106 },
+] as const;
+
 async function main() {
   await prisma.socialLink.updateMany({ where: { name: "LeetCode 2" }, data: { version: "v1" } });
 
@@ -21,17 +31,25 @@ async function main() {
     data: { title: "Software Developer", sortOrder: 100, version: "v2" },
   });
 
+  const skills = await prisma.skill.findMany({
+    where: { name: { in: BADGES_V2.map((b) => b.skill) } },
+    select: { id: true, name: true },
+  });
+  const skillIds = new Map(skills.map((s) => [s.name, s.id]));
+
+  const missing = BADGES_V2.filter((b) => !skillIds.has(b.skill)).map((b) => b.skill);
+  if (missing.length > 0) {
+    throw new Error(`skills missing for hero v2 badges: ${missing.join(", ")}`);
+  }
+
   await prisma.heroSkillBadge.deleteMany({ where: { version: "v2" } });
   await prisma.heroSkillBadge.createMany({
-    data: [
-      { name: "Next.js", iconKey: "Next.js", sortOrder: 100, version: "v2" },
-      { name: "Golang", iconKey: "Go", sortOrder: 101, version: "v2" },
-      { name: "TypeScript", iconKey: "TypeScript", sortOrder: 102, version: "v2" },
-      { name: "Node.js", iconKey: "Node.js", sortOrder: 103, version: "v2" },
-      { name: "React", iconKey: "React", sortOrder: 104, version: "v2" },
-      { name: "Prisma", iconKey: "Prisma", sortOrder: 105, version: "v2" },
-      { name: "Python", iconKey: "Python", sortOrder: 106, version: "v2" },
-    ],
+    data: BADGES_V2.map((b) => ({
+      skillId: skillIds.get(b.skill)!,
+      label: b.label,
+      sortOrder: b.sortOrder,
+      version: "v2" as const,
+    })),
   });
 
   console.log("v2 hero content installed — open /hero in the admin and serve v2 to publish it");

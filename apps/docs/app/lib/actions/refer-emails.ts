@@ -5,6 +5,7 @@ import { prisma } from "db";
 import { getSession } from "@/lib/session";
 import { invalidateSheetCache } from "@/lib/sheet";
 import { syncOpenTrackingToSheet, type TrackingSyncResult } from "@/lib/tracking-sync";
+import { UTM_TAGGED } from "@/lib/utm";
 
 interface SyncReferEmailsResult extends TrackingSyncResult {
   utmChecked: boolean;
@@ -35,18 +36,19 @@ export async function syncReferEmails(): Promise<SyncReferEmailsResult> {
   let utmStats: SyncReferEmailsResult["utmStats"];
   try {
     const [total, withContent, latest] = await Promise.all([
-      prisma.utmTracker.count(),
-      prisma.utmTracker.count({ where: { content: { not: null } } }),
-      prisma.utmTracker.findFirst({
-        orderBy: { visitedAt: "desc" },
-        select: { visitedAt: true },
+      prisma.analyticsSession.count({ where: UTM_TAGGED }),
+      prisma.analyticsSession.count({ where: { rawContent: { not: null } } }),
+      prisma.analyticsSession.findFirst({
+        where: UTM_TAGGED,
+        orderBy: { startedAt: "desc" },
+        select: { startedAt: true },
       }),
     ]);
     utmChecked = true;
     utmStats = {
       total,
       withContent,
-      latestVisitedAt: latest?.visitedAt.toISOString() ?? null,
+      latestVisitedAt: latest?.startedAt.toISOString() ?? null,
     };
   } catch {
     // keep sync successful even if utm stats query fails

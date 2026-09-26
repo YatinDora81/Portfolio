@@ -1,12 +1,16 @@
 import { prisma } from "db";
 import { notFound } from "next/navigation";
+import { utcToMonthInput } from "@/lib/lifecycle";
 import { ExperienceForm } from "../form";
 
 export default async function EditExperiencePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const experience = await prisma.experience.findUnique({
     where: { id },
-    include: { bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }, skills: { select: { id: true } } },
+    include: {
+      bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      skills: { orderBy: { sortOrder: "asc" }, select: { skillId: true } },
+    },
   });
   if (!experience) notFound();
 
@@ -19,13 +23,12 @@ export default async function EditExperiencePage({ params }: { params: Promise<{
         company: experience.company,
         position: experience.position,
         location: experience.location,
-        startDate: experience.startDate,
-        endDate: experience.endDate,
-        isCurrent: experience.isCurrent,
+        startedOn: utcToMonthInput(experience.startedOn),
+        endedOn: experience.endedOn ? utcToMonthInput(experience.endedOn) : null,
         website: experience.website,
         logoUrl: experience.logoUrl,
         visibleBullets: experience.visibleBullets,
-        skillIds: experience.skills.map(s => s.id),
+        skillIds: experience.skills.map(s => s.skillId),
         bullets: experience.bullets.map(b => ({ id: b.id, content: b.content, sortOrder: b.sortOrder })),
       }}
       allSkills={allSkills.map(s => ({ id: s.id, name: s.name }))}

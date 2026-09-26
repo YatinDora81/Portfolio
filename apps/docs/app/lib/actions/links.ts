@@ -8,12 +8,7 @@ export async function updateResumeUrl(url: string): Promise<{ ok: boolean }> {
   const session = await getSession();
   if (!session) return { ok: false };
 
-  await prisma.siteConfig.upsert({
-    where: { key: "resumeUrl" },
-    create: { key: "resumeUrl", value: url },
-    update: { value: url },
-  });
-  // /hero, not /links: the form moved there
+  await prisma.siteSettings.update({ where: { id: 1 }, data: { resumeUrl: url } });
   revalidatePath("/hero");
   return { ok: true };
 }

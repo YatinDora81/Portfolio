@@ -10,10 +10,10 @@ interface BlogPost {
   slug: string;
   title: string;
   description: string;
-  image: string;
+  image: string | null;
   imageOrientation: string;
   color: string;
-  publishedAt?: string | Date | null;
+  publishedAt: string | Date | null;
 }
 
 const INITIAL_BLOGS = 6;
@@ -130,7 +130,7 @@ export default function Blogs({ blogs }: { blogs: BlogPost[] }) {
             const date = formatDate(blog.publishedAt);
             return (
               <Link key={blog.slug} href={`/blog/${blog.slug}`} className="wr" data-slug={blog.slug}>
-                <span className="dt mono">{date ?? ''}</span>
+                <span className="dt mono">{date ?? 'unpublished'}</span>
                 <span>
                   <VT name={`post-${blog.slug}-title`}>
                     <span className="t">{blog.title}</span>

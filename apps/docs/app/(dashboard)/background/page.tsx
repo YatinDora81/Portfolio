@@ -1,22 +1,20 @@
 import { prisma } from "db";
 import { IconArrowUpRight } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
-import { DEFAULTS, keysFor, toBackgroundVersion } from "@/lib/site-config-keys";
+import { configValues, keysFor } from "@/lib/site-config-keys";
 import { BackgroundConsole } from "./layer-card";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/+$/, "");
 
 export default async function BackgroundPage() {
-  const rows = await prisma.siteConfig.findMany({
-    where: { key: { in: keysFor("background") } },
-  });
+  const settings = await prisma.siteSettings.findUniqueOrThrow({ where: { id: 1 } });
 
-  const cfg = new Map(rows.map((r) => [r.key, r.value]));
-  const version = toBackgroundVersion(cfg.get("backgroundVersion") ?? DEFAULTS["backgroundVersion"]);
+  const values = configValues(settings);
+  const version = settings.backgroundVersion;
   const terrain = Object.fromEntries(
     keysFor("background")
       .filter((k) => k !== "backgroundVersion")
-      .map((k) => [k, cfg.get(k) ?? DEFAULTS[k] ?? ""])
+      .map((k) => [k, values[k]])
   );
 
   return (

@@ -768,7 +768,7 @@ export function ReferEmailsList({
           icon={IconWorld}
           label="Portfolio visits"
           value={totalPortfolioVisits}
-          hint={`${portfolioVisitors} contacts visited`}
+          hint={`${portfolioVisitors} contacts visited · last 90 days`}
         />
       </div>
 

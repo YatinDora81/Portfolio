@@ -6,7 +6,6 @@ import { Card, CardHead } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/shared/page-header";
 import { cn } from "@/lib/utils";
 import { createExperience, updateExperience } from "@/lib/actions/experiences";
@@ -18,7 +17,7 @@ import {
 interface Bullet { id?: string; content: string; sortOrder: number }
 interface ExperienceData {
   id: string; company: string; position: string; location: string;
-  startDate: string; endDate: string; isCurrent: boolean;
+  startedOn: string; endedOn: string | null;
   website: string | null; logoUrl: string | null; visibleBullets: number;
   skillIds: string[]; bullets: Bullet[];
 }
@@ -42,9 +41,8 @@ export function ExperienceForm({ experience, allSkills }: {
   const [company, setCompany] = useState(experience?.company || "");
   const [position, setPosition] = useState(experience?.position || "");
   const [location, setLocation] = useState(experience?.location || "");
-  const [startDate, setStartDate] = useState(experience?.startDate || "");
-  const [endDate, setEndDate] = useState(experience?.endDate || "");
-  const [isCurrent, setIsCurrent] = useState(experience?.isCurrent || false);
+  const [startedOn, setStartedOn] = useState(experience?.startedOn || "");
+  const [endedOn, setEndedOn] = useState(experience?.endedOn || "");
   const [website, setWebsite] = useState(experience?.website || "");
   const [logoUrl, setLogoUrl] = useState(experience?.logoUrl || "");
   const [visibleBullets, setVisibleBullets] = useState(experience?.visibleBullets ?? 4);
@@ -52,6 +50,7 @@ export function ExperienceForm({ experience, allSkills }: {
   const [bullets, setBullets] = useState<Bullet[]>(experience?.bullets || [{ content: "", sortOrder: 0 }]);
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [pubError, setPubError] = useState<string | null>(null);
+  const [periodError, setPeriodError] = useState<string | null>(null);
 
   // ref, not state: the click and the submit land in one event
   const wantPublish = useRef(false);
@@ -59,8 +58,15 @@ export function ExperienceForm({ experience, allSkills }: {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const publish = wantPublish.current;
+    if (endedOn && endedOn < startedOn) {
+      setPeriodError("The end month cannot come before the start month.");
+      setBusy(null);
+      return;
+    }
+    setPeriodError(null);
     const data = {
-      company, position, location, startDate, endDate, isCurrent,
+      company, position, location, startedOn,
+      endedOn: endedOn || null,
       website: website || null,
       logoUrl: logoUrl || null,
       visibleBullets,
@@ -107,8 +113,21 @@ export function ExperienceForm({ experience, allSkills }: {
               <Input label="Website" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://…" mono />
             </div>
             <div className="f-row">
-              <Input label="Start date" value={startDate} onChange={e => setStartDate(e.target.value)} placeholder="e.g. July 2025" required />
-              <Input label="End date" value={endDate} onChange={e => setEndDate(e.target.value)} placeholder="e.g. Present" required />
+              <Input
+                label="Start month"
+                type="month"
+                value={startedOn}
+                onChange={e => setStartedOn(e.target.value)}
+                required
+              />
+              <Input
+                label="End month"
+                type="month"
+                value={endedOn}
+                onChange={e => setEndedOn(e.target.value)}
+                hint="Leave it empty while the role is ongoing — the timeline reads Present and its dot turns amber."
+                error={periodError ?? undefined}
+              />
             </div>
             <Input
               label="Logo URL"
@@ -118,12 +137,6 @@ export function ExperienceForm({ experience, allSkills }: {
               hint="Optional. Shown next to the company name on the site."
               mono
             />
-            <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-              <Switch checked={isCurrent} onChange={setIsCurrent} label="Current position" />
-              <span className="f-hint" style={{ marginTop: 0 }}>
-                Marks the role as ongoing — the timeline dot turns amber.
-              </span>
-            </div>
           </div>
         </Card>
 

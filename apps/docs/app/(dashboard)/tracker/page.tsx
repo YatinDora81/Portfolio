@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import UtmTracerChart from "@/components/utm-tracer-chart";
 import UtmRangePicker from "@/components/utm-range-picker";
 import {
-  DEFAULT_TRACKER_DAYS, getUtmSeriesForRange, parseRangeParam, toRangeParam,
+  DEFAULT_TRACKER_DAYS, UTM_TAGGED, getUtmSeriesForRange, parseRangeParam, toRangeParam,
 } from "@/lib/utm";
 import { TrackerTable } from "./table";
 
@@ -39,11 +39,15 @@ export default async function TrackerPage({
 
   const [utm, rows] = await Promise.all([
     getUtmSeriesForRange({ from, to }),
-    prisma.utmTracker.findMany({
-      // lt the midnight after to, since the range includes all of to
-      where: { visitedAt: { gte: from, lt: localDay(to, 1) } },
-      orderBy: { visitedAt: "desc" },
+    prisma.analyticsSession.findMany({
+      where: { ...UTM_TAGGED, startedAt: { gte: from, lt: localDay(to, 1) } },
+      orderBy: { startedAt: "desc" },
       take: ROW_CAP,
+      select: {
+        id: true, rawSource: true, rawMedium: true, rawCampaign: true, rawContent: true,
+        rawTerm: true, messageId: true, landingPath: true, referrerHost: true,
+        deviceType: true, browser: true, startedAt: true,
+      },
     }),
   ]);
 
@@ -58,8 +62,8 @@ export default async function TrackerPage({
         title="Tracker"
         description={
           rows.length < utm.totalHits
-            ? `UTM-tagged visits · ${span} — the ${rows.length} most recent of ${utm.totalHits} hits.`
-            : `Every UTM-tagged visit the site captured · ${span} — ${utm.totalHits} hits.`
+            ? `UTM-tagged sessions · ${span} — the ${rows.length} most recent of ${utm.totalHits}. Attribution is read once, when the session opens, and sessions are pruned after 90 days.`
+            : `Every UTM-tagged session still on record · ${span} — ${utm.totalHits}. Attribution is read once, when the session opens, and sessions are pruned after 90 days.`
         }
       />
       <UtmTracerChart
@@ -76,16 +80,17 @@ export default async function TrackerPage({
       <TrackerTable
         rows={rows.map((r) => ({
           id: r.id,
-          source: r.source,
-          medium: r.medium,
-          campaign: r.campaign,
-          content: r.content,
-          term: r.term,
+          source: r.rawSource,
+          medium: r.rawMedium,
+          campaign: r.rawCampaign,
+          content: r.rawContent,
+          term: r.rawTerm,
           messageId: r.messageId,
-          path: r.path,
-          referrer: r.referrer,
-          userAgent: r.userAgent,
-          visitedAt: r.visitedAt.toISOString(),
+          path: r.landingPath,
+          referrerHost: r.referrerHost,
+          deviceType: r.deviceType,
+          browser: r.browser,
+          visitedAt: r.startedAt.toISOString(),
         }))}
       />
     </div>

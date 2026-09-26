@@ -1,6 +1,5 @@
 import type { ContentStatus } from "db";
 
-// declared order, not alphabetical: this drives the filter tabs
 export const CONTENT_STATUSES = ["DRAFT", "SCHEDULED", "PUBLISHED", "ARCHIVED"] as const;
 
 export const STATUS_LABEL: Record<ContentStatus, string> = {
@@ -25,7 +24,6 @@ export function statusChip(status: ContentStatus): string {
   return `chip st-${status.toLowerCase()}`;
 }
 
-// IST is UTC+05:30 year-round
 const IST_OFFSET_MINUTES = 330;
 const MINUTE_MS = 60_000;
 const IST_OFFSET_MS = IST_OFFSET_MINUTES * MINUTE_MS;
@@ -42,7 +40,6 @@ export function istInputToUtc(value: string): Date | null {
   const hour = Number(m[4]);
   const minute = Number(m[5]);
 
-  // Date.UTC silently rolls 31 February over into March
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
   if (hour > 23 || minute > 59) return null;
 
@@ -65,6 +62,29 @@ const istFormat = new Intl.DateTimeFormat("en-GB", {
 
 export function istLabel(instant: Date): string {
   return `${istFormat.format(instant)} IST`;
+}
+
+export function monthInputToUtc(value: string): Date | null {
+  const m = /^(\d{4})-(\d{2})$/.exec(value.trim());
+  if (!m) return null;
+
+  const month = Number(m[2]);
+  if (month < 1 || month > 12) return null;
+
+  return new Date(Date.UTC(Number(m[1]), month - 1, 1));
+}
+
+export function utcToMonthInput(instant: Date): string {
+  return instant.toISOString().slice(0, 7);
+}
+
+const monthFormat = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "UTC",
+  month: "short", year: "numeric",
+});
+
+export function monthLabel(instant: Date): string {
+  return monthFormat.format(instant);
 }
 
 export function scheduleProblem(

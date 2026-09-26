@@ -6,11 +6,14 @@ async function seed() {
   // Clean up in reverse dependency order
   await prisma.experienceBullet.deleteMany();
   await prisma.projectBullet.deleteMany();
+  await prisma.experienceSkill.deleteMany();
+  await prisma.projectSkill.deleteMany();
+  await prisma.projectImage.deleteMany();
   await prisma.experience.deleteMany();
   await prisma.project.deleteMany();
+  await prisma.heroSkillBadge.deleteMany();
   await prisma.skill.deleteMany();
   await prisma.heroTitle.deleteMany();
-  await prisma.heroSkillBadge.deleteMany();
   await prisma.heroContent.deleteMany();
   await prisma.socialLink.deleteMany();
   await prisma.aboutParagraph.deleteMany();
@@ -18,7 +21,7 @@ async function seed() {
   await prisma.blog.deleteMany();
   await prisma.quote.deleteMany();
   await prisma.contactPurpose.deleteMany();
-  await prisma.siteConfig.deleteMany();
+  await prisma.siteSettings.deleteMany();
   await prisma.adminUser.deleteMany();
 
   // v2 starts at sortOrder 100 so the two versions' ranges don't overlap.
@@ -33,27 +36,6 @@ async function seed() {
     ],
   });
   console.log("Hero titles seeded");
-
-  await prisma.heroSkillBadge.createMany({
-    data: [
-      { name: "Next.js", iconKey: "Next.js", sortOrder: 0, version: "v1" },
-      { name: "Golang", iconKey: "Go", sortOrder: 1, version: "v1" },
-      { name: "TypeScript", iconKey: "TypeScript", sortOrder: 2, version: "v1" },
-      { name: "Node.js", iconKey: "Node.js", sortOrder: 3, version: "v1" },
-      { name: "React", iconKey: "React", sortOrder: 4, version: "v1" },
-      { name: "Prisma", iconKey: "Prisma", sortOrder: 5, version: "v1" },
-      { name: "Python", iconKey: "Python", sortOrder: 6, version: "v1" },
-
-      { name: "Next.js", iconKey: "Next.js", sortOrder: 100, version: "v2" },
-      { name: "Golang", iconKey: "Go", sortOrder: 101, version: "v2" },
-      { name: "TypeScript", iconKey: "TypeScript", sortOrder: 102, version: "v2" },
-      { name: "Node.js", iconKey: "Node.js", sortOrder: 103, version: "v2" },
-      { name: "React", iconKey: "React", sortOrder: 104, version: "v2" },
-      { name: "Prisma", iconKey: "Prisma", sortOrder: 105, version: "v2" },
-      { name: "Python", iconKey: "Python", sortOrder: 106, version: "v2" },
-    ],
-  });
-  console.log("Hero skill badges seeded");
 
   await prisma.socialLink.createMany({
     data: [
@@ -92,8 +74,8 @@ async function seed() {
         scoreType: "CGPA",
         score: "9.5",
         scoreTotal: "10",
-        startYear: "2021",
-        endYear: "2025",
+        startYear: 2021,
+        endYear: 2025,
         sortOrder: 0,
       },
     ],
@@ -101,53 +83,53 @@ async function seed() {
   console.log("Education seeded");
 
   const skillsData = [
-    { name: "Next.js", iconKey: "Next.js", show: true, sortOrder: 0 },
-    { name: "React", iconKey: "React", show: true, sortOrder: 1 },
-    { name: "TypeScript", iconKey: "TypeScript", show: true, sortOrder: 2 },
-    { name: "JavaScript", iconKey: "JavaScript", show: true, sortOrder: 3 },
-    { name: "Redux", iconKey: "Redux", show: true, sortOrder: 4 },
-    { name: "Node.js", iconKey: "Node.js", show: true, sortOrder: 5 },
-    { name: "Express.js", iconKey: "Express.js", show: true, sortOrder: 6 },
-    { name: "Go", iconKey: "Go", show: true, sortOrder: 7 },
-    { name: "Python", iconKey: "Python", show: true, sortOrder: 8 },
-    { name: "FastAPI", iconKey: "FastAPI", show: true, sortOrder: 9 },
-    { name: "Flask", iconKey: "Flask", show: true, sortOrder: 10 },
-    { name: "Gemini", iconKey: "Gemini", show: true, sortOrder: 11 },
-    { name: "REST APIs", iconKey: "REST APIs", show: true, sortOrder: 12 },
-    { name: "WebSockets", iconKey: "WebSockets", show: true, sortOrder: 13 },
-    { name: "PostgreSQL", iconKey: "PostgreSQL", show: true, sortOrder: 14 },
-    { name: "MongoDB", iconKey: "MongoDB", show: true, sortOrder: 15 },
-    { name: "MySQL", iconKey: "MySQL", show: true, sortOrder: 16 },
-    { name: "Redis", iconKey: "Redis", show: true, sortOrder: 17 },
-    { name: "Prisma", iconKey: "Prisma", show: true, sortOrder: 18 },
-    { name: "Drizzle", iconKey: "Drizzle ORM", show: true, sortOrder: 19 },
-    { name: "SQL", iconKey: "SQL", show: true, sortOrder: 20 },
-    { name: "Kafka", iconKey: "Kafka", show: true, sortOrder: 21 },
-    { name: "Docker", iconKey: "Docker", show: true, sortOrder: 22 },
-    { name: "AWS", iconKey: "AWS", show: true, sortOrder: 23 },
-    { name: "AWS S3", iconKey: "AWS S3", show: true, sortOrder: 24 },
-    { name: "AWS EC2", iconKey: "AWS EC2", show: true, sortOrder: 25 },
-    { name: "CI/CD", iconKey: "CI/CD", show: true, sortOrder: 26 },
-    { name: "Jenkins", iconKey: "Jenkins", show: true, sortOrder: 27 },
-    { name: "Nginx", iconKey: "Nginx", show: true, sortOrder: 28 },
-    { name: "Cloudflare", iconKey: "Cloudflare", show: true, sortOrder: 29 },
-    { name: "Cloudflare R2", iconKey: "Cloudflare R2", show: true, sortOrder: 30 },
-    { name: "Monitoring", iconKey: "Monitoring", show: true, sortOrder: 31 },
-    { name: "Logging", iconKey: "Logging", show: true, sortOrder: 32 },
-    { name: "Java", iconKey: "Java", show: true, sortOrder: 33 },
-    { name: "DSA", iconKey: "DSA", show: true, sortOrder: 34 },
-    { name: "OOPs", iconKey: "OOPs", show: true, sortOrder: 35 },
-    { name: "Git", iconKey: "Git", show: true, sortOrder: 36 },
-    { name: "GitHub", iconKey: "GitHub", show: true, sortOrder: 37 },
-    { name: "GitHub Actions", iconKey: "GitHub Actions", show: true, sortOrder: 38 },
-    { name: "Turborepo", iconKey: "Turborepo", show: true, sortOrder: 39 },
-    { name: "Bun", iconKey: "Bun", show: true, sortOrder: 40 },
-    { name: "Jest", iconKey: "Jest", show: true, sortOrder: 41 },
-    { name: "Selenium", iconKey: "Selenium", show: true, sortOrder: 42 },
-    { name: "Jira", iconKey: "Jira", show: true, sortOrder: 43 },
-    { name: "Drizzle ORM", iconKey: "Drizzle ORM", show: false, sortOrder: 100 },
-    { name: "React.js", iconKey: "React.js", show: false, sortOrder: 102 },
-    { name: "WebSocket", iconKey: "WebSocket", show: false, sortOrder: 103 },
+    { name: "Next.js", iconKey: "Next.js", showInGrid: true, sortOrder: 0 },
+    { name: "React", iconKey: "React", showInGrid: true, sortOrder: 1 },
+    { name: "TypeScript", iconKey: "TypeScript", showInGrid: true, sortOrder: 2 },
+    { name: "JavaScript", iconKey: "JavaScript", showInGrid: true, sortOrder: 3 },
+    { name: "Redux", iconKey: "Redux", showInGrid: true, sortOrder: 4 },
+    { name: "Node.js", iconKey: "Node.js", showInGrid: true, sortOrder: 5 },
+    { name: "Express.js", iconKey: "Express.js", showInGrid: true, sortOrder: 6 },
+    { name: "Go", iconKey: "Go", showInGrid: true, sortOrder: 7 },
+    { name: "Python", iconKey: "Python", showInGrid: true, sortOrder: 8 },
+    { name: "FastAPI", iconKey: "FastAPI", showInGrid: true, sortOrder: 9 },
+    { name: "Flask", iconKey: "Flask", showInGrid: true, sortOrder: 10 },
+    { name: "Gemini", iconKey: "Gemini", showInGrid: true, sortOrder: 11 },
+    { name: "REST APIs", iconKey: "REST APIs", showInGrid: true, sortOrder: 12 },
+    { name: "WebSockets", iconKey: "WebSockets", showInGrid: true, sortOrder: 13 },
+    { name: "PostgreSQL", iconKey: "PostgreSQL", showInGrid: true, sortOrder: 14 },
+    { name: "MongoDB", iconKey: "MongoDB", showInGrid: true, sortOrder: 15 },
+    { name: "MySQL", iconKey: "MySQL", showInGrid: true, sortOrder: 16 },
+    { name: "Redis", iconKey: "Redis", showInGrid: true, sortOrder: 17 },
+    { name: "Prisma", iconKey: "Prisma", showInGrid: true, sortOrder: 18 },
+    { name: "Drizzle", iconKey: "Drizzle ORM", showInGrid: true, sortOrder: 19 },
+    { name: "SQL", iconKey: "SQL", showInGrid: true, sortOrder: 20 },
+    { name: "Kafka", iconKey: "Kafka", showInGrid: true, sortOrder: 21 },
+    { name: "Docker", iconKey: "Docker", showInGrid: true, sortOrder: 22 },
+    { name: "AWS", iconKey: "AWS", showInGrid: true, sortOrder: 23 },
+    { name: "AWS S3", iconKey: "AWS S3", showInGrid: true, sortOrder: 24 },
+    { name: "AWS EC2", iconKey: "AWS EC2", showInGrid: true, sortOrder: 25 },
+    { name: "CI/CD", iconKey: "CI/CD", showInGrid: true, sortOrder: 26 },
+    { name: "Jenkins", iconKey: "Jenkins", showInGrid: true, sortOrder: 27 },
+    { name: "Nginx", iconKey: "Nginx", showInGrid: true, sortOrder: 28 },
+    { name: "Cloudflare", iconKey: "Cloudflare", showInGrid: true, sortOrder: 29 },
+    { name: "Cloudflare R2", iconKey: "Cloudflare R2", showInGrid: true, sortOrder: 30 },
+    { name: "Monitoring", iconKey: "Monitoring", showInGrid: true, sortOrder: 31 },
+    { name: "Logging", iconKey: "Logging", showInGrid: true, sortOrder: 32 },
+    { name: "Java", iconKey: "Java", showInGrid: true, sortOrder: 33 },
+    { name: "DSA", iconKey: "DSA", showInGrid: true, sortOrder: 34 },
+    { name: "OOPs", iconKey: "OOPs", showInGrid: true, sortOrder: 35 },
+    { name: "Git", iconKey: "Git", showInGrid: true, sortOrder: 36 },
+    { name: "GitHub", iconKey: "GitHub", showInGrid: true, sortOrder: 37 },
+    { name: "GitHub Actions", iconKey: "GitHub Actions", showInGrid: true, sortOrder: 38 },
+    { name: "Turborepo", iconKey: "Turborepo", showInGrid: true, sortOrder: 39 },
+    { name: "Bun", iconKey: "Bun", showInGrid: true, sortOrder: 40 },
+    { name: "Jest", iconKey: "Jest", showInGrid: true, sortOrder: 41 },
+    { name: "Selenium", iconKey: "Selenium", showInGrid: true, sortOrder: 42 },
+    { name: "Jira", iconKey: "Jira", showInGrid: true, sortOrder: 43 },
+    { name: "Drizzle ORM", iconKey: "Drizzle ORM", showInGrid: false, sortOrder: 100 },
+    { name: "React.js", iconKey: "React.js", showInGrid: false, sortOrder: 102 },
+    { name: "WebSocket", iconKey: "WebSocket", showInGrid: false, sortOrder: 103 },
   ];
 
   const skills = await Promise.all(
@@ -156,10 +138,38 @@ async function seed() {
   const skillMap = new Map(skills.map((s) => [s.name, s.id]));
   console.log("Skills seeded");
 
-  function connectSkills(names: string[]) {
+  const badgesData = [
+    { skill: "Next.js", label: null, sortOrder: 0, version: "v1" },
+    { skill: "Go", label: "Golang", sortOrder: 1, version: "v1" },
+    { skill: "TypeScript", label: null, sortOrder: 2, version: "v1" },
+    { skill: "Node.js", label: null, sortOrder: 3, version: "v1" },
+    { skill: "React", label: null, sortOrder: 4, version: "v1" },
+    { skill: "Prisma", label: null, sortOrder: 5, version: "v1" },
+    { skill: "Python", label: null, sortOrder: 6, version: "v1" },
+
+    { skill: "Next.js", label: null, sortOrder: 100, version: "v2" },
+    { skill: "Go", label: "Golang", sortOrder: 101, version: "v2" },
+    { skill: "TypeScript", label: null, sortOrder: 102, version: "v2" },
+    { skill: "Node.js", label: null, sortOrder: 103, version: "v2" },
+    { skill: "React", label: null, sortOrder: 104, version: "v2" },
+    { skill: "Prisma", label: null, sortOrder: 105, version: "v2" },
+    { skill: "Python", label: null, sortOrder: 106, version: "v2" },
+  ] as const;
+
+  await prisma.heroSkillBadge.createMany({
+    data: badgesData.map((b) => ({
+      skillId: skillMap.get(b.skill)!,
+      label: b.label,
+      sortOrder: b.sortOrder,
+      version: b.version,
+    })),
+  });
+  console.log("Hero skill badges seeded");
+
+  function joinSkills(names: string[]) {
     return names
       .filter((n) => skillMap.has(n))
-      .map((n) => ({ id: skillMap.get(n)! }));
+      .map((n, i) => ({ skillId: skillMap.get(n)!, sortOrder: i }));
   }
 
   await prisma.experience.create({
@@ -167,14 +177,13 @@ async function seed() {
       company: "Wiingy",
       position: "Software Development Engineer",
       location: "Bangalore, Karnataka",
-      startDate: "July 2025",
-      endDate: "Present",
-      isCurrent: true,
+      startedOn: new Date("2025-07-01"),
+      endedOn: null,
       visibleBullets: 3,
       website: "https://wiingy.com", logoUrl: "/logos/wiingy.png",
       sortOrder: 0,
       skills: {
-        connect: connectSkills([
+        create: joinSkills([
           "Next.js", "Express.js", "Node.js", "TypeScript", "Go",
           "Python", "Flask", "MySQL", "Drizzle ORM", "Docker", "GitHub Actions",
         ]),
@@ -207,13 +216,12 @@ async function seed() {
       company: "Nykaa",
       position: "Software Development Engineer Intern (Frontend)",
       location: "Gurugram, Haryana",
-      startDate: "January 2025",
-      endDate: "July 2025",
-      isCurrent: false,
+      startedOn: new Date("2025-01-01"),
+      endedOn: new Date("2025-07-01"),
       website: "https://nykaa.com", logoUrl: "/logos/nykaa.png",
       sortOrder: 1,
       skills: {
-        connect: connectSkills([
+        create: joinSkills([
           "React.js", "Jest", "Selenium", "JavaScript", "Git", "Jira",
         ]),
       },
@@ -248,10 +256,10 @@ async function seed() {
       github: "https://github.com/YatinDora81/Grill",
       live: "https://grill.yatindora.in",
       logoUrl: "/logos/grill.png",
-      images: ["/projects/grill.jpg"],
+      gallery: { create: [{ externalUrl: "/projects/grill.jpg", sortOrder: 0 }] },
       sortOrder: 0,
       skills: {
-        connect: connectSkills(["Next.js", "TypeScript", "Python", "FastAPI", "PostgreSQL", "Prisma", "Docker", "Turborepo"]),
+        create: joinSkills(["Next.js", "TypeScript", "Python", "FastAPI", "PostgreSQL", "Prisma", "Docker", "Turborepo"]),
       },
       bullets: {
         create: [
@@ -270,10 +278,10 @@ async function seed() {
       github: "https://github.com/yatindora/draw-and-connect",
       live: "https://drawsheet.vercel.app",
       logoUrl: "/logos/drawsheet.png",
-      images: ["/projects/drawsheet.png"],
+      gallery: { create: [{ externalUrl: "/projects/drawsheet.png", sortOrder: 0 }] },
       sortOrder: 1,
       skills: {
-        connect: connectSkills(["Next.js", "Node.js", "Express.js", "PostgreSQL", "Prisma", "WebSocket"]),
+        create: joinSkills(["Next.js", "Node.js", "Express.js", "PostgreSQL", "Prisma", "WebSocket"]),
       },
       bullets: {
         create: [
@@ -292,10 +300,10 @@ async function seed() {
       github: "https://github.com/yatindora/next-move-app",
       live: "https://nextmove-yatin.vercel.app",
       logoUrl: "/logos/nextmove.png",
-      images: ["/projects/nextmove.png"],
+      gallery: { create: [{ externalUrl: "/projects/nextmove.png", sortOrder: 0 }] },
       sortOrder: 2,
       skills: {
-        connect: connectSkills(["Next.js", "Express.js", "TypeScript", "PostgreSQL", "Prisma", "Redis", "Docker"]),
+        create: joinSkills(["Next.js", "Express.js", "TypeScript", "PostgreSQL", "Prisma", "Redis", "Docker"]),
       },
       bullets: {
         create: [
@@ -314,10 +322,10 @@ async function seed() {
       github: "https://github.com/yatindora/draw-and-connect",
       live: "https://connect-yatin.vercel.app",
       logoUrl: "/logos/connect.png",
-      images: ["/projects/connect.png"],
+      gallery: { create: [{ externalUrl: "/projects/connect.png", sortOrder: 0 }] },
       sortOrder: 3,
       skills: {
-        connect: connectSkills(["Next.js", "React", "TypeScript", "Express.js", "WebSocket", "Prisma", "Turborepo"]),
+        create: joinSkills(["Next.js", "React", "TypeScript", "Express.js", "WebSocket", "Prisma", "Turborepo"]),
       },
       bullets: {
         create: [
@@ -336,10 +344,10 @@ async function seed() {
       github: "https://github.com/YatinDora81/Netflix-GPT",
       live: "https://netflix-gpt-uysk.vercel.app",
       logoUrl: "/logos/netflix-gpt.png",
-      images: ["/projects/netflix-gpt.png"],
+      gallery: { create: [{ externalUrl: "/projects/netflix-gpt.png", sortOrder: 0 }] },
       sortOrder: 4,
       skills: {
-        connect: connectSkills(["React", "Node.js", "Express.js", "MongoDB", "Docker"]),
+        create: joinSkills(["React", "Node.js", "Express.js", "MongoDB", "Docker"]),
       },
       bullets: {
         create: [
@@ -358,10 +366,10 @@ async function seed() {
       github: "https://github.com/YatinDora81/URL_Shortner",
       live: "https://url-shortner-git-main-yatindora81s-projects.vercel.app",
       logoUrl: "/logos/trimrr.png",
-      images: ["/projects/trimrr.png"],
+      gallery: { create: [{ externalUrl: "/projects/trimrr.png", sortOrder: 0 }] },
       sortOrder: 5,
       skills: {
-        connect: connectSkills(["React", "JavaScript", "Node.js", "Express.js", "MongoDB"]),
+        create: joinSkills(["React", "JavaScript", "Node.js", "Express.js", "MongoDB"]),
       },
       bullets: {
         create: [
@@ -379,7 +387,6 @@ async function seed() {
       slug: "turborepo-monorepo",
       title: "Why I Chose Turborepo for My Monorepo Setup",
       description: "After trying Lerna, Nx, and plain workspaces — Turborepo changed everything with zero-config caching and parallel execution.",
-      image: "",
       imageOrientation: "LANDSCAPE" as const,
       color: "from-blue-500/20 to-cyan-500/20",
       sortOrder: 0,
@@ -408,7 +415,6 @@ The result? 30% faster dev cycles and zero dependency conflicts.`,
       slug: "websocket-scaling",
       title: "Scaling WebSockets — Lessons from Real-Time Apps",
       description: "Single-server WebSocket worked in dev. Production with load balancers? Redis pub/sub saved the day.",
-      image: "",
       imageOrientation: "LANDSCAPE" as const,
       color: "from-purple-500/20 to-pink-500/20",
       sortOrder: 1,
@@ -437,7 +443,6 @@ Real-time is addictive once you get it right.`,
       slug: "drizzle-vs-prisma",
       title: "Drizzle vs Prisma — Which ORM Should You Pick?",
       description: "I've used both in production. Prisma for rapid prototyping, Drizzle when performance matters.",
-      image: "",
       imageOrientation: "SQUARE" as const,
       color: "from-green-500/20 to-emerald-500/20",
       sortOrder: 2,
@@ -469,7 +474,6 @@ I use Prisma for rapid prototyping and Drizzle for production systems where perf
       slug: "docker-dev-setup",
       title: "Docker for Dev — Stop Breaking Your Local Machine",
       description: "One docker-compose up and everything works. Database, Redis, backend, frontend. Your teammates will thank you.",
-      image: "",
       imageOrientation: "PORTRAIT" as const,
       color: "from-orange-500/20 to-amber-500/20",
       sortOrder: 3,
@@ -510,7 +514,6 @@ Your teammates will thank you.`,
       slug: "nextjs-app-router",
       title: "Next.js App Router — Worth the Migration?",
       description: "Migrated from Pages Router to App Router. Server components are a game-changer but the learning curve is real.",
-      image: "",
       imageOrientation: "LANDSCAPE" as const,
       color: "from-slate-500/20 to-zinc-500/20",
       sortOrder: 4,
@@ -543,7 +546,6 @@ Worth it for new projects, absolutely. For existing apps, migrate incrementally.
       slug: "redis-caching-patterns",
       title: "Redis Caching Patterns That Actually Work",
       description: "Cache-aside, write-through, TTL strategies — practical patterns I use in production every day.",
-      image: "",
       imageOrientation: "SQUARE" as const,
       color: "from-red-500/20 to-rose-500/20",
       sortOrder: 5,
@@ -575,7 +577,6 @@ Write to cache and DB simultaneously. Ensures cache is always fresh but adds wri
       slug: "cicd-github-actions",
       title: "CI/CD with GitHub Actions",
       description: "From zero to automated deployments. How I set up lint, test, build, and deploy pipelines for every project.",
-      image: "",
       imageOrientation: "LANDSCAPE" as const,
       color: "from-violet-500/20 to-indigo-500/20",
       sortOrder: 6,
@@ -608,7 +609,6 @@ Automated pipelines save hours every week. Here's how I set them up.
       slug: "typescript-tricks",
       title: "TypeScript Tricks I Wish I Knew Earlier",
       description: "Discriminated unions, template literals, satisfies operator, and more. Level up your TS game.",
-      image: "",
       imageOrientation: "PORTRAIT" as const,
       color: "from-blue-500/20 to-indigo-500/20",
       sortOrder: 7,
@@ -642,7 +642,6 @@ Use \`as const\` to preserve literal types in arrays and objects. Essential for 
       slug: "jwt-auth-patterns",
       title: "JWT Auth Done Right",
       description: "Access tokens, refresh tokens, rotation strategies. Stop storing JWTs in localStorage.",
-      image: "",
       imageOrientation: "SQUARE" as const,
       color: "from-yellow-500/20 to-amber-500/20",
       sortOrder: 8,
@@ -676,7 +675,6 @@ Access tokens in memory, refresh tokens in httpOnly secure cookies. Automatic to
       slug: "postgres-performance",
       title: "PostgreSQL Performance Tips for Backend Devs",
       description: "Indexes, query plans, connection pooling, and EXPLAIN ANALYZE. Make your queries fly.",
-      image: "",
       imageOrientation: "LANDSCAPE" as const,
       color: "from-teal-500/20 to-cyan-500/20",
       sortOrder: 9,
@@ -715,16 +713,16 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
 
   await prisma.quote.createMany({
     data: [
-      { quote: "First, solve the problem. Then, write the code.", author: "John Johnson" },
-      { quote: "Code is like humor. When you have to explain it, it's bad.", author: "Cory House" },
-      { quote: "Simplicity is the soul of efficiency.", author: "Austin Freeman" },
-      { quote: "Make it work, make it right, make it fast.", author: "Kent Beck" },
-      { quote: "Any fool can write code that a computer can understand. Good programmers write code that humans can understand.", author: "Martin Fowler" },
-      { quote: "The best error message is the one that never shows up.", author: "Thomas Fuchs" },
-      { quote: "Programming isn't about what you know; it's about what you can figure out.", author: "Chris Pine" },
-      { quote: "It's not a bug — it's an undocumented feature.", author: "Anonymous" },
-      { quote: "The only way to go fast, is to go well.", author: "Robert C. Martin" },
-      { quote: "Talk is cheap. Show me the code.", author: "Linus Torvalds" },
+      { quote: "First, solve the problem. Then, write the code.", author: "John Johnson", sortOrder: 0 },
+      { quote: "Code is like humor. When you have to explain it, it's bad.", author: "Cory House", sortOrder: 1 },
+      { quote: "Simplicity is the soul of efficiency.", author: "Austin Freeman", sortOrder: 2 },
+      { quote: "Make it work, make it right, make it fast.", author: "Kent Beck", sortOrder: 3 },
+      { quote: "Any fool can write code that a computer can understand. Good programmers write code that humans can understand.", author: "Martin Fowler", sortOrder: 4 },
+      { quote: "The best error message is the one that never shows up.", author: "Thomas Fuchs", sortOrder: 5 },
+      { quote: "Programming isn't about what you know; it's about what you can figure out.", author: "Chris Pine", sortOrder: 6 },
+      { quote: "It's not a bug — it's an undocumented feature.", author: "Anonymous", sortOrder: 7 },
+      { quote: "The only way to go fast, is to go well.", author: "Robert C. Martin", sortOrder: 8 },
+      { quote: "Talk is cheap. Show me the code.", author: "Linus Torvalds", sortOrder: 9 },
     ],
   });
   console.log("Quotes seeded");
@@ -759,25 +757,26 @@ Use PgBouncer or built-in pooling. Opening a new connection per request is expen
   });
   console.log("Hero content seeded");
 
-  await prisma.siteConfig.createMany({
-    data: [
-      { key: "name", value: "Yatin Dora" },
-      { key: "avatarUrl", value: "/mine/avatar.png" },
-      { key: "heroPhotos", value: "/mine/avatar.png,/mine/avatar2.jpeg" },
-      { key: "resumeUrl", value: "https://drive.google.com/file/d/1eljvOFwiltQbn6EvSiTv1fwjDipTSVI1/view?usp=sharing" },
-      { key: "navbarLogo", value: "Yatin.Dora" },
-      { key: "contactEmail", value: "yatin.dora81@gmail.com" },
-      { key: "availabilityStatus", value: "Available for opportunities" },
-      { key: "availabilityDetail", value: "Open to freelance, full-time & collaborations" },
-      { key: "heroDotColor", value: "" },
-      { key: "heroDotPulse", value: "on" },
-      { key: "catNapStyle", value: "ticks" },
-      { key: "catNapSeconds", value: "30" },
-      { key: "projectsVersion", value: "v2" },
-      { key: "copyrightName", value: "Yatin Dora" },
-    ],
+  await prisma.siteSettings.create({
+    data: {
+      id: 1,
+      name: "Yatin Dora",
+      avatarUrl: "/mine/avatar.png",
+      heroPhotos: ["/mine/avatar.png", "/mine/avatar2.jpeg"],
+      resumeUrl: "https://drive.google.com/file/d/1eljvOFwiltQbn6EvSiTv1fwjDipTSVI1/view?usp=sharing",
+      navbarLogo: "Yatin.Dora",
+      contactEmail: "yatin.dora81@gmail.com",
+      availabilityStatus: "Available for opportunities",
+      availabilityDetail: "Open to freelance, full-time & collaborations",
+      heroDotColor: "",
+      heroDotPulse: true,
+      catNapStyle: "TICKS",
+      catNapSeconds: 30,
+      projectsVersion: "v2",
+      copyrightName: "Yatin Dora",
+    },
   });
-  console.log("Site config seeded");
+  console.log("Site settings seeded");
 
   const hashedPassword = await bcrypt.hash("admin123", 10);
   await prisma.adminUser.create({

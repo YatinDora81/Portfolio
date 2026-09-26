@@ -98,7 +98,7 @@ async function deleteBatched(build: () => Prisma.Sql): Promise<number> {
 async function summarisedThrough(now: Date): Promise<Date | null> {
   const anySummary = await prisma.dailyStat.findFirst({
     where: { dimension: "total" },
-    select: { id: true },
+    select: { date: true },
   });
   if (!anySummary) return null;
 

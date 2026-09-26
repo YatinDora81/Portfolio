@@ -36,12 +36,13 @@ const CONTACT_ENTITIES = ["contactPurpose", "socialLink"] as const;
 const LINK_ENTITIES = ["socialLink"] as const;
 
 export function StagedHeroPreview({
-  version, titles, badges, socialLinks, content, name, avatarUrl, photos,
+  version, titles, badges, skills, socialLinks, content, name, avatarUrl, photos,
   availabilityStatus, dotColor, dotPulse, totalSkills, label = "Hero Preview",
 }: {
   version?: "v1" | "v2";
   titles: { id: string; title: string; version: string }[];
-  badges: { id: string; name: string; version: string }[];
+  badges: { id: string; skillId: string; label: string | null; version: string }[];
+  skills: { id: string; name: string }[];
   socialLinks: { id: string; name: string; iconKey?: string; version: string | null }[];
   content: HeroContentRow[];
   name: string;
@@ -63,6 +64,8 @@ export function StagedHeroPreview({
   const c = useLive("heroContent", content).find((x) => x.version === v);
   const pending = usePendingCount(HERO_ENTITIES);
 
+  const skillName = new Map(skills.map((s) => [s.id, s.name] as const));
+
   return (
     <PreviewFrame label={label} pendingCount={pending}>
       <HeroPreview
@@ -71,7 +74,7 @@ export function StagedHeroPreview({
         name={name}
         tagline={str(c?.tagline)}
         intro={str(c?.intro)}
-        skills={b.map((x) => ({ name: str(x.name) }))}
+        skills={b.map((x) => ({ name: x.label ?? skillName.get(x.skillId) ?? "" }))}
         socialLinks={s.map((x) => ({ name: str(x.name), iconKey: str(x.iconKey) || undefined }))}
         avatarUrl={avatarUrl}
         photos={photos}
@@ -94,8 +97,8 @@ export function StagedAboutPreview({ paragraphs, education, experiences, label =
     scoreType: string | null;
     score: string | null;
     scoreTotal: string | null;
-    startYear: string;
-    endYear: string;
+    startYear: number;
+    endYear: number | null;
   }[];
   experiences?: { company: string; logoUrl: string | null }[];
   label?: string;
@@ -122,8 +125,8 @@ export function StagedAboutPreview({ paragraphs, education, experiences, label =
           scoreType: x.scoreType ?? null,
           score: x.score ?? null,
           scoreTotal: x.scoreTotal ?? null,
-          startYear: str(x.startYear),
-          endYear: str(x.endYear),
+          startYear: x.startYear,
+          endYear: x.endYear,
         }))}
       />
     </PreviewFrame>
@@ -131,14 +134,14 @@ export function StagedAboutPreview({ paragraphs, education, experiences, label =
 }
 
 export function StagedSkillsPreview({ skills, label = "Skills Preview" }: {
-  skills: { id: string; name: string; show: boolean }[];
+  skills: { id: string; name: string; showInGrid: boolean }[];
   label?: string;
 }) {
   const live = useLive("skill", skills);
   const pending = usePendingCount(SKILL_ENTITIES);
 
   // visibility filter runs after the overlay
-  const shown = live.filter((s) => s.show !== false);
+  const shown = live.filter((s) => s.showInGrid !== false);
 
   return (
     <PreviewFrame label={label} pendingCount={pending}>

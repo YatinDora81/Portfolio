@@ -2,14 +2,12 @@ import { prisma } from "db";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardHead } from "@/components/ui/card";
 import { CatConsole } from "./cat-console";
+import { napLabel } from "@/lib/site-config-keys";
 import {
   IconArrowNarrowDown, IconArrowUpRight, IconPaw, IconTerminal2,
 } from "@tabler/icons-react";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/+$/, "");
-
-// apps/web falls back to these when the row is missing
-const DEFAULTS = { catNapStyle: "ticks", catNapSeconds: "30" };
 
 const SURFACES = [
   {
@@ -53,7 +51,7 @@ const FACTS = [
   },
   {
     k: "the nap zone",
-    v: <>Fixed at 64px from any window edge (<code>data-nap-edge</code>). Not exposed by <code>OnekoCat</code> and not a SiteConfig key — reference only.</>,
+    v: <>Fixed at 64px from any window edge (<code>data-nap-edge</code>). Not exposed by <code>OnekoCat</code> and not a site setting — reference only.</>,
   },
   {
     k: "reduced motion",
@@ -62,10 +60,10 @@ const FACTS = [
 ];
 
 export default async function CatPage() {
-  const configs = await prisma.siteConfig.findMany({
-    where: { key: { in: ["catNapStyle", "catNapSeconds"] } },
+  const settings = await prisma.siteSettings.findUniqueOrThrow({
+    where: { id: 1 },
+    select: { catNapStyle: true, catNapSeconds: true },
   });
-  const map = Object.fromEntries(configs.map(c => [c.key, c.value]));
 
   return (
     <div className="view">
@@ -90,8 +88,8 @@ export default async function CatPage() {
       </div>
 
       <CatConsole
-        napStyle={map["catNapStyle"] || DEFAULTS.catNapStyle}
-        napSeconds={map["catNapSeconds"] || DEFAULTS.catNapSeconds}
+        napStyle={napLabel(settings.catNapStyle)}
+        napSeconds={String(settings.catNapSeconds)}
       >
         <Card flush>
           <CardHead

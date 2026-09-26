@@ -20,23 +20,13 @@ export default async function FlagsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const stored = await prisma.featureFlag.findMany();
+  const [stored, me] = await Promise.all([
+    prisma.featureFlag.findMany(),
+    prisma.adminUser.findUnique({ where: { id: session.userId }, select: { name: true } }),
+  ]);
   const byKey = new Map(stored.map((f) => [f.key, f]));
 
   const map: FlagMap = Object.fromEntries(stored.map((f) => [f.key, f.enabled]));
-
-  const actorIds = [
-    ...new Set([
-      ...stored.map((f) => f.updatedById).filter((id): id is string => id !== null),
-      session.userId,
-    ]),
-  ];
-  const admins = await prisma.adminUser.findMany({
-    where: { id: { in: actorIds } },
-    select: { id: true, name: true },
-  });
-  const actors: Record<string, string> = {};
-  for (const a of admins) actors[a.id] = a.name;
 
   const rows: FlagRow[] = FLAG_DEFINITIONS.map((def) => {
     const row = byKey.get(def.key);
@@ -50,7 +40,7 @@ export default async function FlagsPage() {
       note: row?.note ?? null,
       present: row !== undefined,
       changedAt: row ? day(row.updatedAt) : null,
-      changedBy: row?.updatedById ? (actors[row.updatedById] ?? row.updatedById) : null,
+      changedBy: row?.updatedByName ?? null,
     };
   });
 
@@ -94,7 +84,7 @@ export default async function FlagsPage() {
         </div>
       </div>
 
-      <FlagBoard rows={rows} actor={actors[session.userId] ?? "you"} />
+      <FlagBoard rows={rows} actor={me?.name ?? "you"} />
     </div>
   );
 }

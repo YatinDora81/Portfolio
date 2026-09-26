@@ -7,11 +7,14 @@ import { cdnUrl } from "./site";
 
 const CACHE_LIFETIME_SECONDS = 86400;
 
-// unstable_cache json round-trips, so cached dates come back strings
-function reviveBlogDates<T extends { publishedAt: Date; updatedAt: Date }>(
+function reviveBlogDates<T extends { publishedAt: Date | null; updatedAt: Date }>(
   row: T,
-): Omit<T, "publishedAt" | "updatedAt"> & { publishedAt: Date; updatedAt: Date } {
-  return { ...row, publishedAt: new Date(row.publishedAt), updatedAt: new Date(row.updatedAt) };
+): Omit<T, "publishedAt" | "updatedAt"> & { publishedAt: Date | null; updatedAt: Date } {
+  return {
+    ...row,
+    publishedAt: row.publishedAt === null ? null : new Date(row.publishedAt),
+    updatedAt: new Date(row.updatedAt),
+  };
 }
 
 export type HeroVersion = "v1" | "v2";
@@ -20,10 +23,6 @@ export type ProjectsVersion = "v1" | "v2";
 
 export type CatNapStyle =
   | "tooltip" | "ring" | "halo" | "pixel" | "moon" | "ticks" | "random" | "off";
-
-const CAT_NAP_STYLES: CatNapStyle[] = [
-  "tooltip", "ring", "halo", "pixel", "moon", "ticks", "random", "off",
-];
 
 export type BackgroundVersion = "v1" | "v2";
 
@@ -60,64 +59,44 @@ export interface SiteConfig {
   background: SiteBackground;
 }
 
-const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-
-function clampedInt(raw: string | undefined, fallback: number, min: number, max: number) {
-  const n = parseInt(raw ?? "", 10);
-  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
-}
-
 async function readSiteConfig(): Promise<SiteConfig> {
-  const [rows, content] = await Promise.all([
-    prisma.siteConfig.findMany(),
+  const [settings, content] = await Promise.all([
+    prisma.siteSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.heroContent.findMany(),
   ]);
-  const map = new Map(rows.map((r) => [r.key, r.value]));
   const live = content.find((c) => c.live) ?? content.find((c) => c.version === "v2") ?? null;
-  const heroVersion: HeroVersion = live?.version === "v1" ? "v1" : "v2";
+  const heroVersion: HeroVersion = live?.version ?? "v2";
   const intro = live?.intro ?? "";
   const tagline = live?.tagline ?? "";
-  const rawNapStyle = (map.get("catNapStyle") ?? "ticks").trim().toLowerCase() as CatNapStyle;
-  const catNapStyle: CatNapStyle = CAT_NAP_STYLES.includes(rawNapStyle) ? rawNapStyle : "ticks";
-  const rawNapSeconds = parseInt(map.get("catNapSeconds") ?? "30", 10);
-  const catNapSeconds = Number.isFinite(rawNapSeconds)
-    ? Math.min(300, Math.max(3, rawNapSeconds))
-    : 30;
   const background: SiteBackground = {
-    version: map.get("backgroundVersion") === "v2" ? "v2" : "v1",
-    strength: clampedInt(map.get("terrainStrength"), 50, 10, 100) / 100,
-    veil: clampedInt(map.get("terrainVeil"), 50, 0, 90) / 100,
-    cell: clampedInt(map.get("terrainCell"), 12, 8, 28),
-    levels: clampedInt(map.get("terrainLevels"), 14, 4, 24),
-    minor: clampedInt(map.get("terrainMinor"), 20, 2, 60) / 100,
-    major: clampedInt(map.get("terrainMajor"), 48, 5, 90) / 100,
-    channel: (map.get("terrainChannel") ?? "on") !== "off",
-    interactive: (map.get("terrainInteractive") ?? "on") !== "off",
+    version: settings.backgroundVersion,
+    strength: settings.terrainStrength / 100,
+    veil: settings.terrainVeil / 100,
+    cell: settings.terrainCell,
+    levels: settings.terrainLevels,
+    minor: settings.terrainMinor / 100,
+    major: settings.terrainMajor / 100,
+    channel: settings.terrainChannel,
+    interactive: settings.terrainInteractive,
   };
   return {
-    name: map.get("name") ?? "",
+    name: settings.name,
     heroVersion,
-    projectsVersion: map.get("projectsVersion") === "v1" ? "v1" : "v2",
+    projectsVersion: settings.projectsVersion,
     tagline,
     intro,
-    avatarUrl: cdnUrl(map.get("avatarUrl") ?? ""),
-    heroPhotos: (map.get("heroPhotos") ?? "")
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean)
-      .map((p) => cdnUrl(p)),
-    resumeUrl: map.get("resumeUrl") ?? "",
-    navbarLogo: map.get("navbarLogo") ?? "",
-    contactEmail: map.get("contactEmail") ?? "",
-    availabilityStatus: map.get("availabilityStatus") ?? "",
-    availabilityDetail: map.get("availabilityDetail") ?? "",
-    heroDotColor: HEX.test((map.get("heroDotColor") ?? "").trim())
-      ? map.get("heroDotColor")!.trim()
-      : "",
-    heroDotPulse: (map.get("heroDotPulse") ?? "on") !== "off",
-    catNapStyle,
-    catNapSeconds,
-    copyrightName: map.get("copyrightName") ?? "",
+    avatarUrl: cdnUrl(settings.avatarUrl),
+    heroPhotos: settings.heroPhotos.map((p) => cdnUrl(p)),
+    resumeUrl: settings.resumeUrl,
+    navbarLogo: settings.navbarLogo,
+    contactEmail: settings.contactEmail,
+    availabilityStatus: settings.availabilityStatus,
+    availabilityDetail: settings.availabilityDetail,
+    heroDotColor: settings.heroDotColor,
+    heroDotPulse: settings.heroDotPulse,
+    catNapStyle: settings.catNapStyle.toLowerCase() as CatNapStyle,
+    catNapSeconds: settings.catNapSeconds,
+    copyrightName: settings.copyrightName,
     background,
   };
 }
@@ -138,6 +117,7 @@ export async function getHeroData(version: HeroVersion) {
     prisma.heroSkillBadge.findMany({
       where: { version },
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+      select: { label: true, skill: { select: { name: true, iconKey: true } } },
     }),
     prisma.socialLink.findMany({
       where: { OR: [{ version }, { version: null }] },
@@ -146,7 +126,7 @@ export async function getHeroData(version: HeroVersion) {
   ]);
   return {
     titles: titles.map((t) => t.title),
-    skills: skills.map((s) => ({ name: s.name, iconKey: s.iconKey })),
+    skills: skills.map((s) => ({ name: s.label ?? s.skill.name, iconKey: s.skill.iconKey })),
     socialLinks: socialLinks.map((l) => ({
       name: l.name,
       href: l.href,
@@ -178,7 +158,7 @@ export async function getAboutData() {
 
 export async function getSkills() {
   const skills = await prisma.skill.findMany({
-    where: { show: true },
+    where: { showInGrid: true },
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
   });
   return skills.map((s) => ({ name: s.name, iconKey: s.iconKey }));
@@ -189,21 +169,20 @@ export async function getExperiences() {
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     include: {
       bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
-      skills: { select: { name: true } },
+      skills: { select: { skill: { select: { name: true } } }, orderBy: { sortOrder: "asc" } },
     },
   });
   return experiences.map((exp) => ({
     company: exp.company,
     position: exp.position,
     location: exp.location,
-    startDate: exp.startDate,
-    endDate: exp.endDate,
-    isCurrent: exp.isCurrent,
+    startedOn: exp.startedOn,
+    endedOn: exp.endedOn,
     website: exp.website,
     logoUrl: cdnUrl(exp.logoUrl),
     visibleBullets: exp.visibleBullets,
     bullets: exp.bullets.map((b) => b.content),
-    technologies: exp.skills.map((s) => s.name),
+    technologies: exp.skills.map((s) => s.skill.name),
   }));
 }
 
@@ -240,19 +219,34 @@ async function readProjects(isPreview: boolean) {
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     include: {
       bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
-      skills: { select: { name: true, iconKey: true } },
+      skills: {
+        select: { skill: { select: { name: true, iconKey: true } } },
+        orderBy: { sortOrder: "asc" },
+      },
+      gallery: {
+        select: { externalUrl: true, asset: { select: { url: true } } },
+        orderBy: { sortOrder: "asc" },
+      },
+      health: { select: { status: true, latencyMs: true } },
     },
   });
-  const health = await Promise.all(projects.map((p) => probeLive(p.live)));
+  const health = await Promise.all(
+    projects.map((p): BuildHealth | Promise<BuildHealth> =>
+      p.health?.status ? { status: p.health.status, ms: p.health.latencyMs } : probeLive(p.live),
+    ),
+  );
   return projects.map((p, i) => ({
     title: p.title,
     summary: p.summary,
     github: p.github,
     live: p.live,
     logoUrl: cdnUrl(p.logoUrl),
-    images: p.images.map((img) => cdnUrl(img)),
+    images: p.gallery
+      .map((img) => img.externalUrl ?? img.asset?.url ?? "")
+      .filter(Boolean)
+      .map((img) => cdnUrl(img)),
     bullets: p.bullets.map((b) => b.content),
-    technologies: p.skills.map((s) => ({ name: s.name, iconKey: s.iconKey })),
+    technologies: p.skills.map((s) => s.skill),
     health: health[i] ?? { status: "unknown" as const, ms: null },
   }));
 }
@@ -359,7 +353,7 @@ export async function getBlogBySlug(slug: string, isPreview = false) {
 }
 
 export async function getQuotes() {
-  const quotes = await prisma.quote.findMany({ orderBy: { id: "asc" } });
+  const quotes = await prisma.quote.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] });
   return quotes.map((q) => ({ quote: q.quote, author: q.author }));
 }
 

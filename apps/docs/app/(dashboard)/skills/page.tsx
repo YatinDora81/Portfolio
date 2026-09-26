@@ -31,9 +31,8 @@ export default async function SkillsPage() {
         </div>
       </div>
 
-      <SkillsTable skills={skills.map(s => ({ id: s.id, name: s.name, iconKey: s.iconKey, show: s.show, sortOrder: s.sortOrder }))} />
-      {/* hidden skills go through too; the wrapper applies show later */}
-      <StagedSkillsPreview skills={skills.map(s => ({ id: s.id, name: s.name, show: s.show }))} />
+      <SkillsTable skills={skills.map(s => ({ id: s.id, name: s.name, iconKey: s.iconKey, showInGrid: s.showInGrid, sortOrder: s.sortOrder }))} />
+      <StagedSkillsPreview skills={skills.map(s => ({ id: s.id, name: s.name, showInGrid: s.showInGrid }))} />
     </div>
   );
 }

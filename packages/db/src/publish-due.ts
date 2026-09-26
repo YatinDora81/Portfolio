@@ -31,14 +31,13 @@ export async function publishDueContent(now = new Date()): Promise<PublishedItem
   ]);
 
   for (const blog of dueBlogs) {
-    // a past date is the author's editorial date, leave it alone
-    const datedInTheFuture = blog.publishedAt.getTime() > now.getTime();
+    const needsStamp = blog.publishedAt === null || blog.publishedAt.getTime() > now.getTime();
 
     const res = await prisma.blog.updateMany({
       where: { id: blog.id, status: "SCHEDULED", publishAt: { lte: now } },
       data: {
         status: "PUBLISHED",
-        ...(datedInTheFuture ? { publishedAt: now } : {}),
+        ...(needsStamp ? { publishedAt: now } : {}),
       },
     });
 

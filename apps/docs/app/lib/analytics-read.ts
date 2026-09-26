@@ -255,7 +255,6 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
       prisma.linkClick.count(),
       prisma.analyticsSalt.count(),
       prisma.rateLimitBucket.count(),
-      prisma.utmTracker.count(),
     ]),
   ]);
 
@@ -432,7 +431,7 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
 
   const [
     sessionRows, eventRows, dailyStatRows, rollupRunRows,
-    trackedLinkRows, linkClickRows, saltRows, rateLimitRows, utmRows,
+    trackedLinkRows, linkClickRows, saltRows, rateLimitRows,
   ] = counts;
 
   return {
@@ -457,14 +456,13 @@ export async function readAnalytics(days: WindowDays): Promise<AnalyticsView> {
       .sort((a, b) => b.rows - a.rows),
     counts: [
       { table: "AnalyticsSession", rows: sessionRows, note: "one per visit, salted daily" },
-      { table: "AnalyticsEvent", rows: eventRows, note: "pageviews, section dwell, clicks" },
+      { table: "AnalyticsEvent", rows: eventRows, note: "pageviews and section dwell" },
       { table: "DailyStat", rows: dailyStatRows, note: "what the rollup writes" },
       { table: "RollupRun", rows: rollupRunRows, note: "one per day summarized" },
       { table: "TrackedLink", rows: trackedLinkRows, note: "short links in the registry" },
       { table: "LinkClick", rows: linkClickRows, note: "clicks on those links" },
       { table: "AnalyticsSalt", rows: saltRows, note: "one per day, pruned by maintenance" },
       { table: "RateLimitBucket", rows: rateLimitRows, note: "live windows, pruned by maintenance" },
-      { table: "UtmTracker", rows: utmRows, note: "the older UTM capture, kept separate" },
     ],
     runs: runs.map((r) => ({
       id: r.id,

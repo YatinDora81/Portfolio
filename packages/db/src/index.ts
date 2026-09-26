@@ -14,15 +14,5 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.__prisma = prisma;
 
 export { prisma };
 export type * from "./generated/prisma/models";
-export {
-  ScoreType,
-  ImageOrientation,
-  AdminRole,
-  NoteKind,
-  RevalidationTrigger,
-  RevalidationStatus,
-  ContentStatus,
-  MessageStatus,
-  EventType,
-} from "./generated/prisma/enums";
+export * from "./generated/prisma/enums";
 export { Prisma } from "./generated/prisma/client";

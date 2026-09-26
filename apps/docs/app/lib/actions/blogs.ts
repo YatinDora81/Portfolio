@@ -6,7 +6,6 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { resolveLifecycle } from "@/lib/lifecycle";
 
-// middleware never runs for a direct server-action POST
 async function requireSession() {
   if (!(await getSession())) redirect("/login");
 }
@@ -30,11 +29,12 @@ export async function createBlog(formData: FormData): Promise<Saved> {
       title: formData.get("title") as string,
       description: formData.get("description") as string,
       content: formData.get("content") as string,
-      image: formData.get("image") as string,
+      image: (formData.get("image") as string) || null,
       imageOrientation: (formData.get("imageOrientation") as "LANDSCAPE" | "PORTRAIT" | "SQUARE") || "LANDSCAPE",
       color: formData.get("color") as string,
       status: lifecycle.status,
       publishAt: lifecycle.publishAt,
+      publishedAt: lifecycle.status === "PUBLISHED" ? new Date() : null,
       sortOrder: count,
     },
   });
@@ -48,6 +48,8 @@ export async function updateBlog(id: string, formData: FormData): Promise<Saved>
   const lifecycle = readLifecycle(formData);
   if (!lifecycle.ok) return { ok: false, error: lifecycle.error };
 
+  const current = await prisma.blog.findUnique({ where: { id }, select: { publishedAt: true } });
+
   await prisma.blog.update({
     where: { id },
     data: {
@@ -55,12 +57,14 @@ export async function updateBlog(id: string, formData: FormData): Promise<Saved>
       title: formData.get("title") as string,
       description: formData.get("description") as string,
       content: formData.get("content") as string,
-      image: formData.get("image") as string,
+      image: (formData.get("image") as string) || null,
       imageOrientation: (formData.get("imageOrientation") as "LANDSCAPE" | "PORTRAIT" | "SQUARE") || "LANDSCAPE",
       color: formData.get("color") as string,
       status: lifecycle.status,
       publishAt: lifecycle.publishAt,
-      // publishedAt is the printed editorial date, not a lifecycle stamp
+      ...(lifecycle.status === "PUBLISHED" && current?.publishedAt == null
+        ? { publishedAt: new Date() }
+        : {}),
     },
   });
   revalidatePath("/blogs");

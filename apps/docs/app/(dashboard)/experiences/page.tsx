@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DeleteButton } from "@/components/shared/delete-button";
 import { deleteExperience } from "@/lib/actions/experiences";
+import { monthLabel } from "@/lib/lifecycle";
 import { cn, cdnUrl } from "@/lib/utils";
 import {
   IconPlus, IconPencil, IconBriefcase, IconArrowUpRight, IconBuilding,
@@ -25,11 +26,14 @@ function renderBullet(text: string) {
 export default async function ExperiencesPage() {
   const experiences = await prisma.experience.findMany({
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-    include: { bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }, skills: { select: { name: true } } },
+    include: {
+      bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      skills: { orderBy: { sortOrder: "asc" }, include: { skill: true } },
+    },
   });
 
   const withMark = experiences.filter(e => e.logoUrl).length;
-  const current = experiences.find(e => e.isCurrent);
+  const current = experiences.find(e => e.endedOn === null);
 
   return (
     <div className="view">
@@ -86,9 +90,10 @@ export default async function ExperiencesPage() {
             {experiences.map((exp) => {
               const fold = exp.visibleBullets > 0 ? exp.visibleBullets : DEFAULT_VISIBLE_BULLETS;
               const folded = Math.max(0, exp.bullets.length - fold);
+              const isCurrent = exp.endedOn === null;
 
               return (
-                <div key={exp.id} className={cn("xp-item", exp.isCurrent && "now")}>
+                <div key={exp.id} className={cn("xp-item", isCurrent && "now")}>
                   <Card>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                       {exp.logoUrl ? (
@@ -110,11 +115,11 @@ export default async function ExperiencesPage() {
                       </div>
 
                       <span
-                        className={cn("chip", exp.isCurrent && "amb")}
+                        className={cn("chip", isCurrent && "amb")}
                         style={{ marginTop: 2, flex: "none", whiteSpace: "nowrap" }}
                       >
-                        {exp.isCurrent && <span className="dot" />}
-                        {exp.startDate} — {exp.endDate}
+                        {isCurrent && <span className="dot" />}
+                        {monthLabel(exp.startedOn)} — {exp.endedOn ? monthLabel(exp.endedOn) : "Present"}
                       </span>
 
                       <div className="row-acts">
@@ -142,8 +147,8 @@ export default async function ExperiencesPage() {
 
                     {exp.skills.length > 0 && (
                       <div className="pskills" style={{ marginTop: 11 }}>
-                        {exp.skills.map((s) => (
-                          <Badge key={s.name} variant="outline">{s.name}</Badge>
+                        {exp.skills.map(({ skill }) => (
+                          <Badge key={skill.id} variant="outline">{skill.name}</Badge>
                         ))}
                       </div>
                     )}
@@ -174,7 +179,7 @@ export default async function ExperiencesPage() {
       )}
 
       <PreviewFrame label="Experience Preview">
-        <ExperiencePreview experiences={experiences.map(exp => ({ company: exp.company, position: exp.position, location: exp.location, startDate: exp.startDate, endDate: exp.endDate, isCurrent: exp.isCurrent, bullets: exp.bullets.map(b => b.content), technologies: exp.skills.map(s => s.name), visibleBullets: exp.visibleBullets, logoUrl: exp.logoUrl }))} />
+        <ExperiencePreview experiences={experiences.map(exp => ({ company: exp.company, position: exp.position, location: exp.location, startDate: monthLabel(exp.startedOn), endDate: exp.endedOn ? monthLabel(exp.endedOn) : "", isCurrent: exp.endedOn === null, bullets: exp.bullets.map(b => b.content), technologies: exp.skills.map(s => s.skill.name), visibleBullets: exp.visibleBullets, logoUrl: exp.logoUrl }))} />
       </PreviewFrame>
     </div>
   );

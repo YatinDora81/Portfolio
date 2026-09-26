@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useTransition } from "react";
+import type { LiveProbeStatus } from "db";
 import {
   IconPencil, IconBrandGithub, IconWorld, IconGripVertical,
   IconChevronUp, IconChevronDown,
@@ -13,6 +14,12 @@ import { useSortable } from "@/lib/use-sortable";
 
 const FEATURED = 3;
 
+export interface ProjectHealthCard {
+  status: LiveProbeStatus;
+  latencyMs: number | null;
+  probedAt: string | null;
+}
+
 export interface ProjectCard {
   id: string;
   title: string;
@@ -20,7 +27,8 @@ export interface ProjectCard {
   github: string | null;
   live: string | null;
   logoUrl: string | null;
-  images: string[];
+  cover: string | null;
+  health: ProjectHealthCard | null;
   bulletCount: number;
   skills: string[];
 }
@@ -45,7 +53,6 @@ export function ProjectGrid({ projects }: { projects: ProjectCard[] }) {
       {order.map((id, i) => {
         const p = byId.get(id);
         if (!p) return null;
-        const cover = p.images?.[0];
 
         return (
           <Fragment key={p.id}>
@@ -61,9 +68,9 @@ export function ProjectGrid({ projects }: { projects: ProjectCard[] }) {
             <div
               className="pcover"
               style={
-                cover
+                p.cover
                   ? {
-                      backgroundImage: `url("${cdnUrl(cover)}")`,
+                      backgroundImage: `url("${cdnUrl(p.cover)}")`,
                       backgroundSize: "cover",
                       backgroundPosition: "center",
                     }
@@ -103,10 +110,20 @@ export function ProjectGrid({ projects }: { projects: ProjectCard[] }) {
                 />
               )}
 
-              {p.live ? (
-                <span className="chip on"><span className="dot" /> Live</span>
-              ) : (
+              {!p.live ? (
                 <span className="chip off"><span className="dot" /> No demo</span>
+              ) : p.health ? (
+                <span
+                  className={p.health.status === "up" ? "chip on" : "chip bad"}
+                  title={p.health.probedAt ? `Last probed ${p.health.probedAt}` : "Never probed"}
+                >
+                  <span className="dot" /> {p.health.status}
+                  {p.health.latencyMs === null ? "" : ` · ${p.health.latencyMs} ms`}
+                </span>
+              ) : (
+                <span className="chip on" title="Live URL set — nothing has probed it yet">
+                  <span className="dot" /> Live
+                </span>
               )}
 
               {i < FEATURED && (

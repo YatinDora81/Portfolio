@@ -14,17 +14,19 @@ import { SocialLinksTable } from "./social-links-table";
 import { ResumeForm } from "./resume-form";
 
 interface Title { id: string; title: string; sortOrder: number; version: string }
-interface Badge { id: string; name: string; iconKey: string; sortOrder: number; version: string }
+interface Badge { id: string; skillId: string; label: string | null; sortOrder: number; version: string }
+interface Skill { id: string; name: string; iconKey: string }
 interface Social {
   id: string; name: string; href: string; iconKey: string; detail: string | null;
   sortOrder: number; version: string | null;
 }
 
 export function HeroSections({
-  titles, badges, content, socialLinks, config, resumeUrl, availabilityStatus, totalSkills,
+  titles, badges, skills, content, socialLinks, config, resumeUrl, availabilityStatus, totalSkills,
 }: {
   titles: Title[];
   badges: Badge[];
+  skills: Skill[];
   content: HeroContentRow[];
   socialLinks: Social[];
   config: Record<string, string>;
@@ -111,7 +113,7 @@ export function HeroSections({
       <div className="hro-stack">
         <HeroCopyCard content={content} version={version} />
         <HeroTitlesTable titles={titles} version={version} />
-        <HeroSkillBadgesTable badges={badges} version={version} />
+        <HeroSkillBadgesTable badges={badges} skills={skills} version={version} />
       </div>
 
       <ConfigCard
@@ -130,7 +132,8 @@ export function HeroSections({
       <StagedHeroPreview
         version={version}
         titles={titles.map((t) => ({ id: t.id, title: t.title, version: t.version }))}
-        badges={badges.map((b) => ({ id: b.id, name: b.name, version: b.version }))}
+        badges={badges.map((b) => ({ id: b.id, skillId: b.skillId, label: b.label, version: b.version }))}
+        skills={skills}
         socialLinks={socialLinks.map((l) => ({ id: l.id, name: l.name, iconKey: l.iconKey, version: l.version }))}
         content={content}
         name={draft["name"] || "Yatin"}

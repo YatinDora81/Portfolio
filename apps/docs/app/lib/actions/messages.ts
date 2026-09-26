@@ -20,14 +20,12 @@ async function requireSession() {
   return session;
 }
 
-const readFor = (status: MessageStatus) => status !== "UNREAD";
-
 export async function markMessageRead(id: string): Promise<MessageResult> {
   await requireSession();
   // don't walk a REPLIED row back to READ
   await prisma.contactMessage.updateMany({
     where: { id, status: "UNREAD" },
-    data: { status: "READ", read: true, readAt: new Date() },
+    data: { status: "READ", readAt: new Date() },
   });
   revalidatePath("/messages");
   return { ok: true };
@@ -37,7 +35,7 @@ export async function markMessageUnread(id: string): Promise<MessageResult> {
   await requireSession();
   await prisma.contactMessage.updateMany({
     where: { id, status: { in: ["UNREAD", "READ"] } },
-    data: { status: "UNREAD", read: false, readAt: null },
+    data: { status: "UNREAD", readAt: null },
   });
   revalidatePath("/messages");
   return { ok: true };
@@ -82,11 +80,11 @@ export async function bulkUpdateMessages(input: {
     const filed = { id: { in: ids }, status: { in: ["ARCHIVED", "SPAM"] as MessageStatus[] } };
     const replied = await prisma.contactMessage.updateMany({
       where: { ...filed, repliedAt: { not: null } },
-      data: { status: "REPLIED", read: true },
+      data: { status: "REPLIED" },
     });
     const read = await prisma.contactMessage.updateMany({
       where: { ...filed, repliedAt: null },
-      data: { status: "READ", read: true },
+      data: { status: "READ" },
     });
     revalidatePath("/messages");
     return { ok: true, count: replied.count + read.count };
@@ -103,7 +101,6 @@ export async function bulkUpdateMessages(input: {
     where,
     data: {
       status: next,
-      read: readFor(next),
       ...(action === "read" ? { readAt: new Date() } : {}),
     },
   });
@@ -138,10 +135,13 @@ export async function sendMessageReply(input: {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "That reply could not be read." };
   }
 
-  const message = await prisma.contactMessage.findUnique({
-    where: { id: parsed.data.messageId },
-    select: { id: true, name: true, email: true, purpose: true, notificationMessageId: true },
-  });
+  const [message, sender] = await Promise.all([
+    prisma.contactMessage.findUnique({
+      where: { id: parsed.data.messageId },
+      select: { id: true, name: true, email: true, purpose: true, notificationMessageId: true },
+    }),
+    prisma.adminUser.findUnique({ where: { id: session.userId }, select: { id: true, name: true } }),
+  ]);
   if (!message) return { ok: false, error: "That message is no longer in the inbox." };
 
   const vars = { name: message.name, purpose: message.purpose ?? "" };
@@ -165,7 +165,8 @@ export async function sendMessageReply(input: {
       subject,
       bodyHtml: html,
       bodyText: text,
-      sentById: session.userId,
+      sentById: sender?.id ?? null,
+      sentByName: sender?.name ?? session.email,
       outboundMessageId: sent.messageId ?? null,
       deliveryOk: sent.ok,
       deliveryError: error,
@@ -175,7 +176,7 @@ export async function sendMessageReply(input: {
   if (sent.ok) {
     await prisma.contactMessage.update({
       where: { id: message.id },
-      data: { status: "REPLIED", read: true, repliedAt: new Date() },
+      data: { status: "REPLIED", repliedAt: new Date() },
     });
     if (parsed.data.templateId) {
       await prisma.replyTemplate.updateMany({

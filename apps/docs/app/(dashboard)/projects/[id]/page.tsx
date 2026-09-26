@@ -6,7 +6,14 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const project = await prisma.project.findUnique({
     where: { id },
-    include: { bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }, skills: { select: { id: true } } },
+    include: {
+      bullets: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      skills: { orderBy: { sortOrder: "asc" }, select: { skillId: true } },
+      gallery: {
+        orderBy: { sortOrder: "asc" },
+        select: { externalUrl: true, asset: { select: { url: true } } },
+      },
+    },
   });
   if (!project) notFound();
 
@@ -21,8 +28,8 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
         github: project.github,
         live: project.live,
         logoUrl: project.logoUrl,
-        images: project.images,
-        skillIds: project.skills.map(s => s.id),
+        images: project.gallery.map(img => img.externalUrl ?? img.asset?.url ?? "").filter(Boolean),
+        skillIds: project.skills.map(s => s.skillId),
         bullets: project.bullets.map(b => ({ id: b.id, content: b.content, sortOrder: b.sortOrder })),
         status: project.status,
         publishAtIso: project.publishAt?.toISOString() ?? null,

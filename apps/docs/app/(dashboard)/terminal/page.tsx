@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "db";
+import { publicContentWhere } from "db/visibility";
 import { TERMINAL_COMMANDS, NOT_FOUND_OUTPUT } from "@repo/ui/terminal";
 import { FLAG_KEYS, flagValue, type FlagKey, type FlagMap } from "@repo/shared/flags";
 import { PageHeader } from "@/components/shared/page-header";
@@ -42,7 +43,7 @@ const KEYS = [
 export default async function TerminalPage() {
   const [paragraphs, blogCount, flagRows] = await Promise.all([
     prisma.aboutParagraph.count(),
-    prisma.blog.count({ where: { show: true } }),
+    prisma.blog.count({ where: publicContentWhere() }),
     prisma.featureFlag.findMany(),
   ]);
 

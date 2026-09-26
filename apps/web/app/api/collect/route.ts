@@ -35,9 +35,12 @@ const bodySchema = z.object({
       source: z.string().max(200).nullish(),
       medium: z.string().max(200).nullish(),
       campaign: z.string().max(200).nullish(),
+      content: z.string().max(512).nullish(),
+      term: z.string().max(200).nullish(),
     })
     .nullish(),
   linkSlug: z.string().max(100).nullish(),
+  messageId: z.string().max(200).nullish(),
   landingPath: z.string().max(500),
 });
 
@@ -156,13 +159,14 @@ export async function POST(request: Request) {
           durationMs: e.durationMs,
         })),
       }),
-      prisma.analyticsSession.update({
-        where: { id: session.id },
-        data: {
-          lastSeenAt: new Date(),
-          ...(pageviews > 0 ? { pageviews: { increment: pageviews } } : {}),
-        },
-      }),
+      ...(pageviews > 0
+        ? [
+            prisma.analyticsSession.update({
+              where: { id: session.id },
+              data: { pageviews: { increment: pageviews } },
+            }),
+          ]
+        : []),
     ]);
 
     return noContent();
@@ -212,6 +216,9 @@ async function getOrCreateSession(input: SessionInput): Promise<{ id: string } |
         rawSource: attribution.rawSource,
         rawMedium: attribution.rawMedium,
         rawCampaign: attribution.rawCampaign,
+        rawContent: body.utm?.content ?? null,
+        rawTerm: body.utm?.term ?? null,
+        messageId: body.messageId ?? null,
         referrerHost: attribution.referrerHost,
         landingPath: body.landingPath,
         linkSlug: body.linkSlug ?? null,

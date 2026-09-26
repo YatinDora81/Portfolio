@@ -18,24 +18,47 @@ const MEMO_LIFETIME_MS = 10_000;
 let memo: { at: number; sources: ReferenceSource[] } | null = null;
 
 async function readSources(): Promise<ReferenceSource[]> {
-  const [projects, blogs, experiences, config] = await Promise.all([
-    prisma.project.findMany({ select: { title: true, logoUrl: true, images: true } }),
-    prisma.blog.findMany({ select: { title: true, image: true, content: true } }),
-    prisma.experience.findMany({ select: { company: true, logoUrl: true } }),
-    prisma.siteConfig.findMany({ select: { key: true, value: true } }),
+  const [projects, blogs, experiences, settings] = await Promise.all([
+    prisma.project.findMany({
+      select: {
+        title: true,
+        logoUrl: true,
+        logo: { select: { key: true } },
+        gallery: { select: { externalUrl: true, asset: { select: { key: true } } } },
+      },
+    }),
+    prisma.blog.findMany({
+      select: { title: true, image: true, content: true, cover: { select: { key: true } } },
+    }),
+    prisma.experience.findMany({
+      select: { company: true, logoUrl: true, logo: { select: { key: true } } },
+    }),
+    prisma.siteSettings.findUniqueOrThrow({
+      where: { id: 1 },
+      select: { avatarUrl: true, heroPhotos: true, resumeUrl: true },
+    }),
   ]);
 
   return [
     ...projects.map((p) => ({
       label: `Project · ${p.title}`,
-      text: [p.logoUrl ?? "", ...p.images].join("\n"),
+      text: [
+        p.logoUrl ?? "",
+        p.logo?.key ?? "",
+        ...p.gallery.map((g) => g.externalUrl ?? g.asset?.key ?? ""),
+      ].join("\n"),
     })),
-    ...blogs.map((b) => ({ label: `Blog · ${b.title}`, text: `${b.image}\n${b.content}` })),
-    ...experiences.map((e) => ({ label: `Experience · ${e.company}`, text: e.logoUrl ?? "" })),
-    ...config.map((c) => ({
-      label: `Site setting · ${KEYS[c.key]?.label ?? c.key}`,
-      text: c.value,
+    ...blogs.map((b) => ({
+      label: `Blog · ${b.title}`,
+      text: [b.image ?? "", b.cover?.key ?? "", b.content].join("\n"),
     })),
+    ...experiences.map((e) => ({
+      label: `Experience · ${e.company}`,
+      text: [e.logoUrl ?? "", e.logo?.key ?? ""].join("\n"),
+    })),
+    { label: `Site setting · ${KEYS.avatarUrl.label}`, text: settings.avatarUrl },
+    { label: `Site setting · ${KEYS.heroPhotos.label}`, text: settings.heroPhotos.join("\n") },
+    { label: `Site setting · ${KEYS.resumeUrl.label}`, text: settings.resumeUrl },
   ].filter((s) => s.text.trim() !== "");
 }
 

@@ -1,3 +1,7 @@
+import type { SiteSettingsModel } from "db";
+
+export type ConfigColumn = Exclude<keyof SiteSettingsModel, "id" | "createdAt" | "updatedAt">;
+
 export type ConfigOwner =
   | "background" | "hero" | "cat" | "contact" | "projects" | "chrome";
 
@@ -5,42 +9,54 @@ export type ConfigControl =
   | "text" | "mono" | "long" | "color" | "toggle" | "number" | "napStyle" | "photoList"
   | "versionTiles";
 
+export interface ConfigRange {
+  min: number;
+  max: number;
+  fallback: number;
+}
+
 export interface ConfigKeyDef {
   owner: ConfigOwner;
   label: string;
   description: string;
   control: ConfigControl;
+  range?: ConfigRange;
   bespoke?: true;
-  legacy?: true;
 }
 
-export const KEYS: Record<string, ConfigKeyDef> = {
+export const KEYS: Record<ConfigColumn, ConfigKeyDef> = {
   backgroundVersion: {
     owner: "background", control: "versionTiles", label: "Layer",
     description: "Which field sits under every page — v1's fifty drawn lines, or v2's contour map. Site-wide, not per section.",
   },
   terrainStrength: {
     owner: "background", control: "number", label: "Strength",
+    range: { min: 10, max: 100, fallback: 50 },
     description: "Master multiplier on every contour's opacity, in percent (10–100). Scales the minor and major lines together — the first dial to reach for.",
   },
   terrainVeil: {
     owner: "background", control: "number", label: "Veil",
+    range: { min: 0, max: 90, fallback: 50 },
     description: "How much page ground is laid back over the canvas, in percent (0–90). Higher sinks the map further under the text.",
   },
   terrainCell: {
     owner: "background", control: "number", label: "Grid cell",
+    range: { min: 8, max: 28, fallback: 12 },
     description: "The marching-squares cell, in pixels (8–28). Smaller draws a smoother map and costs more per frame; 12 is what it was tuned at.",
   },
   terrainLevels: {
     owner: "background", control: "number", label: "Levels",
+    range: { min: 4, max: 24, fallback: 14 },
     description: "How many heights the field is sliced into (4–24). More levels is a denser map, not a taller one.",
   },
   terrainMinor: {
     owner: "background", control: "number", label: "Minor lines",
+    range: { min: 2, max: 60, fallback: 20 },
     description: "Opacity of an ordinary contour, in percent (2–60), before Strength scales it.",
   },
   terrainMajor: {
     owner: "background", control: "number", label: "Major lines",
+    range: { min: 5, max: 90, fallback: 48 },
     description: "Opacity of every fourth contour, in percent (5–90). These index lines are what give the map its grain.",
   },
   terrainChannel: {
@@ -62,7 +78,7 @@ export const KEYS: Record<string, ConfigKeyDef> = {
   },
   heroPhotos: {
     owner: "hero", control: "photoList", label: "Photo deck",
-    description: "The fanned stack behind the avatar. Stored as one comma-separated row — first path is the top card.",
+    description: "The fanned stack behind the avatar — first path is the top card. Blank rows are dropped on save.",
   },
   heroDotColor: {
     owner: "hero", control: "color", label: "Dot colour",
@@ -76,19 +92,6 @@ export const KEYS: Record<string, ConfigKeyDef> = {
   resumeUrl: {
     owner: "hero", control: "mono", label: "Résumé", bespoke: true,
     description: "Written by updateResumeUrl, not updateSiteConfig — it keeps its own form on Hero.",
-  },
-
-  heroVersion: {
-    owner: "hero", control: "text", label: "Hero version", legacy: true,
-    description: "Superseded by HeroContent.live.",
-  },
-  intro: {
-    owner: "hero", control: "long", label: "Intro", legacy: true,
-    description: "Superseded by HeroContent.intro — edited on Hero.",
-  },
-  tagline: {
-    owner: "hero", control: "text", label: "Tagline", legacy: true,
-    description: "Superseded by HeroContent.tagline — edited on Hero.",
   },
 
   contactEmail: {
@@ -115,6 +118,7 @@ export const KEYS: Record<string, ConfigKeyDef> = {
   },
   catNapSeconds: {
     owner: "cat", control: "number", label: "Nap length",
+    range: { min: 3, max: 300, fallback: 30 },
     description: "Seconds the cat sleeps before it wakes and starts chasing again (3–300).",
   },
 
@@ -128,33 +132,45 @@ export const KEYS: Record<string, ConfigKeyDef> = {
   },
 };
 
-export function keysFor(owner: ConfigOwner): string[] {
-  return Object.keys(KEYS).filter(
-    (k) => KEYS[k]!.owner === owner && !KEYS[k]!.bespoke && !KEYS[k]!.legacy,
+export function keysFor(owner: ConfigOwner): ConfigColumn[] {
+  return (Object.keys(KEYS) as ConfigColumn[]).filter(
+    (k) => KEYS[k].owner === owner && !KEYS[k].bespoke,
   );
 }
 
-export function isUnclaimed(key: string): boolean {
-  return !(key in KEYS);
+export function configValues(settings: SiteSettingsModel): Record<ConfigColumn, string> {
+  return {
+    backgroundVersion: settings.backgroundVersion,
+    terrainStrength: String(settings.terrainStrength),
+    terrainVeil: String(settings.terrainVeil),
+    terrainCell: String(settings.terrainCell),
+    terrainLevels: String(settings.terrainLevels),
+    terrainMinor: String(settings.terrainMinor),
+    terrainMajor: String(settings.terrainMajor),
+    terrainChannel: onOff(settings.terrainChannel),
+    terrainInteractive: onOff(settings.terrainInteractive),
+    name: settings.name,
+    avatarUrl: settings.avatarUrl,
+    heroPhotos: settings.heroPhotos.join(","),
+    heroDotColor: settings.heroDotColor,
+    heroDotPulse: onOff(settings.heroDotPulse),
+    resumeUrl: settings.resumeUrl,
+    contactEmail: settings.contactEmail,
+    availabilityStatus: settings.availabilityStatus,
+    availabilityDetail: settings.availabilityDetail,
+    projectsVersion: settings.projectsVersion,
+    catNapStyle: napLabel(settings.catNapStyle),
+    catNapSeconds: String(settings.catNapSeconds),
+    navbarLogo: settings.navbarLogo,
+    copyrightName: settings.copyrightName,
+  };
 }
 
-export const DEFAULTS: Record<string, string> = {
-  catNapStyle: "ticks",
-  catNapSeconds: "30",
-  projectsVersion: "v2",
-  backgroundVersion: "v1",
-  // percentages stored as integers, divided by 100 on read
-  terrainStrength: "50",
-  terrainVeil: "50",
-  terrainCell: "12",
-  terrainLevels: "14",
-  terrainMinor: "20",
-  terrainMajor: "48",
-  terrainChannel: "on",
-  terrainInteractive: "on",
-};
+function onOff(on: boolean): string {
+  return on ? "on" : "off";
+}
 
-export type ProjectsVersion = "v1" | "v2";
+export type ProjectsVersion = SiteSettingsModel["projectsVersion"];
 
 export function toProjectsVersion(raw: string | null | undefined): ProjectsVersion {
   return raw === "v1" ? "v1" : "v2";
@@ -173,7 +189,7 @@ export const PROJECT_LAYOUTS: { value: ProjectsVersion; name: string; detail: st
   },
 ];
 
-export type BackgroundVersion = "v1" | "v2";
+export type BackgroundVersion = SiteSettingsModel["backgroundVersion"];
 
 export function toBackgroundVersion(raw: string | null | undefined): BackgroundVersion {
   return raw === "v2" ? "v2" : "v1";
@@ -192,30 +208,14 @@ export const BACKGROUND_LAYERS: { value: BackgroundVersion; name: string; detail
   },
 ];
 
-export const NUMBER_RANGE: Record<string, { min: number; max: number }> = {
-  catNapSeconds: { min: 3, max: 300 },
-  terrainStrength: { min: 10, max: 100 },
-  terrainVeil: { min: 0, max: 90 },
-  terrainCell: { min: 8, max: 28 },
-  terrainLevels: { min: 4, max: 24 },
-  terrainMinor: { min: 2, max: 60 },
-  terrainMajor: { min: 5, max: 90 },
-};
-
-const NUMBER_FALLBACK: Record<string, number> = {
-  catNapSeconds: 30,
-  terrainStrength: 50,
-  terrainVeil: 50,
-  terrainCell: 12,
-  terrainLevels: 14,
-  terrainMinor: 20,
-  terrainMajor: 48,
-};
+export const NUMBER_RANGE: Record<string, ConfigRange> = Object.fromEntries(
+  Object.entries(KEYS).flatMap(([key, def]) => (def.range ? [[key, def.range] as const] : [])),
+);
 
 export function clampNumber(key: string, raw: string): number {
-  const range = NUMBER_RANGE[key] ?? { min: 0, max: Number.MAX_SAFE_INTEGER };
+  const range = NUMBER_RANGE[key] ?? { min: 0, max: Number.MAX_SAFE_INTEGER, fallback: 0 };
   const n = parseInt(raw, 10);
-  if (!Number.isFinite(n)) return NUMBER_FALLBACK[key] ?? range.min;
+  if (!Number.isFinite(n)) return range.fallback;
   return Math.min(range.max, Math.max(range.min, n));
 }
 
@@ -228,7 +228,46 @@ export const DOT_PRESETS = [
   { value: "#F43F5E", label: "Rose" },
 ];
 
-export const NAP_STYLES: { value: string; label: string }[] = [
+export type CatNapStyle = SiteSettingsModel["catNapStyle"];
+
+export type NapLabel = "tooltip" | "ring" | "halo" | "pixel" | "moon" | "ticks" | "random" | "off";
+
+const NAP_LABEL: Record<CatNapStyle, NapLabel> = {
+  TOOLTIP: "tooltip",
+  RING: "ring",
+  HALO: "halo",
+  PIXEL: "pixel",
+  MOON: "moon",
+  TICKS: "ticks",
+  RANDOM: "random",
+  OFF: "off",
+};
+
+const NAP_STYLE: Record<NapLabel, CatNapStyle> = {
+  tooltip: "TOOLTIP",
+  ring: "RING",
+  halo: "HALO",
+  pixel: "PIXEL",
+  moon: "MOON",
+  ticks: "TICKS",
+  random: "RANDOM",
+  off: "OFF",
+};
+
+export function napLabel(style: CatNapStyle): NapLabel {
+  return NAP_LABEL[style];
+}
+
+export function toNapStyle(raw: string): CatNapStyle {
+  const label = raw.trim().toLowerCase();
+  return isNapLabel(label) ? NAP_STYLE[label] : "TICKS";
+}
+
+function isNapLabel(raw: string): raw is NapLabel {
+  return Object.hasOwn(NAP_STYLE, raw);
+}
+
+export const NAP_STYLES: { value: NapLabel; label: string }[] = [
   { value: "ticks", label: "Ticks — watch-face dial around the cat" },
   { value: "moon", label: "Moon — crescent crosses a starry arc overhead" },
   { value: "pixel", label: "Pixel — 8-bit speech bubble with a block bar" },

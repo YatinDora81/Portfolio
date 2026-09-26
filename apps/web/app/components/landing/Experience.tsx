@@ -12,9 +12,8 @@ export interface ExperienceData {
   company: string;
   position: string;
   location: string;
-  startDate: string;
-  endDate: string;
-  isCurrent: boolean;
+  startedOn: string | Date;
+  endedOn: string | Date | null;
   website: string | null;
   logoUrl: string | null;
   visibleBullets: number;
@@ -50,27 +49,26 @@ function MetricizedDetail({ text }: { text: string }) {
   );
 }
 
-const MONTHS = [
-  'january', 'february', 'march', 'april', 'may', 'june',
-  'july', 'august', 'september', 'october', 'november', 'december',
-];
+const MONTH_YEAR = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
 
-function monthOrdinal(value: string): number {
-  if (/present|current|now/i.test(value)) {
-    const now = new Date();
-    return now.getFullYear() * 12 + now.getMonth();
-  }
-  const parts = value.trim().toLowerCase().split(/\s+/);
-  const year = Number(parts[1]);
-  if (!Number.isFinite(year)) return NaN;
-  const token = parts[0] ?? '';
-  const month = token.length >= 3 ? MONTHS.findIndex((m) => m.startsWith(token)) : -1;
-  return year * 12 + (month === -1 ? 0 : month);
+function monthLabel(value: string | Date): string {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? '' : MONTH_YEAR.format(d);
 }
 
-function tenure(start: string, end: string, isCurrent: boolean): string {
-  const from = monthOrdinal(start);
-  const to = isCurrent ? monthOrdinal('present') : monthOrdinal(end);
+function monthOrdinal(value: string | Date): number {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? NaN : d.getUTCFullYear() * 12 + d.getUTCMonth();
+}
+
+function tenure(startedOn: string | Date, endedOn: string | Date | null): string {
+  const now = new Date();
+  const from = monthOrdinal(startedOn);
+  const to = endedOn === null ? now.getUTCFullYear() * 12 + now.getUTCMonth() : monthOrdinal(endedOn);
   const months = to - from + 1;
   if (!(months > 0)) return '';
   const years = Math.floor(months / 12);
@@ -94,8 +92,9 @@ function LogLine({ bullet, index }: { bullet: string; index: number }) {
 }
 
 function ExperienceCard({ exp }: { exp: ExperienceData }) {
-  const duration = tenure(exp.startDate, exp.endDate, exp.isCurrent);
-  const endLabel = exp.isCurrent ? exp.endDate || 'Present' : exp.endDate;
+  const current = exp.endedOn === null;
+  const duration = tenure(exp.startedOn, exp.endedOn);
+  const endLabel = exp.endedOn === null ? 'Present' : monthLabel(exp.endedOn);
 
   const visible = exp.visibleBullets > 0 ? exp.visibleBullets : DEFAULT_VISIBLE_BULLETS;
   const overflows = exp.bullets.length > visible;
@@ -143,7 +142,7 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
       onMouseMove={onMouseMove}
       className={`xp-card scroll-mt-24${inView ? ' in' : ''}${open ? ' open' : ''}`}
     >
-      <span className={exp.isCurrent ? 'xp-node live' : 'xp-node'} aria-hidden />
+      <span className={current ? 'xp-node live' : 'xp-node'} aria-hidden />
 
       <div className="xp-top">
         <div>
@@ -169,7 +168,7 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
                 exp.company
               )}
             </h3>
-            {exp.isCurrent && (
+            {current && (
               <span className="xp-cur">
                 <i />
                 Current
@@ -181,7 +180,7 @@ function ExperienceCard({ exp }: { exp: ExperienceData }) {
 
         <div className="xp-when">
           <span className="dates">
-            {exp.startDate} - {endLabel}
+            {monthLabel(exp.startedOn)} - {endLabel}
             {duration && <span className="xp-dur">{duration}</span>}
           </span>
           <span className="loc">
@@ -260,12 +259,12 @@ export default function Experience({ experiences }: { experiences: ExperienceDat
           channel="03"
           label="experience"
           title="Where I've shipped."
-          hint={`${experiences.length} entries · ${experiences.filter((e) => e.isCurrent).length} live`}
+          hint={`${experiences.length} entries · ${experiences.filter((e) => e.endedOn === null).length} live`}
         />
         <div className="xp-list">
           <span className="xp-rail" aria-hidden />
           {experiences.map((exp) => (
-            <ExperienceCard key={`${exp.company}-${exp.startDate}`} exp={exp} />
+            <ExperienceCard key={`${exp.company}-${exp.position}`} exp={exp} />
           ))}
         </div>
       </Container>

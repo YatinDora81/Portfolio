@@ -1,4 +1,5 @@
 import { prisma } from "db";
+import { publicContentWhere } from "db/visibility";
 import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardHead } from "@/components/ui/card";
@@ -34,11 +35,11 @@ async function getDashboardData() {
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
-    prisma.blog.count({ where: { show: true } }),
+    prisma.blog.count({ where: publicContentWhere() }),
     prisma.blog.count(),
     prisma.project.count(),
     prisma.project.count({ where: { live: { not: null } } }),
-    prisma.skill.count({ where: { show: true } }),
+    prisma.skill.count({ where: { showInGrid: true } }),
     prisma.skill.count(),
     liveHeroTitleCount(),
     prisma.aboutParagraph.count(),

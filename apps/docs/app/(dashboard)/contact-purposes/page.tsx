@@ -1,7 +1,7 @@
 import { prisma } from "db";
 import { IconArrowUpRight } from "@tabler/icons-react";
 import { PageHeader } from "@/components/shared/page-header";
-import { keysFor, DEFAULTS } from "@/lib/site-config-keys";
+import { configValues, keysFor } from "@/lib/site-config-keys";
 import { readGithubLedger } from "./github-ledger";
 import { GithubTile } from "./github-tile";
 import { ContactSections } from "./sections";
@@ -9,18 +9,16 @@ import { ContactSections } from "./sections";
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/+$/, "");
 
 export default async function ContactPurposesPage() {
-  const [purposes, socialLinks, siteConfigs] = await Promise.all([
+  const [purposes, socialLinks, settings] = await Promise.all([
     prisma.contactPurpose.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
     prisma.socialLink.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
-    prisma.siteConfig.findMany(),
+    prisma.siteSettings.findUniqueOrThrow({ where: { id: 1 } }),
   ]);
 
   const ledger = await readGithubLedger(socialLinks.map((l) => ({ iconKey: l.iconKey, href: l.href })));
 
-  const cfg = new Map(siteConfigs.map((c) => [c.key, c.value]));
-  const config = Object.fromEntries(
-    keysFor("contact").map((k) => [k, cfg.get(k) ?? DEFAULTS[k] ?? ""])
-  );
+  const values = configValues(settings);
+  const config = Object.fromEntries(keysFor("contact").map((k) => [k, values[k]]));
 
   return (
     <div className="view">
@@ -48,7 +46,7 @@ export default async function ContactPurposesPage() {
         purposes={purposes.map((p) => ({ id: p.id, label: p.label, emoji: p.emoji, sortOrder: p.sortOrder }))}
         socialLinks={socialLinks.map((l) => ({ id: l.id, name: l.name, iconKey: l.iconKey, detail: l.detail }))}
         config={config}
-        resumeUrl={cfg.get("resumeUrl") ?? ""}
+        resumeUrl={settings.resumeUrl}
         githubTile={
           <GithubTile ledger={ledger} hasGithubRow={socialLinks.some((l) => l.iconKey === "github")} />
         }

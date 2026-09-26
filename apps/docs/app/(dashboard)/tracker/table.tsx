@@ -14,9 +14,10 @@ interface TrackerRow {
   content: string | null;
   term: string | null;
   messageId: string | null;
-  path: string | null;
-  referrer: string | null;
-  userAgent: string | null;
+  path: string;
+  referrerHost: string | null;
+  deviceType: string | null;
+  browser: string | null;
   visitedAt: string;
 }
 
@@ -151,8 +152,9 @@ export function TrackerTable({ rows }: { rows: TrackerRow[] }) {
             r.term,
             r.messageId,
             r.path,
-            r.referrer,
-            r.userAgent,
+            r.referrerHost,
+            r.deviceType,
+            r.browser,
           ]
             .filter(Boolean)
             .some((v) => String(v).toLowerCase().includes(s)),
@@ -174,7 +176,7 @@ export function TrackerTable({ rows }: { rows: TrackerRow[] }) {
   return (
     <Card flush>
       <CardHead
-        title="UTM hits"
+        title="UTM sessions"
         count={filtered.length}
         right={
           <button
@@ -291,9 +293,9 @@ export function TrackerTable({ rows }: { rows: TrackerRow[] }) {
               <th>Content</th>
               <th>Term</th>
               <th>Message ID</th>
-              <th>Path</th>
-              <th>Referrer</th>
-              <th>User agent</th>
+              <th>Landing path</th>
+              <th>Referrer host</th>
+              <th>Device</th>
             </tr>
           </thead>
           <tbody>
@@ -317,14 +319,14 @@ export function TrackerTable({ rows }: { rows: TrackerRow[] }) {
                 <td style={{ fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--dim)" }} title={r.messageId || ""}>
                   {short(r.messageId, 24)}
                 </td>
-                <td style={{ fontFamily: "var(--mono)", fontSize: 11.5 }} title={r.path || ""}>
+                <td style={{ fontFamily: "var(--mono)", fontSize: 11.5 }} title={r.path}>
                   {short(r.path, 28)}
                 </td>
-                <td style={{ color: "var(--dim)" }} title={r.referrer || ""}>
-                  {short(r.referrer, 36)}
+                <td style={{ color: "var(--dim)" }} title={r.referrerHost || ""}>
+                  {short(r.referrerHost, 36)}
                 </td>
-                <td style={{ color: "var(--faint)", fontSize: 12 }} title={r.userAgent || ""}>
-                  {short(r.userAgent, 42)}
+                <td style={{ color: "var(--faint)", fontSize: 12 }}>
+                  {[r.deviceType, r.browser].filter(Boolean).join(" · ") || "—"}
                 </td>
               </tr>
             ))}
@@ -333,8 +335,8 @@ export function TrackerTable({ rows }: { rows: TrackerRow[] }) {
                 <td colSpan={10} style={{ padding: 0 }}>
                   <div className="empty">
                     <div className="empty-ic"><IconChartBar size={18} stroke={1.5} /></div>
-                    <b>No UTM hits</b>
-                    <span>Nothing matches these filters yet — tagged links show up here within seconds of a visit.</span>
+                    <b>No UTM sessions</b>
+                    <span>Nothing matches these filters yet — a tagged link shows up here within seconds, unless it was opened inside a session that had already started.</span>
                   </div>
                 </td>
               </tr>
@@ -346,7 +348,7 @@ export function TrackerTable({ rows }: { rows: TrackerRow[] }) {
       <div style={{ padding: "11px 16px", borderTop: "1px solid var(--line2)" }}>
         <div className="hint">
           <IconRefresh size={13} stroke={1.5} />
-          Auto-refreshes every {AUTO_SYNC_INTERVAL_MS / 1000}s while this tab is visible · showing {filtered.length} of {rows.length} captured hits.
+          Auto-refreshes every {AUTO_SYNC_INTERVAL_MS / 1000}s while this tab is visible · showing {filtered.length} of {rows.length} captured sessions.
         </div>
       </div>
     </Card>

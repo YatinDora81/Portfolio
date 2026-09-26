@@ -18,15 +18,14 @@ const fmtUTC = (ms: number) =>
     .toLowerCase();
 
 export default async function QuotesPage() {
-  // Quote has no sortOrder, so id asc is the only stable order
-  const quotes = await prisma.quote.findMany({ orderBy: { id: "asc" } });
+  const quotes = await prisma.quote.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] });
 
   const now = new Date();
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const tomorrow = today + 86_400_000;
   const year = now.getUTCFullYear();
 
-  const rows = quotes.map(q => ({ id: q.id, quote: q.quote, author: q.author }));
+  const rows = quotes.map(q => ({ id: q.id, quote: q.quote, author: q.author, sortOrder: q.sortOrder }));
 
   return (
     <div className="view">

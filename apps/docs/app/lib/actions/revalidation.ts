@@ -2,7 +2,7 @@
 
 import { prisma } from "db";
 import { revalidatePath } from "next/cache";
-import { ALL_KNOWN_TAGS, blogTags } from "@repo/shared/tags";
+import { ALL_KNOWN_TAGS, blogTags, projectTags } from "@repo/shared/tags";
 import { getSession } from "@/lib/session";
 import { revalidate } from "@/lib/revalidation";
 import { findStaleContent } from "@/lib/stale";
@@ -56,19 +56,28 @@ export async function revalidateWholeSite(): Promise<{
   return result;
 }
 
-export async function revalidateBlog(
+export async function revalidateStaleItem(
+  type: "Blog" | "Project",
   id: string,
 ): Promise<{ ok: boolean; durationMs: number; httpStatus?: number; error?: string }> {
   const session = await getSession();
   if (!session) return { ok: false, durationMs: 0, error: "Not signed in." };
 
-  const blog = await prisma.blog.findUnique({ where: { id }, select: { slug: true } });
-  if (!blog) return { ok: false, durationMs: 0, error: "Blog not found." };
+  let itemTags: string[];
+  if (type === "Blog") {
+    const blog = await prisma.blog.findUnique({ where: { id }, select: { slug: true } });
+    if (!blog) return { ok: false, durationMs: 0, error: "Blog not found." };
+    itemTags = blogTags(blog.slug);
+  } else {
+    const project = await prisma.project.findUnique({ where: { id }, select: { id: true } });
+    if (!project) return { ok: false, durationMs: 0, error: "Project not found." };
+    itemTags = projectTags(project.id);
+  }
 
   const result = await revalidate({
-    tags: blogTags(blog.slug),
+    tags: itemTags,
     trigger: "MANUAL",
-    entityType: "Blog",
+    entityType: type,
     entityId: id,
     actorId: session.userId,
   });
@@ -98,7 +107,7 @@ export async function revalidateAllStale(): Promise<{
   for (const item of batch) {
     if (Date.now() - started > STALE_RUN_BUDGET_MS) break;
     const result = await revalidate({
-      tags: blogTags(item.slug),
+      tags: item.tags,
       trigger: "MANUAL",
       entityType: item.type,
       entityId: item.id,

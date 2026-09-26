@@ -1,4 +1,4 @@
-import { prisma } from "db";
+import { prisma, type AdminRole, type PublishState } from "db";
 import type { AuditActor, AuditDraft } from "@/lib/audit";
 import { draft } from "@/lib/audit";
 
@@ -6,16 +6,21 @@ type Db = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$use" | "$ex
 
 type Session = { userId: string; email: string; role: string };
 
+function asRole(claim: string, stored: AdminRole | undefined): AdminRole {
+  if (claim === "OWNER" || claim === "ADMIN" || claim === "SUB_ADMIN") return claim;
+  return stored ?? "SUB_ADMIN";
+}
+
 export async function resolveActor(db: Db, session: Session): Promise<AuditActor> {
   const row = await db.adminUser.findUnique({
     where: { id: session.userId },
-    select: { name: true, email: true },
+    select: { name: true, email: true, role: true },
   });
   return {
     userId: session.userId,
     name: row?.name || session.email.split("@")[0] || "unknown",
     email: row?.email || session.email,
-    role: session.role,
+    role: asRole(session.role, row?.role),
   };
 }
 
@@ -50,7 +55,7 @@ export async function recordPublish(
   result: { ok: boolean; error?: string }
 ): Promise<void> {
   try {
-    const state = result.ok ? "OK" : "FAILED";
+    const state: PublishState = result.ok ? "OK" : "FAILED";
     if (eventId) {
       await prisma.auditEvent.updateMany({
         where: { id: eventId, actorId: session.userId, publishState: "NONE" },
@@ -63,7 +68,7 @@ export async function recordPublish(
       return;
     }
     const actor = await resolveActor(prisma, session);
-    const d = draft("PUBLISH", "publish", actor);
+    const d = draft("PUBLISH", "PUBLISH", actor);
     const id = await commitAudit(prisma, d);
     if (id) {
       await prisma.auditEvent.update({

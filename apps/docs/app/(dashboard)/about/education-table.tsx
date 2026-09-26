@@ -18,7 +18,7 @@ import {
 interface Entry {
   id: string; institution: string; location: string; degree: string;
   scoreType: string | null; score: string | null; scoreTotal: string | null;
-  startYear: string; endYear: string; sortOrder: number;
+  startYear: number; endYear: number | null; sortOrder: number;
 }
 
 const FORM_ID = "education-form";
@@ -32,6 +32,10 @@ function scoreLabel(e: Entry) {
 
 function fieldsFrom(formData: FormData) {
   const s = (k: string) => String(formData.get(k) ?? "");
+  const year = (k: string) => {
+    const raw = s(k).trim();
+    return raw === "" ? null : Number(raw);
+  };
   return {
     institution: s("institution"),
     location: s("location"),
@@ -39,8 +43,8 @@ function fieldsFrom(formData: FormData) {
     scoreType: s("scoreType"),
     score: s("score"),
     scoreTotal: s("scoreTotal"),
-    startYear: s("startYear"),
-    endYear: s("endYear"),
+    startYear: year("startYear"),
+    endYear: year("endYear"),
   };
 }
 
@@ -110,7 +114,7 @@ export function EducationTable({ entries }: { entries: Entry[] }) {
                 <div className="row-main">
                   <div className="row-t">{e.institution}</div>
                   <div className="row-m">
-                    {e.degree} · {e.location} · {e.startYear}–{e.endYear}
+                    {e.degree} · {e.location} · {e.startYear}–{e.endYear ?? "Present"}
                   </div>
                 </div>
                 {score ? <span className="chip">{score}</span> : null}
@@ -204,8 +208,26 @@ export function EducationTable({ entries }: { entries: Entry[] }) {
             <Input name="scoreTotal" label="Total" defaultValue={editing?.scoreTotal || ""} />
           </div>
           <div className="f-row">
-            <Input name="startYear" label="Start year" defaultValue={editing?.startYear || ""} required />
-            <Input name="endYear" label="End year" defaultValue={editing?.endYear || ""} required />
+            <Input
+              name="startYear"
+              label="Start year"
+              type="number"
+              min={1950}
+              max={2200}
+              step={1}
+              defaultValue={editing?.startYear ?? ""}
+              required
+            />
+            <Input
+              name="endYear"
+              label="End year"
+              type="number"
+              min={1950}
+              max={2200}
+              step={1}
+              defaultValue={editing?.endYear ?? ""}
+              hint="Blank means still enrolled — the timeline prints Present."
+            />
           </div>
           <div className="f-hint">
             Leave the score fields blank if you&apos;d rather not publish a grade. Nothing here is written

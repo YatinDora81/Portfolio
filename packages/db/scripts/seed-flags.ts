@@ -3,7 +3,7 @@ import { prisma } from "../src/index";
 
 async function seedFlags() {
   let created = 0;
-  let updated = 0;
+  let kept = 0;
 
   for (const def of FLAG_DEFINITIONS) {
     const before = await prisma.featureFlag.findUnique({
@@ -11,19 +11,15 @@ async function seedFlags() {
       select: { key: true },
     });
 
-    await prisma.featureFlag.upsert({
-      where: { key: def.key },
-      create: {
-        key: def.key,
-        label: def.label,
-        description: def.description,
-        enabled: def.defaultEnabled,
-      },
-      update: { label: def.label, description: def.description },
-    });
+    if (before) {
+      kept += 1;
+      continue;
+    }
 
-    if (before) updated += 1;
-    else created += 1;
+    await prisma.featureFlag.create({
+      data: { key: def.key, enabled: def.defaultEnabled },
+    });
+    created += 1;
   }
 
   const rows = await prisma.featureFlag.findMany({
@@ -31,7 +27,7 @@ async function seedFlags() {
     select: { key: true, enabled: true },
   });
 
-  console.log(`flags: ${created} created, ${updated} refreshed`);
+  console.log(`flags: ${created} created, ${kept} left as set`);
   for (const r of rows) console.log(`  ${r.enabled ? "on " : "off"}  ${r.key}`);
 
   const known = new Set(FLAG_DEFINITIONS.map((d) => d.key as string));

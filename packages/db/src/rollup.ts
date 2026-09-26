@@ -214,7 +214,7 @@ function writes(dayStart: Date, rows: StatRow[]): Prisma.PrismaPromise<number>[]
   for (let i = 0; i < deduped.length; i += WRITE_CHUNK) {
     const values = deduped.slice(i, i + WRITE_CHUNK).map(
       (r) => Prisma.sql`(
-        gen_random_uuid()::text, ${date}::date, ${r.dimension}, ${r.key},
+        ${date}::date, ${r.dimension}, ${r.key},
         ${r.pageviews}, ${r.uniques}, ${r.sessions},
         ${r.avgDurationMs}, ${r.medianMs}, ${r.reachedCount}, NOW()
       )`,
@@ -222,7 +222,7 @@ function writes(dayStart: Date, rows: StatRow[]): Prisma.PrismaPromise<number>[]
     out.push(
       prisma.$executeRaw`
         INSERT INTO "DailyStat" (
-          "id", "date", "dimension", "key",
+          "date", "dimension", "key",
           "pageviews", "uniques", "sessions",
           "avgDurationMs", "medianMs", "reachedCount", "computedAt"
         )

@@ -17,8 +17,8 @@ interface EducationEntry {
   scoreType: string | null;
   score: string | null;
   scoreTotal: string | null;
-  startYear: string;
-  endYear: string;
+  startYear: number;
+  endYear: number | null;
 }
 
 interface AboutProps {
@@ -654,7 +654,7 @@ export default function About({ paragraphs, education, resumeUrl, companyLogos }
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <h3 className="font-semibold">{edu.institution}</h3>
                       <span className="inline-flex h-6 items-center rounded-lg border border-dashed border-border bg-background px-2 text-xs font-medium text-secondary">
-                        {edu.startYear} — {edu.endYear}
+                        {edu.startYear} — {edu.endYear ?? 'Present'}
                       </span>
                     </div>
 

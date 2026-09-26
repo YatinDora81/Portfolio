@@ -1,4 +1,14 @@
-import { prisma } from "db";
+import { prisma, type Prisma } from "db";
+
+export const UTM_TAGGED: Prisma.AnalyticsSessionWhereInput = {
+  OR: [
+    { rawSource: { not: null } },
+    { rawMedium: { not: null } },
+    { rawCampaign: { not: null } },
+    { rawContent: { not: null } },
+    { rawTerm: { not: null } },
+  ],
+};
 
 export type UtmSeries = {
   days: string[];
@@ -54,10 +64,9 @@ export async function getUtmSeriesForRange(range: UtmRange): Promise<UtmSeries> 
   const days = dates.map((d) => d.toLocaleDateString("en-US", fmt));
   const slotOf = new Map(dates.map((d, i) => [localDayKey(d), i]));
 
-  const rows = await prisma.utmTracker.findMany({
-    // lt midnight after end, so end's own hits count
-    where: { visitedAt: { gte: start, lt: localDay(end, 1) } },
-    select: { source: true, visitedAt: true },
+  const rows = await prisma.analyticsSession.findMany({
+    where: { ...UTM_TAGGED, startedAt: { gte: start, lt: localDay(end, 1) } },
+    select: { rawSource: true, startedAt: true },
   });
 
   if (rows.length === 0) return { days, series: [], totalHits: 0 };
@@ -66,9 +75,9 @@ export async function getUtmSeriesForRange(range: UtmRange): Promise<UtmSeries> 
   let total = 0;
 
   for (const r of rows) {
-    const slot = slotOf.get(localDayKey(r.visitedAt));
+    const slot = slotOf.get(localDayKey(r.startedAt));
     if (slot == null) continue;
-    const source = (r.source ?? "").trim() || "direct";
+    const source = (r.rawSource ?? "").trim() || "no source";
     let vals = buckets.get(source);
     if (!vals) {
       vals = new Array<number>(dayCount).fill(0);

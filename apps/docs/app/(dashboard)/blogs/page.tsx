@@ -43,9 +43,8 @@ export default async function BlogsPage({ searchParams }: {
 
   const now = new Date();
 
-  // must not drift from publicContentWhere in db/visibility
-  const isLive = (b: { status: ContentStatus; publishedAt: Date }) =>
-    b.status === "PUBLISHED" && b.publishedAt <= now;
+  const isLive = (b: { status: ContentStatus; publishedAt: Date | null }) =>
+    b.status === "PUBLISHED" && b.publishedAt !== null && b.publishedAt <= now;
 
   const live = blogs.filter(isLive);
   const counts: Record<ContentStatus, number> = { DRAFT: 0, SCHEDULED: 0, PUBLISHED: 0, ARCHIVED: 0 };
@@ -55,7 +54,9 @@ export default async function BlogsPage({ searchParams }: {
     (b) => b.status === "SCHEDULED" && b.publishAt !== null && b.publishAt <= now
   );
 
-  const postdated = blogs.filter((b) => b.status === "PUBLISHED" && b.publishedAt > now);
+  const postdated = blogs.filter(
+    (b) => b.status === "PUBLISHED" && b.publishedAt !== null && b.publishedAt > now
+  );
 
   const rows = active === null ? blogs : blogs.filter((b) => b.status === active);
 
@@ -195,7 +196,8 @@ export default async function BlogsPage({ searchParams }: {
                   <div className="row-main">
                     <div className="row-t">{b.title}</div>
                     <div className="row-m" style={{ fontFamily: "var(--mono)", fontSize: 11 }}>
-                      /blog/{b.slug} · {dateFmt.format(b.publishedAt)} · {readMins(b.content)} min
+                      /blog/{b.slug} · {b.publishedAt ? dateFmt.format(b.publishedAt) : "no date yet"} ·{" "}
+                      {readMins(b.content)} min
                     </div>
 
                     {b.status === "SCHEDULED" && b.publishAt !== null && !isOverdue && (
@@ -211,10 +213,17 @@ export default async function BlogsPage({ searchParams }: {
                       </div>
                     )}
 
-                    {b.status === "PUBLISHED" && b.publishedAt > now && (
+                    {b.status === "PUBLISHED" && b.publishedAt !== null && b.publishedAt > now && (
                       <div className="lc-line bad">
                         <IconAlertTriangle size={12} stroke={1.7} /> dated{" "}
                         {dateFmt.format(b.publishedAt)}, so it is not visible until then
+                      </div>
+                    )}
+
+                    {b.status === "PUBLISHED" && b.publishedAt === null && (
+                      <div className="lc-line bad">
+                        <IconAlertTriangle size={12} stroke={1.7} /> published with no date, so the
+                        site cannot show it — save the post again to stamp one
                       </div>
                     )}
 
@@ -259,7 +268,7 @@ export default async function BlogsPage({ searchParams }: {
           blogs={live.map(b => ({
             title: b.title,
             description: b.description,
-            image: b.image,
+            image: b.image ?? undefined,
             imageOrientation: b.imageOrientation,
           }))}
         />

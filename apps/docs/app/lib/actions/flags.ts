@@ -45,11 +45,16 @@ export async function setFlag(input: {
   }
 
   const trimmed = note?.trim();
+  const actor = await prisma.adminUser.findUnique({
+    where: { id: session.userId },
+    select: { id: true, name: true },
+  });
   const updated = await prisma.featureFlag.updateMany({
     where: { key },
     data: {
       enabled,
-      updatedById: session.userId,
+      updatedById: actor?.id ?? null,
+      updatedByName: actor?.name ?? session.email,
       ...(note === undefined ? {} : { note: trimmed ? trimmed : null }),
     },
   });

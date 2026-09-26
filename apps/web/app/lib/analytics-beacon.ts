@@ -3,8 +3,15 @@ const ENDPOINT = '/api/collect';
 export const ATTR_KEY = 'attr';
 
 export type Attribution = {
-  utm?: { source?: string; medium?: string; campaign?: string };
+  utm?: {
+    source?: string;
+    medium?: string;
+    campaign?: string;
+    content?: string;
+    term?: string;
+  };
   linkSlug?: string;
+  messageId?: string;
   referrer: string | null;
   landingPath: string;
 };
@@ -43,6 +50,7 @@ export function sendEvents(events: CollectEvent[], attribution: Attribution): vo
     referrer: attribution.referrer,
     utm: attribution.utm,
     linkSlug: attribution.linkSlug,
+    messageId: attribution.messageId,
     landingPath: attribution.landingPath,
   });
 

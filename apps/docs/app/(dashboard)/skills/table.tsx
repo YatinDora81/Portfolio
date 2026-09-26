@@ -19,7 +19,7 @@ import {
 import { findSkillIcon } from "@repo/ui/icons/registry";
 import { CATEGORIES, metaFor, deriveSymbol, type CategoryId } from "@/components/preview/skills";
 
-interface Skill { id: string; name: string; iconKey: string; show: boolean; sortOrder: number }
+interface Skill { id: string; name: string; iconKey: string; showInGrid: boolean; sortOrder: number }
 
 type Sortable = ReturnType<typeof useSortable>;
 
@@ -37,7 +37,7 @@ function SkillChip({ skill, sortable, muted }: { skill: Skill; sortable: Sortabl
 
   return (
     <div
-      className={cn("skill sortable skl-el", !skill.show && "hid", muted && "skl-mute", mark)}
+      className={cn("skill sortable skl-el", !skill.showInGrid && "hid", muted && "skl-mute", mark)}
       style={{ ["--cat" as string]: color }}
       title={cluster ? `${skill.name} — ${cluster.label}` : skill.name}
       {...sortable.itemProps(skill.id)}
@@ -73,18 +73,18 @@ function SkillChip({ skill, sortable, muted }: { skill: Skill; sortable: Sortabl
         <>
           <button
             className="ibtn"
-            aria-label={skill.show ? `Hide ${skill.name}` : `Show ${skill.name}`}
-            title={skill.show ? "Hide from the grid" : "Show in the grid"}
-            onClick={() => stageUpdate("skill", skill.id, { show: !skill.show })}
+            aria-label={skill.showInGrid ? `Hide ${skill.name}` : `Show ${skill.name}`}
+            title={skill.showInGrid ? "Hide from the grid" : "Show in the grid"}
+            onClick={() => stageUpdate("skill", skill.id, { showInGrid: !skill.showInGrid })}
           >
-            {skill.show ? <IconEye size={13} stroke={1.5} /> : <IconEyeOff size={13} stroke={1.5} />}
+            {skill.showInGrid ? <IconEye size={13} stroke={1.5} /> : <IconEyeOff size={13} stroke={1.5} />}
           </button>
           <SkillEditButton skill={skill} />
           <DeleteButton
             staged
             newRow={isNew("skill", skill.id)}
             label={`"${skill.name}"`}
-            sub="This also drops it from every project and experience it's tagged on."
+            sub="This also drops it from every project and experience it's tagged on. A skill a hero badge points at cannot go until that badge does."
             onDelete={() => stageDelete("skill", skill.id)}
           />
         </>
@@ -107,7 +107,7 @@ function SkillEditButton({ skill }: { skill: Skill }) {
 
 function SkillDialog({ onClose, editing }: { onClose: () => void; editing: Skill | null }) {
   const { stageCreate, stageUpdate } = useStaging();
-  const [show, setShow] = useState(editing?.show ?? true);
+  const [show, setShow] = useState(editing?.showInGrid ?? true);
   const [name, setName] = useState(editing?.name ?? "");
   const cluster = CATEGORIES.find(c => c.id === metaFor(name.trim()).category);
 
@@ -118,7 +118,7 @@ function SkillDialog({ onClose, editing }: { onClose: () => void; editing: Skill
           const fields = {
             name: String(formData.get("name") ?? ""),
             iconKey: String(formData.get("iconKey") ?? ""),
-            show,
+            showInGrid: show,
           };
           if (editing) stageUpdate("skill", editing.id, fields);
           else stageCreate("skill", fields);
@@ -179,8 +179,8 @@ export function SkillsTable({ skills }: { skills: Skill[] }) {
   const at = (id: string) => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
   const ordered = [...staged].sort((a, b) => at(a.id) - at(b.id));
 
-  const grid = ordered.filter(s => s.show);
-  const tray = ordered.filter(s => !s.show);
+  const grid = ordered.filter(s => s.showInGrid);
+  const tray = ordered.filter(s => !s.showInGrid);
 
   const counts = useMemo(() => {
     const m = new Map<CategoryId, number>();

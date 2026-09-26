@@ -28,7 +28,7 @@ export function ReferEmailsRefreshButton() {
           );
         } else {
           setMessage(
-            `Sheet up to date · ${result.supabaseRows} tracking row${result.supabaseRows === 1 ? "" : "s"}${result.utmChecked ? ` · UTM hits: ${result.utmStats?.total ?? 0}` : ""}`,
+            `Sheet up to date · ${result.supabaseRows} tracking row${result.supabaseRows === 1 ? "" : "s"}${result.utmChecked ? ` · ${result.utmStats?.total ?? 0} UTM-tagged session${result.utmStats?.total === 1 ? "" : "s"} in the last 90 days` : ""}`,
           );
         }
         router.refresh();

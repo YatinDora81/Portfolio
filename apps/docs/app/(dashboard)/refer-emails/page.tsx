@@ -76,28 +76,28 @@ export default async function ReferEmailsPage() {
     );
   }
 
-  const utmHits = await prisma.utmTracker.findMany({
-    where: { content: { not: null } },
-    select: { content: true, visitedAt: true },
-    orderBy: { visitedAt: "desc" },
+  const utmHits = await prisma.analyticsSession.findMany({
+    where: { rawContent: { not: null } },
+    select: { rawContent: true, startedAt: true },
+    orderBy: { startedAt: "desc" },
     take: 20000,
   });
 
   const visitsByEmail = new Map<string, { count: number; lastVisitedAt: string }>();
   for (const hit of utmHits) {
-    if (!hit.content) continue;
-    const decoded = decodeUrlSafeBase64(hit.content);
+    if (!hit.rawContent) continue;
+    const decoded = decodeUrlSafeBase64(hit.rawContent);
     if (!decoded) continue;
     const existing = visitsByEmail.get(decoded);
     if (!existing) {
       visitsByEmail.set(decoded, {
         count: 1,
-        lastVisitedAt: hit.visitedAt.toISOString(),
+        lastVisitedAt: hit.startedAt.toISOString(),
       });
     } else {
       existing.count += 1;
-      if (new Date(hit.visitedAt).getTime() > new Date(existing.lastVisitedAt).getTime()) {
-        existing.lastVisitedAt = hit.visitedAt.toISOString();
+      if (hit.startedAt.getTime() > new Date(existing.lastVisitedAt).getTime()) {
+        existing.lastVisitedAt = hit.startedAt.toISOString();
       }
     }
   }
@@ -116,7 +116,7 @@ export default async function ReferEmailsPage() {
       <PageHeader
         eyebrow="outreach · campaign sheet"
         title="Refer emails"
-        description={`${data.stats.total} contacts in "${data.sheetTitle}", synced from Google Sheets with open and portfolio-visit tracking.`}
+        description={`${data.stats.total} contacts in "${data.sheetTitle}", synced from Google Sheets with open tracking, plus the portfolio visits recorded in the last 90 days.`}
       >
         <ReferEmailsRefreshButton />
         <Link href={data.sheetUrl} target="_blank" rel="noopener noreferrer">

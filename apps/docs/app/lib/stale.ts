@@ -1,15 +1,15 @@
 import "server-only";
 
 import { prisma } from "db";
-import { tags } from "@repo/shared/tags";
-
-// blog only: `Project` has no `updatedAt` to compare against
+import { publicContentWhere } from "db/visibility";
+import { blogTags, projectTags, tags } from "@repo/shared/tags";
 
 export type StaleItem = {
-  type: "Blog";
+  type: "Blog" | "Project";
   id: string;
-  slug: string;
+  slug: string | null;
   title: string;
+  tags: string[];
   updatedAt: Date;
   lastRevalidatedAt: Date | null;
 };
@@ -30,10 +30,15 @@ async function readLastSiteFlushAt(): Promise<Date | null> {
 }
 
 export async function findStaleContent(): Promise<StaleItem[]> {
-  const [blogs, states, siteFlushAt] = await Promise.all([
+  const live = publicContentWhere();
+  const [blogs, projects, states, siteFlushAt] = await Promise.all([
     prisma.blog.findMany({
-      where: { show: true },
+      where: live,
       select: { id: true, slug: true, title: true, updatedAt: true },
+    }),
+    prisma.project.findMany({
+      where: live,
+      select: { id: true, title: true, updatedAt: true },
     }),
     prisma.tagState.findMany(),
     readLastSiteFlushAt(),
@@ -42,18 +47,31 @@ export async function findStaleContent(): Promise<StaleItem[]> {
   const lastSuccessByTag = new Map(states.map((s) => [s.tag, s.lastSuccessAt]));
 
   const stale: StaleItem[] = [];
+  const consider = (ownTag: string, item: Omit<StaleItem, "lastRevalidatedAt">) => {
+    const lastRevalidatedAt = latest(lastSuccessByTag.get(ownTag) ?? null, siteFlushAt);
+    if (lastRevalidatedAt !== null && lastRevalidatedAt >= item.updatedAt) return;
+    stale.push({ ...item, lastRevalidatedAt });
+  };
+
   for (const blog of blogs) {
-    const tagSuccessAt = lastSuccessByTag.get(tags.blog(blog.slug)) ?? null;
-    const lastRevalidatedAt = latest(tagSuccessAt, siteFlushAt);
-    // never flushed at all counts as stale
-    if (lastRevalidatedAt !== null && lastRevalidatedAt >= blog.updatedAt) continue;
-    stale.push({
+    consider(tags.blog(blog.slug), {
       type: "Blog",
       id: blog.id,
       slug: blog.slug,
       title: blog.title,
+      tags: blogTags(blog.slug),
       updatedAt: blog.updatedAt,
-      lastRevalidatedAt,
+    });
+  }
+
+  for (const project of projects) {
+    consider(tags.project(project.id), {
+      type: "Project",
+      id: project.id,
+      slug: null,
+      title: project.title,
+      tags: projectTags(project.id),
+      updatedAt: project.updatedAt,
     });
   }
 

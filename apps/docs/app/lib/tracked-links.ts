@@ -1,6 +1,7 @@
 import "server-only";
 import QRCode from "qrcode";
 import { prisma } from "db";
+import { publicContentWhere } from "db/visibility";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.yatindora.in").replace(/\/$/, "");
 
@@ -8,7 +9,6 @@ export function shortUrl(slug: string): string {
   return `${SITE}/r/${slug}`;
 }
 
-// only the short /r form increments the click count
 export function fullUrl(link: {
   destination: string;
   slug: string;
@@ -22,7 +22,6 @@ export function fullUrl(link: {
   return url.toString();
 }
 
-// a themed QR stops scanning
 export async function qrDataUrl(text: string): Promise<string | null> {
   try {
     return await QRCode.toDataURL(text, {
@@ -50,7 +49,7 @@ const PAGE_DESTINATIONS: DestinationOption[] = [
 
 export async function destinationOptions(): Promise<DestinationOption[]> {
   const posts = await prisma.blog.findMany({
-    where: { status: "PUBLISHED" },
+    where: publicContentWhere(),
     select: { slug: true, title: true },
     orderBy: { publishedAt: "desc" },
     take: 50,

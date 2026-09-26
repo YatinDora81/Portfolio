@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "db";
 import type {
   RevalidationLogModel,
+  RevalidationScope,
   RevalidationStatus,
   RevalidationTrigger,
   TagStateModel,
@@ -32,6 +33,13 @@ export type RevalidateOpts = {
 const TIMEOUT_MS = 8000;
 
 const ERROR_BODY_CHARS = 300;
+
+function scopeOf(paths: string[], tags: string[]): RevalidationScope {
+  if (paths.length > 0 && tags.length > 0) return "MIXED";
+  if (paths.length > 0) return "PATHS";
+  if (tags.length > 0) return "TAGS";
+  return "SITE";
+}
 
 export async function revalidate(opts: RevalidateOpts): Promise<RevalidateResult> {
   const paths = opts.paths ?? [];
@@ -75,15 +83,23 @@ export async function revalidate(opts: RevalidateOpts): Promise<RevalidateResult
 
   try {
     const now = new Date();
+    const actor = opts.actorId
+      ? await prisma.adminUser.findUnique({
+          where: { id: opts.actorId },
+          select: { id: true, name: true },
+        })
+      : null;
 
     await prisma.revalidationLog.create({
       data: {
+        scope: scopeOf(paths, tags),
         paths,
         tags,
         trigger: opts.trigger,
         entityType: opts.entityType,
         entityId: opts.entityId,
-        actorId: opts.actorId,
+        actorId: actor?.id,
+        actorName: actor?.name,
         status,
         httpStatus,
         durationMs,

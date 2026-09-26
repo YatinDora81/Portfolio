@@ -6,9 +6,14 @@ import { IconLibrary } from "./gallery";
 export default async function IconsPage() {
   const [skills, badges, links] = await Promise.all([
     prisma.skill.findMany({ select: { name: true, iconKey: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
-    prisma.heroSkillBadge.findMany({ select: { name: true, iconKey: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+    prisma.heroSkillBadge.findMany({
+      select: { label: true, skill: { select: { name: true, iconKey: true } } },
+      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    }),
     prisma.socialLink.findMany({ select: { name: true, iconKey: true }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
   ]);
+
+  const badgeRows = badges.map((b) => ({ name: b.label ?? b.skill.name, iconKey: b.skill.iconKey }));
 
   const skillUse = new Map<string, number>();
   const socialUse = new Map<string, number>();
@@ -16,7 +21,7 @@ export default async function IconsPage() {
 
   for (const [rows, where, find, use] of [
     [skills, "Skills", findSkillIcon, skillUse],
-    [badges, "Hero badges", findSkillIcon, skillUse],
+    [badgeRows, "Hero badges", findSkillIcon, skillUse],
     [links, "Social links", findSocialIcon, socialUse],
   ] as const) {
     for (const row of rows) {

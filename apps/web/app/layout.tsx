@@ -9,7 +9,6 @@ import { BackgroundProvider } from "./components/common/BackgroundProvider";
 import AnalyticsTracker from "./components/common/AnalyticsTracker";
 import OnekoCat from "./components/OnekoCat";
 import ClarityAnalytics from "./components/ClarityAnalytics";
-import UtmTrackerBeacon from "./components/UtmTrackerBeacon";
 import VercelAnalytics from "./components/VercelAnalytics";
 
 // next/font ships only the wght axis unless opsz is asked for
@@ -102,7 +101,6 @@ export default async function RootLayout({
         {analytics && <AnalyticsTracker />}
         {analytics && <VercelAnalytics />}
         {analytics && <ClarityAnalytics />}
-        {analytics && <UtmTrackerBeacon />}
       </body>
     </html>
   );

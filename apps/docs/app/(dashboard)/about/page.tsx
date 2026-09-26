@@ -24,15 +24,14 @@ function hostOf(url: string): string | null {
 }
 
 export default async function AboutPage() {
-  const [paragraphs, education, experiences, configRows] = await Promise.all([
+  const [paragraphs, education, experiences, settings] = await Promise.all([
     prisma.aboutParagraph.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
     prisma.education.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
     prisma.experience.findMany({ select: { company: true, logoUrl: true } }),
-    prisma.siteConfig.findMany({ where: { key: "resumeUrl" } }),
+    prisma.siteSettings.findUniqueOrThrow({ where: { id: 1 }, select: { resumeUrl: true } }),
   ]);
 
-  const resumeUrl = configRows.find((c) => c.key === "resumeUrl")?.value ?? "";
-  const resumeHost = hostOf(resumeUrl);
+  const resumeHost = hostOf(settings.resumeUrl);
   const withLogo = experiences.filter((e) => e.logoUrl).length;
 
   const discoverable = TERMINAL_COMMANDS.filter(

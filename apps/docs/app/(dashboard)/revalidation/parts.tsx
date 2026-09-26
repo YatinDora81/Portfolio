@@ -6,7 +6,7 @@ import { Card, CardHead } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  revalidateAllStale, revalidateBlog, revalidateNow, revalidateWholeSite,
+  revalidateAllStale, revalidateNow, revalidateStaleItem, revalidateWholeSite,
 } from "@/lib/actions/revalidation";
 import {
   IconCircleCheck, IconRefresh, IconRefreshDot, IconWorldUpload, IconChecks, IconTimeline,
@@ -75,8 +75,8 @@ function useRunner() {
 
 export interface StaleRow {
   id: string;
-  type: string;
-  slug: string;
+  type: "Blog" | "Project";
+  slug: string | null;
   title: string;
   editedAt: string;
   revalidatedAt: string | null;
@@ -174,7 +174,9 @@ export function StaleContent({ items }: { items: StaleRow[] }) {
                 <div className="row-main">
                   <div className="row-t">{it.title}</div>
                   <div className="row-m">
-                    {it.type} · <span className="rv-mono">/{it.slug}</span> · edited {it.editedAt} ·{" "}
+                    {it.type}
+                    {it.slug ? <> · <span className="rv-mono">/{it.slug}</span></> : null} · edited{" "}
+                    {it.editedAt} ·{" "}
                     {it.revalidatedAt ? `last revalidated ${it.revalidatedAt}` : "never revalidated"}
                   </div>
                   {res ? <div className="rv-rowout"><Result outcome={res} /></div> : null}
@@ -185,7 +187,7 @@ export function StaleContent({ items }: { items: StaleRow[] }) {
                     variant="outline"
                     size="sm"
                     disabled={anyBusy}
-                    onClick={() => run(it.id, () => revalidateBlog(it.id), () => router.refresh())}
+                    onClick={() => run(it.id, () => revalidateStaleItem(it.type, it.id), () => router.refresh())}
                   >
                     {busy === it.id
                       ? <><IconRefresh size={13} className="spin" /> Revalidating…</>
@@ -272,12 +274,13 @@ export interface LogRow {
   id: string;
   at: string;
   trigger: string;
+  scope: string | null;
   paths: string[];
   tags: string[];
   status: string;
   httpStatus: number | null;
   durationMs: number;
-  actorId: string | null;
+  actor: string | null;
   error: string | null;
 }
 
@@ -296,15 +299,8 @@ const STATUS_CHIP: Record<string, string> = {
   TIMEOUT: "chip amb",
 };
 
-// null = no human actor
-function actorLabel(id: string | null, actors: Record<string, string>): string {
-  if (id === null) return "—";
-  return actors[id] ?? id;
-}
-
-export function RecentLog({ rows, actors, capped }: {
+export function RecentLog({ rows, capped }: {
   rows: LogRow[];
-  actors: Record<string, string>;
   capped: boolean;
 }) {
   const [filter, setFilter] = useState<StatusFilter>("ALL");
@@ -372,7 +368,9 @@ export function RecentLog({ rows, actors, capped }: {
                     <td className="rv-mono">{r.trigger.toLowerCase().replace(/_/g, " ")}</td>
                     <td>
                       {r.paths.length === 0 && r.tags.length === 0 ? (
-                        <span className="rv-none">—</span>
+                        r.scope === "SITE"
+                          ? <span className="chip off">whole site</span>
+                          : <span className="rv-none">—</span>
                       ) : (
                         <div className="rv-targets">
                           {r.paths.map((p, i) => (
@@ -393,7 +391,7 @@ export function RecentLog({ rows, actors, capped }: {
                       ) : null}
                     </td>
                     <td className="rv-mono" style={{ textAlign: "right" }}>{r.durationMs} ms</td>
-                    <td>{actorLabel(r.actorId, actors)}</td>
+                    <td>{r.actor ?? <span className="rv-none">—</span>}</td>
                     <td>
                       {r.error ? <div className="rv-err">{r.error}</div> : <span className="rv-none">—</span>}
                     </td>

@@ -1,4 +1,4 @@
-import { prisma } from 'db';
+import { Prisma, prisma } from 'db';
 import {
   bestStreak,
   buildWeeks,
@@ -140,7 +140,15 @@ export async function refreshGithubActivity(handle: string): Promise<boolean> {
       where: { handle, year: { in: [...byYear.keys()] } },
     });
 
-    const writes = [];
+    const snapshot = { total, fetchedAt: new Date() };
+    const writes: Prisma.PrismaPromise<unknown>[] = [
+      prisma.githubProfile.upsert({
+        where: { handle },
+        create: { handle, ...snapshot },
+        update: snapshot,
+      }),
+    ];
+
     for (const [year, entries] of byYear) {
       const data = mergeYear(existing.find((r) => r.year === year) ?? null, year, entries);
       writes.push(
@@ -151,15 +159,6 @@ export async function refreshGithubActivity(handle: string): Promise<boolean> {
         }),
       );
     }
-
-    const snapshot = { total, fetchedAt: new Date() };
-    writes.push(
-      prisma.githubProfile.upsert({
-        where: { handle },
-        create: { handle, ...snapshot },
-        update: snapshot,
-      }),
-    );
 
     await prisma.$transaction(writes);
     return true;

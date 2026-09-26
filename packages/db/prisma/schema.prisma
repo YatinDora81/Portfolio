@@ -7,41 +7,111 @@ datasource db {
   provider = "postgresql"
 }
 
+model SiteSettings {
+  id Int @id @default(1)
+
+  name       String   @default("")
+  avatarUrl  String   @default("")
+  heroPhotos String[] @default([])
+  resumeUrl  String   @default("")
+
+  projectsVersion   SiteVersion @default(v2)
+  backgroundVersion SiteVersion @default(v1)
+
+  heroDotColor String  @default("")
+  heroDotPulse Boolean @default(true)
+
+  navbarLogo    String @default("")
+  copyrightName String @default("")
+
+  contactEmail       String @default("")
+  availabilityStatus String @default("")
+  availabilityDetail String @default("")
+
+  terrainStrength    Int     @default(50)
+  terrainVeil        Int     @default(50)
+  terrainCell        Int     @default(12)
+  terrainLevels      Int     @default(14)
+  terrainMinor       Int     @default(20)
+  terrainMajor       Int     @default(48)
+  terrainChannel     Boolean @default(true)
+  terrainInteractive Boolean @default(true)
+
+  catNapStyle   CatNapStyle @default(TICKS)
+  catNapSeconds Int         @default(30)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum SiteVersion {
+  v1
+  v2
+}
+
+enum CatNapStyle {
+  TOOLTIP @map("tooltip")
+  RING    @map("ring")
+  HALO    @map("halo")
+  PIXEL   @map("pixel")
+  MOON    @map("moon")
+  TICKS   @map("ticks")
+  RANDOM  @map("random")
+  OFF     @map("off")
+}
+
 model HeroContent {
-  id      String  @id @default(uuid())
-  version String  @unique
-  intro   String  @default("")
-  tagline String  @default("")
-  live    String? @unique
+  id      String      @id @default(uuid())
+  version SiteVersion @unique
+  intro   String      @default("")
+  tagline String      @default("")
+  live    String?     @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model HeroTitle {
-  id        String @id @default(uuid())
+  id        String      @id @default(uuid())
+  version   SiteVersion @default(v2)
   title     String
   sortOrder Int
-  version   String @default("v2")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([version, sortOrder])
 }
 
 model HeroSkillBadge {
-  id        String @id @default(uuid())
-  name      String
-  iconKey   String
-  sortOrder Int
-  version   String @default("v2")
+  id      String      @id @default(uuid())
+  version SiteVersion @default(v2)
+  skillId String
+  skill   Skill       @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  label   String?
 
+  sortOrder Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([version, skillId])
   @@index([version, sortOrder])
+  @@index([skillId])
 }
 
 model SocialLink {
-  id        String  @id @default(uuid())
+  id      String       @id @default(uuid())
+  version SiteVersion?
+
   name      String
   href      String
   iconKey   String
   detail    String?
   sortOrder Int
-  version   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([version, sortOrder])
 }
@@ -50,6 +120,9 @@ model AboutParagraph {
   id        String @id @default(uuid())
   content   String
   sortOrder Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Education {
@@ -60,37 +133,57 @@ model Education {
   scoreType   ScoreType?
   score       String?
   scoreTotal  String?
-  startYear   String
-  endYear     String
+  startYear   Int
+  endYear     Int?
   sortOrder   Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum ScoreType {
+  CGPA
+  PERCENTAGE
 }
 
 model Skill {
-  id          String       @id @default(uuid())
-  name        String
-  iconKey     String
-  show        Boolean      @default(true)
-  sortOrder   Int
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  experiences Experience[] @relation("ExperienceToSkill")
-  projects    Project[]    @relation("ProjectToSkill")
+  id         String  @id @default(uuid())
+  name       String  @unique
+  iconKey    String
+  showInGrid Boolean @default(true)
+  sortOrder  Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  experiences ExperienceSkill[]
+  projects    ProjectSkill[]
+  heroBadges  HeroSkillBadge[]
 }
 
 model Experience {
-  id        String             @id @default(uuid())
+  id        String    @id @default(uuid())
   company   String
   position  String
   location  String
-  startDate String
-  endDate   String
-  isCurrent Boolean            @default(false)
+  startedOn DateTime  @db.Date
+  endedOn   DateTime? @db.Date
   website   String?
-  logoUrl   String?
-  sortOrder Int
-  visibleBullets Int           @default(4)
-  bullets   ExperienceBullet[]
-  skills    Skill[]            @relation("ExperienceToSkill")
+
+  logoUrl     String?
+  logoAssetId String?
+  logo        MediaAsset? @relation(fields: [logoAssetId], references: [id], onDelete: SetNull)
+
+  visibleBullets Int @default(4)
+  sortOrder      Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bullets ExperienceBullet[]
+  skills  ExperienceSkill[]
+
+  @@index([logoAssetId])
 }
 
 model ExperienceBullet {
@@ -99,27 +192,49 @@ model ExperienceBullet {
   sortOrder    Int
   experienceId String
   experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+
+  @@index([experienceId, sortOrder])
+}
+
+model ExperienceSkill {
+  experienceId String
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  skillId      String
+  skill        Skill      @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  sortOrder    Int
+
+  @@id([experienceId, skillId])
+  @@index([experienceId, sortOrder])
+  @@index([skillId])
 }
 
 model Project {
-  id        String          @id @default(uuid())
+  id        String  @id @default(uuid())
   title     String
   summary   String
   github    String?
   live      String?
-  logoUrl   String?
   sortOrder Int
-  images    String[]
-  bullets   ProjectBullet[]
-  skills    Skill[]         @relation("ProjectToSkill")
 
-  status      ContentStatus   @default(DRAFT)
+  logoUrl     String?
+  logoAssetId String?
+  logo        MediaAsset? @relation(fields: [logoAssetId], references: [id], onDelete: SetNull)
+
+  status      ContentStatus @default(DRAFT)
   publishAt   DateTime?
   publishedAt DateTime?
-  updatedAt   DateTime        @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bullets ProjectBullet[]
+  skills  ProjectSkill[]
+  gallery ProjectImage[]
+  health  ProjectHealth?
 
   @@index([status, publishAt])
   @@index([status, publishedAt])
+  @@index([logoAssetId])
 }
 
 model ProjectBullet {
@@ -128,33 +243,98 @@ model ProjectBullet {
   sortOrder Int
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, sortOrder])
+}
+
+model ProjectSkill {
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skillId   String
+  skill     Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  sortOrder Int
+
+  @@id([projectId, skillId])
+  @@index([projectId, sortOrder])
+  @@index([skillId])
+}
+
+model ProjectImage {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  assetId     String?
+  asset       MediaAsset? @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  externalUrl String?
+  sortOrder   Int
+
+  @@index([projectId, sortOrder])
+  @@index([assetId])
+}
+
+model ProjectHealth {
+  projectId String  @id
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  status    LiveProbeStatus?
+  latencyMs Int?
+  checkedAt DateTime?
+}
+
+enum LiveProbeStatus {
+  up
+  down
 }
 
 model Blog {
-  id               String           @id @default(uuid())
-  slug             String           @unique
-  title            String
-  description      String
-  content          String
-  image            String
-  imageOrientation ImageOrientation @default(LANDSCAPE)
-  color            String
-  sortOrder        Int
-  publishedAt      DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  show             Boolean          @default(true)
+  id          String @id @default(uuid())
+  slug        String @unique
+  title       String
+  description String
+  content     String
+  color       String
+  sortOrder   Int
 
-  status           ContentStatus  @default(DRAFT)
-  publishAt        DateTime?
+  imageOrientation ImageOrientation @default(LANDSCAPE)
+
+  image        String?
+  coverAssetId String?
+  cover        MediaAsset? @relation(fields: [coverAssetId], references: [id], onDelete: SetNull)
+
+  status      ContentStatus @default(DRAFT)
+  publishAt   DateTime?
+  publishedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status, publishAt])
-  @@index([status, publishedAt])
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([coverAssetId])
+}
+
+enum ContentStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ImageOrientation {
+  LANDSCAPE
+  PORTRAIT
+  SQUARE
 }
 
 model Quote {
-  id     String @id @default(uuid())
-  quote  String
-  author String
+  id        String @id @default(uuid())
+  quote     String
+  author    String
+  sortOrder Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ContactPurpose {
@@ -162,16 +342,17 @@ model ContactPurpose {
   label     String
   emoji     String
   sortOrder Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model ContactMessage {
-  id        String   @id @default(uuid())
-  name      String
-  email     String
-  purpose   String?
-  message   String
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id      String  @id @default(uuid())
+  name    String
+  email   String
+  purpose String?
+  message String
 
   status  MessageStatus @default(UNREAD)
   starred Boolean       @default(false)
@@ -186,6 +367,7 @@ model ContactMessage {
 
   notificationMessageId String?
 
+  createdAt DateTime  @default(now())
   readAt    DateTime?
   repliedAt DateTime?
   updatedAt DateTime  @default(now()) @updatedAt
@@ -206,14 +388,17 @@ model MessageReply {
   bodyHtml String
   bodyText String
 
-  sentById String?
-  sentAt   DateTime @default(now())
+  sentById   String?
+  sentBy     AdminUser? @relation(fields: [sentById], references: [id], onDelete: SetNull)
+  sentByName String?
+  sentAt     DateTime   @default(now())
 
   outboundMessageId String?
   deliveryOk        Boolean @default(false)
   deliveryError     String?
 
   @@index([messageId, sentAt])
+  @@index([sentById])
 }
 
 model ReplyTemplate {
@@ -226,14 +411,6 @@ model ReplyTemplate {
   updatedAt DateTime @updatedAt
 }
 
-model RateLimitBucket {
-  key      String   @id
-  count    Int      @default(0)
-  windowAt DateTime
-
-  @@index([windowAt])
-}
-
 enum MessageStatus {
   UNREAD
   READ
@@ -243,81 +420,69 @@ enum MessageStatus {
 }
 
 model GithubProfile {
-  id     String @id @default(uuid())
-  handle String @unique
+  id        String   @id @default(uuid())
+  handle    String   @unique
   total     Int      @default(0)
   fetchedAt DateTime
+
+  years GithubYear[]
 }
 
 model GithubYear {
-  id     String @id @default(uuid())
-  handle String
-  year   Int
-  /// one char per day, index 0 = jan 1 utc
-  days   String
-  /// rare high days as "index:count" pairs
-  spikes String @default("")
+  id      String        @id @default(uuid())
+  handle  String
+  profile GithubProfile @relation(fields: [handle], references: [handle], onDelete: Restrict, onUpdate: Cascade)
+  year    Int
+  days    String
+  spikes  String        @default("")
 
   @@unique([handle, year])
 }
 
-model SiteConfig {
-  id    String @id @default(uuid())
-  key   String @unique
-  value String
-}
-
-model UtmTracker {
-  id        String   @id @default(uuid())
-  source    String?
-  medium    String?
-  campaign  String?
-  content   String?
-  term      String?
-  messageId String?
-  path      String?
-  referrer  String?
-  userAgent String?
-  visitedAt DateTime @default(now())
-
-  @@index([content])
-  @@index([campaign])
-  @@index([messageId])
-  @@index([visitedAt])
-}
-
 model AdminUser {
-  id             String    @id @default(uuid())
-  email          String    @unique
-  username       String    @unique
-  password       String
-  name           String
-  role           AdminRole @default(ADMIN)
+  id       String    @id @default(uuid())
+  email    String    @unique
+  username String    @unique
+  password String
+  name     String
+  role     AdminRole @default(ADMIN)
+
   failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
   otp            String?
   otpExpiresAt   DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  otpAttempts    Int       @default(0)
 
-  auditEvents AuditEvent[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditEvents   AuditEvent[]
+  mediaUploads  MediaAsset[]
+  trackedLinks  TrackedLink[]
+  flagChanges   FeatureFlag[]
+  replies       MessageReply[]
+  revalidations RevalidationLog[]
+}
+
+enum AdminRole {
+  OWNER
+  ADMIN
+  SUB_ADMIN
 }
 
 model AuditEvent {
-  id        String   @id @default(uuid())
-  /// SAVE | SAVE_AND_PUBLISH | PUBLISH
-  action    String
-  /// where the write came from: "staging", "messages"
-  surface   String
-  createdAt DateTime @default(now())
+  id        String       @id @default(uuid())
+  action    AuditAction
+  surface   AuditSurface
+  createdAt DateTime     @default(now())
 
   actorId    String?
   actor      AdminUser? @relation(fields: [actorId], references: [id], onDelete: SetNull)
   actorName  String
   actorEmail String
-  actorRole  String
+  actorRole  AdminRole
 
-  /// NONE | OK | FAILED
-  publishState String    @default("NONE")
+  publishState PublishState @default(NONE)
   publishedAt  DateTime?
   publishError String?
 
@@ -337,23 +502,45 @@ model AuditChange {
   event   AuditEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   seq  Int
-  /// CREATE | UPDATE | DELETE | REORDER
-  kind String
+  kind AuditChangeKind
 
   entity      String
   entityLabel String
   rowId       String?
   rowLabel    String?
 
-  field  String
-  before String?
-  after  String?
+  field     String
+  before    String?
+  after     String?
   redacted  Boolean @default(false)
-  /// value is a window around the first divergence
   truncated Boolean @default(false)
 
   @@index([eventId, seq])
-  @@index([entity, rowId])
+}
+
+enum AuditAction {
+  SAVE
+  SAVE_AND_PUBLISH
+  PUBLISH
+}
+
+enum AuditSurface {
+  STAGING @map("staging")
+  PUBLISH @map("publish")
+  SCRIPT  @map("script")
+}
+
+enum PublishState {
+  NONE
+  OK
+  FAILED
+}
+
+enum AuditChangeKind {
+  CREATE
+  UPDATE
+  DELETE
+  REORDER
 }
 
 model NoteNode {
@@ -366,7 +553,6 @@ model NoteNode {
   title String
   slug  String
 
-  /// materialised ancestry: "/dsa/graphs/dijkstra"
   path  String @unique
   depth Int    @default(0)
 
@@ -382,6 +568,7 @@ model NoteNode {
 
   @@index([parentId, sortOrder])
   @@index([deletedAt])
+  @@index([path(ops: raw("text_pattern_ops"))], map: "NoteNode_path_prefix_idx")
 }
 
 model NoteAnswer {
@@ -391,13 +578,13 @@ model NoteAnswer {
   body String   @default("")
   tags String[] @default([])
 
-  /// 0 unrated, 1 again, 2 shaky, 3 good, 4 solid
   confidence    Int       @default(0)
   lastRevisedAt DateTime?
 
   updatedAt DateTime @updatedAt
 
   @@index([confidence])
+  @@index([tags], type: Gin, map: "NoteAnswer_tags_idx")
 }
 
 enum NoteKind {
@@ -405,49 +592,73 @@ enum NoteKind {
   QUESTION
 }
 
-enum ScoreType {
-  CGPA
-  PERCENTAGE
+model MediaAsset {
+  id          String  @id @default(uuid())
+  key         String  @unique
+  url         String
+  filename    String
+  mimeType    String
+  bytes       Int
+  width       Int?
+  height      Int?
+  blurDataUrl String?
+
+  altText String
+  folder  String @default("uploads")
+
+  uploadedById String?
+  uploadedBy   AdminUser? @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projectLogos    Project[]
+  projectImages   ProjectImage[]
+  experienceLogos Experience[]
+  blogCovers      Blog[]
+
+  @@index([createdAt])
+  @@index([uploadedById])
+  @@index([key(ops: raw("text_pattern_ops"))], map: "MediaAsset_key_prefix_idx")
 }
 
-enum ImageOrientation {
-  LANDSCAPE
-  PORTRAIT
-  SQUARE
-}
+model FeatureFlag {
+  key     String  @id
+  enabled Boolean @default(true)
+  note    String?
 
-enum AdminRole {
-  OWNER
-  ADMIN
-  SUB_ADMIN
-}
+  updatedById   String?
+  updatedBy     AdminUser? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedByName String?
+  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime   @default(now())
 
-model JobLock {
-  key       String   @id
-  lockedAt  DateTime
-  lockedBy  String
-  expiresAt DateTime
-
-  @@index([expiresAt])
+  @@index([updatedById])
 }
 
 model RevalidationLog {
-  id         String              @id @default(uuid())
-  paths      String[]
-  tags       String[]
-  trigger    RevalidationTrigger
+  id      String              @id @default(uuid())
+  scope   RevalidationScope?
+  paths   String[]
+  tags    String[]
+  trigger RevalidationTrigger
+
   entityType String?
   entityId   String?
-  actorId    String?
+
+  actorId   String?
+  actor     AdminUser? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName String?
+
   status     RevalidationStatus
   httpStatus Int?
   durationMs Int
   error      String?
-  createdAt  DateTime            @default(now())
+  createdAt  DateTime           @default(now())
 
   @@index([createdAt])
   @@index([status, createdAt])
-  @@index([entityType, entityId])
+  @@index([actorId])
 }
 
 model TagState {
@@ -457,36 +668,24 @@ model TagState {
   consecutiveFails Int      @default(0)
 }
 
+enum RevalidationScope {
+  SITE
+  TAGS
+  PATHS
+  MIXED
+}
+
 enum RevalidationTrigger {
   MANUAL
   CONTENT_SAVE
   SCHEDULED_PUBLISH
   FLAG_CHANGE
-  SYSTEM
 }
 
 enum RevalidationStatus {
   SUCCESS
   FAILED
   TIMEOUT
-}
-
-model FeatureFlag {
-  key         String   @id
-  label       String
-  description String?
-  enabled     Boolean  @default(true)
-  note        String?
-  updatedById String?
-  updatedAt   DateTime @updatedAt
-  createdAt   DateTime @default(now())
-}
-
-enum ContentStatus {
-  DRAFT
-  SCHEDULED
-  PUBLISHED
-  ARCHIVED
 }
 
 model AnalyticsSalt {
@@ -504,6 +703,9 @@ model AnalyticsSession {
   rawSource    String?
   rawMedium    String?
   rawCampaign  String?
+  rawContent   String?
+  rawTerm      String?
+  messageId    String?
   referrerHost String?
   landingPath  String
   linkSlug     String?
@@ -515,15 +717,13 @@ model AnalyticsSession {
   browser    String?
   os         String?
 
-  startedAt  DateTime @default(now())
-  lastSeenAt DateTime @default(now())
-  pageviews  Int      @default(0)
+  startedAt DateTime @default(now())
+  pageviews Int      @default(0)
 
   events AnalyticsEvent[]
 
   @@index([startedAt])
-  @@index([channel, startedAt])
-  @@index([visitorHash, startedAt])
+  @@index([rawContent, startedAt])
 }
 
 model AnalyticsEvent {
@@ -536,21 +736,16 @@ model AnalyticsEvent {
   section    String?
   label      String?
   durationMs Int?
-  meta       Json?
   createdAt  DateTime  @default(now())
 
   @@index([createdAt])
   @@index([type, createdAt])
   @@index([sessionId])
-  @@index([section, createdAt])
 }
 
 enum EventType {
   PAGEVIEW
   SECTION_DWELL
-  CLICK
-  RESUME_OPEN
-  OUTBOUND
 }
 
 model TrackedLink {
@@ -565,15 +760,15 @@ model TrackedLink {
   clickCount  Int       @default(0)
   lastClickAt DateTime?
 
-  active      Boolean  @default(true)
+  active      Boolean    @default(true)
   createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdBy   AdminUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   clicks LinkClick[]
 
-  @@index([channel, createdAt])
-  @@index([active, createdAt])
+  @@index([createdById])
 }
 
 model LinkClick {
@@ -592,7 +787,6 @@ model LinkClick {
 }
 
 model DailyStat {
-  id        String   @id @default(uuid())
   date      DateTime @db.Date
   dimension String
   key       String
@@ -606,8 +800,7 @@ model DailyStat {
 
   computedAt DateTime @default(now())
 
-  @@unique([date, dimension, key])
-  @@index([date])
+  @@id([date, dimension, key])
   @@index([dimension, date])
 }
 
@@ -625,30 +818,23 @@ model RollupRun {
   @@index([createdAt])
 }
 
+model JobLock {
+  key       String   @id
+  lockedAt  DateTime
+  lockedBy  String
+  expiresAt DateTime
+}
+
 model MaintenanceState {
   key        String   @id
   lastRunAt  DateTime
   lastResult String?
 }
 
-model MediaAsset {
-  id          String  @id @default(uuid())
-  key         String  @unique
-  url         String
-  filename    String
-  mimeType    String
-  bytes       Int
-  width       Int?
-  height      Int?
-  blurDataUrl String?
+model RateLimitBucket {
+  key      String   @id
+  count    Int      @default(0)
+  windowAt DateTime
 
-  altText String
-  folder  String @default("uploads")
-
-  uploadedById String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@index([folder, createdAt])
-  @@index([createdAt])
+  @@index([windowAt])
 }

@@ -60,7 +60,10 @@ export function ConfigCard({
   const [saved, setSaved] = useState(false);
   const [pubError, setPubError] = useState<string | null>(null);
 
-  const defs = useMemo(() => ({ ...KEYS, ...extraDefs }), [extraDefs]);
+  const defs = useMemo<Record<string, ConfigKeyDef>>(
+    () => ({ ...KEYS, ...extraDefs }),
+    [extraDefs],
+  );
 
   // only the keys these groups declare are ever posted
   const owned = useMemo(

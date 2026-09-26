@@ -28,7 +28,7 @@ async function main() {
   let changed = 0;
 
   await prisma.$transaction(async (tx) => {
-    const d = draft("SAVE", "script", {
+    const d = draft("SAVE", "SCRIPT", {
       userId: owner.id,
       name: owner.name,
       email: owner.email,

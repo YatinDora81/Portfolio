@@ -1,4 +1,3 @@
-import { prisma } from "db";
 import { redirect } from "next/navigation";
 import { ALL_KNOWN_TAGS } from "@repo/shared/tags";
 import { PageHeader } from "@/components/shared/page-header";
@@ -38,13 +37,6 @@ export default async function RevalidationPage() {
     readRecentLogs(LOG_CAP),
     readTagStates(),
   ]);
-
-  const actorIds = [...new Set(logs.map((l) => l.actorId).filter((id): id is string => id !== null))];
-  const admins = actorIds.length > 0
-    ? await prisma.adminUser.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
-    : [];
-  const actors: Record<string, string> = {};
-  for (const a of admins) actors[a.id] = a.name;
 
   const stateByTag = new Map(tagStates.map((s) => [s.tag, s]));
   const tagRows = ALL_KNOWN_TAGS.map((tag) => {
@@ -144,15 +136,15 @@ export default async function RevalidationPage() {
           id: l.id,
           at: stamp(l.createdAt),
           trigger: l.trigger,
+          scope: l.scope,
           paths: l.paths,
           tags: l.tags,
           status: l.status,
           httpStatus: l.httpStatus,
           durationMs: l.durationMs,
-          actorId: l.actorId,
+          actor: l.actorName ?? l.actorId,
           error: l.error,
         }))}
-        actors={actors}
         capped={logs.length === LOG_CAP}
       />
     </div>

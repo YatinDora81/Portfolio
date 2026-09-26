@@ -39,7 +39,6 @@ const StatusInput = z
         message: "Status must be one of DRAFT, SCHEDULED, PUBLISHED or ARCHIVED.",
       }),
     }),
-    // absent leaves the column alone, null or "" clears it
     publishAt: z.string().nullable().optional(),
   })
   .superRefine((value, ctx) => {
@@ -154,11 +153,7 @@ export async function runDuePublish(): Promise<{
   };
 }
 
-function blogPublishStamp(current: Date, now: Date): { publishedAt: Date } | Record<string, never> {
-  return current.getTime() > now.getTime() ? { publishedAt: now } : {};
-}
-
-function projectPublishStamp(
+function publishStamp(
   current: Date | null,
   now: Date,
 ): { publishedAt: Date } | Record<string, never> {
@@ -190,11 +185,10 @@ export async function publishBlogNow(id: string): Promise<StatusResult> {
     data: {
       status: "PUBLISHED",
       publishAt: null,
-      ...blogPublishStamp(blog.publishedAt, now),
+      ...publishStamp(blog.publishedAt, now),
     },
   });
 
-  // updateMany, not update: a row deleted between read and write is count 0
   if (updated.count === 0) {
     return { ok: false, revalidated: false, error: "That blog no longer exists." };
   }
@@ -227,7 +221,7 @@ export async function publishProjectNow(id: string): Promise<StatusResult> {
     data: {
       status: "PUBLISHED",
       publishAt: null,
-      ...projectPublishStamp(project.publishedAt, now),
+      ...publishStamp(project.publishedAt, now),
     },
   });
 
@@ -269,7 +263,7 @@ export async function setBlogStatus(input: {
     data: {
       status,
       ...(publishAt === undefined ? {} : { publishAt }),
-      ...(status === "PUBLISHED" ? blogPublishStamp(blog.publishedAt, now) : {}),
+      ...(status === "PUBLISHED" ? publishStamp(blog.publishedAt, now) : {}),
     },
   });
 
@@ -311,7 +305,7 @@ export async function setProjectStatus(input: {
     data: {
       status,
       ...(publishAt === undefined ? {} : { publishAt }),
-      ...(status === "PUBLISHED" ? projectPublishStamp(project.publishedAt, now) : {}),
+      ...(status === "PUBLISHED" ? publishStamp(project.publishedAt, now) : {}),
     },
   });
 

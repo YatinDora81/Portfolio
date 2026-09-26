@@ -1,7 +1,7 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { prisma, type ScoreType } from "db";
+import { prisma, type ScoreType, type SiteVersion } from "db";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 import { draft, labelOf, WHERE } from "@/lib/audit";
@@ -52,7 +52,7 @@ export async function applyStagedChanges(ops: StagedOp[], intent?: unknown): Pro
     await prisma.$transaction(
       async (tx) => {
         const cursors = new Map<Entity, number>();
-        const d = draft(action, "staging", await resolveActor(tx, session));
+        const d = draft(action, "STAGING", await resolveActor(tx, session));
 
         for (const [i, op] of plan.entries()) {
           if (op.kind !== "create") continue;
@@ -134,7 +134,13 @@ async function readRows(tx: TxClient, entity: Entity, ids: string[]): Promise<Ro
   const where = { id: { in: ids } };
   switch (entity) {
     case "heroTitle": return tx.heroTitle.findMany({ where });
-    case "heroSkillBadge": return tx.heroSkillBadge.findMany({ where });
+    case "heroSkillBadge": {
+      const rows = await tx.heroSkillBadge.findMany({
+        where,
+        include: { skill: { select: { name: true } } },
+      });
+      return rows.map(({ skill, ...badge }) => ({ ...badge, skillName: skill.name }));
+    }
     case "heroContent": return tx.heroContent.findMany();
     case "aboutParagraph": return tx.aboutParagraph.findMany({ where });
     case "education": return tx.education.findMany({ where });
@@ -199,7 +205,7 @@ type TxClient = Omit<
   "$connect" | "$disconnect" | "$on" | "$use" | "$extends" | "$transaction"
 >;
 
-type SortableEntity = Exclude<Entity, "quote" | "adminUser" | "heroContent">;
+type SortableEntity = Exclude<Entity, "adminUser" | "heroContent">;
 
 const ENTITY_PATHS: Record<Entity, readonly string[]> = {
   heroTitle: ["/hero"],
@@ -220,6 +226,7 @@ const SORTABLE: Record<SortableEntity, true> = {
   aboutParagraph: true,
   education: true,
   skill: true,
+  quote: true,
   contactPurpose: true,
   socialLink: true,
 };
@@ -354,18 +361,31 @@ function bool(f: StagedFields, key: string, entity: Entity): boolean {
   fail(`${LABEL[entity]}: "${key}" must be true or false.`);
 }
 
+function int(f: StagedFields, key: string, entity: Entity): number {
+  const v = f[key];
+  const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v.trim()) : NaN;
+  if (!Number.isInteger(n)) fail(`${LABEL[entity]}: "${key}" must be a whole number.`);
+  return n;
+}
+
+function intOpt(f: StagedFields, key: string, entity: Entity): number | null {
+  const v = f[key];
+  if (v === undefined || v === null || (typeof v === "string" && v.trim() === "")) return null;
+  return int(f, key, entity);
+}
+
 function scoreType(f: StagedFields): ScoreType | null {
   const v = f.scoreType;
   return v === "CGPA" || v === "PERCENTAGE" ? v : null;
 }
 
-function versionReq(f: StagedFields, entity: Entity): "v1" | "v2" {
+function versionReq(f: StagedFields, entity: Entity): SiteVersion {
   const v = f.version;
   if (v !== "v1" && v !== "v2") fail(`${LABEL[entity]}: "version" must be v1 or v2.`);
   return v;
 }
 
-function versionOpt(f: StagedFields, entity: Entity): "v1" | "v2" | null {
+function versionOpt(f: StagedFields, entity: Entity): SiteVersion | null {
   const v = f.version;
   if (v === undefined || v === null || v === "") return null;
   if (v !== "v1" && v !== "v2") fail(`${LABEL[entity]}: "version" must be v1, v2 or blank.`);
@@ -458,6 +478,10 @@ async function maxSortOrder(tx: TxClient, entity: SortableEntity): Promise<numbe
       const { _max } = await tx.skill.aggregate({ _max: { sortOrder: true } });
       return _max.sortOrder ?? -1;
     }
+    case "quote": {
+      const { _max } = await tx.quote.aggregate({ _max: { sortOrder: true } });
+      return _max.sortOrder ?? -1;
+    }
     case "contactPurpose": {
       const { _max } = await tx.contactPurpose.aggregate({ _max: { sortOrder: true } });
       return _max.sortOrder ?? -1;
@@ -467,6 +491,27 @@ async function maxSortOrder(tx: TxClient, entity: SortableEntity): Promise<numbe
       return _max.sortOrder ?? -1;
     }
   }
+}
+
+async function assertSkillNameFree(tx: TxClient, name: string, exceptId: string | null): Promise<void> {
+  const clash = await tx.skill.findFirst({
+    where: { name: { equals: name, mode: "insensitive" }, ...(exceptId ? { id: { not: exceptId } } : {}) },
+    select: { name: true },
+  });
+  if (clash) fail(`A skill called "${clash.name}" already exists — rename that one or reuse it.`);
+}
+
+async function assertBadgeFree(
+  tx: TxClient,
+  version: SiteVersion,
+  skillId: string,
+  exceptId: string | null
+): Promise<void> {
+  const clash = await tx.heroSkillBadge.findFirst({
+    where: { version, skillId, ...(exceptId ? { id: { not: exceptId } } : {}) },
+    select: { id: true },
+  });
+  if (clash) fail(`That skill already has a ${version} hero badge — edit that one instead.`);
 }
 
 async function createRow(
@@ -490,12 +535,15 @@ async function createRow(
       return row.id;
     }
     case "heroSkillBadge": {
+      const version = versionReq(f, entity);
+      const skillId = req(f, "skillId", entity);
+      await assertBadgeFree(tx, version, skillId, null);
       const row = await tx.heroSkillBadge.create({
         data: {
-          name: req(f, "name", entity),
-          iconKey: text(f, "iconKey", entity),
+          skillId,
+          label: nullable(f, "label", entity),
           sortOrder: await nextSortOrder(tx, entity, cursors),
-          version: versionReq(f, entity),
+          version,
         },
         select: { id: true },
       });
@@ -519,8 +567,8 @@ async function createRow(
           scoreType: scoreType(f),
           score: nullable(f, "score", entity),
           scoreTotal: nullable(f, "scoreTotal", entity),
-          startYear: req(f, "startYear", entity),
-          endYear: req(f, "endYear", entity),
+          startYear: int(f, "startYear", entity),
+          endYear: intOpt(f, "endYear", entity),
           sortOrder: await nextSortOrder(tx, entity, cursors),
         },
         select: { id: true },
@@ -528,11 +576,13 @@ async function createRow(
       return row.id;
     }
     case "skill": {
+      const name = req(f, "name", entity);
+      await assertSkillNameFree(tx, name, null);
       const row = await tx.skill.create({
         data: {
-          name: req(f, "name", entity),
+          name,
           iconKey: text(f, "iconKey", entity),
-          show: present(f, "show") ? bool(f, "show", entity) : true,
+          showInGrid: present(f, "showInGrid") ? bool(f, "showInGrid", entity) : true,
           sortOrder: await nextSortOrder(tx, entity, cursors),
         },
         select: { id: true },
@@ -541,7 +591,11 @@ async function createRow(
     }
     case "quote": {
       const row = await tx.quote.create({
-        data: { quote: req(f, "quote", entity), author: req(f, "author", entity) },
+        data: {
+          quote: req(f, "quote", entity),
+          author: req(f, "author", entity),
+          sortOrder: await nextSortOrder(tx, entity, cursors),
+        },
         select: { id: true },
       });
       return row.id;
@@ -608,10 +662,14 @@ async function updateRow(
       return;
     }
     case "heroSkillBadge": {
-      const data: { name?: string; iconKey?: string } = {};
-      if (present(f, "name")) data.name = req(f, "name", entity);
-      if (present(f, "iconKey")) data.iconKey = text(f, "iconKey", entity);
+      const data: { skillId?: string; label?: string | null } = {};
+      if (present(f, "skillId")) data.skillId = req(f, "skillId", entity);
+      if (present(f, "label")) data.label = nullable(f, "label", entity);
       nonEmpty(data, entity);
+      if (data.skillId !== undefined) {
+        const current = await tx.heroSkillBadge.findUnique({ where: { id }, select: { version: true } });
+        if (current) await assertBadgeFree(tx, current.version, data.skillId, id);
+      }
       await tx.heroSkillBadge.update({ where: { id }, data });
       return;
     }
@@ -644,8 +702,8 @@ async function updateRow(
         scoreType?: ScoreType | null;
         score?: string | null;
         scoreTotal?: string | null;
-        startYear?: string;
-        endYear?: string;
+        startYear?: number;
+        endYear?: number | null;
       } = {};
       if (present(f, "institution")) data.institution = req(f, "institution", entity);
       if (present(f, "location")) data.location = req(f, "location", entity);
@@ -653,18 +711,19 @@ async function updateRow(
       if (present(f, "scoreType")) data.scoreType = scoreType(f);
       if (present(f, "score")) data.score = nullable(f, "score", entity);
       if (present(f, "scoreTotal")) data.scoreTotal = nullable(f, "scoreTotal", entity);
-      if (present(f, "startYear")) data.startYear = req(f, "startYear", entity);
-      if (present(f, "endYear")) data.endYear = req(f, "endYear", entity);
+      if (present(f, "startYear")) data.startYear = int(f, "startYear", entity);
+      if (present(f, "endYear")) data.endYear = intOpt(f, "endYear", entity);
       nonEmpty(data, entity);
       await tx.education.update({ where: { id }, data });
       return;
     }
     case "skill": {
-      const data: { name?: string; iconKey?: string; show?: boolean } = {};
+      const data: { name?: string; iconKey?: string; showInGrid?: boolean } = {};
       if (present(f, "name")) data.name = req(f, "name", entity);
       if (present(f, "iconKey")) data.iconKey = text(f, "iconKey", entity);
-      if (present(f, "show")) data.show = bool(f, "show", entity);
+      if (present(f, "showInGrid")) data.showInGrid = bool(f, "showInGrid", entity);
       nonEmpty(data, entity);
+      if (data.name !== undefined) await assertSkillNameFree(tx, data.name, id);
       await tx.skill.update({ where: { id }, data });
       return;
     }
@@ -687,7 +746,7 @@ async function updateRow(
     case "socialLink": {
       const data: {
         name?: string; href?: string; iconKey?: string; detail?: string | null;
-        version?: "v1" | "v2" | null;
+        version?: SiteVersion | null;
       } = {};
       if (present(f, "name")) data.name = req(f, "name", entity);
       if (present(f, "href")) data.href = req(f, "href", entity);
@@ -737,9 +796,12 @@ async function deleteRow(tx: TxClient, entity: Entity, id: string, actor: Actor)
     case "education":
       await tx.education.deleteMany({ where: { id } });
       return;
-    case "skill":
+    case "skill": {
+      const badges = await tx.heroSkillBadge.count({ where: { skillId: id } });
+      if (badges > 0) fail("A hero badge still uses that skill — delete the badge first, then the skill.");
       await tx.skill.deleteMany({ where: { id } });
       return;
+    }
     case "quote":
       await tx.quote.deleteMany({ where: { id } });
       return;
@@ -785,6 +847,11 @@ async function reorderRows(tx: TxClient, entity: SortableEntity, ids: string[]):
     case "skill":
       for (const [sortOrder, id] of ids.entries()) {
         await tx.skill.updateMany({ where: { id }, data: { sortOrder } });
+      }
+      return;
+    case "quote":
+      for (const [sortOrder, id] of ids.entries()) {
+        await tx.quote.updateMany({ where: { id }, data: { sortOrder } });
       }
       return;
     case "contactPurpose":

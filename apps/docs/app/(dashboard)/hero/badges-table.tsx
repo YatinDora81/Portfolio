@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardHead } from "@/components/ui/card";
 import { Button, IconButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Dialog } from "@/components/ui/dialog";
 import { DeleteButton } from "@/components/shared/delete-button";
 import {
@@ -11,19 +12,20 @@ import {
   IconChevronUp, IconChevronDown, IconArrowBackUp,
 } from "@tabler/icons-react";
 import { findSkillIcon } from "@repo/ui/icons/registry";
-import { IconPicker } from "@/components/shared/icon-picker";
 import { useStaging } from "@/components/staging/staging-provider";
 import { useSortable } from "@/lib/use-sortable";
 import { cn } from "@/lib/utils";
 
 type Version = "v1" | "v2";
 
-interface Badge { id: string; name: string; iconKey: string; sortOrder: number; version: string }
+interface Badge { id: string; skillId: string; label: string | null; sortOrder: number; version: string }
+interface Skill { id: string; name: string; iconKey: string }
 
 const FORM_ID = "hero-badge-form";
 
-export function HeroSkillBadgesTable({ badges, version }: {
+export function HeroSkillBadgesTable({ badges, skills, version }: {
   badges: Badge[];
+  skills: Skill[];
   version: Version;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -48,6 +50,8 @@ export function HeroSkillBadgesTable({ badges, version }: {
   const seen = new Set(order);
   const rows = [...order.flatMap((id) => byId.get(id) ?? []), ...mine.filter((b) => !seen.has(b.id))];
 
+  const skillById = new Map(skills.map((s) => [s.id, s] as const));
+
   const mark = (id: string) =>
     isDeleted("heroSkillBadge", id) ? "staged-del"
       : isNew("heroSkillBadge", id) ? "staged-new"
@@ -62,13 +66,16 @@ export function HeroSkillBadgesTable({ badges, version }: {
     stageReorder("heroSkillBadge", ids, version);
   };
 
+  const taken = new Set(rows.filter((b) => b.id !== editing?.id).map((b) => b.skillId));
+  const available = skills.filter((s) => !taken.has(s.id) || s.id === editing?.skillId);
+
   return (
     <Card flush>
       <CardHead
         title="Skill badges"
         count={rows.length}
         right={
-          <Button size="sm" onClick={openNew}>
+          <Button size="sm" onClick={openNew} disabled={available.length === 0}>
             <IconPlus size={14} stroke={1.8} /> Add badge
           </Button>
         }
@@ -78,13 +85,17 @@ export function HeroSkillBadgesTable({ badges, version }: {
         <div className="empty">
           <div className="empty-ic"><IconTag size={18} stroke={1.5} /></div>
           <b>No {version} badges yet</b>
-          <span>v1 sets these inline in the hero paragraph, v2 lists them as pills under it. Each one needs a name and an icon.</span>
-          <Button size="sm" onClick={openNew}><IconPlus size={14} stroke={1.8} /> Add the first badge</Button>
+          <span>v1 sets these inline in the hero paragraph, v2 lists them as pills under it. Each one points at a skill and borrows its name and icon.</span>
+          <Button size="sm" onClick={openNew} disabled={available.length === 0}>
+            <IconPlus size={14} stroke={1.8} /> Add the first badge
+          </Button>
         </div>
       ) : (
         <div className="rows">
           {rows.map((b, i) => {
-            const icon = findSkillIcon(b.iconKey);
+            const skill = skillById.get(b.skillId);
+            const name = b.label ?? skill?.name ?? "";
+            const icon = findSkillIcon(skill?.iconKey ?? "");
             const del = isDeleted("heroSkillBadge", b.id);
             return (
             <div key={b.id} className={cn("row sortable", mark(b.id))} {...itemProps(b.id)}>
@@ -96,13 +107,19 @@ export function HeroSkillBadgesTable({ badges, version }: {
                 {icon ? <icon.Icon /> : <IconAlertTriangle size={12} stroke={1.8} />}
               </span>
               <div className="row-main">
-                <div className="row-t mono">{b.name}</div>
-                <div className="row-m">{icon ? `icon · ${b.iconKey}` : `no icon for "${b.iconKey}" — renders blank`}</div>
+                <div className="row-t mono">{name}</div>
+                <div className="row-m">
+                  {!skill
+                    ? "the skill behind this badge is gone — pick another"
+                    : b.label !== null
+                      ? `renamed from ${skill.name} · icon ${skill.iconKey}`
+                      : icon ? `skill · icon ${skill.iconKey}` : `no icon for "${skill.iconKey}" — renders blank`}
+                </div>
               </div>
               <div className="row-acts">
                 <IconButton
                   className="move"
-                  aria-label={`Move ${b.name} earlier`}
+                  aria-label={`Move ${name} earlier`}
                   disabled={i === 0 || del || saving}
                   onClick={() => move(i, i - 1)}
                 >
@@ -110,7 +127,7 @@ export function HeroSkillBadgesTable({ badges, version }: {
                 </IconButton>
                 <IconButton
                   className="move"
-                  aria-label={`Move ${b.name} later`}
+                  aria-label={`Move ${name} later`}
                   disabled={i === rows.length - 1 || del || saving}
                   onClick={() => move(i, i + 1)}
                 >
@@ -118,7 +135,7 @@ export function HeroSkillBadgesTable({ badges, version }: {
                 </IconButton>
                 {del ? (
                   <IconButton
-                    aria-label={`Keep ${b.name}`}
+                    aria-label={`Keep ${name}`}
                     title="Undo delete"
                     onClick={() => unstageDelete("heroSkillBadge", b.id)}
                   >
@@ -127,7 +144,7 @@ export function HeroSkillBadgesTable({ badges, version }: {
                 ) : (
                   <>
                     <IconButton
-                      aria-label={`Edit ${b.name}`}
+                      aria-label={`Edit ${name}`}
                       onClick={() => { setEditing(b); setDialogOpen(true); }}
                     >
                       <IconPencil size={13} stroke={1.5} />
@@ -135,7 +152,7 @@ export function HeroSkillBadgesTable({ badges, version }: {
                     <DeleteButton
                       staged
                       newRow={isNew("heroSkillBadge", b.id)}
-                      label={`"${b.name}"`}
+                      label={`"${name}"`}
                       onDelete={() => stageDelete("heroSkillBadge", b.id)}
                     />
                   </>
@@ -162,22 +179,31 @@ export function HeroSkillBadgesTable({ badges, version }: {
         <form
           id={FORM_ID}
           action={(formData) => {
-            const name = String(formData.get("name") ?? "").trim();
-            const iconKey = String(formData.get("iconKey") ?? "").trim();
-            if (!name) return;
-            if (editing) stageUpdate("heroSkillBadge", editing.id, { name, iconKey });
-            else stageCreate("heroSkillBadge", { name, iconKey, version });
+            const skillId = String(formData.get("skillId") ?? "");
+            const typed = String(formData.get("label") ?? "").trim();
+            if (!skillId) return;
+            const label = typed === "" || typed === skillById.get(skillId)?.name ? null : typed;
+            if (editing) stageUpdate("heroSkillBadge", editing.id, { skillId, label });
+            else stageCreate("heroSkillBadge", { skillId, label, version });
             setDialogOpen(false);
           }}
         >
-          <Input name="name" label="Name" defaultValue={editing?.name || ""} required />
-          <IconPicker
-            key={editing?.id ?? "new"}
-            kind="skill"
-            label="Icon"
-            defaultValue={editing?.iconKey || ""}
+          <Select
+            name="skillId"
+            label="Skill"
+            defaultValue={editing?.skillId ?? ""}
             required
-            hint="Drawn beside the badge name — inline in v1's paragraph, in v2's pill row."
+            options={available.map((s) => ({ value: s.id, label: `${s.name} · ${s.iconKey}` }))}
+            hint={available.length === 0
+              ? "Every skill already has a badge in this version."
+              : "The badge takes this skill's name and icon, and follows it when the skill is renamed."}
+          />
+          <Input
+            name="label"
+            label="Label override"
+            defaultValue={editing?.label ?? ""}
+            placeholder="leave blank to use the skill's name"
+            hint="Only for a badge that has to read differently from the skill — Golang over Go."
           />
         </form>
       </Dialog>
