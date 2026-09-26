@@ -30,7 +30,7 @@
 --
 -- WAIT AT LEAST ONE FULL ROLLUP CYCLE between DEPLOY and this file. The
 -- rollup and retention have no cron (there is no vercel.json): they ride
--- `after()` on /api/collect (collect/route.ts:100 schedulePostResponseWork).
+-- `after()` on /api/collect (collect/route.ts:108 schedulePostResponseWork).
 -- On a low-traffic site "the next visit" can be hours. Do not confuse
 -- "nothing has failed" with "nothing has run".
 --
@@ -120,7 +120,40 @@ FROM pg_constraint WHERE conrelid = '"DailyStat"'::regclass AND contype = 'p';
 
 -- =====================================================================
 -- STAGE 1. The column and index removals. One transaction.
+--
+-- LOCK AND STATEMENT TIMEOUTS. This file previously set neither, which made
+-- RUNBOOK.md's headline promise ("every ALTER runs under lock_timeout = '3s'
+-- so a blocked statement fails instead of queueing the site behind it") false
+-- for it, and made STOP-THE-LINE S3 unreachable: with lock_timeout unset the
+-- Neon default is 0, i.e. wait forever. Each of the three stages below now
+-- opens with a plain `SET` pair, matching hero-contract.sql.
+--
+-- Plain SET, not SET LOCAL. SET LOCAL outside a transaction block only emits
+-- `WARNING: SET LOCAL can only be used in transaction blocks` and applies
+-- nothing; the pair is placed BEFORE each BEGIN so it also covers a run pasted
+-- statement by statement, and repeated per stage because a reconnect between
+-- transactions resets it.
+--
+-- Which lock this buys something on, in this stage: "AnalyticsEvent" and
+-- "AnalyticsSession" are written from the public collect beacon on every
+-- visit, and "DailyStat" is written by the rollup that rides after() on that
+-- same beacon (0050cc9:apps/web/app/api/collect/route.ts:108
+-- schedulePostResponseWork, before the flag check at :110 — so the analytics
+-- flag does NOT stop the rollup or retention). Those two line numbers are
+-- CORRECTED: several files in this directory cite :100 and :103, which match
+-- neither 0050cc9 (108 / 110) nor the v2 tree (111 / 113). The claim is right
+-- at both commits; only the numbers were stale. Nothing READS these tables to
+-- render, which is why this cluster leads CONTRACT; but a DDL request that
+-- QUEUES here still parks the beacon's own writes behind it, and those writes
+-- are what /api/collect's try/catch turns into a silent 204. Failing at 3s and
+-- retrying is strictly better than a window of silently dropped analytics.
+-- 120s statement_timeout: STAGE 2 rewrites "AnalyticsEvent" (4803 rows) to
+-- narrow the enum, which is the longest statement in the file by an order of
+-- magnitude and still finishes in well under a second.
 -- =====================================================================
+SET lock_timeout = '3s';
+SET statement_timeout = '120s';
+
 BEGIN;
 
 DO $gate$
@@ -296,7 +329,7 @@ COMMIT;
 -- one dropped batch -- a 204 the browser never sees.
 -- To reduce it to zero: flip the admin flag `analytics.enabled` off, wait for
 -- the cross-app revalidate, run this stage, flip it back on. While it is off
--- /api/collect returns at collect/route.ts:103 without touching Postgres, and
+-- /api/collect returns at collect/route.ts:110 without touching Postgres, and
 -- the public site is unaffected -- the flag only removes a beacon.
 --
 -- Safe in ONE transaction because the new type is CREATEd inside it. The
@@ -306,7 +339,16 @@ COMMIT;
 -- The column has no DEFAULT (schema.prisma declares `type EventType` bare),
 -- so there is nothing to drop and re-add around the cast, and NOT NULL plus
 -- the SERIAL identity survive untouched.
+--
+-- Repeated per stage: STAGE 1's COMMIT does not clear a plain SET but a
+-- reconnect between stages does, and this is the stage most likely to be
+-- re-run on its own. This is the only table rewrite in the file, so it is the
+-- one place the 120s ceiling is doing real work rather than acting as a
+-- tripwire.
 -- =====================================================================
+SET lock_timeout = '3s';
+SET statement_timeout = '120s';
+
 BEGIN;
 
 DO $enum$
@@ -390,7 +432,18 @@ COMMIT;
 -- campaign were all present, while session attribution is written only at
 -- session create, so an outreach link opened inside an existing 30-minute
 -- session now records no "rawContent" at all.
+--
+-- lock_timeout matters more here than the one-statement body suggests: RENAME
+-- takes ACCESS EXCLUSIVE, and until Step 30 "UtmTracker" was written on EVERY
+-- public page load (0050cc9:apps/web/app/api/track/utm/route.ts:103, beaconed
+-- from 0050cc9:apps/web/app/layout.tsx:105). v2 deletes both the route and the
+-- beacon, so by the time this runs there should be no writer left — but stale
+-- v1 HTML in a visitor's browser can still fire the old beacon, and that is
+-- exactly the kind of writer a rename must not queue behind.
 -- =====================================================================
+SET lock_timeout = '3s';
+SET statement_timeout = '120s';
+
 BEGIN;
 
 ALTER TABLE IF EXISTS "UtmTracker" RENAME TO "UtmTracker__retired_v2";

@@ -305,6 +305,21 @@ COMMIT;
 --
 -- Caveat: "name" comes back exactly ("label" carried the override), but
 -- "iconKey" comes back as the SKILL's icon key. That equals the original only
--- for the rows expand preflight P7 reported as non-drifting. For the rest, take
--- the value out of the pre-expand JSON dump.
+-- for the rows expand preflight P7 reported as non-drifting.
+--
+-- SECOND PASS, for the true per-badge "iconKey". Run it even when P7 reported no
+-- drift: it costs one transaction and removes the last guess. The columns are
+-- already NOT NULL by then, so this is a plain UPDATE and cannot raise 23502.
+--
+--   cd packages/db
+--   jq -r -f v2-production/recover-from-dump.jq \
+--      --arg table HeroSkillBadge --arg key id --arg cols 'iconKey' \
+--      --arg mode update backups/PRE-CUTOVER-<stamp>.json \
+--      > /tmp/v2/prod/recover-badge-iconkey.sql
+--   # read it, then apply it the same way you applied this file
+--
+-- RUNBOOK.md Step 8b rehearses that exact command against a throwaway branch.
+-- Its guard aborts if a badge in the dump no longer exists; a badge created
+-- AFTER the dump is simply absent from the generated file, and for those rows
+-- the skill-icon value above is all there is.
 -- =====================================================================

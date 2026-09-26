@@ -340,8 +340,19 @@ COMMIT;
 --   -- and then blogs-expand.sql's own rollback block if you are going all the way
 --   -- back to v1.
 -- Caveats, stated because they are the parts DDL cannot undo:
---   * "show" cannot be restored per row. All ten were false, so the blanket
---     UPDATE is exact today; per-row values also live in the read-only JSON dump.
+--   * "show" is not restored per row by the blanket UPDATE above. All ten rows
+--     were false, so it is exact TODAY. For a post created during the window it
+--     is a guess, and the per-row values are recoverable from the dump with a
+--     second pass -- the column is NOT NULL DEFAULT true from the moment it is
+--     re-added, so this is a plain UPDATE and cannot raise 23502:
+--       cd packages/db
+--       jq -r -f v2-production/recover-from-dump.jq \
+--          --arg table Blog --arg key id --arg cols 'show' --arg mode update \
+--          backups/PRE-CONTRACT-<stamp>.json > /tmp/v2/prod/recover-blog-show.sql
+--       # read it, then apply it the same way you applied this file
+--     Use the Step 38 PRE-CONTRACT dump, not Step 7's: a post created during the
+--     window exists only in the later one, and that is precisely the row the
+--     blanket UPDATE gets wrong. RUNBOOK.md Step 8b rehearses this command.
 --   * "publishedAt" comes back from "createdAt", which is where EXPAND put it, so
 --     the ten seed stamps return identical. A post PUBLISHED after CONTRACT is not
 --     touched by the null-out and so is not touched by this restore either.

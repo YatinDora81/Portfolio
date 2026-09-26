@@ -128,10 +128,12 @@
 --     `actor: l.actorName ?? l.actorId`), so you will see a uuid in the actor
 --     column for those rows until CONTRACT step 1 re-runs the backfill.
 --   * v1 flag toggles move "FeatureFlag"."updatedById" WITHOUT moving
---     "updatedByName" (apps/docs/app/lib/actions/flags.ts:48-55 sets only the
---     id). With one admin the backfilled name stays correct; with two it would go
---     stale. CONTRACT step 1 re-syncs it with an IS DISTINCT FROM guard, not an
---     IS NULL guard, for exactly this reason.
+--     "updatedByName" (0050cc9:apps/docs/app/lib/actions/flags.ts:48-55 sets only
+--     the id). With one admin the backfilled name stays correct; with two it would
+--     go stale. Three sweeps repair it with an IS DISTINCT FROM guard rather than
+--     an IS NULL guard for exactly this reason: T1 section 2 below,
+--     media-flags-reval-github-expand.sql section 2 (Step 15), and
+--     contact-admin-audit-contract.sql STEP 1 (Step 39).
 --
 -- TRANSACTIONALITY. Three transactions, deliberately separate so that a failure
 -- in the riskiest one does not unwind the free ones:
@@ -148,12 +150,172 @@
 --       VACUUM, no superuser statement, no session_replication_role.
 --
 -- IDEMPOTENCY. Every ADD COLUMN is IF NOT EXISTS, every CREATE INDEX is IF NOT
--- EXISTS, every backfill is IS NULL-guarded, every CREATE TYPE is guarded in a DO
--- block, every FK is DROP IF EXISTS then ADD (Postgres has no ADD CONSTRAINT IF
--- NOT EXISTS, and drop-then-add also repairs a same-named constraint carrying the
--- wrong referential actions), and every cast is written ::text::"Type" so it
--- re-runs cleanly once the column is already the enum. The whole file is
--- re-runnable.
+-- EXISTS, every backfill is guarded (IS NULL for the two append-only name
+-- columns, IS DISTINCT FROM for the one mutable one — see THE THREE NAME COLUMNS
+-- below), every CREATE TYPE is guarded in a DO block, every FK is DROP IF EXISTS
+-- then ADD (Postgres has no ADD CONSTRAINT IF NOT EXISTS, and drop-then-add also
+-- repairs a same-named constraint carrying the wrong referential actions), and
+-- every cast is written ::text::"Type" so it re-runs cleanly once the column is
+-- already the enum. The whole file is re-runnable.
+--
+-- =============================================================================
+-- "HEAD:" IN THIS FILE MEANS COMMIT 0050cc9. IT NO LONGER MEANS `git HEAD`.
+-- =============================================================================
+-- Every v1 citation above and below was written when 0050cc9 was the tip. The v2
+-- work has since been committed, so `git HEAD` is f760425 and `git show
+-- HEAD:<path>` returns the v2 file — which inverts several of the arguments in
+-- this header. Read every v1 claim with
+--     git show 0050cc9:<path>
+-- and nothing else. 0050cc9 is what Vercel is serving while this file runs.
+-- Working-tree/v2 paths are cited bare, with no prefix. The v1 evidence was
+-- re-checked that way on 2026-09-27; see the spot-check block below.
+--
+-- =============================================================================
+-- LOCK AND STATEMENT TIMEOUTS
+-- =============================================================================
+-- This file previously set neither, which made RUNBOOK.md's headline promise
+-- ("every ALTER runs under lock_timeout = '3s' so a blocked statement fails
+-- instead of queueing the site behind it") false for it, and made STOP-THE-LINE
+-- S3 unreachable — with lock_timeout unset Neon's default is 0, i.e. wait
+-- forever. T1 and T2 each now open with a plain `SET` pair, matching
+-- hero-expand.sql and hero-contract.sql.
+--
+-- Plain SET, not SET LOCAL, and the distinction is load-bearing: SET LOCAL
+-- outside a transaction block only emits `WARNING: SET LOCAL can only be used in
+-- transaction blocks` and applies nothing. The pair is placed BEFORE each BEGIN
+-- so it also covers a run that is pasted statement by statement, and it is
+-- repeated before T2 because a reconnect between transactions resets it.
+--
+-- Which lock this actually buys anything on: "FeatureFlag" (T1 section 3's
+-- ADD CONSTRAINT, ACCESS EXCLUSIVE) is read on every uncached public render —
+-- 0050cc9:apps/web/app/layout.tsx:70 getFlags() ->
+-- 0050cc9:apps/web/app/lib/flags.ts:13 featureFlag.findMany. A request for that
+-- lock that QUEUES behind a slow holder parks every subsequent public
+-- FeatureFlag read behind it, which is the one mechanism in this file that could
+-- reach a visitor. Failing at 3s and retrying costs nothing.
+--
+-- =============================================================================
+-- THE THREE NAME COLUMNS ARE SHARED WITH ANOTHER CLUSTER. RUN ORDER MATTERS.
+-- =============================================================================
+-- Two of the three columns this file adds are ALSO added, with a DIFFERENT
+-- backfill, by media-flags-reval-github-expand.sql (RUNBOOK Step 15, the step
+-- immediately after this one):
+--
+--   column                        this file (Step 14)   media cluster (Step 15)
+--   "FeatureFlag"."updatedByName"  ADD + repair          ADD + repair
+--   "RevalidationLog"."actorName"  ADD + fill            ADD + fill
+--   "MessageReply"."sentByName"    ADD + fill            not touched
+--
+-- Both ADDs are IF NOT EXISTS, so whichever file runs second is a no-op for the
+-- ADD and reports `ALTER TABLE` with no change. That is expected, not a warning
+-- sign. What must NOT diverge is the PREDICATE, and there is one rule, stated in
+-- contact-admin-audit-contract.sql's header (STEP 1) and now honoured by all
+-- four files that touch these columns:
+--
+--   * "FeatureFlag"."updatedByName" is MUTABLE — a flag is toggled repeatedly and
+--     the column means "who last changed it". A v1 toggle moves "updatedById"
+--     without moving the name (0050cc9:apps/docs/app/lib/actions/flags.ts:52
+--     sets only the id), so the copy goes STALE. Guard on IS DISTINCT FROM, so a
+--     stale name is repaired and not merely a missing one.
+--   * "RevalidationLog"."actorName" and "MessageReply"."sentByName" are
+--     APPEND-ONLY — one row per event, never re-attributed. A non-NULL value
+--     there is already correct BY DEFINITION, and re-deriving it from the
+--     current "AdminUser"."name" would rewrite history: v2 writes both at insert
+--     time (apps/docs/app/lib/revalidation.ts:102,
+--     apps/docs/app/lib/actions/messages.ts:169, the latter falling back to
+--     `session.email`), so after the deploy the stored value is deliberately the
+--     name-as-of-then and not today's. Guard on IS NULL, always.
+--
+-- WHY THE ORDER IS 14 THEN 15, AND WHAT BREAKS IF IT IS NOT.
+--   * Both files' sweeps INNER JOIN "AdminUser", so on a first forward run the
+--     end state is the same in either order. The order is not what makes the
+--     DATA right.
+--   * What the order does decide is which file's gate fires first. V6 below
+--     asserts that every name agrees with its "AdminUser" row. It is the earlier
+--     gate, so it is the one that stops the night — and the repair that can
+--     satisfy it for "updatedByName" now lives in BOTH files rather than only in
+--     Step 15, which is the change that makes V6 self-consistent. Before this
+--     revision this file backfilled "updatedByName" with IS NULL while its own
+--     V6 checked IS DISTINCT FROM: a stale name made V6 fail at Step 14 with no
+--     repair available until Step 15.
+--   * THE ONE GENUINELY ORDER-DEPENDENT HAZARD IS THE ROLLBACK, NOT THE FORWARD
+--     RUN. Both files' rollback blocks drop "updatedByName" and "actorName". So
+--     rolling back ONE cluster silently removes two columns the OTHER cluster
+--     created and requires, and the v2 flags and revalidation pages then throw
+--     P2022. Both rollback blocks now open with a fail-closed DO guard that
+--     aborts if the other cluster's EXPAND is still applied. Do not delete it.
+--
+-- =============================================================================
+-- V1 EVIDENCE RE-VERIFIED AT 0050cc9        (spot check 3 of 5, 2026-09-27)
+--
+-- WHY THIS FILE IS ONE OF THE FIVE. T2 retypes five live columns, and one of
+-- them, "AuditEvent"."actorRole", has NEVER had a CHECK constraint — so unlike
+-- action / publishState / kind there is no database-level proof of its value
+-- set, only an argument about the deployed code. A single stray string aborts
+-- the USING cast. T1's five foreign keys are added VALID against a live writer,
+-- which is the other statement class here that a v1 write could reject.
+--
+-- RE-CHECKED WITH `git show 0050cc9:<path>`, NOT by reading the working tree:
+--
+--  1. actorRole's only producer is the signed session role. CONFIRMED.
+--       0050cc9:apps/docs/app/lib/audit-writer.ts:31   actorRole: d.actor.role,
+--       0050cc9:apps/docs/app/lib/audit.ts:5           AuditActor = { ... role: string }
+--     `role` reaches the draft from the JWT claim, which is written from
+--     "AdminUser"."role" — already typed "AdminRole" in the database. Closed set,
+--     but closed by the type system and not by a constraint, which is exactly
+--     why preflight P6 (the "AdminRole" label set) and P3 (the stored values)
+--     are not optional. Nothing in this cluster may proceed on the header's word.
+--
+--  2. AuditSurface really needs THREE labels, not two. CONFIRMED, and this is
+--     the claim most likely to have rotted, because the third writer is a script
+--     nobody runs during the cutover:
+--       0050cc9:apps/docs/app/lib/actions/staging.ts:55    draft(action, "staging", ...)
+--       0050cc9:apps/docs/app/lib/audit-writer.ts:66       draft("PUBLISH", "publish", actor)
+--       0050cc9:apps/docs/scripts/update-about-copy.ts:31  draft("SAVE", "script", {
+--     Three literals in the whole v1 tree, at the three cited lines. A
+--     two-member enum would abort T2's cast on live rows AND break
+--     `bun run about:copy` afterwards.
+--
+--  3. action and kind are already constrained, so their label sets are proved by
+--     the database and not only by the code.
+--       0050cc9:apps/docs/app/lib/audit.ts:3  AuditAction = "SAVE"|"SAVE_AND_PUBLISH"|"PUBLISH"
+--       0050cc9:apps/docs/app/lib/audit.ts:4  ChangeKind  = "CREATE"|"UPDATE"|"DELETE"|"REORDER"
+--     matching "AuditEvent_action_check" and "AuditChange_kind_check", whose
+--     definitions P4 prints.
+--
+--  4. All five new FKs are written from one expression, so none can reject a v1
+--     write that would otherwise have succeeded. Every line CONFIRMED at the
+--     number cited earlier in this header:
+--       0050cc9:apps/docs/app/lib/actions/messages.ts:168      sentById:      session.userId
+--       0050cc9:apps/docs/app/lib/actions/media.ts:242         uploadedById:  session.userId
+--       0050cc9:apps/docs/app/lib/actions/media-browser.ts:506 uploadedById:  session.userId
+--       0050cc9:apps/docs/app/lib/actions/tracked-links.ts:89  createdById:   session.userId
+--       0050cc9:apps/docs/app/lib/actions/flags.ts:52          updatedById:   session.userId
+--       0050cc9:apps/docs/app/lib/revalidation.ts:86           actorId:       opts.actorId
+--     and the one v1 path that deletes an admin is
+--     0050cc9:apps/docs/app/lib/actions/staging.ts:757 tx.adminUser.delete,
+--     which today leaves five dangling ids and is strictly improved by SetNull.
+--
+--  5. "AdminUser"."otpAttempts" NOT NULL is only safe because of its DEFAULT.
+--     CONFIRMED: 0050cc9:apps/docs/app/lib/actions/staging.ts:579
+--     `const row = await tx.adminUser.create({` — a v1 insert that cannot name
+--     the column. Without DEFAULT 0 it raises 23502 and the staged Save bar
+--     cannot create a second admin.
+--
+--  6. "ContactMessage"."read" and its DEFAULT. 0050cc9:packages/db/prisma/
+--     schema.prisma:173 declares `read Boolean @default(false)`, but the table
+--     appears in ONLY ONE migration in the whole repo
+--     (20260822110000_add_inbox_workflow, which merely ALTERs it), so the
+--     database-level DEFAULT is asserted by no file under version control. It is
+--     the single thing keeping the PUBLIC contact form alive between Step 30 and
+--     Step 39, because v2 stops naming the column while it is still NOT NULL.
+--     Hence the unconditional SET DEFAULT belt in T1 section 0 below, and V9's
+--     promotion into Step 14's gate.
+--
+-- VERDICT: every statement in this file is safe against the code actually
+-- deployed at 0050cc9. Two things needed correcting, both recorded above: the
+-- `HEAD:` labels, and "updatedByName"'s backfill predicate.
+-- =============================================================================
 --
 -- =============================================================================
 -- PREFLIGHT. Run all of these, read all of them, and only then run T0/T1/T2.
@@ -211,12 +373,12 @@ SELECT "table_name", "column_name", "data_type", "is_nullable", "column_default"
 --       kind         UPDATE
 --     ANY other value is a STOP. Do not "fix" it by widening the enum; find out
 --     which writer produced it first.
-SELECT 'AuditEvent.action' AS "column", "action" AS "value", count(*) AS "rows"
+SELECT 'AuditEvent.action' AS "column", "action"::text AS "value", count(*) AS "rows"
   FROM "AuditEvent" GROUP BY 2
-UNION ALL SELECT 'AuditEvent.surface',      "surface",      count(*) FROM "AuditEvent"  GROUP BY 2
-UNION ALL SELECT 'AuditEvent.publishState', "publishState", count(*) FROM "AuditEvent"  GROUP BY 2
-UNION ALL SELECT 'AuditEvent.actorRole',    "actorRole",    count(*) FROM "AuditEvent"  GROUP BY 2
-UNION ALL SELECT 'AuditChange.kind',        "kind",         count(*) FROM "AuditChange" GROUP BY 2
+UNION ALL SELECT 'AuditEvent.surface',      "surface"::text,      count(*) FROM "AuditEvent"  GROUP BY 2
+UNION ALL SELECT 'AuditEvent.publishState', "publishState"::text, count(*) FROM "AuditEvent"  GROUP BY 2
+UNION ALL SELECT 'AuditEvent.actorRole',    "actorRole"::text,    count(*) FROM "AuditEvent"  GROUP BY 2
+UNION ALL SELECT 'AuditChange.kind',        "kind"::text,         count(*) FROM "AuditChange" GROUP BY 2
  ORDER BY 1, 2;
 
 -- P4. Exactly three CHECK constraints exist on these two tables, and they are
@@ -324,7 +486,45 @@ SELECT
 -- T1. THE ADDITIVE WORK. Nothing in this transaction removes anything.
 -- =============================================================================
 
+-- Plain SET, outside the transaction, so it survives a COMMIT and so it still
+-- applies if this file is pasted statement by statement. SET LOCAL here would be
+-- a silent no-op. See LOCK AND STATEMENT TIMEOUTS in the header.
+SET lock_timeout = '3s';
+SET statement_timeout = '60s';
+
 BEGIN;
+
+-- -----------------------------------------------------------------------------
+-- 0. THE BELT UNDER "ContactMessage"."read".
+--
+-- Not additive work, not a removal — a re-assertion of a default that nothing in
+-- version control asserts. Idempotent, and the exact mirror of what the hero
+-- cluster does for "HeroSkillBadge"."name"/"iconKey" and the projects cluster
+-- for "Project"."images".
+--
+-- WHY IT IS HERE AND NOT LEFT TO CHANCE. "read" is BOOLEAN NOT NULL and stays
+-- that way from Step 30 (v2 deploys and stops writing it) until Step 39 (the
+-- column is dropped). Stage 5's preamble explicitly permits sitting at the end of
+-- Stage 4 for a week. Through that whole gap the ONLY thing standing between a
+-- public contact-form submission and a 23502 not_null_violation is the database
+-- DEFAULT — v2's insert (apps/web/app/api/contact/route.ts:175-187) names
+-- status/readAt and never "read", where v1's did
+-- (0050cc9:apps/web/app/api/contact/route.ts:182 `read: verdict.isSpam`).
+-- If the default is absent, every POST /api/contact returns HTTP 500
+-- {"error":"Failed to send message"} to a real visitor, with no log row, no
+-- retry and no record, for as long as the gap lasts.
+--
+-- 0050cc9:packages/db/prisma/schema.prisma:173 declares `@default(false)`, so it
+-- SHOULD be there — but "ContactMessage" is created by no migration in
+-- packages/db/prisma/migrations (only altered, by 20260822110000), so its CREATE
+-- TABLE is not under version control and the default is asserted by nothing you
+-- can read. V9 at the foot of this file is what verifies it; this statement is
+-- what guarantees it. One metadata-only catalogue write, no table rewrite, no
+-- lock beyond ACCESS EXCLUSIVE for microseconds, and a no-op if the default is
+-- already correct.
+-- -----------------------------------------------------------------------------
+ALTER TABLE "ContactMessage" ALTER COLUMN "read" SET DEFAULT false;
+
 
 -- -----------------------------------------------------------------------------
 -- 1. "AdminUser" gains the two auth-fix columns.
@@ -372,28 +572,62 @@ ALTER TABLE "AdminUser"
 -- reads `l.actorName ?? l.actorId` ((dashboard)/revalidation/page.tsx:145), and
 -- readRecentLogs selects the whole row. A missing column is P2022 on those pages.
 --
--- The backfills are IS NULL-guarded so a re-run cannot overwrite a name a later
--- writer put there, and so a row whose sender has ALREADY been deleted (id NULL,
--- name kept) is untouched. Rows with a NULL id stay NULL: no name is invented.
+-- Every backfill INNER JOINs "AdminUser", so a row whose actor has ALREADY been
+-- deleted (id NULL, name kept) is untouched, and a row with a NULL id stays NULL:
+-- no name is invented, and the one case these columns exist to outlive is never
+-- overwritten.
+--
+-- TWO OF THESE THREE COLUMNS ARE ALSO ADDED BY
+-- media-flags-reval-github-expand.sql AT STEP 15, THE NEXT STEP. Read THE THREE
+-- NAME COLUMNS ARE SHARED WITH ANOTHER CLUSTER in this file's header before
+-- touching any predicate below. The short form:
+--   "sentByName", "actorName"   append-only  -> IS NULL guard. Fill, never repair.
+--   "updatedByName"             mutable      -> IS DISTINCT FROM guard. Repair.
+-- Both ADDs are IF NOT EXISTS and Step 15's are too, so whichever of the two
+-- files runs second reports `ALTER TABLE` with no change. Expected.
 -- -----------------------------------------------------------------------------
 ALTER TABLE "MessageReply"    ADD COLUMN IF NOT EXISTS "sentByName"    TEXT;
 ALTER TABLE "FeatureFlag"     ADD COLUMN IF NOT EXISTS "updatedByName" TEXT;
 ALTER TABLE "RevalidationLog" ADD COLUMN IF NOT EXISTS "actorName"     TEXT;
 
+-- Append-only: fill a missing name, never re-derive an existing one. A non-NULL
+-- value here is the name as of the event and is correct by definition. From the
+-- deploy onward v2 writes it at insert time — apps/docs/app/lib/actions/
+-- messages.ts:169 `sentByName: sender?.name ?? session.email`, whose fallback is
+-- deliberately NOT "AdminUser"."name" — so a re-sync would corrupt it.
 UPDATE "MessageReply" "r"
    SET "sentByName" = "a"."name"
   FROM "AdminUser" "a"
  WHERE "a"."id" = "r"."sentById" AND "r"."sentByName" IS NULL;
 
-UPDATE "FeatureFlag" "f"
-   SET "updatedByName" = "a"."name"
-  FROM "AdminUser" "a"
- WHERE "a"."id" = "f"."updatedById" AND "f"."updatedByName" IS NULL;
-
+-- Append-only, same rule. v2's writer is apps/docs/app/lib/revalidation.ts:102.
 UPDATE "RevalidationLog" "l"
    SET "actorName" = "a"."name"
   FROM "AdminUser" "a"
  WHERE "a"."id" = "l"."actorId" AND "l"."actorName" IS NULL;
+
+-- Mutable, so IS DISTINCT FROM, not IS NULL. Three reasons, in order of weight:
+--   1. V6 at the foot of this file asserts `"updatedByName" IS DISTINCT FROM
+--      "a"."name"` returns 0 rows. An IS NULL backfill cannot satisfy that gate
+--      on a stale row, so the file would fail its own verification with no repair
+--      available until Step 15. This predicate is what makes V6 self-consistent.
+--   2. It matches contact-admin-audit-contract.sql STEP 1 and
+--      media-flags-reval-github-expand.sql section 2 exactly. All three sweeps of
+--      this column now agree, which is what stops the Step 14 / Step 15 run order
+--      from changing the outcome.
+--   3. A v1 flag toggle moves "updatedById" without moving the name
+--      (0050cc9:apps/docs/app/lib/actions/flags.ts:52 sets only the id), so with
+--      more than one admin the copy goes stale during the window and a fill-only
+--      guard would leave the wrong person's name on the row forever.
+-- The INNER JOIN keeps this safe after the deploy too: v2 writes
+-- `updatedById: actor?.id ?? null, updatedByName: actor?.name ?? session.email`
+-- (apps/docs/app/lib/actions/flags.ts:56-57), so the one row whose name is
+-- legitimately an email rather than a name has a NULL id and is never joined.
+UPDATE "FeatureFlag" "f"
+   SET "updatedByName" = "a"."name"
+  FROM "AdminUser" "a"
+ WHERE "a"."id" = "f"."updatedById"
+   AND "f"."updatedByName" IS DISTINCT FROM "a"."name";
 
 
 -- -----------------------------------------------------------------------------
@@ -494,6 +728,13 @@ COMMIT;
 --     client. If it fails, run the T2 rollback at the bottom of this file; the
 --     public site was never involved.
 -- =============================================================================
+
+-- Repeated, not inherited: T1's COMMIT does not clear a plain SET but a reconnect
+-- between the two transactions does, and T2 is the half an operator is most
+-- likely to re-run on its own. 60s is generous for single-digit row counts — a
+-- statement here that runs for a minute is wedged, not slow.
+SET lock_timeout = '3s';
+SET statement_timeout = '60s';
 
 BEGIN;
 
@@ -666,7 +907,7 @@ SELECT 'index' AS "kind", "t"."relname" AS "table", "i"."relname" AS "name",
   JOIN "pg_namespace" "n" ON "n"."oid" = "t"."relnamespace"
  WHERE "n"."nspname" = current_schema() AND "t"."relname" IN ('AuditEvent','AuditChange')
 UNION ALL
-SELECT 'constraint ' || "co"."contype", "cl"."relname", "co"."conname",
+SELECT 'constraint ' || "co"."contype"::text, "cl"."relname", "co"."conname",
        pg_get_constraintdef("co"."oid")
   FROM "pg_constraint" "co"
   JOIN "pg_class" "cl" ON "cl"."oid" = "co"."conrelid"
@@ -692,6 +933,24 @@ SELECT "cl"."relname" AS "table", "co"."conname", "co"."convalidated",
 -- V6. Every backfilled name matches its AdminUser row, and no row has an id
 --     without a name.
 --     EXPECTED: 0 rows from both halves.
+--
+--     ALL SIX ARMS MUST BE 0 ON THE FORWARD RUN, and the three 'mismatch' arms
+--     are now satisfiable by this file: T1 section 2's "updatedByName" sweep is
+--     IS DISTINCT FROM-guarded, and the two append-only columns start NULL, so a
+--     mismatch there can only mean the column was ALREADY POPULATED before this
+--     file ran.
+--
+--     If a 'mismatch' row appears on "MessageReply" or "RevalidationLog", DO NOT
+--     REPAIR IT BY HAND. Those two columns are append-only and a non-NULL value
+--     is the name as of the event; re-deriving it from today's
+--     "AdminUser"."name" rewrites history. What the row actually tells you is
+--     that you are running EXPAND over a database that has already had EXPAND or
+--     the v2 deploy — a reused rehearsal branch, or production being re-run.
+--     Establish which, and why, before continuing. The rule and its four-file
+--     provenance are in this file's header under THE THREE NAME COLUMNS.
+--
+--     The 'id without name' arms have no such exception: an id with no name is
+--     always a backfill that did not run.
 SELECT 'mismatch' AS "problem", 'MessageReply' AS "table", "r"."id"::text AS "row",
        "r"."sentByName" AS "stored", "a"."name" AS "expected"
   FROM "MessageReply" "r" JOIN "AdminUser" "a" ON "a"."id" = "r"."sentById"
@@ -747,6 +1006,25 @@ SELECT
 --     important verification in the file: it is what proves the deployed v1
 --     contact form and inbox are untouched, and it captures the exact definition
 --     the contract file's rollback has to reproduce.
+--
+--     THIS IS A HARD GATE IN RUNBOOK STEP 14, not a for-the-record read.
+--     `column_default` must come back `false`. If it comes back blank, the PUBLIC
+--     contact form returns HTTP 500 to every visitor who submits it, for the
+--     whole span from Step 30 to Step 39 — v2's insert stops naming the column
+--     while it is still BOOLEAN NOT NULL, so only the DEFAULT keeps the row
+--     legal. T1 section 0 sets it unconditionally, so a blank answer here means
+--     T1 section 0 did not run and you are looking at a stale copy of this file.
+--     Blank is a STOP, not a note.
+--
+--     The same one-line audit, for the record, on the other three columns v2
+--     stops writing that survive into CONTRACT — all three confirmed to have a
+--     database default, so none needs a belt:
+--       "Blog"."show"                 DEFAULT true              20260308175836:2
+--       "Skill"."show"                DEFAULT true              20260307195336_init:68
+--       "AnalyticsSession"."lastSeenAt" DEFAULT CURRENT_TIMESTAMP 20260822120000:42
+--     "Skill"."show" is additionally filled by skills-joins-expand.sql:257's
+--     BEFORE trigger, so it is belted twice.
+--
 --     EXPECTED: read = boolean / NO / false, and disagreements = 0,
 --     readTrue = 9 (data-facts.txt "ContactMessage read=true: 9", plus anything
 --     the inbox has done since).
@@ -792,7 +1070,27 @@ SELECT count(*) FILTER (WHERE "read")                                   AS "read
 -- column still references them, which is the safety net.
 --
 -- -- Undo T1 (the additive work).
+-- --
+-- -- READ THIS BEFORE YOU PASTE. Two of the three name columns dropped below are
+-- -- ALSO created and required by media-flags-reval-github-expand.sql (Step 15).
+-- -- Undoing T1 while that cluster is still applied removes "updatedByName" and
+-- -- "actorName" out from under it, and the v2 flags page
+-- -- (apps/docs/app/(dashboard)/flags/page.tsx:43) and revalidation page (:145)
+-- -- then throw P2022 the moment v2 is deployed. The guard is the first statement
+-- -- inside the transaction so the whole undo rolls back rather than half-landing.
+-- -- If it fires you have two correct answers: undo Step 15 first, or keep the two
+-- -- shared columns and drop only "sentByName". There is no third answer, and
+-- -- deleting the guard is not one of them.
 -- BEGIN;
+-- SET LOCAL lock_timeout = '3s';
+-- DO $$
+-- BEGIN
+--   IF EXISTS (SELECT 1 FROM "information_schema"."columns"
+--              WHERE "table_schema" = current_schema()
+--                AND "table_name" = 'RevalidationLog' AND "column_name" = 'scope') THEN
+--     RAISE EXCEPTION 'T1 undo aborted: media-flags-reval-github-expand.sql (Step 15) is still applied — "RevalidationLog"."scope" exists. This undo would drop "updatedByName" and "actorName", which that cluster also owns. Undo Step 15 first, or drop only "sentByName" here.';
+--   END IF;
+-- END $$;
 -- ALTER TABLE "RevalidationLog" DROP CONSTRAINT IF EXISTS "RevalidationLog_actorId_fkey";
 -- DROP INDEX IF EXISTS "RevalidationLog_actorId_idx";
 -- ALTER TABLE "FeatureFlag"  DROP CONSTRAINT IF EXISTS "FeatureFlag_updatedById_fkey";
@@ -814,6 +1112,20 @@ SELECT count(*) FILTER (WHERE "read")                                   AS "read
 -- section 2 recompute, for as long as the "AdminUser" rows they came from still
 -- exist — which is precisely the window those columns exist to outlive. A
 -- rollback re-opens a hole rather than losing data today.
+--
+-- That sentence is true ONLY BEFORE THE v2 DEPLOY, and this rollback is an EXPAND
+-- rollback, so it should never run after it. Stated anyway, because the two
+-- append-only columns stop being recomputable the instant v2 starts writing them:
+-- apps/docs/app/lib/actions/messages.ts:169 and
+-- apps/docs/app/lib/actions/flags.ts:57 both fall back to `session.email`, a value
+-- that appears in no "AdminUser"."name" and that no re-run of T1 can reconstruct.
+-- Past Step 30, treat these three columns like any other data: the dump is the
+-- floor, via v2-production/recover-from-dump.jq (RUNBOOK Step 8b).
+--
+-- Also note the ONE thing this undo deliberately does not reverse: T1 section 0's
+-- `ALTER COLUMN "read" SET DEFAULT false`. Leave it. It restores a default that
+-- 0050cc9's schema already declares, it is what keeps the public contact form
+-- alive in the Step 30 -> Step 39 gap, and reverting it has no upside at all.
 --
 -- T0 is NOT reversible: Postgres has no ALTER TYPE ... DROP VALUE. If you ran it
 -- and need it gone, that is a type rebuild, and AdminUser.role depends on the

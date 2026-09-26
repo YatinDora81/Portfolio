@@ -11,8 +11,28 @@
 -- section 4 arms a constraint the v1 writer violates.
 --
 -- Postgres 17 / Neon. Role is the database OWNER, not a superuser.
--- Run as:   BEGIN; \i media-flags-reval-github-contract.sql
---           COMMIT;
+--
+-- THIS FILE CARRIES ITS OWN TRANSACTION. One BEGIN below the header, one COMMIT
+-- after the verification block, matching the other 21 files in this directory.
+-- Do NOT wrap it in an outer BEGIN/COMMIT and do NOT pass psql
+-- --single-transaction. Atomicity here is not tidiness; it is the whole safety
+-- argument of the file:
+--   * SET LOCAL lock_timeout / statement_timeout are a silent NO-OP outside a
+--     transaction block (they only emit "WARNING: SET LOCAL can only be used in
+--     transaction blocks"). Section 3 takes ACCESS EXCLUSIVE on
+--     "RevalidationLog" to rewrite it while two live writers can be mid-statement,
+--     and section 1 takes it on "FeatureFlag", which apps/web reads inside the
+--     root layout. Without the lock timeout a blocked statement queues the site
+--     behind it instead of failing fast.
+--   * the DROP COLUMN in section 1 is the one statement in this file whose only
+--     remaining source is the Step 15 P4 dump. Without a transaction it commits
+--     BEFORE section 3's SYSTEM-rows guard and section 4's orphan-GithubYear
+--     guard, both of which RAISE EXCEPTION — and section 4's is the LAST
+--     statement in the file and the likeliest to fire. Half-applied is the one
+--     state the rollback block at the foot of this file cannot describe.
+-- The verification SELECTs therefore run INSIDE the transaction and COMMIT is
+-- the last statement. Read the human GATE above and the P4 dump from Step 15 in
+-- PASS 1 (RUNBOOK.md Stage 1), before any DDL.
 --
 -- ADMIN FREEZE: state a 2-minute admin freeze for this file. Section 3 rewrites
 -- RevalidationLog under ACCESS EXCLUSIVE. The PUBLIC site is untouched by every
@@ -27,6 +47,7 @@
 -- step 28.
 -- ============================================================================
 
+BEGIN;
 SET LOCAL lock_timeout = '3s';
 SET LOCAL statement_timeout = '120s';
 
@@ -141,7 +162,7 @@ DROP INDEX IF EXISTS "RevalidationLog_entityType_entityId_idx";
 -- writers can be in flight — the log INSERT
 -- (HEAD:apps/docs/app/lib/revalidation.ts:79) and the retention DELETE
 -- (HEAD:packages/db/src/maintenance.ts:163-177) which fires off a *visitor*
--- beacon at HEAD:apps/web/app/api/collect/route.ts:99. The admin freeze plus
+-- beacon at HEAD:apps/web/app/api/collect/route.ts:108. The admin freeze plus
 -- lock_timeout = 3s is the mitigation: we fail fast and retry rather than queue.
 --
 -- What is NOT a hazard, checked in the installed driver: the deployed client is
@@ -172,6 +193,12 @@ BEGIN
       RAISE EXCEPTION 'ABORT: % RevalidationLog row(s) hold trigger SYSTEM. Decide what they should become before the label is dropped.', "systemRows";
     END IF;
 
+    -- Now that this file carries its own BEGIN/COMMIT, a failed run rolls the
+    -- rename back and this cannot fire from a retry of THIS file. It is kept
+    -- because the state it detects is still reachable: somebody running the
+    -- rename by hand, or an older copy of this file applied without a
+    -- transaction. The condition is cheap and the failure it prevents -- two
+    -- enum types both claiming the column -- is not.
     IF EXISTS (SELECT 1 FROM "pg_type" t JOIN "pg_namespace" n ON n."oid" = t."typnamespace"
                 WHERE t."typname" = 'RevalidationTrigger_old' AND n."nspname" = current_schema()) THEN
       RAISE EXCEPTION 'ABORT: RevalidationTrigger_old already exists — a previous attempt half-finished. Clean it up by hand.';
@@ -337,25 +364,96 @@ SELECT "column_name", "data_type", "is_nullable"
  ORDER BY "column_name";
 
 
+COMMIT;
+
+
 -- ============================================================================
--- ROLLBACK  (after COMMIT; one transaction, this order)
+-- ROLLBACK  (after COMMIT)
 --
+-- FIVE STEPS, NOT ONE TRANSACTION. `SET NOT NULL` on "label" cannot be in the
+-- same transaction as the ADD COLUMN, because between them the text has to be
+-- put back, and the tool that puts most of it back is a separate process. If you
+-- run them together, SET NOT NULL raises 23502 on the first row whose label is
+-- still NULL and rolls back the entire rollback — including the FK drop and the
+-- enum re-widening, which had nothing to do with it. That failure is not
+-- hypothetical: it is the expected outcome whenever any FeatureFlag key is
+-- outside FLAG_DEFINITIONS, which is precisely the case section 1 above RAISEs a
+-- WARNING about.
+--
+-- R1. Shape back, in one transaction. "label" returns NULLABLE, i.e. the
+--     post-EXPAND shape, which is deliberate: R5 is what closes it.
+--
+--   BEGIN;
+--   SET LOCAL lock_timeout = '3s';
 --   ALTER TABLE "GithubYear" DROP CONSTRAINT IF EXISTS "GithubYear_handle_fkey";
 --   ALTER TYPE "RevalidationTrigger" ADD VALUE IF NOT EXISTS 'SYSTEM';
 --     -- appends last, which is exactly where 20260821130000 had it, so the
 --     -- label order comes back byte-identical. On PG12+ this is allowed inside
 --     -- a transaction but the restored label cannot be USED until after COMMIT.
---   CREATE INDEX "RevalidationLog_entityType_entityId_idx"
+--   CREATE INDEX IF NOT EXISTS "RevalidationLog_entityType_entityId_idx"
 --     ON "RevalidationLog" ("entityType", "entityId");
---   CREATE INDEX "MediaAsset_folder_createdAt_idx" ON "MediaAsset" ("folder", "createdAt");
---   ALTER TABLE "FeatureFlag" ADD COLUMN "label" TEXT, ADD COLUMN "description" TEXT;
---   -- then, ON THE V1 CODE: cd packages/db && bun run flags:seed
---   --   (HEAD's seed writes label + description; the v2 seed does not)
---   ALTER TABLE "FeatureFlag" ALTER COLUMN "label" SET NOT NULL;
+--   CREATE INDEX IF NOT EXISTS "MediaAsset_folder_createdAt_idx"
+--     ON "MediaAsset" ("folder", "createdAt");
+--   ALTER TABLE "FeatureFlag" ADD COLUMN IF NOT EXISTS "label" TEXT,
+--                             ADD COLUMN IF NOT EXISTS "description" TEXT;
+--   COMMIT;
 --
--- The label/description recovery only works for the nine FLAG_DEFINITIONS keys.
--- A row whose key is outside the registry cannot have its text restored by any
--- automated means; the EXPAND preflight P4 output is the only record.
+-- R2. The text back, for EVERY key including the off-registry ones, out of the
+--     Step 38 PRE-CONTRACT dump (or Step 7's — both predate this file, so both
+--     still carry label and description). This is the executable form of what
+--     used to be "read the P4 output and retype it":
+--
+--       cd packages/db
+--       jq -r -f v2-production/recover-from-dump.jq \
+--          --arg table FeatureFlag --arg key key \
+--          --arg cols 'label,description' --arg mode update \
+--          backups/PRE-CONTRACT-<stamp>.json \
+--          > /tmp/v2/prod/recover-flag-labels.sql
+--       # read it, then apply it the same way you applied this file
+--
+--     Its guard aborts if a key in the dump no longer exists in "FeatureFlag" —
+--     read the message rather than deleting the guard. A key CREATED after the
+--     dump is simply absent from the generated file and is what R4 exists for.
+--     RUNBOOK.md Step 8b rehearses this exact command on a throwaway branch; if
+--     you have not run Step 8b, do not first learn this path here.
+--
+-- R3. Belt and braces for the nine FLAG_DEFINITIONS keys, if R2's dump is
+--     unavailable or you want the registry text rather than the stored text. The
+--     DATABASE_URL override is MANDATORY: `flags:seed` resolves its connection
+--     through packages/db/src/index.ts:1,5 (dotenv/config + process.env
+--     .DATABASE_URL), and local DATABASE_URL points at the throwaway Neon child
+--     branch — without the override you seed the branch, leave production's
+--     labels NULL, and then R5 fails 23502 with no obvious cause.
+--
+--       git stash && git checkout 0050cc9 -- packages/db packages/shared
+--       cd packages/db && DATABASE_URL="$PGPROD" bun run db:generate
+--       DATABASE_URL="$PGPROD" bun run flags:seed
+--
+--     0050cc9 is the deployed v1 commit. Its seed upserts label + description
+--     (0050cc9:packages/db/scripts/seed-flags.ts:14-23); the v2 seed writes
+--     neither (HEAD:packages/db/scripts/seed-flags.ts:19-22), so the v1 tree is
+--     required, and the generated client is gitignored (.gitignore,
+--     `**/generated/prisma`) so db:generate has to run again against it. The v1
+--     seed leaves off-registry keys alone by design (0050cc9:.../seed-flags.ts
+--     :37-42) — that is why R2 comes first and R4 exists.
+--
+-- R4. The fail-safe. Never expected to matter, and the only reason R5 is safe.
+--
+--   BEGIN;
+--   SELECT "key" FROM "FeatureFlag" WHERE "label" IS NULL;      -- read this
+--   UPDATE "FeatureFlag" SET "label" = "key" WHERE "label" IS NULL;
+--   COMMIT;
+--
+-- R5. Only now:
+--
+--   BEGIN; ALTER TABLE "FeatureFlag" ALTER COLUMN "label" SET NOT NULL; COMMIT;
+--
+-- DO NOT RE-ALIAS THE v1 DEPLOYMENT UNTIL R5 HAS COMMITTED. The v1 client's
+-- datamodel declares `label String`, non-nullable
+-- (0050cc9:packages/db/prisma/schema.prisma, model FeatureFlag), so a NULL label
+-- is a value its three reader pages were never built to receive. `description`
+-- is already `String?` there and needs nothing. Finish the rollback, re-alias
+-- second — the same ordering rule as Step 39's `ContactMessage.read`.
 --
 -- If you are rolling back because the v2 DEPLOY is being reverted, roll back
 -- this file FIRST and leave EXPAND in place: v1 runs correctly against the

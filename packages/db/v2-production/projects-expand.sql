@@ -108,10 +108,11 @@ SET LOCAL idle_in_transaction_session_timeout = '5min';
 
 DO $$
 DECLARE
-    bad_elements  bigint;
-    asset_matches bigint;
-    logo_matches  bigint;
-    scheduled_bad bigint;
+    bad_elements    bigint;
+    asset_matches   bigint;
+    logo_matches    bigint;
+    scheduled_bad   bigint;
+    already_written boolean;
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                     WHERE table_schema = 'public' AND table_name = 'Project'
@@ -135,9 +136,12 @@ BEGIN
         RAISE EXCEPTION 'MediaAsset."id" is not text; the two new FK columns are TEXT';
     END IF;
 
-    IF to_regclass('public."ProjectImage"') IS NOT NULL
-       AND EXISTS (SELECT 1 FROM "ProjectImage" WHERE "assetId" IS NOT NULL) THEN
-        RAISE EXCEPTION 'ProjectImage already holds assetId rows; v2 has written here, do not re-run EXPAND';
+    IF to_regclass('public."ProjectImage"') IS NOT NULL THEN
+        EXECUTE 'SELECT EXISTS (SELECT 1 FROM "ProjectImage" WHERE "assetId" IS NOT NULL)'
+           INTO already_written;
+        IF already_written THEN
+            RAISE EXCEPTION 'ProjectImage already holds assetId rows; v2 has written here, do not re-run EXPAND';
+        END IF;
     END IF;
 
     SELECT count(*) INTO bad_elements
@@ -614,7 +618,8 @@ SELECT count(*)                                                        AS projec
        count(*) FILTER (WHERE "createdAt" <= "updatedAt")               AS created_before_updated,
        count(*) FILTER (WHERE "createdAt" > now())                      AS in_the_future,
        count(*) FILTER (WHERE "createdAt" > LEAST("publishedAt", "publishAt", "updatedAt"))
-                                                                        AS not_earliest;
+                                                                        AS not_earliest
+  FROM "Project";
 
 -- V5  all six logos are still string logos, none moved to an asset.
 --     expected: 6 | 6 | 0

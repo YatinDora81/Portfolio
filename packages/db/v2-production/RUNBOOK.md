@@ -7,21 +7,42 @@ STAGE 0  PRE-FLIGHT        Steps  1 – 12
 STAGE 1  EXPAND            Steps 13 – 23    (11 SQL files, additive only)
 STAGE 2  VERIFY EXPAND     Steps 24 – 27    (v1 must still be correct)
 STAGE 3  DEPLOY            Steps 28 – 32    (git push, two Vercel builds)
-STAGE 4  VERIFY DEPLOY     Steps 33 – 37    (v2 must be correct; freeze ends)
+STAGE 4  VERIFY DEPLOY     Steps 33 – 37b   (v2 must be correct; freeze ends at 37)
 STAGE 5  CONTRACT          Steps 38 – 49    (11 SQL files, destructive)
 STAGE 6  VERIFY CONTRACT   Steps 50 – 52
 STAGE 7  POST-CUTOVER      Steps 53 – 58    (soak, then delete things)
 ```
 
+A **lettered** step (`8b`, …) is one added after the first numbering, sitting between the two numbers
+it is named for. It is not optional and it is not an appendix; run it in place.
+
 **Admin freeze:** starts at Step 10, ends at Step 37. Budget **120 minutes**, hard stop at 180.
+Step **37b** is deliberately the first thing you do *after* the freeze — it is the R2 upload and the
+SMTP reply, the two writes rule 2 below will not allow inside one.
 A second, shorter freeze covers Steps 38 – 49 (~30 minutes).
 
 **Public downtime target: zero.** Nothing in EXPAND or CONTRACT drops a column the *currently
-deployed* code reads, and every `ALTER` runs under `lock_timeout = '3s'` so a blocked statement
-fails instead of queueing the site behind it.
+deployed* code reads. All 22 SQL files carry their own `BEGIN;`/`COMMIT;` — **never** supply an outer
+one — and every `ALTER` runs under `lock_timeout = '3s'` so a blocked statement fails instead of
+queueing the site behind it. `SET LOCAL` is a silent no-op outside a transaction block, so that
+promise and the per-file transaction are the same promise.
+
+**All 22 files now set a lock timeout. Four of them did not.** `analytics-expand.sql`,
+`analytics-contract.sql`, `contact-admin-audit-expand.sql` and `contact-admin-audit-contract.sql`
+contained no `lock_timeout` and no `statement_timeout` at all, which made the paragraph above false
+for them and made **S3** unreachable — with `lock_timeout` unset, Neon's default is `0`, *wait
+forever*. All four now open each stage with a **plain `SET` pair before the `BEGIN`**, the form
+`hero-expand.sql` and `hero-contract.sql` already used. The distinction is not style: `SET LOCAL`
+placed before a `BEGIN` sets nothing and warns. **Six** files now use plain `SET` (the four above plus
+the two `hero` files), **sixteen** use `SET LOCAL` inside their own transaction, and both forms are in
+effect — what matters is that
+**`WARNING: SET LOCAL can only be used in transaction blocks` must appear in no run log.** If it
+does, that file lost its lock timeout; stop and find out why before the next `ALTER`.
 
 **Point of no clean return: Step 43.** Before Step 43 every undo is a SQL statement. From Step 43
-the only undo for `HeroSkillBadge.iconKey` is the JSON dump from Step 7.
+the only undo for `HeroSkillBadge.iconKey` is the JSON dump from Step 7 — via
+`v2-production/recover-from-dump.jq`, which **Step 8b** exists to rehearse. "The dump is the floor"
+is only true if you have run Step 8b.
 
 ---
 
@@ -39,10 +60,10 @@ the SQL file you were running.** Do not improvise forward.
 | S4 | A `DO $$` block **RAISE EXCEPTION**s | A guard caught a value the plan did not predict. Nothing was applied. | Read the message — it names the rows. Fix the data, do not relax the guard. |
 | S5 | **22P02 invalid input value for enum** | A value outside an enum's label set exists. | Stop. Find the row. Do not coerce it. |
 | S6 | **23502 not_null_violation** during an admin save | A `NOT NULL` column lost its default too early. | Restore the default: `ALTER TABLE x ALTER COLUMN c SET DEFAULT ...`. This is always a CONTRACT statement that leaked into EXPAND. |
-| S7 | A Vercel build **fails** after EXPAND has run | You are stuck mid-window with no deadline. | Do not push again blindly. Fix the build locally (Step 5 exists to prevent this). EXPAND is safe to sit on indefinitely — v1 runs correctly against it. |
+| S7 | A Vercel build **fails** after EXPAND has run | You are stuck mid-window with no deadline. Three distinct causes, in descending likelihood: **(a) env** — `Invalid environment variables` from `packages/config/src/env.ts:39-43`, i.e. a missing `DATABASE_URL` or a `REVALIDATE_SECRET` under 32 chars in *that* environment (Step 6); **(b) schema** — a `42703`/`42P01` from the prerender, because `next build` reads the database (Step 4, gate 2); **(c) code**. | Do not push again blindly. Read which of (a)/(b)/(c) it is before doing anything. Fix the build locally (Step 5 exists to prevent this). EXPAND is safe to sit on indefinitely — v1 runs correctly against it. |
 | S8 | Only **one** of the two Vercel projects went Ready | Half-deployed is the one state CONTRACT cannot survive. | Do not run any contract file. Fix or roll back the failed project first. |
 | S9 | The Vercel build log shows **`prisma db push`** or **`prisma migrate deploy`** | The deploy is mutating the schema behind your back. It will silently drop the CHECK constraints and may drop columns while v1 lambdas drain. | **Stop before Step 13.** Fix the dashboard command. This is Step 3. |
-| S10 | Vercel production `DATABASE_URL` points at the **Neon child branch** | The live site is serving from a throwaway clone. | Stop. Repoint it to production. This is Step 6. |
+| S10 | Vercel `DATABASE_URL` points at the wrong database in **any** environment | **Production → child branch:** the live site serves from a throwaway clone, *and* the build bakes its HTML from it. **Preview → production:** the branch push at Step 30 stands up a live v2 admin against production before the production deploy. | Stop. Repoint it. This is Step 6, which reads all three environments for both projects. |
 | S11 | An admin save you did not make appears in the audit log during the freeze | Someone is editing. Window writes are the primary silent-corruption vector. | Stop, find out who, restart the affected cluster's EXPAND (they are all re-runnable). |
 | S12 | `bun run db:verify` reports drift you cannot name | You do not know what state the database is in. | Stop. Diff against `packages/db/v2-migration-draft/target-ddl.sql` by hand before doing anything else. |
 
@@ -163,53 +184,104 @@ deploy`**, **stop and do not run Step 13.**
 
 ---
 
-## Step 4 — Make the build self-sufficient (code change, four edits)
+## Step 4 — Make the build self-sufficient. Four of the five edits are already committed.
 
 **What it does.** Moves `prisma generate` into the turbo build graph so the deploy is reproducible
 from git. Every one of the eleven clusters names this as a required step, because a failed build
 after EXPAND leaves you mid-window with **no deadline** (S7).
 
-**Command.** Four edits, in the same commit as the v2 code:
+**Status, verified against git.** Four of the five edits below are **already in `HEAD`**. Do not
+re-make them. Verify them, then make edit 5, which is the only one outstanding.
 
-1. `packages/db/package.json` — add to `scripts` (it currently ends at `"db:verify"`):
-   ```json
-   "build": "prisma generate",
-   ```
-2. **New file** `packages/db/turbo.json`:
+| # | Edit | Where it landed | Verify with |
+|---|---|---|---|
+| 1 | `packages/db/package.json` → `"build": "prisma generate"` | `6493c8f` | `git log --oneline -S'"build": "prisma generate"' -- packages/db/package.json` |
+| 2 | **New file** `packages/db/turbo.json` | `83743d2` | `git show 83743d2 --stat` |
+| 3 | root `turbo.json` → `"^build"` in `tasks["check-types"].dependsOn` (`turbo.json:52-57`) | `83743d2` | same |
+| 4 | root `package.json` → `"postinstall": "bun run --cwd packages/db db:generate"` | `83743d2` | same |
+| 5 | `packages/db` gets a `check-types` task — **see below, still outstanding** | — | — |
+
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio
+git show 83743d2 --stat
+cat packages/db/turbo.json
+git log --oneline -S'"build": "prisma generate"' -- packages/db/package.json
+```
+
+Edit 2's committed `inputs` are `["prisma/schema.prisma", "prisma.config.ts"]` — the draft of this
+runbook also listed `package.json`; its absence is harmless (a script rename would not bust the
+cache, but a script rename does not change the generated client either). The package-level override
+is **required**, for the reason the draft gave: the root `build` task declares
+`outputs: [".next/**"]` (`turbo.json:41-45`), which is wrong for `packages/db` and would cache
+nothing. Nothing else is needed: `apps/web/package.json` and `apps/docs/package.json` already
+depend on the `db` workspace, and the root `build` task already has `dependsOn: ["^build"]`.
+
+**Edit 5, the one that is still missing.** `packages/db` has **no `check-types` script**, so
+`turbo run check-types` skips the package entirely — and Steps 5 and 29 both gate on
+`bun run check-types` passing. That means `packages/db/seed.ts` (19 `deleteMany` calls, rewritten
+for v2), `scripts/install-hero-v2.ts`, `scripts/seed-flags.ts` and the five newer
+`packages/db/scripts/*.ts` are **never typechecked by anything**. Neither app imports them, so
+`tsc --noEmit` in `apps/web`/`apps/docs` does not reach them. A `seed.ts` still naming `Blog.show`,
+`Skill.show`, `Project.images` or `SiteConfig` would pass every gate in this runbook and only
+explode the next time someone seeds. Two files:
+
+1. **New file** `packages/db/tsconfig.check.json`:
    ```json
    {
-     "extends": ["//"],
-     "tasks": {
-       "build": {
-         "inputs": ["prisma/schema.prisma", "prisma.config.ts", "package.json"],
-         "outputs": ["src/generated/prisma/**"]
-       }
-     }
+     "extends": "./tsconfig.json",
+     "compilerOptions": {
+       "rootDir": ".",
+       "noEmit": true
+     },
+     "include": ["src", "scripts", "seed.ts", "prisma.config.ts"]
    }
    ```
-   A package-level override is **required**: the root `build` task declares `outputs: [".next/**"]`
-   (`turbo.json:28-32`), which is wrong for `packages/db` and would cache nothing.
-3. `turbo.json` — add `"^build"` to `tasks["check-types"].dependsOn`, because `apps/*/check-types`
-   runs `tsc --noEmit` against the generated client.
-4. Root `package.json` — add a belt so a bare clone works:
+2. `packages/db/package.json` — add to `scripts`:
    ```json
-   "postinstall": "bun run --cwd packages/db db:generate",
+   "check-types": "tsc --noEmit -p tsconfig.check.json",
    ```
 
-Nothing else is needed: `apps/web/package.json` and `apps/docs/package.json` already depend on the
-`db` workspace, and the root `build` task already has `dependsOn: ["^build"]`.
+A separate tsconfig is **required**, not tidiness. The plain `"check-types": "tsc --noEmit"` that
+every other package uses would run against `packages/db/tsconfig.json`, whose `include` is
+`["src"]` — so it would typecheck the client wrapper and skip every file this edit exists to cover.
+Widening `include` in `tsconfig.json` itself fails outright: `rootDir` there is `./src`, and
+`tsc` answers with nine `TS6059: File ... is not under 'rootDir'` errors. The override sets
+`rootDir: "."` and keeps `noEmit`, which is the only combination that compiles all three trees.
 
 **Expected output.** `bun run build` generates the client before either `next build`.
+`bunx turbo run check-types --filter=db` prints `db:check-types: $ tsc --noEmit -p
+tsconfig.check.json` and exits 0. Verified on this tree: 3 tasks, 3 successful.
 
-**Gate.** One gotcha, confirmed: `prisma generate` **fails** with
-`PrismaConfigEnvError: Cannot resolve environment variable: DATABASE_URL` if `DATABASE_URL` is
-unset, because `packages/db/prisma.config.ts` resolves `env("DATABASE_URL")` at config load. It
-never opens a connection. So `DATABASE_URL` must be **present** in the Vercel *build* environment.
-It already is in `turbo.json` `globalEnv` (line 5), so Turbo passes it through. Confirm it is set
-for the Production environment in both Vercel projects.
+**Gate — two things, and the second is the one that gets missed.**
 
-**Undo.** `git checkout -- turbo.json package.json packages/db/package.json && rm -f
-packages/db/turbo.json`.
+1. `prisma generate` **fails** with `PrismaConfigEnvError: Cannot resolve environment variable:
+   DATABASE_URL` if `DATABASE_URL` is unset, because `packages/db/prisma.config.ts` resolves
+   `env("DATABASE_URL")` at config load. It never opens a connection. So `DATABASE_URL` must be
+   **present** in the Vercel *build* environment. It already is in `turbo.json` `globalEnv`
+   (line 5), so Turbo passes it through.
+
+2. **`next build` is not like `prisma generate`: it opens a real connection and issues real SQL.**
+   This is stated nowhere else in this runbook and it governs Steps 5, 21, 29, 30, 31 and 33.
+   - `apps/web` — `apps/web/app/page.tsx:276` is `export const revalidate = 86400` with no
+     `force-dynamic`, and `apps/web/app/layout.tsx` calls neither `cookies()` nor `headers()`, so
+     `/` is **prerendered at build time**. That prerender runs `getAboutData()`, which does
+     `prisma.education.findMany(...)`. `apps/web/app/sitemap.ts:8` and
+     `apps/web/app/blog/[slug]/page.tsx:14` `generateStaticParams()` both call `getBlogs()`.
+     Three database reads, in the build, against **whatever `DATABASE_URL` the build environment
+     holds**.
+   - `apps/docs` — every dashboard page is dynamic (`apps/docs/app/(dashboard)/layout.tsx:12`
+     awaits `getSession()`, which reads `cookies()`), and the four non-dashboard pages
+     (`/`, `/login`, `/forgot-password`, `/reset-password`) touch no table. So the docs build
+     issues **no SQL** — but it still evaluates `@repo/config/env` (reached from
+     `apps/docs/app/lib/revalidation.ts`), which throws at module load on a missing
+     `DATABASE_URL` or a `REVALIDATE_SECRET` under 32 characters. A docs build therefore fails on
+     bad env without ever proving the database is reachable.
+   - Consequence to hold onto: a build is a **schema compatibility test against one specific
+     database**. Step 21 edits the schema mid-EXPAND, which is what makes this dangerous —
+     see Step 21 sub-steps **21.3** and **21.4**.
+
+**Undo.** Edits 1–4 are committed history; leave them. For edit 5:
+`git checkout -- packages/db/package.json && rm -f packages/db/tsconfig.check.json`.
 
 ---
 
@@ -228,24 +300,52 @@ bun run build
 ```
 
 **Expected output.** `bun run build` recreates `packages/db/src/generated/prisma/**` and both
-`apps/web` and `apps/docs` build. `check-types` is clean.
+`apps/web` and `apps/docs` build. `check-types` is clean. The `apps/web` build log ends with a
+`Generating static pages (N/N)` line and a route table marking `/` and `/blog/[slug]` as
+prerendered.
 
-**Gate.** All three commands exit 0, **and** the build log shows the `db#build` task running before
-`web#build` and `docs#build`. If `db#build` does not appear, edit 1 or 2 of Step 4 is wrong.
+**Gate.** All four:
+- All three commands exit 0.
+- The build log shows the `db#build` task running **before** `web#build` and `docs#build`. If
+  `db#build` does not appear, edit 1 or 2 of Step 4 is wrong.
+- The `check-types` run lists a **`db#check-types`** task. If it does not, **edit 5 of Step 4 is
+  missing**, and `seed.ts` plus every script under `packages/db/scripts/` is going out
+  untypechecked. This is the only gate in this runbook that catches Step 58 hazard 3 before it
+  fires.
+- `Generating static pages` appears and does not error. **This build just read the database** (Step
+  4, gate 2) — specifically the one local `DATABASE_URL` points at, which is the Neon child branch,
+  **not** production. So a green build here proves the v2 code matches *the branch's* schema. That
+  is exactly the guarantee Step 21 breaks, and Step 29 is where you re-establish it.
 
 **Undo.** `bun install` restores the generated client. Nothing in the database was touched.
 
 ---
 
-## Step 6 — Confirm Vercel environment variables. Production must point at PRODUCTION.
+## Step 6 — Confirm Vercel environment variables. All three environments, both projects.
 
 **What it does.** Local `.env` files now point `DATABASE_URL` at the **Neon child branch**.
 Vercel's own variables were not touched. Verify that, because a mistake here means the live site
 serves from a throwaway clone (S10) or, worse, that EXPAND lands on the branch while production
 goes untouched and you spend the night confused.
 
-**Command.** Not SQL. In both Vercel dashboards, Settings → Environment Variables, for the
-**Production** environment, read `DATABASE_URL` and compare its host to:
+**Read Production, Preview AND Development. Not just Production.** Step 30 makes the entire cutover
+conditional on **two green Preview builds** — so Preview env is load-bearing, and an unverified
+Preview env has two failure modes, both bad:
+- **Preview is missing `DATABASE_URL` or `REVALIDATE_SECRET`** → both preview builds throw at module
+  load in `packages/config/src/env.ts:37-43`, Step 30's gate can never be satisfied, and you are
+  parked mid-window with EXPAND applied and no deadline. That is **S7**, arrived at by a route S7
+  does not mention.
+- **Preview `DATABASE_URL` points at production** → the branch push at Step 30 stands up a live v2
+  public site *and* a live v2 admin **against production**, before the production deploy. Step 10's
+  freeze instruction ("Close EVERY admin tab in every browser and on every device") was written
+  before that URL existed. See Step 30's gate.
+
+Development matters less but is not free: `bun run dev` and `vercel dev` read it, and a Development
+`DATABASE_URL` pointing at production is hazard 1 of Step 58 already armed.
+
+**Command.** Not SQL. In both Vercel dashboards (`web` and `docs`), Settings → Environment
+Variables, read every row below for **each** of Production / Preview / Development. Then compare
+hosts to local:
 
 ```bash
 cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
@@ -255,14 +355,57 @@ for v in DATABASE_URL PROD_DATABASE_URL NEW_DATABASE_URL; do
 done
 ```
 
-**Expected output.** Three different hosts. `PROD_DATABASE_URL`'s host is the one that must match
-Vercel Production. `DATABASE_URL` (local) is the branch and must **not** appear anywhere in Vercel
-Production.
+**The exact variables to read.** Group A is fatal at **module load**, which means it fails the
+*build*, not a request. Group B is validated only if it is set, so a typo is fatal and an absence is
+not. Group C is never validated, so a miss is silently wrong behaviour rather than an error.
 
-**Gate.**
-- Vercel Production `DATABASE_URL` host **==** local `PROD_DATABASE_URL` host, in both projects.
-- `REVALIDATE_SECRET`, `JWT_SECRET`, `R2_*`, `SMTP_*` are unchanged. This cutover changes none of
-  them, and a missing one turns into a runtime 500 that looks like a schema problem.
+| Group | Variable | Needed by | Rule | Source |
+|---|---|---|---|---|
+| **A** | `DATABASE_URL` | web + docs | non-empty, or the build throws | `packages/config/src/env.ts:10` |
+| **A** | `REVALIDATE_SECRET` | web + docs | **≥ 32 characters**, or the build throws | `env.ts:13` |
+| **A** | `JWT_SECRET` | **docs only** | non-empty; bare `throw` at module load | `apps/docs/app/lib/auth.ts:2`, `actions/auth.ts:13` |
+| **A** | `PORTFOLIO_URL` | **docs only** | non-empty; bare `throw` at module load | `apps/docs/app/lib/revalidate.ts:1` |
+| B | `NEXT_PUBLIC_SITE_URL` | web + docs | must parse as a URL if set; defaults to `https://www.yatindora.in` | `env.ts:14` |
+| B | `PREVIEW_SECRET` | web + docs | ≥ 32 if set | `env.ts:21` |
+| B | `CONTACT_FORM_HMAC_SECRET` | web | ≥ 32 if set | `env.ts:23` |
+| B | `SMTP_EMAIL` / `SMTP_PASSWORD` | web + docs | `SMTP_EMAIL` must be an email if set | `env.ts:18-19` |
+| B | `NOTIFY_EMAIL_TO` | web | must be an email if set | `env.ts:26` |
+| B | `ADMIN_BASE_URL` | web | must be a URL if set | `env.ts:27` |
+| B | `TURNSTILE_SECRET_KEY`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | web | non-empty if set | `env.ts:24-25` |
+| B | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | docs (uploads) | `""` counts as unset, not invalid | `env.ts:29-32` |
+| B | `CDN_BASE_URL` | docs | must be a URL if set; `""` is unset | `env.ts:34` |
+| C | `NEXT_PUBLIC_CDN_URL` | web + docs | falls back to `https://cdn.yatindora.in` — a miss silently rewrites every media URL | `apps/web/app/lib/site.ts:14`, `apps/docs/app/lib/utils.ts:6` |
+| C | `NEXT_PUBLIC_ENABLE_CLARITY`, `NEXT_PUBLIC_CLARITY_PROJECT_ID` | web | analytics script only | `apps/web/app/components/ClarityAnalytics.tsx:9-10` |
+| C | `TRACKING_ENABLED`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | docs | tracking silently disables itself when absent | `apps/docs/app/lib/supabase-tracking.ts:7-15` |
+| C | `GOOGLE_SHEET_ID`, `GOOGLE_SHEET_TAB`, `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY` | docs | `/refer-emails` sheet sync | `apps/docs/app/lib/sheet.ts:97-100` |
+
+**Expected output.** **Two** distinct local hosts, not three — verified on this tree:
+`DATABASE_URL` and `NEW_DATABASE_URL` are currently the *same* branch (`ep-aged-cake-a1ipqgrh`,
+database `neondb`), and `PROD_DATABASE_URL` is the other one (`ep-withered-bird-a1tz5xe6`,
+`neondb`). `apps/web/.env` and `apps/docs/.env` also point `DATABASE_URL` at
+`ep-aged-cake-a1ipqgrh`. Three hosts is the state you reach **after** Step 9 repoints
+`NEW_DATABASE_URL` at a fresh branch cut from production; if you see three before Step 9, someone
+already cut it.
+
+`PROD_DATABASE_URL`'s host is the one that must match Vercel **Production**. Local `DATABASE_URL`
+must **not** appear anywhere in Vercel Production.
+
+Note what the shared branch is: **not** a production clone. It carries the **v2 canonical** schema —
+43 tables, `Education.startYear integer NOT NULL`, `Education.endYear integer NULL`,
+`Experience.startedOn date NOT NULL`, `Experience.logoAssetId` present, and no `startDate` /
+`endDate` / `isCurrent` at all. That is why Step 9 insists on a **fresh** branch cut from production
+for the rehearsal, and it is the fact Step 21 sub-step 21.3 turns on.
+
+**Gate — five, and write the answers into the run log.**
+- Vercel **Production** `DATABASE_URL` host **==** local `PROD_DATABASE_URL` host, in both projects.
+- Vercel **Preview** has a non-empty `DATABASE_URL` and a `REVALIDATE_SECRET` of **at least 32
+  characters**, in both projects, and `docs` Preview also has `JWT_SECRET` and `PORTFOLIO_URL`.
+- **You have written down, verbatim, which database Preview points at** — production, the child
+  branch, or a third thing. Step 30's gate reads this line back. If you cannot answer it, stop:
+  you do not know what the push at Step 30 will do.
+- Every Group A row is present in **Production** for the project that needs it. Group B rows are
+  unchanged by this cutover; confirm that, because a typo here becomes a build failure at Step 31
+  that looks nothing like an env problem.
 - Export the secret you will need for the cache flushes:
   ```bash
   export REVALIDATE_SECRET='<the production value>'
@@ -277,7 +420,15 @@ take effect on the **next deployment**, not immediately, which is its own trap.
 
 **What it does.** The read-only JSON dump is the only undo for three things:
 `HeroSkillBadge.iconKey` (Step 43), `FeatureFlag.label`/`description` for any key outside
-`FLAG_DEFINITIONS` (Step 40), and `Blog.show`'s per-row values (Step 47).
+`FLAG_DEFINITIONS` (Step 40), and `Blog.show`'s per-row values (Step 47). Step 56a adds a fourth,
+`legacy_v1."SiteConfig"`.
+
+**"The only undo" means a specific, rehearsed command, not a hope.** The path from this file back
+into a single table is `v2-production/recover-from-dump.jq`, and **Step 8b** is where you prove you
+can run it. `bun run db:restore` is *not* that path and cannot be made into it: it has no per-table
+mode — `scripts/restore.ts:144-147` `TRUNCATE`s every dumped table present in the target and
+`:150-216` reloads all of them — so using it to recover one column would destroy everything written
+since this dump.
 
 **Command.**
 
@@ -326,7 +477,198 @@ row counts as the dump.
 `refusing: ... which PROD_DATABASE_URL protects`, you pointed `NEW_DATABASE_URL` at production —
 fix it, do not work around the guard.
 
+**What this step does NOT prove.** It proves the dump is complete and parseable. It does **not**
+prove you can get one column of one table out of it and into **production**, which is the direction
+Steps 40, 43, 47 and 56a actually need — and `db:restore` is structurally incapable of that
+direction, for both of the reasons in Step 7. That is Step 8b. **Do not skip it.** The untested half
+is the half you will need.
+
 **Undo.** Delete the scratch Neon branch. Production was never a target.
+
+---
+
+## Step 8b — Rehearse the recovery you will actually need: one table, out of the dump
+
+**What it does.** Three CONTRACT steps name this dump as their only undo (Step 40's off-registry
+`FeatureFlag.label`/`description`, Step 43's `HeroSkillBadge.iconKey`, Step 47's per-row `Blog.show`),
+and Step 56a adds `legacy_v1."SiteConfig"`. This step turns that claim into something you have done
+once, at zero production risk, before the night starts.
+
+`packages/db/v2-production/recover-from-dump.jq` reads the dump and **emits a `.sql` file** that
+touches exactly one table and exactly the columns you name. It connects to nothing. The generated
+file is an ordinary SQL file with its own `BEGIN;`/`COMMIT;`, a guard, and a verification `SELECT`,
+so at recovery time it goes through the **same production-apply path as any `*-contract.sql`** (Stage
+1, PASS 2). No new production write path is introduced by any of this, and no guard is bypassed.
+
+**FIRST, check the shape of the branch you are about to rehearse against.** This is the one thing
+that will waste your evening. The generator reads the **dump**, which is v1-shaped, but the apply
+lands on a **branch**, and `db:restore` does not change a target's shape — `scripts/restore.ts` keeps
+only the dump columns the target already has (`ignoring <cols>`) and leaves target-only columns at
+their default. So restoring the PRE-CUTOVER dump into a branch that has already had EXPAND **and**
+CONTRACT run against it (which is what the `NEW_DATABASE_URL` branch is after Step 9) gives you v1
+*data* in a v2 *shape* — and the `HeroSkillBadge.iconKey` rehearsal then dies on apply with
+`42703 column "iconKey" of relation "HeroSkillBadge" does not exist`, which looks like the generator
+is broken and is not.
+
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
+bun run db:dump --from=NEW_DATABASE_URL --out=/tmp/v2/prod/8b-shape.json | tail -2
+jq -r '[.tables[]|select(.name=="HeroSkillBadge")|.columns[].name]|join(" ")' /tmp/v2/prod/8b-shape.json
+jq -r '[.tables[].name]|index("SiteConfig")' /tmp/v2/prod/8b-shape.json
+```
+
+- `iconKey` and `name` present, `SiteConfig` present (a number, not `null`) → **v1 shape**. Run
+  part A, which is the real rehearsal of Steps 43 and 56a.
+- Either one absent → **post-CONTRACT shape.** Either cut a fresh Neon branch from production, point
+  `NEW_DATABASE_URL` at it and re-run Step 8, or skip to part B, which proves the same mechanism on a
+  column that exists in both shapes. **Do not skip both.**
+
+**Part A — the real thing, on a v1-shaped branch.**
+
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
+mkdir -p /tmp/v2/prod
+
+# 1. Break the branch on purpose, the way Step 43 breaks production. No BEGIN/COMMIT
+#    in this one: db:apply-sql supplies its own (scripts/apply-sql.ts:54-56).
+printf '%s\n' 'UPDATE "HeroSkillBadge" SET "iconKey" = $$WRONG$$;' > /tmp/v2/prod/rehearsal-break.sql
+bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/rehearsal-break.sql --apply=true
+
+# 2. Generate the recovery from the dump. This writes a file; it opens no connection.
+jq -r -f v2-production/recover-from-dump.jq \
+   --arg table HeroSkillBadge --arg key id --arg cols 'iconKey,name' --arg mode update \
+   backups/PRE-CUTOVER-<stamp>.json > /tmp/v2/prod/rehearsal-badge-iconkey.sql
+
+# 3. READ IT. This is the step that makes the rehearsal worth anything.
+less /tmp/v2/prod/rehearsal-badge-iconkey.sql
+
+# 4. Apply it to the branch.
+bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/rehearsal-badge-iconkey.sql
+bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/rehearsal-badge-iconkey.sql --apply=true
+
+# 5. Rehearse the insert shape too — it is what Step 56a's undo needs, and it is a
+#    different code path (INSERT ... ON CONFLICT DO NOTHING, all columns).
+jq -r -f v2-production/recover-from-dump.jq \
+   --arg table SiteConfig --arg key id --arg cols '*' --arg mode insert \
+   backups/PRE-CUTOVER-<stamp>.json > /tmp/v2/prod/rehearsal-siteconfig.sql
+less /tmp/v2/prod/rehearsal-siteconfig.sql
+bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/rehearsal-siteconfig.sql --apply=true
+```
+
+**Part B — shape-independent, works on any branch.** `HeroSkillBadge.label` exists in both v1 and v2,
+so this exercises generate → break → recover → verify without needing a v1-shaped target. **This
+exact sequence has been run against the `NEW_DATABASE_URL` child branch and the restored labels came
+back byte-identical to the dump**, so a clean pass is the expected result, not a lucky one.
+
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
+bun run db:dump --from=NEW_DATABASE_URL --out=/tmp/v2/prod/8b-before.json | tail -2
+
+jq -r -f v2-production/recover-from-dump.jq \
+   --arg table HeroSkillBadge --arg key id --arg cols 'label' --arg mode update \
+   /tmp/v2/prod/8b-before.json > /tmp/v2/prod/8b-recover.sql
+less /tmp/v2/prod/8b-recover.sql
+
+printf '%s\n' 'UPDATE "HeroSkillBadge" SET "label" = $$WRONG$$;' > /tmp/v2/prod/8b-break.sql
+bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/8b-break.sql --apply=true
+bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/8b-recover.sql --apply=true
+
+bun run db:dump --from=NEW_DATABASE_URL --out=/tmp/v2/prod/8b-after.json | tail -2
+for f in before after; do
+  jq -S '[.tables[]|select(.name=="HeroSkillBadge")|.rows[]|{id,label}]|sort_by(.id)' \
+     /tmp/v2/prod/8b-$f.json > /tmp/v2/prod/8b-$f.cmp
+done
+diff /tmp/v2/prod/8b-before.cmp /tmp/v2/prod/8b-after.cmp && echo 'RECOVERED byte-identical'
+```
+
+**Part C — prove the guard fires, and that a failed recovery leaves nothing half-applied.** This is
+the half you will care about most, because the row you are recovering may have been deleted. Forge a
+dump with a row the target does not have, and watch the whole transaction abort:
+
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
+jq '(.tables[]|select(.name=="HeroSkillBadge").rows) += [{"id":"ghost-row","label":"GHOST"}]' \
+   /tmp/v2/prod/8b-before.json > /tmp/v2/prod/8b-ghost.json
+jq -r -f v2-production/recover-from-dump.jq \
+   --arg table HeroSkillBadge --arg key id --arg cols 'label' --arg mode update \
+   /tmp/v2/prod/8b-ghost.json > /tmp/v2/prod/8b-ghost.sql
+bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/8b-ghost.sql --apply=true; echo "exit=$?"
+```
+
+Expected: `P0001 recover aborted: HeroSkillBadge row(s) [ghost-row] in the dump no longer exist.
+Decide what that means before restoring the rest.`, a non-zero exit, and the branch **unchanged** —
+re-run part B's `diff` to confirm. Verified: it aborts and the labels are untouched.
+
+Every recovery the runbook depends on, with its arguments and the dump it must come from.
+`FeatureFlag`'s key column is `key`, not `id`, because that is its primary key. **The first four are
+the ones that matter** — they are the steps whose undo has no other source.
+
+| Step | table | `--arg key` | `--arg cols` | `--arg mode` | which dump |
+|---|---|---|---|---|---|
+| 40 | `FeatureFlag` | `key` | `label,description` | `update` | 38, or 7 |
+| 43 | `HeroSkillBadge` | `id` | `iconKey,name` | `update` | 7 (pre-EXPAND) |
+| 47 | `Blog` | `id` | `show` | `update` | **38** — a post published in the window exists only there |
+| 56a | `SiteConfig` | `id` | `*` | `insert` | **38 or 7 only.** No post-cutover dump has this table: `dump.ts:31-33` reads `table_schema='public'` and C4 moved it to `legacy_v1` |
+| 48 | `AnalyticsSession` | `id` | `lastSeenAt` | `update` | 38. Cosmetic, and the largest table here — check the row count first |
+| 56b | `UtmTracker` | `id` | `*` | `insert` | 52, where it is named `UtmTracker__retired_v2`. Pass the name the dump actually holds |
+| 56c | `Project` | `id` | `images` | `update` | any dump before Step 46 |
+
+**Expected output.** The generator prints a header naming the dump's host, database and
+`generatedAt`, the table and the row count; then `BEGIN;`, the two `SET LOCAL`s, one guard
+`DO $recover$` block (update mode only), one statement per dumped row, two verification `SELECT`s
+(the second leads with the key column, so rows are identifiable against the dump), `COMMIT;`. For
+`HeroSkillBadge` that is one `UPDATE` per badge. `db:apply-sql`'s dry run prints the target and the
+character count and changes nothing; the apply run prints `applied.`
+
+**It refuses to generate rather than emit a wrong file**, exit 1 with a one-line reason, when: the
+table is not in the dump; a named column is not in the dump; the key column is not in the dump; `mode`
+is neither word; the table has **zero rows** in the dump (you picked the wrong dump, or the table is
+under a post-rename name — see Step 48's `UtmTracker__retired_v2`); or `update` mode was handed
+nothing but the key column to set, which would emit `UPDATE t SET  WHERE …` and fail `42601` halfway
+through a recovery. Every one of those refusals happens on your laptop with nothing connected.
+
+**A nested transaction, in this rehearsal only — and you will not be told about it.** `db:apply-sql`
+wraps whatever you hand it in its own `begin`/`commit` (`scripts/apply-sql.ts:54-56`), so a file that
+already carries its own produces `there is already a transaction in progress` on the inner `BEGIN;`
+and `there is no transaction in progress` on the helper's trailing `commit`. Both are server
+**notices**, and `apply-sql.ts` registers no `notice` listener, so **neither is printed** — the run
+just looks clean. It is clean: the statements land atomically, because the generated file's `COMMIT;`
+is its **last** statement, so the inner commit and the helper's commit close the same transaction with
+nothing after it. Two consequences worth holding:
+- Do **not** strip the `BEGIN;`/`COMMIT;` out of a generated file to make the nesting go away. It is
+  what makes the file safe on the production path, where `apply-sql` is not involved.
+- Do **not** append anything after the `COMMIT;` in a generated file. Anything past it runs in
+  autocommit and is not covered by the rollback.
+
+This nesting is a property of the branch-only helper, **not** of the production path: at recovery
+time the generated file supplies the only transaction, exactly like every `*-contract.sql`.
+
+**Gate.** Five. The **first four are mandatory**; the fifth is only reachable on a v1-shaped branch.
+- The generated file has a `BEGIN;` and a `COMMIT;` and you have **read** it end to end. It is
+  generated SQL aimed at production; treat it like every other file in this directory. (Above a few
+  thousand rows that stops being possible — read the header, spot-check, and say so in the run log.)
+- **Part B's `diff` is empty.** The recovery put every value back byte-for-byte, including `NULL`s and
+  empty strings, which the two forms in the generated file (`NULL` vs `''::"text"`) distinguish.
+- **Part C aborts with `P0001 recover aborted`, exits non-zero, and part B's `diff` is still empty
+  afterwards.** This is the important one: it proves the guard catches a deleted row *and* that a
+  failed recovery is atomic. A recovery that half-applies is worse than one that refuses.
+- `SHOW standard_conforming_strings;` is `on`. The generator emits backslashes verbatim, which is
+  only correct while it is. **Verified `on` on the Neon child branch**, and it is the PG17/Neon
+  default that nothing in this cutover changes — but read it on **production** once, here, rather
+  than during a recovery. While you are there, confirm the `::"udt"` casts the generator emits parse:
+  `SELECT 1::"int4", now()::"timestamp", ARRAY['a']::"_text", '{}'::"_text", '{"x":1}'::"jsonb";`
+  All five are verified good on Neon PG17; `information_schema.columns.udt_name` is the `pg_type`
+  name, so the quoted form always resolves.
+- Part A step 5's `INSERT` shows `ON CONFLICT DO NOTHING` semantics, i.e. re-running it is a no-op
+  rather than 26 duplicate-key errors. Run it twice to see that.
+
+**If the generator raises.** Read the message; it names exactly what it could not find. In `update`
+mode the *generated* file also aborts if a key in the dump no longer exists in the target — that is a
+row somebody deleted, and it is information, not an obstacle. **Do not delete the guard**, and do not
+hand-edit the generated file: fix the arguments, or prune the dump, and regenerate.
+
+**Undo.** N/A for production — nothing here touches it. The branch is disposable; if you mangle it,
+re-run Step 8.
 
 ---
 
@@ -365,6 +707,18 @@ except the two known-pending opclass indexes.
 
 **Gate.** All of the above. Any `RAISE EXCEPTION` you see here you would have seen on production at
 2 a.m. instead. Fix the cause, re-cut the branch, rehearse again.
+
+**Before the first `-f`, prove the branch is a v1 clone.** `NEW_DATABASE_URL` as shipped in
+`packages/db/.env` is **not** a production clone — it is the same branch local `DATABASE_URL` uses
+(`ep-aged-cake-a1ipqgrh`, `neondb`), and it already holds the **v2 canonical** schema: 43 tables,
+`Education.startYear integer NOT NULL`, `Experience.startedOn date NOT NULL`, no `startDate` /
+`endDate` / `isCurrent`. Rehearsing against it does not test anything this runbook does, and section
+E of `experience-education-expand.sql` will fail `42883` because `public.v2_year_to_int` takes `text`
+and would be handed an `integer`. **Repoint `NEW_DATABASE_URL` at a genuinely fresh branch cut from
+production first**, then confirm with the read-only probe (Step 21.3's form,
+`TARGET=NEW_DATABASE_URL`): `Education.startYear` must come back `text`, and `Experience` must still
+have `startDate` / `endDate` / `isCurrent`. Every preflight in every file is written against that
+shape.
 
 **Undo.** Delete the rehearsal branch.
 
@@ -433,7 +787,7 @@ minutes.
 **Command.** Read, do not run:
 
 - There is **no `vercel.json`**, therefore **no cron**. Three background jobs ride `after()` on the
-  public collect beacon (`HEAD:apps/web/app/api/collect/route.ts:99-100`):
+  public collect beacon (`HEAD:apps/web/app/api/collect/route.ts:108-110`):
   scheduled publishing (`packages/db/src/publish-due.ts`), the analytics rollup
   (`packages/db/src/rollup.ts`) and retention (`packages/db/src/maintenance.ts`).
 - The GitHub refresh rides the *home page's own ISR regeneration*:
@@ -442,8 +796,18 @@ minutes.
 - Consequence: on a low-traffic site, "the next rollup" can be **hours** away. Step 48 (analytics
   CONTRACT) requires at least one `RollupRun` row with `status = 'ok'` and a `createdAt` **after**
   the deploy. Plan for that wait; do not fake it.
+- **A fourth trigger, and it is not an `after()`:** `/analytics` in the admin awaits
+  `catchUpRollups()` **synchronously inside the render**
+  (`apps/docs/app/(dashboard)/analytics/page.tsx:39`), which runs `rollupDay` for up to
+  `MAX_DAYS_PER_REQUEST = 5` unsummarised past days and inserts `DailyStat` and `RollupRun` rows.
+  So *you* are a scheduler: **opening one admin page is an analytics write.** This matters twice —
+  it means `/analytics` is not a safe page to open idly during a freeze (Step 35 says so), and it
+  means Step 48's prerequisite is reachable on demand rather than only by waiting (Step 37).
+  It is also a `try/catch` that renders its error into the page, so a failure is visible rather than
+  silent — the opposite of the beacon path.
 
-**Gate.** You have accepted that Step 48 may need to happen the next day.
+**Gate.** You have accepted that Step 48 may need to happen the next day — or that you will force it
+by opening `/analytics` after the freeze ends.
 
 **Undo.** N/A.
 
@@ -537,8 +901,31 @@ psql "$PGPROD" -v ON_ERROR_STOP=1 -f "/tmp/v2/prod/$F-expand.sql" \
 echo "exit=$?"
 ```
 
-**Do not pass `--single-transaction`.** Several files manage their own multiple transactions, and
-`analytics-expand.sql` STAGE 3 has a `CREATE INDEX CONCURRENTLY` that *must* run outside one.
+**Every one of the 22 files carries its own `BEGIN;` / `COMMIT;`. Never supply an outer transaction**
+— no `psql --single-transaction`, no hand-typed `BEGIN;` before an `\i`. Two reasons, and they apply
+to Stage 5 as well as Stage 1:
+
+- **Six files open more than one transaction** and need each boundary honoured:
+  `analytics-expand.sql` (STAGE 1 as one transaction, STAGE 2's `VALIDATE`s outside one, STAGE 3's
+  `CREATE INDEX CONCURRENTLY` which **cannot** be inside one, and a `BEGIN … ROLLBACK` probe at V6),
+  `contact-admin-audit-expand.sql` (T1, T2), `hero-expand.sql`, `settings-expand.sql` (STEP A,
+  STEP B), `analytics-contract.sql` (three stages) and `settings-contract.sql` (C1, then C2–C4).
+- **An outer `BEGIN` does not add safety, it removes signal.** The inner `BEGIN` becomes a
+  `WARNING: there is already a transaction in progress`, the inner `COMMIT` commits *your* outer
+  transaction, and the trailing outer `COMMIT` warns that there is no transaction in progress. The
+  statements still land atomically, but the log no longer tells you where the boundaries were.
+
+`SET LOCAL lock_timeout`/`statement_timeout` at the head of every file depends on this: outside a
+transaction block `SET LOCAL` is a **silent no-op** that emits only
+`WARNING: SET LOCAL can only be used in transaction blocks`, which would make the header claim about
+`lock_timeout = '3s'` false for that file. If a run's log shows that warning, **stop** — the file lost
+its lock timeout, and you should find out why before the next `ALTER`.
+
+> Historical note, since the old instruction may still be in your muscle memory: until this revision
+> `media-flags-reval-github-expand.sql` and `-contract.sql` were the only two files *without* their
+> own transaction, and their headers told the operator to supply one while Stage 1 and Step 40
+> invoked them with a plain `-f`. Both now carry their own. If you are looking at a copy in
+> `/tmp/v2/prod/` that has no `BEGIN;` on the line after the header, re-copy it.
 
 **Two clusters deliberately overlap.** `contact-admin-audit-expand.sql` and
 `media-flags-reval-github-expand.sql` both add `FeatureFlag.updatedByName` and
@@ -635,9 +1022,19 @@ psql "$PGPROD" -v ON_ERROR_STOP=1 -f /tmp/v2/prod/contact-admin-audit-expand.sql
   2>&1 | tee /tmp/v2/prod/log/14-contact-admin-audit-expand.log
 ```
 
-**Expected output.** T1 commits, T2 commits.
+**This step must run before Step 15, and now enforces it.** T1 adds `FeatureFlag.updatedByName` and
+`RevalidationLog.actorName`, and so does Step 15 — the same two columns, `IF NOT EXISTS` in both.
+Step 15's preflight **P7** aborts if this step's T1 has not committed, so the order is fail-closed
+from that side. From this side the order is a note, not an abort, because if the order has already
+slipped this file still *must* run (it owns the `AdminUser` columns, the five FKs and the enum pass)
+and aborting it would strand you mid-window. What Step 14 gains from going first is its own preflight
+**P1**, which asserts the three name columns *do not exist yet* — the only tripwire either file has
+for EXPAND being replayed over a database that has already had it. Read P1 rather than skimming it.
 
-**Gate.** Two preflights decide the shape:
+**Expected output.** T1 commits, T2 commits. Section 0 of T1 reports one `ALTER TABLE` for
+`ContactMessage.read`'s default, and `updatedByName`'s sweep may report `UPDATE 0` — both normal.
+
+**Gate.** Two preflights decide the shape, and two verifications are hard stops:
 - **P3** — the distinct stored values of the five columns about to become enums. Any value outside
   the label set is **S5**. Do not coerce it.
 - **P6** — the label set of the pre-existing `"AdminRole"` type. **If a label is missing**, run T0
@@ -645,6 +1042,32 @@ psql "$PGPROD" -v ON_ERROR_STOP=1 -f /tmp/v2/prod/contact-admin-audit-expand.sql
   in the same transaction). **T0 is NOT reversible** — Postgres has no `ALTER TYPE ... DROP VALUE`
   and `AdminUser.role` depends on the type. If P6 surprises you, prefer *leaving `actorRole` as
   text and writing the drift down* over widening a type irreversibly mid-cutover.
+- **V9 must report `column_default = false` on `ContactMessage.read`.** This is the most consequential
+  single line in the file's output and it used to be listed nowhere in this step. `read` stays
+  `BOOLEAN NOT NULL` from Step 30 until Step 39, and Stage 5's preamble explicitly lets you sit there
+  for a week — through which the **only** thing keeping the public contact form working is that
+  database default, because v2's insert
+  (`apps/web/app/api/contact/route.ts:175-187`) stops naming the column where v1's did
+  (`0050cc9:apps/web/app/api/contact/route.ts:182` `read: verdict.isSpam`). If the default is missing,
+  **every** public `POST /api/contact` returns HTTP 500 `{"error":"Failed to send message"}` for the
+  whole gap: no log row, no retry, no record, and nothing visible in the admin.
+  T1 section 0 now sets it unconditionally (`ALTER TABLE "ContactMessage" ALTER COLUMN "read" SET
+  DEFAULT false;`), which is idempotent and the exact mirror of what Step 18 does for
+  `Project.images` and Step 20 for `HeroSkillBadge.name`/`iconKey`. So a blank `column_default` here
+  means **you are running a stale copy of the file** — re-copy it. Blank is a stop, not a note.
+  The other three columns v2 stops writing that survive into CONTRACT were audited the same way and
+  all three already have a default, so none needs a belt: `Blog.show` (`DEFAULT true`),
+  `Skill.show` (`DEFAULT true`, and also filled by `skills-joins-expand.sql:257`'s BEFORE trigger),
+  `AnalyticsSession.lastSeenAt` (`DEFAULT CURRENT_TIMESTAMP`).
+- **V6 must return 0 rows from all six arms.** It compares each denormalised name against its
+  `AdminUser` row. If a `mismatch` row appears on `MessageReply` or `RevalidationLog`, **do not repair
+  it by hand** — those two columns are append-only and the stored value is the name as of the event.
+  Such a row means EXPAND is being replayed over a database that already has it. Find out which
+  before continuing. The `id without name` arms have no exception.
+- **The log contains no `SET LOCAL can only be used in transaction blocks`,** and it contains two
+  `SET` statements before each of T1 and T2. This file previously set no timeouts at all; if you see
+  neither the `SET`s nor a warning, you are running the pre-revision copy and both transactions ran
+  with `lock_timeout = 0`, i.e. willing to queue the public `FeatureFlag` read behind them forever.
 
 **Then the smoke test, and do it now rather than later.** In the live admin, change one hero title,
 press Save, open `/history`. One gesture exercises a v1 `INSERT` into all four retyped `AuditEvent`
@@ -667,9 +1090,34 @@ Full text: ROLLBACK block of `contact-admin-audit-expand.sql`.
 ## Step 15 — EXPAND: media-flags-reval-github
 
 **What it does.** `MediaAsset_key_prefix_idx` and the `MediaAsset_folder_check`,
-`FeatureFlag.updatedByName` (+ the `IS DISTINCT FROM` backfill that supersedes Step 14's),
-`FeatureFlag.label DROP NOT NULL`, the `RevalidationScope` type, and
-`RevalidationLog.scope` + `.actorName` with their backfills.
+`FeatureFlag.updatedByName` + its `IS DISTINCT FROM` sweep, `FeatureFlag.label DROP NOT NULL`, the
+`RevalidationScope` type, and `RevalidationLog.scope` + `.actorName` with their backfills.
+
+**The two columns it shares with Step 14, and the one rule that governs them.** `updatedByName` and
+`actorName` are created by *both* files, `IF NOT EXISTS` in both, so this file finds them already
+there. The **predicates** are what must not diverge, and there is a single rule — stated canonically
+in `contact-admin-audit-contract.sql`'s header, now honoured by all four files that touch these
+columns:
+
+| column | kind | guard | why |
+|---|---|---|---|
+| `FeatureFlag.updatedByName` | **mutable** — "who last changed it" | `IS DISTINCT FROM` | a v1 toggle moves `updatedById` without moving the name (`0050cc9:apps/docs/app/lib/actions/flags.ts:52`), so the copy goes stale and must be *repaired* |
+| `RevalidationLog.actorName` | **append-only** ledger | `IS NULL` | v2 writes it at insert time (`apps/docs/app/lib/revalidation.ts:102`); re-deriving it from today's `AdminUser.name` rewrites history rather than repairing it |
+| `MessageReply.sentByName` | **append-only** | `IS NULL` | same, and `apps/docs/app/lib/actions/messages.ts:169` falls back to `session.email`, a value no re-sync can reconstruct |
+
+This revision changed `actorName`'s sweep here from `IS DISTINCT FROM` to `IS NULL`. During EXPAND
+the two select **exactly the same rows** — v1 never writes the column — so the forward run is
+unchanged; what changes is that a re-run can no longer restamp every past revalidation with the
+current admin's name. V5 was corrected to match: `INNER JOIN` instead of `LEFT JOIN` (the old form
+flagged a deleted actor's preserved name, i.e. the very rows these columns exist for), and the
+`RevalidationLog` half now asks only "is a name missing".
+
+**Order is enforced, not assumed.** Preflight **P7** aborts this file if Step 14's T1 has not
+committed, detected by `FeatureFlag_updatedById_fkey` and `RevalidationLog_actorId_fkey` — the last
+two objects T1 creates, so their presence proves T1 committed *in full*. P7 runs before any DDL, so a
+fire leaves nothing applied. The one genuinely order-dependent hazard is the **rollback**: both files'
+undo blocks drop these two columns, so undoing one cluster silently disarms the other. Both undos now
+open with a fail-closed guard, and this file's ROLLBACK also carries a shared-column-safe variant.
 
 **Command.**
 
@@ -681,26 +1129,55 @@ psql "$PGPROD" -v ON_ERROR_STOP=1 -f /tmp/v2/prod/media-flags-reval-github-expan
   2>&1 | tee /tmp/v2/prod/log/15-media-flags-reval-github-expand.log
 ```
 
-**Expected output.** One `COMMIT`. `FeatureFlag.updatedByName` and `RevalidationLog.actorName`
-report `ALTER TABLE` with no change (Step 14 already added them) — **expected**. The `scope`
-backfill updates every existing row.
+**Expected output.** One `BEGIN`, then one `COMMIT` — the file carries its own transaction, like the
+other 21. `FeatureFlag.updatedByName` and `RevalidationLog.actorName` report `ALTER TABLE` with no
+change (Step 14 already added them) — **expected**. The `scope` backfill updates every existing row.
 
-**Gate.** The folder preflight returns **0**. The `FeatureFlag` dump is in your run log. `scope`
-is `NULLABLE with no default` — verify that, because a `NOT NULL` `scope` makes the v1 log INSERT
-fail 23502 inside a `catch` that merely logs (`HEAD:apps/docs/app/lib/revalidation.ts:109-111`),
-silently losing both the log row **and** the `TagState` upsert loop that follows it — the
-cache-staleness detector's substrate.
+**Gate.** The folder preflight returns **0**. **P7 did not fire** — if it did, Step 14 has not
+committed its T1 and you are out of order; run Step 14, then come back (nothing was applied, P7 runs
+before any DDL). The `FeatureFlag` dump is in your run log. `scope` is `NULLABLE with no default` —
+verify that, because a `NOT NULL` `scope` makes the v1 log INSERT fail 23502 inside a `catch` that
+merely logs (`0050cc9:apps/docs/app/lib/revalidation.ts:109-110`), silently losing both the log row
+**and** the `TagState` upsert loop that follows it — the cache-staleness detector's substrate. **V5
+returns 0 rows from both arms**, and read which question each arm asks before you act on a row: the
+`FeatureFlag` arm is an agreement check, the `RevalidationLog` arm is a missing-name check only.
 
 **Note the row set is not frozen.** `HEAD:packages/db/src/maintenance.ts:163-177` batch-deletes
 `RevalidationLog` rows older than 30 days, fired from a **visitor beacon**. So the preflight count
 is an upper bound, not an invariant. Verify "no NULL scope", never "count equals N".
 
-**Undo.** One transaction, in this order: `DROP COLUMN scope, actorName`; then
-`DROP TYPE IF EXISTS "RevalidationScope"` (must follow the drop); `DROP COLUMN updatedByName`;
-`UPDATE "FeatureFlag" SET "label" = "key" WHERE "label" IS NULL` (a guard — expect 0 rows);
-`ALTER COLUMN "label" SET NOT NULL`; drop `MediaAsset_folder_check`; drop
-`MediaAsset_key_prefix_idx`. Nothing in this EXPAND destroys anything, so its rollback needs no
-dump. Full text: ROLLBACK block of the file.
+**Also confirm the log contains no `SET LOCAL can only be used in transaction blocks`.** If it does,
+you are running a stale copy of the file from before it carried its own `BEGIN;` — the two `ALTER`s
+on `FeatureFlag` then ran with **no** `lock_timeout`, and `FeatureFlag` is on the public render path
+(`apps/web/app/lib/flags.ts:13` inside `apps/web/app/layout.tsx:70`). Re-copy the file and re-run;
+everything in it is idempotent.
+
+**Undo.** Two transactions, not one, because restoring `label`'s `NOT NULL` may need a step that is
+not SQL:
+
+- **First transaction:** `DROP COLUMN scope, actorName`; then `DROP TYPE IF EXISTS
+  "RevalidationScope"` (must follow the drop); `DROP COLUMN updatedByName`; drop
+  `MediaAsset_folder_check`; drop `MediaAsset_key_prefix_idx`.
+  **`actorName` and `updatedByName` are not this cluster's alone.** Step 14 creates them too and v2
+  requires them (`flags/page.tsx:43`, `revalidation/page.tsx:145` — P2022 without them), so this
+  transaction now opens with a **fail-closed guard** that aborts if Step 14's cluster is still applied
+  (detected by `AdminUser.otpAttempts`). If it fires: either undo Step 14's T1 as well, or use the
+  **shared-column-safe variant** printed beside R1 in the file, which drops only `scope`,
+  `RevalidationScope` and the two `MediaAsset` objects and leaves the two nullable, v1-unread columns
+  in place. Deleting the guard is not a third option.
+- **Then** `SELECT count(*) FROM "FeatureFlag" WHERE "label" IS NULL`. If it is **0** (the expected
+  answer — no v1 writer can produce a NULL label), a second transaction does
+  `ALTER COLUMN "label" SET NOT NULL` and you are done. If it is **non-zero**, the v2 seed ran in the
+  gap: restore the text first (**R3** of this file's own ROLLBACK block — the `recover-from-dump.jq`
+  route over the Step 7 dump, which also covers off-registry keys, or failing that the v1 seed **with**
+  `DATABASE_URL="$PGPROD"`), then `UPDATE "FeatureFlag" SET "label" = "key" WHERE "label" IS NULL` as a
+  mop-up, then `SET NOT NULL`.
+
+Do **not** put `SET NOT NULL` in the first transaction: a single NULL label makes it raise `23502`
+and roll back the whole undo — including the `DROP TYPE` and both `DROP COLUMN`s, which had nothing to
+do with it. Nothing in this EXPAND destroys anything, so the **shape** comes back without a dump; the
+dump appears only for a label the *v2 seed* overwrote after DEPLOY, which is a plain `UPDATE` of a
+column this file never dropped. Full text: ROLLBACK block of the file.
 
 ---
 
@@ -923,18 +1400,134 @@ psql "$PGPROD" -v ON_ERROR_STOP=1 -f /tmp/v2/prod/experience-education-expand.sq
 **Expected output.** One `COMMIT`. Wiingy → `2025-07-01` / NULL; Nykaa → `2025-01-01` /
 `2025-07-01`. `Education.startYearInt` = 2021, `endYearInt` = 2025.
 
-**Gate.** Three things:
+### Step 21, sub-steps — the code half, in this order. Do not stop after 21.1.
+
+This is the one step in the whole runbook where the **schema file changes mid-EXPAND**, and the
+consequence is a red local build at Step 29 that has a wrong, tempting fix. Run all four.
+
+**21.1 — the two `@map` lines.** `packages/db/prisma/schema.prisma`, model `Education`
+(`schema.prisma:136-137` today, `startYear Int` / `endYear Int?`):
+
+```prisma
+startYear   Int  @map("startYearInt")
+endYear     Int? @map("endYearInt")
+```
+
+The Prisma **field** names stay `startYear` / `endYear`, so **zero TypeScript churn** and the six v2
+call sites compile untouched. `bunx prisma validate` already passed in Step 2 for this shape.
+
+**21.2 — regenerate the client.**
+
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
+bun run db:generate
+```
+
+**21.3 — rename the two columns on the Neon branch that local `DATABASE_URL` points at.**
+**This is the sub-step that gets skipped, and skipping it is what breaks Step 29.** This is also the
+third of the three mandatory follow-ups the SQL file itself names
+(`experience-education-expand.sql:78-83`), and the only one with no other home.
+
+The rule is simple and does not depend on which branch you are on: after 21.1, the physical columns
+the build queries are `startYearInt` and `endYearInt`. **Whatever database local `DATABASE_URL`
+points at must have columns by those names**, or `next build` fails `42703`.
+
+Verified state of that branch as of this revision — `ep-aged-cake-a1ipqgrh`, `neondb`, 43 tables — is
+the **v2 canonical** shape: `Education.startYear integer NOT NULL`, `Education.endYear integer NULL`,
+and no `startYearInt`/`endYearInt` at all. So a rename is all it needs: no backfill, no trigger, no
+`v2_year_to_int`. Check before you act, because the branch may have moved since:
+
+`bun run db:apply-sql` executes a file but prints only the table count, never a result set, so it
+cannot answer this. `psql` is not installed. Use a read-only inline probe — it refuses the production
+host by the same rule `apply-sql.ts` uses, and `TARGET` names the env var, never a URL:
+
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
+TARGET=DATABASE_URL Q="select column_name, data_type, is_nullable
+  from information_schema.columns
+ where table_schema='public' and table_name='Education'
+   and column_name in ('startYear','endYear','startYearInt','endYearInt')
+ order by column_name" bun -e '
+import "dotenv/config";
+import { Client } from "pg";
+const h = (x: string) => new URL(x.replace(/^postgres(ql)?:\/\//, "https://")).hostname;
+const u = process.env[process.env.TARGET!]!;
+if (h(u) === h(process.env.PROD_DATABASE_URL!)) { console.error("refusing: production host"); process.exit(1); }
+const c = new Client({ connectionString: u });
+await c.connect();
+console.log("target", h(u));
+console.table((await c.query(process.env.Q!)).rows);
+await c.end();
+'
+```
+
+Verified output on this tree: `target ep-aged-cake-a1ipqgrh-...`, two rows — `endYear integer YES`
+and `startYear integer NO`.
+
+- **Two rows, `startYear`/`endYear`, both `integer`** → the canonical shape. Run the rename below.
+- **Four rows** → EXPAND already ran against this database (you rehearsed on it). Nothing to do; the
+  `@map` targets already exist.
+- **`startYear`/`endYear` as `text`** → this is a production clone. Do **not** rename: run the real
+  `experience-education-expand.sql` against it instead, which adds the two INTEGER columns additively
+  with the backfill and the sync triggers.
+
+`psql` is not installed on this machine, so use the repo's own applier. It refuses any target
+resolving to `PROD_DATABASE_URL` (`scripts/apply-sql.ts:31-38`), which is exactly why it is safe to
+point at a branch by env-var name:
+
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
+cat > /tmp/v2/prod/21-rehearse-education-rename.sql <<'SQL'
+-- Local dev branch ONLY. Never production. Production gets the additive
+-- startYearInt/endYearInt from experience-education-expand.sql section E;
+-- this branch already holds v2's canonical INTEGER names, so @map's physical
+-- names are all it is missing.
+ALTER TABLE "Education" RENAME COLUMN "startYear" TO "startYearInt";
+ALTER TABLE "Education" RENAME COLUMN "endYear"   TO "endYearInt";
+SQL
+bun run db:apply-sql --file=/tmp/v2/prod/21-rehearse-education-rename.sql --to=DATABASE_URL
+bun run db:apply-sql --file=/tmp/v2/prod/21-rehearse-education-rename.sql --to=DATABASE_URL --apply=true
+```
+
+The first invocation is a dry run: it prints the target host and the table count and executes
+nothing. **Read the host and confirm it is not production** before adding `--apply=true`.
+
+**One ordering trap, because of how `.env` is set up right now.** `DATABASE_URL` and
+`NEW_DATABASE_URL` are currently the **same branch** (Step 6). Step 9 tells you to repoint
+`NEW_DATABASE_URL` at a *fresh* branch cut from production — do that first, and do not run this
+rename until Step 9's rehearsal is finished, or you will rename columns out from under the
+rehearsal's own EXPAND run. If you have already repointed `NEW_DATABASE_URL`, only `DATABASE_URL`
+matters here: it is the one the **build** reads.
+
+**21.4 — re-prove the build, in full.** Step 5's green build is now stale: it was taken against a
+branch whose `Education` columns had the old names.
+
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio
+rm -rf packages/db/src/generated && bun install && bun run check-types && bun run build
+```
+
+**If `bun run build` fails with `42703 column Education.startYearInt does not exist`, you skipped
+21.3. Fix 21.3. DO NOT revert the `@map` lines to make the build green.** Reverting them ships v2
+code reading `Education."startYear"` — the exact column Step 45 drops — and the result is a
+site-wide 500 on `/`, which is **S1**, after CONTRACT has already run. This is the single most
+plausible wrong instinct in the whole cutover, and it is available to you only for the next few
+steps.
+
+**Gate.** Four things:
 1. **Do NOT backfill `Experience.logoAssetId`.** `Experience_logo_source_check` allows at most one
    logo source, so pointing `logoAssetId` at an adopted `MediaAsset` requires nulling `logoUrl` in
    the same UPDATE — and v1 renders `logoUrl` (`HEAD:apps/web/app/lib/data.ts:203`), so the company
    logos would **vanish from the live site**. That backfill is contract-side media work.
-2. **The code half must land in the same commit**: `packages/db/prisma/schema.prisma` →
-   `startYear Int @map("startYearInt")` and `endYear Int? @map("endYearInt")`, then
-   `cd packages/db && bun run db:generate`. Field names are unchanged, so **zero TypeScript churn**.
-   Validated: `bunx prisma validate` passed in Step 2. Also apply the same two renames to the Neon
-   child branch, or local dev stops matching the schema.
+2. **Sub-steps 21.1 through 21.4 all ran, in order, and 21.4 exited 0.** The `@map` lines must land
+   in the same commit as the v2 code (Step 29 verifies this explicitly).
 3. `SET NOT NULL` on `startedOn` is safe **only** because the `BEFORE INSERT` trigger fills it and
    `NOT NULL` is evaluated *after* BEFORE-row triggers. Verify the trigger exists before trusting it.
+4. `packages/db/v2-migration-draft/target-ddl.sql` still names `startYear`/`endYear`, so
+   `bun run db:verify` will report those two columns as drift from here on. That is **expected** and
+   is the third mandatory follow-up named in `experience-education-expand.sql:76-83`. Either
+   regenerate `target-ddl.sql` now or write the two expected names into the run log so Step 24 and
+   Step 50 do not read them as a surprise.
 
 **Undo.** Drop both triggers and both trigger functions, the three `Experience` CHECKs and the FK,
 `Experience_logoAssetId_idx`, `ExperienceBullet_experienceId_sortOrder_idx`, the three `Education`
@@ -1208,8 +1801,15 @@ nearly lost, now rescued. If you see one, note which setting it was, then **push
 
 ## Step 29 — Commit the v2 code
 
-**What it does.** Stages the 79 changed files plus the four build-graph edits from Step 4 plus the
-two `@map` lines from Step 21.
+**What it does.** Stages whatever v2 code is not yet committed, plus Step 4's edit 5, plus the two
+`@map` lines from Step 21.
+
+**Read this before you read the file counts below.** This step was drafted when `HEAD` was
+`0050cc9` and the whole v2 change was uncommitted. It is not, any more: the v2 schema and both apps
+(`dae8f41`), the JSON dump tooling (`6493c8f`), the build-graph wiring (`83743d2`) and the schema
+reference (`f760425`) are already commits on `main`, and the working tree was clean when this
+revision was made. So any file count in this step is a count for the *pre-commit* world. Run
+`git status --porcelain | wc -l` and trust that, not the number written here.
 
 **Command.**
 
@@ -1219,22 +1819,33 @@ git checkout -b v2-cutover          # NOT main -- branch first, then merge when 
 git add -A
 git status --short | wc -l
 git diff --cached --stat | tail -1
-# Verify the four build-graph edits are in:
-git diff --cached -- turbo.json package.json packages/db/package.json packages/db/turbo.json
+# Build-graph edits 1-4 are ALREADY in HEAD (6493c8f and 83743d2), so they will
+# NOT show in --cached. Confirm they are present in the tree, not in the diff:
+git log --oneline -1 --format='%h %s' 83743d2
+jq -r '.scripts | {build, "check-types"}' packages/db/package.json
+git diff --cached -- packages/db/package.json packages/db/tsconfig.check.json   # edit 5, the only new one
 # Verify the two @map lines are in:
 git diff --cached -- packages/db/prisma/schema.prisma | grep -n 'startYearInt\|endYearInt'
 git commit
 ```
 
-**Expected output.** ~84 files staged. `packages/db/turbo.json` appears as a **new file**. Both
-`@map` lines appear.
+**Expected output.** `packages/db/tsconfig.check.json` appears as a **new file** (Step 4, edit 5).
+`packages/db/turbo.json` does **not** appear — it was committed in `83743d2`. Both `@map` lines
+appear.
 
 **Gate.** Four:
 - The commit message does **not** add a Claude co-author trailer, and authorship is yours alone.
 - `git ls-files | grep -c generated/prisma` is still **0** — the generated client stays gitignored;
   Step 4 is what makes that safe.
-- `bun run check-types` and `bun run build` still pass on the staged tree (re-run if you touched
-  anything since Step 5).
+- **Step 5 has been re-run in full since Step 21, not merely re-checked.** This is a hard gate, not
+  a parenthetical, because Step 21 changed `schema.prisma` *after* Step 5 passed:
+  ```bash
+  cd /Users/yatindora/Developer/web-projects/portfolio
+  rm -rf packages/db/src/generated && bun install && bun run check-types && bun run build
+  ```
+  All four exit 0, `db#build` and `db#check-types` both appear, and the `apps/web` build reaches
+  `Generating static pages` without a `42703`. If it did not, sub-step **21.3** was skipped — fix
+  21.3, and do **not** revert the `@map` lines (Step 21, 21.4).
 - You are on a branch, not `main`.
 
 **Undo.** `git reset --soft HEAD~1`. Nothing is deployed yet.
@@ -1257,9 +1868,28 @@ git checkout main && git merge --ff-only v2-cutover && git push origin main
 
 **Expected output.** Two preview deployments, then two production deployments.
 
-**Gate.** Do **not** merge to `main` until **both** preview builds are green. A failed build after
-EXPAND is **S7**: you are stuck mid-window with no deadline. The preview build is a free rehearsal
-of the exact thing Step 31 gates on.
+**Gate — three.**
+
+1. Do **not** merge to `main` until **both** preview builds are green. A failed build after EXPAND is
+   **S7**: you are stuck mid-window with no deadline. The preview build is a free rehearsal of the
+   exact thing Step 31 gates on.
+2. **A preview build is only a rehearsal of production if Preview env says so.** Read back the line
+   you wrote in Step 6's gate: *which database does Preview `DATABASE_URL` point at?*
+   - **Production** → the preview build is a true rehearsal, and it is also the only build in this
+     runbook that reads post-EXPAND production before the production deploy. Good news, with a
+     catch: see gate 3.
+   - **The Neon child branch** → the preview build proves the code compiles and prerenders, but
+     against a database that only has `startYearInt` because *you* renamed it at sub-step 21.3. It
+     does **not** prove EXPAND landed on production. Treat Step 31 as the first real proof.
+   - **Missing or a `REVALIDATE_SECRET` under 32 characters** → both preview builds will fail at
+     module load in `packages/config/src/env.ts:37-43` with `Invalid environment variables`, and
+     this gate can never be satisfied. Fix Preview env before pushing. That is not S7 and does not
+     need a rollback — nothing is live — but it will read like S7 if you have not been told.
+3. **The two preview URLs are a live v2 site and a live v2 admin.** If Preview `DATABASE_URL` is
+   production, the Step 10 freeze **extends to them**: do not log into the preview admin, do not
+   save anything there, and close the tabs when you are done reading the build log. A save on the
+   preview admin is a production write made by v2 code before Stage 4 has verified anything, and
+   Step 10's instruction to close every admin tab predates these URLs existing.
 
 **Undo.** Before the `main` merge: nothing is live; delete the branch. After the merge: Vercel
 **instant rollback** to the previous deployment on both projects. That rollback is **free and
@@ -1276,9 +1906,19 @@ until Step 39.
 the build log.
 
 **Expected output.** In each log, a `db#build` task running `prisma generate` **before**
-`web#build` / `docs#build`, and `Generated Prisma Client ... to ./src/generated/prisma`.
+`web#build` / `docs#build`, and `Generated Prisma Client ... to ./src/generated/prisma`. In the
+`web` log additionally: `Generating static pages (N/N)` and a route table marking `/` and
+`/blog/[slug]` as prerendered.
 
-**Gate.** Three:
+**This build reads production.** Not `prisma generate` — that resolves `env("DATABASE_URL")` and
+never connects — but `next build` itself. `apps/web`'s `/` is prerendered (`revalidate = 86400`,
+no `force-dynamic`) and its prerender runs `getAboutData()` → `prisma.education.findMany`;
+`app/sitemap.ts` and `generateStaticParams()` in `app/blog/[slug]/page.tsx` both call `getBlogs()`.
+Whatever `DATABASE_URL` the Production build environment holds is the database those queries hit.
+`apps/docs` issues no SQL at build (every dashboard page is dynamic via `cookies()`), but it does
+evaluate `@repo/config/env`, so it fails on bad env without proving anything about the schema.
+
+**Gate.** Five:
 - Both projects reach **Ready** and are promoted to the **production alias**. One of two is **S8**.
 - The `prisma generate` step came from the **turbo graph**, not only from the dashboard command.
   (Leave the dashboard command in place for this first deploy; it merely runs generate twice, which
@@ -1286,6 +1926,25 @@ the build log.
 - The log contains **no** `prisma db push` and no `prisma migrate deploy`. If it does, that is
   **S9** and the schema has just been mutated behind your back — stop and audit with Step 24
   immediately.
+- **`Generating static pages (N/N)` is present in the `web` log and did not error.** A build that
+  reports Ready without this line has not prerendered, which means a config change you did not
+  intend. **Write `N` into the run log** — Step 55's deploy must produce the same `N`. Do not
+  predict `N`: `generateStaticParams()` contributes **zero** slugs today, because all ten `Blog`
+  rows are `status = 'DRAFT'` (`data-facts.txt:144`) and `getBlogs()` filters to published for the
+  non-preview path (`apps/web/app/lib/data.ts:294-305`). `N` will jump the first time you publish a
+  post. That is expected, not drift.
+- **A build failure here is better news than it looks.** A missing `SiteSettings` row, a
+  CHECK-failing `SiteSettings` row, or a leftover EXPAND gap makes the *prerender* throw, so it
+  fails the build — **S7, recoverable, nothing aliased, no public impact** — rather than 500ing a
+  live site at Step 33. Read the error, fix the data, re-deploy. Do not "fix" it by making `/`
+  dynamic.
+  - The one failure mode to read carefully: `42703 column Education.startYearInt does not exist`
+    means the deploy is building against a database where EXPAND's section E did not run. If that
+    is production, Step 21 did not complete. If Preview `DATABASE_URL` differs from Production's,
+    check which one this log belongs to (Step 6).
+
+**Undo for a red build.** Nothing is aliased yet if the build failed, so there is nothing to roll
+back. Do **not** push again blindly (S7). EXPAND is safe to sit on indefinitely.
 
 **Undo.** Vercel instant rollback, both projects.
 
@@ -1329,11 +1988,27 @@ done
 
 **Expected output.** All 200.
 
-**Gate.** All 200. A 500 here is **S1** and it is almost certainly `SiteSettings`: v2's first render
-hits `prisma.siteSettings.findUniqueOrThrow` at `apps/web/app/lib/data.ts:64`, and
-`unstable_cache` **cannot** reuse v1's persisted payload because it keys on the callback source
-(Step 12). So a missing or wrong `SiteSettings` row is an **instant whole-site 500**, not a
-day-delayed one. Rollback is still free — `SiteConfig` is untouched.
+**What "cold" actually means here — read this before you treat a 200 as evidence.** `/` is
+prerendered at **build** time (Step 31), so this curl is serving HTML that Vercel's build already
+produced from post-EXPAND production. It is a real proof of one thing — *the prerender succeeded* —
+and no proof at all of the second thing it looks like it proves, that a fresh request can render the
+page. **Step 34's forced regeneration is the only honest public proof.** Demote this step
+accordingly: a green Step 33 is a pass, not a clearance.
+
+**Gate.** All 200, read as "the build's prerender succeeded and the alias is serving it".
+
+The runbook previously predicted that a bad `SiteSettings` row surfaces as a 500 here. **It does
+not, and the real behaviour is better.** v2's first render hits
+`prisma.siteSettings.findUniqueOrThrow` (`apps/web/app/lib/data.ts:64`), and `unstable_cache` cannot
+reuse v1's persisted payload because it keys on the callback source (Step 12) — but that first render
+happens in the **build**, not in this request. So a missing or CHECK-failing `SiteSettings` row
+fails the Step 31 build (**S7**: recoverable, nothing aliased, no public impact) instead of 500ing a
+live site (**S1**). If you reached Step 33 at all, `SiteSettings` rendered at least once.
+
+A 500 *here*, with a green build behind it, therefore means something that is true at request time
+and was not true at build time — most likely a runtime-only env var (Step 6, group C), a connection
+limit on the Neon endpoint, or a middleware/edge failure. It is still **S1**. Rollback is still free
+— `SiteConfig` is untouched.
 
 **Undo.** Vercel instant rollback, both projects. Then re-run Step 23's STEP A assertions.
 
@@ -1341,16 +2016,44 @@ day-delayed one. Rollback is still free — `SiteConfig` is untouched.
 
 ## Step 34 — Force a real regeneration and look at the page
 
-**What it does.** A warm page proves nothing. Flush every tag and look.
+**What it does.** A warm page proves nothing, and after Step 31 the "cold" page in Step 33 was warm
+too — it was baked by the build. **This is the first and only time production renders `/` from a
+live request.** Flush every tag, force the HTML to be rebuilt, prove it was rebuilt, then look.
+
+**The tag list is complete, verified.** `packages/shared/src/tags.ts:18-23` `ALL_KNOWN_TAGS` is
+exactly `["blogs", "projects", "site-config", "flags"]`, and that file is **byte-identical** in
+`0050cc9` and the v2 tree — so there is no v2-only tag to miss. Only four readers are
+`unstable_cache`d: `cachedSiteConfig` (`data.ts:104`), `cachedProjects` (`:258`), `cachedBlogs`
+(`:298`), `cachedBlogBySlug` (`:347`), plus `readFlags` in `apps/web/app/lib/flags.ts:10`.
+`getHeroData`, `getAboutData`, `getSkills`, `getExperiences`, `getQuotes` and `getContactData` are
+**uncached** and hit the database on every regeneration, so there is no hidden stale-payload surface
+for them at all.
 
 **Command.**
 
 ```bash
+# 1. flush all four tags (this is exactly ALL_KNOWN_TAGS)
 curl -s -X POST https://www.yatindora.in/api/revalidate \
   -H "x-revalidate-secret: $REVALIDATE_SECRET" -H 'content-type: application/json' \
   -d '{"tags":["site-config","projects","blogs","flags"]}'
+
+# 2. flush the HTML itself. An EMPTY body takes the widest path available:
+#    revalidatePath("/", "layout"), which drops every route under the root
+#    layout, not just the four tagged data entries.
+#    apps/web/app/api/revalidate/route.ts:37-39.
+curl -s -X POST https://www.yatindora.in/api/revalidate \
+  -H "x-revalidate-secret: $REVALIDATE_SECRET" -H 'content-type: application/json' -d '{}'
+
 sleep 5
-curl -s -o /dev/null -w 'home %{http_code}\n' https://www.yatindora.in/
+
+# 3. PROVE the page regenerated rather than replaying build output. Two
+#    consecutive requests: the first should MISS (or STALE) and the second HIT.
+for i in 1 2; do
+  curl -s -o /dev/null -D - https://www.yatindora.in/ \
+    | grep -i -E '^(HTTP/|x-vercel-cache|x-nextjs-cache|age):' | tr -d '\r'
+  echo '--'
+  sleep 3
+done
 ```
 
 Then hard-reload in a browser and check the **full Step 25 list** again, item by item. The ones
@@ -1369,35 +2072,85 @@ most likely to be wrong, and what each means:
 | `NaN` months on a role | experience-education | date parse |
 | No GitHub tile | media-flags-reval-github | the refresh is failing; check `GithubYear` |
 
-**Gate.** Every item on the Step 25 list renders, and renders **correctly**, not merely without an
-error.
+**One symptom that will NOT appear here, and where to look instead.** A broken `FeatureFlag` read
+renders as *nothing wrong*: `apps/web/app/lib/flags.ts:15-17` wraps the query in a `try/catch` that
+logs and returns `defaultFlagMap()`. So a `42703` on `FeatureFlag` after Step 15 or Step 40 produces
+a page that looks correct while silently serving registry defaults for all nine flags. Flushing the
+`flags` tag cannot prove `FeatureFlag` is healthy. The only proofs are `/flags` in the admin
+(Step 35) and the Vercel function log line `[flags] read failed`. Add that string to your log filter
+for the Step 53 watch.
+
+**Gate.** Three:
+- Every item on the Step 25 list renders, and renders **correctly**, not merely without an error.
+- Both revalidate calls returned `{"revalidated":true,...}`. A `401` means `REVALIDATE_SECRET` in
+  your shell does not match Vercel Production's (Step 6); a `400` means the body was malformed.
+- The header probe shows a **MISS or STALE followed by a HIT**, with `age` resetting. If both
+  requests are `HIT` with a large, growing `age`, the flush did not take and you are still reading
+  build output — **this step has proved nothing yet**. Re-run the empty-body POST and check the
+  Vercel function log for the `/api/revalidate` invocation.
 
 **Undo.** Vercel instant rollback. Note that after a rollback the v1 code reads `SiteConfig`, which
-is **stale** with respect to anything v2 wrote — no reverse trigger is installed, deliberately.
+is **stale** with respect to anything v2 wrote — no reverse trigger is installed, deliberately. Also
+note the asymmetry: a rollback does **not** un-flush these caches, so post-rollback v1 will
+regenerate from the database rather than replay its old HTML. That is the correct behaviour and it
+is also why the rollback is not instant in *appearance* — give it a minute.
 
 ---
 
 ## Step 35 — Admin smoke: every page must open
 
-**Command.** Log into the admin and open every page, confirming a 200 and sane content:
+**Command.** **Start by logging OUT and logging back IN.** Step 35 used to open with "log into the
+admin", which a surviving `admin_session` cookie satisfies without ever exercising the login path.
+Step 14 adds `AdminUser.lockedUntil` and `AdminUser.otpAttempts`, and
+`apps/docs/app/lib/actions/auth.ts` is **unmodified** by v2 — so if EXPAND broke login you would not
+learn it until the cookie expired, by which time Steps 36, 51 and all of CONTRACT are blocked and
+you cannot reach the admin to diagnose it.
+
+```
+1. /login  — log out, then log back in with the real password + OTP.
+```
+
+Then open every page, confirming a 200 and sane content. The full route list, from
+`find apps/docs/app -name page.tsx`:
 
 `/dashboard` `/site-config` `/hero` `/background` `/cat` `/about` `/skills` `/icons`
-`/experiences` `/experiences/<id>` `/projects` `/projects/<id>` `/blogs` `/quotes`
-`/contact-purposes` `/messages` (open a detail pane) `/media` `/flags` `/revalidation` `/tracker`
-`/terminal` `/history` `/notes` `/refer-emails`
+`/experiences` `/experiences/<id>` `/experiences/new` `/projects` `/projects/<id>` `/projects/new`
+`/blogs` `/blogs/<id>` `/blogs/new` `/quotes` `/contact-purposes` `/messages` (open a detail pane)
+`/media` `/flags` `/revalidation` `/tracker` `/tracked-links` `/tracked-links/<id>` `/terminal`
+`/history` `/notes` `/notes/search` `/notes/trash` `/notes/revise` `/refer-emails` `/admin-users`
+`/analytics`
 
-**Expected output.** All render.
+Two notes on that list:
+- `/links` and `/social-links` are one-line `redirect("/hero")` stubs kept for old bookmarks. Nothing
+  to smoke. Same for `/about/education` and `/about/paragraphs`, which redirect to `/about`.
+- **`/analytics` is a WRITE, not a read.** `apps/docs/app/(dashboard)/analytics/page.tsx:39` awaits
+  `catchUpRollups()` **synchronously in the render** — not inside `after()` — which runs `rollupDay`
+  for up to `MAX_DAYS_PER_REQUEST = 5` unsummarised past days and inserts `DailyStat` and
+  `RollupRun` rows (`packages/db/src/rollup.ts:269-290`). Opening it during the freeze is a
+  deliberate analytics write. That is safe — the analytics cluster's EXPAND is done and its CONTRACT
+  is Step 48 — but know that you did it, and see Step 37 for why it is also useful.
 
-**Gate.** Four are specific proofs, not general checks:
+**Expected output.** All render. `/login` accepts the password and the OTP and lands on `/dashboard`.
+
+**Gate.** Six are specific proofs, not general checks:
+- **Login worked from a cold session.** Not a cookie. This is the prerequisite for everything after
+  it.
 - `/blogs` prints **"no date yet"** for the ten drafts. That string is v2's null branch at
   `apps/docs/app/(dashboard)/blogs/page.tsx:199` and is proof the deployed bundle is the v2 one.
 - `/flags` and `/revalidation` show a **name**, not a uuid, in the changed-by / actor columns.
+  `/flags` rendering at all is also the **only** proof `FeatureFlag` survived Step 15 — the public
+  read swallows its own errors (Step 34).
 - `/revalidation` shows **scope** values, not blanks.
 - `/tracker` renders — it is the only reader of `rawContent`/`rawTerm`/`messageId`, and a `42703`
   there means Step 13 did not land.
+- `/notes` renders its tree, and `/notes/search`, `/notes/trash` and `/notes/revise` all render.
+  `NoteNode` is 881 rows, the largest data set in the database, and Step 16 is flagged in the
+  Appendix as **unrehearsed**. Four pages is the cheapest coverage available for it.
 
 A 500 on `/tracker`, `/flags`, `/site-config` or `/terminal` is a missing EXPAND column. Find it in
-Step 24's log.
+Step 24's log. A 500 on `/analytics` is different in kind: `catchUpRollups()` is already wrapped in a
+`try/catch` that renders the error into the page (`analytics/page.tsx:41-44`), so a 500 there is the
+*read* path, and the error banner is the *write* path.
 
 **Undo.** Vercel instant rollback.
 
@@ -1423,8 +2176,21 @@ shapes from v1. Several are `update`, not `upsert`, and throw P2025 on a missing
 | `/flags`: toggle a flag twice | `updatedByName` is written |
 | `/revalidation`: trigger a manual revalidation | `scope` and `actorName` are written |
 | Public: submit the **contact form** once | `POST /api/contact` writes `status`/`readAt`, not `read` |
+| **`/about`: open the Education row's edit dialog, press *Update entry* without changing a field, then Save** | **`startYearInt`/`endYearInt`.** This is Step 45's prerequisite and nothing else in this runbook touches it. `education-table.tsx:33-49` builds the staged fields from the *whole* form, so an unchanged dialog still puts `startYear`/`endYear` in the `SET` list; `staging.ts:697-717` then issues the `tx.education.update`. Do **not** instead press the page-level Save with no dialog: `staging-provider.tsx:78` drops an empty field set, so that writes nothing and proves nothing. Watch for **"Couldn't save your changes. Nothing was applied."** — per Step 10 that string is the *only* user-visible symptom of an Education failure, and the reason is in the Postgres log |
+| **`/messages`: pick a message that is currently UNREAD, mark it read, then unread, then star, then unstar** | **`status` + `readAt` with no `read`.** Step 39 drops `ContactMessage.read`. `messages.ts:23-47` — note these are `updateMany` with a status filter, so a row that is already READ silently matches nothing: if you pick the wrong message every click is a no-op that looks like a success. The SQL gate below is how you know it actually wrote |
+| **`/notes`: create a folder, create a question inside it, set its confidence, then delete both** | All **three** CHECKs from Step 16: `NoteNode_depth_check` (`depth >= 0`, from `createNode`), `NoteNode_self_parent_check` (`parentId <> id`, from the move on create), `NoteAnswer_confidence_check` (`confidence BETWEEN 0 AND 4`, from `notes.ts:207` `setConfidence`). 881 rows, the largest data set, and the Appendix flags this cluster **unrehearsed** |
+| **`/contact-purposes`: add one, then delete it** | `staging.ts:485-488` reads `_max: { sortOrder }` then creates — the same `nextSortOrder` shape as `/quotes`, on a different table |
+| **`/tracked-links`: create a link, then delete it** (not `/tracker` — that page is read-only) | `tracked-links.ts:52` `createTrackedLink`, plus the `rawContent`/`rawTerm`/`messageId` columns Step 13 added |
+| **`/refer-emails`: press Refresh once** | `refer-emails.ts:20` `syncReferEmails`, which also needs the four `GOOGLE_*` vars from Step 6 group C. A silent no-op here is an env miss, not a schema miss |
+| **`/cat`: change the nap style, save, change it back** | The `CatNapStyle` enum minted in Step 23 and `SiteSettings.catNapStyle`/`.catNapSeconds` (`site-config.ts:43-44`). Step 10 calls this the **most deceptive** save in the app because `cat-console.tsx` previews locally and looks right regardless |
 
-**Expected output.** Every one succeeds.
+**Expected output.** Every one succeeds. Fifteen writes covering eleven clusters.
+
+**What is deliberately NOT here, and where it is.** The first **R2 upload** and the first **SMTP
+reply** are the two writes that cannot be rolled back (STOP-THE-LINE rule 2), so they stay out of the
+freeze. They are the **first thing you do after Step 37**, not at Step 51 — see the note at the end of
+Step 37. Until then, `media-references.ts`, `messages.ts`'s reply path and the new
+`MediaAsset_folder_check` from Step 15 are **unproven**.
 
 **Gate.** All of them, plus:
 
@@ -1435,12 +2201,40 @@ select "id", "updatedAt" > now() - interval '1 hour' as written_by_v2_recently,
   from "SiteSettings";
 select count(*) as quotes_with_sortorder from "Quote" where "sortOrder" is not null;
 select count(*) as badges_resolved from "HeroSkillBadge" where "skillId" is not null;
+
+-- the seven writes added above, each one proved by a column that only v2 writes
+select "id", "startYearInt", "endYearInt", "updatedAt" > now() - interval '1 hour' as edu_touched
+  from "Education";
+select "id", "status", "readAt", "starred", "read" as legacy_read
+  from "ContactMessage" order by "updatedAt" desc nulls last limit 3;
+select count(*) as notes_now from "NoteNode";
+select count(*) as answers_now from "NoteAnswer";
+select "confidence", "lastRevisedAt" from "NoteAnswer"
+  order by "lastRevisedAt" desc nulls last limit 1;
+select "catNapStyle", "catNapSeconds" from "SiteSettings";
+select count(*) as tracked_links from "TrackedLink";
 SQL
 ```
 
-`written_by_v2_recently = t`, `not_all_defaults = t`, and both counts equal their table's row count.
+`written_by_v2_recently = t`, `not_all_defaults = t`, and both original counts equal their table's
+row count. Then:
+- **`edu_touched = t` and `startYearInt` is 2021.** If `edu_touched` is `f`, the `/about` save did
+  not reach the database — re-read the dialog instruction in the table above.
+- **The `ContactMessage` row you clicked has `readAt` non-null and back to null as you toggled, and
+  `legacy_read` did NOT move with it.** `legacy_read` frozen at its old value is the *point*: it
+  proves v2 stopped writing the column Step 39 drops. If `legacy_read` moved, the deployed bundle is
+  v1.
+- **`notes_now` = 881 and `answers_now` back at its Step 12 value**, after you deleted both nodes.
+  A number that stayed high means the delete did not purge; check `/notes/trash`.
+- **`lastRevisedAt` is within the last hour**, which is the only observable proof `setConfidence`
+  wrote through `NoteAnswer_confidence_check`.
+- **`catNapStyle` is back to its original value** and is a valid `CatNapStyle` label.
+- **`tracked_links` is back to its starting count.**
 
-**Undo.** Vercel instant rollback. It is still free: Stage 5 has not run.
+**Undo.** Vercel instant rollback. It is still free: Stage 5 has not run. Two of the fifteen writes
+are *not* covered by that rollback and you should know which: the `/refer-emails` sync pushes to a
+Google Sheet, and the contact-form submission sends a notification email. Both are external side
+effects. Neither is destructive.
 
 ---
 
@@ -1472,11 +2266,75 @@ and it returns **204 on every error**, so silence is not success. Check the Verc
 **The `RollupRun 'ok'` row is Step 48's hard prerequisite.** It may take hours on a low-traffic
 site. Do not wait for it here; note the requirement and come back.
 
+**There is a faster, legitimate way to get that row than waiting for a visitor: open `/analytics`.**
+`apps/docs/app/(dashboard)/analytics/page.tsx:39` awaits `catchUpRollups()` **in the render**, which
+calls `rollupDay(day, "catch-up")` for up to five unsummarised past days and records a `RollupRun`
+with `status = 'ok'` (`packages/db/src/rollup.ts:269`). Caveat, so you do not mistake silence for
+failure: `catchUpRollups` only acts on **complete past days that have no `DailyStat` row yet**
+(`rollup.ts:311-320`). If every past day is already summarised it does nothing and writes no
+`RollupRun` at all — that is a legitimate "nothing to do", not an error. Check with:
+
+```sql
+select "status", "triggeredBy", "date", "createdAt" from "RollupRun"
+  order by "createdAt" desc limit 5;
+```
+
+A row with `triggeredBy = 'catch-up'` and a `createdAt` after the deploy satisfies Step 48.
+
 Also note: `lastRunAt` is bumped **before** the task body runs, so a task that throws is locked out
 for its full interval — **24 hours for retention** — with the only evidence an `error:` prefix in
 `lastResult`. Read that column.
 
 **Undo.** N/A. The freeze is over.
+
+---
+
+## Step 37b — R2 and SMTP: the two write paths that could not go in the freeze
+
+**What it does.** Proves the only two write paths in the app that no earlier step is allowed to
+touch, at the first moment it becomes legal to touch them.
+
+**Do this now, before Step 38's dump. Not at Step 51.** R2 uploads and SMTP replies are the two
+writes STOP-THE-LINE rule 2 keeps out of a freeze, because the bytes land in the bucket before the
+row is written (`media.ts:237`) and the email is delivered before the `MessageReply` insert
+(`messages.ts:158` then `:162`). The freeze is now over, so a deliberate orphan is traceable and
+cheap — which makes this the first moment they *can* be tested, and it is also the last moment at
+which finding them broken is free. Leaving them at Step 51 puts them behind Step 39
+(`ContactMessage.read` gone), Step 43 (**the point of no clean return**) and Step 49 (`SiteConfig`
+moved to `legacy_v1`), i.e. past every threshold where Vercel instant rollback is still complete.
+`MediaAsset_folder_check` is new in Step 15 and both `media-references.ts` and `messages.ts` are
+modified, so neither path is proven by anything before this.
+
+```
+1. /media  — upload one small file (a <50 KB PNG). Confirm it appears in the
+             grid and the thumbnail renders from the CDN host.
+2. /media  — delete it. Confirm the row is gone AND the R2 object is gone
+             (check the bucket view, not just the grid).
+3. /messages — open any message and send ONE reply to your own address.
+             Confirm the mail arrives and that a MessageReply row exists.
+```
+
+**Expected output.** The upload renders from the CDN host, the delete removes both the row and the
+object, and the reply arrives in your inbox.
+
+```sql
+select count(*) as assets from "MediaAsset";
+select "folder", count(*) from "MediaAsset" group by 1 order by 1;
+select "id", "messageId", "createdAt" from "MessageReply" order by "createdAt" desc limit 3;
+select "id", "status", "repliedAt" from "ContactMessage" where "repliedAt" is not null
+  order by "repliedAt" desc limit 3;
+```
+
+**Gate.** `assets` is back to its starting count, every `folder` value satisfies
+`MediaAsset_folder_check`, the newest `MessageReply` is yours, and the replied message has
+`status = 'REPLIED'` with a `repliedAt`. **Both gates must pass before Step 38.** If you choose to
+defer this anyway, write that decision into the run log verbatim: *"the media and reply write paths
+are unverified until after Step 43"* — and re-read Stage 5's preamble knowing it.
+
+**Undo.** Step 2 above *is* the undo for the upload — delete the asset and confirm the R2 object is
+gone. The reply email cannot be unsent; that is the point of STOP-THE-LINE rule 2, and sending it to
+your own address is what makes it harmless. Nothing here is a schema change, so there is nothing to
+roll back in the database.
 
 ---
 
@@ -1582,8 +2440,19 @@ psql "$PGPROD" -v ON_ERROR_STOP=1 -f /tmp/v2/prod/media-flags-reval-github-contr
   2>&1 | tee /tmp/v2/prod/log/40-media-flags-reval-github-contract.log
 ```
 
-**Expected output.** One `COMMIT`. A **WARN** (not an abort) if any `FeatureFlag` key is outside
-`FLAG_DEFINITIONS`.
+**Expected output.** One `BEGIN`, then one `COMMIT` — the file carries its own transaction, so
+either all four sections landed or none did. A **WARN** (not an abort) if any `FeatureFlag` key is
+outside `FLAG_DEFINITIONS`.
+
+**Atomicity here is load-bearing, not cosmetic.** The `DROP COLUMN label, description` in section 1
+is the one statement in this file whose only remaining source is the Step 15 P4 dump, and it sits
+*before* two guards that `RAISE EXCEPTION`: section 3's SYSTEM-rows check and section 4's orphan
+`GithubYear` check — and section 4's is the **last statement in the file** and the likeliest to fire.
+If the file were applied without a transaction, that drop would already be committed when the guard
+aborted, leaving a state the ROLLBACK block does not describe and for which **S3** and **S4**'s
+"Nothing was applied — the transaction rolled back" would be false. Confirm the log shows `BEGIN` and
+no `SET LOCAL can only be used in transaction blocks` warning; if it shows that warning you are on a
+stale copy of the file, and section 1 and section 3 ran with **no** `lock_timeout`.
 
 **Gate.** `/flags`, `/site-config` and `/terminal` all return 200 (they are the three pages that
 select `FeatureFlag.label` under v1), `/revalidation` shows scope values, and the home page renders
@@ -1596,18 +2465,51 @@ select indexrelname, idx_scan from pg_stat_user_indexes
 where indexrelname in ($$MediaAsset_folder_createdAt_idx$$,$$RevalidationLog_entityType_entityId_idx$$);'
 ```
 
-**The one irreversible thing in this whole cluster:** `label`/`description` for a `FeatureFlag` key
-**outside** `FLAG_DEFINITIONS`. `HEAD:packages/db/scripts/seed-flags.ts:37-42` leaves such rows
-alone by design, so no automated means restores them. Step 15's preflight dump is the only record.
+**The one thing in this cluster with no source in the database afterwards:** `label`/`description`
+for a `FeatureFlag` key **outside** `FLAG_DEFINITIONS`. The **v1** seed at
+`0050cc9:packages/db/scripts/seed-flags.ts:37-42` leaves such rows alone by design, so no seed
+restores them. Their only record is the Step 15 P4 output in your run log **and** the `FeatureFlag`
+rows in the Step 7 and Step 38 dumps — which, since Step 8b, you have an executable path back from.
 Read the WARN.
 
-**Undo.** One transaction, in this order: drop `GithubYear_handle_fkey`;
-`ALTER TYPE "RevalidationTrigger" ADD VALUE IF NOT EXISTS 'SYSTEM'` (appends last, exactly where
-`20260821130000` had it, so label order comes back byte-identical — legal inside a transaction on
-PG12+, but the restored label cannot be **used** until after COMMIT); recreate the two indexes;
-`ADD COLUMN "label" TEXT, ADD COLUMN "description" TEXT`; then **on the v1 code**
-`cd packages/db && bun run flags:seed` (HEAD's seed writes label + description; the v2 seed writes
-neither); then `ALTER COLUMN "label" SET NOT NULL`.
+**Undo — five steps, deliberately not one transaction.** Full text, with the reasoning, in the
+ROLLBACK block of `media-flags-reval-github-contract.sql`. In outline:
+
+1. **One transaction:** drop `GithubYear_handle_fkey`; `ALTER TYPE "RevalidationTrigger" ADD VALUE IF
+   NOT EXISTS 'SYSTEM'` (appends last, exactly where `20260821130000` had it, so label order comes
+   back byte-identical — legal inside a transaction on PG12+, but the restored label cannot be
+   **used** until after COMMIT); recreate the two indexes; `ADD COLUMN IF NOT EXISTS "label" TEXT,
+   ADD COLUMN IF NOT EXISTS "description" TEXT`. `label` comes back **nullable**, which is the
+   post-EXPAND shape and is intentional.
+2. **The text back for every key, off-registry included**, from the Step 38 dump via the Step 8b
+   generator:
+   ```bash
+   cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
+   jq -r -f v2-production/recover-from-dump.jq \
+      --arg table FeatureFlag --arg key key --arg cols 'label,description' --arg mode update \
+      backups/PRE-CONTRACT-<stamp>.json > /tmp/v2/prod/recover-flag-labels.sql
+   less /tmp/v2/prod/recover-flag-labels.sql        # read it
+   ```
+   then apply that file exactly the way you applied this step's contract file.
+3. **Belt and braces for the nine registry keys**, if the dump is unavailable. `flags:seed` reads
+   `process.env.DATABASE_URL` through `packages/db/src/index.ts:1,5`, and local `DATABASE_URL` points
+   at the **throwaway Neon child branch** — so the override is mandatory, and you need the v1 tree
+   because only the v1 seed writes `label`/`description`:
+   ```bash
+   git stash && git checkout 0050cc9 -- packages/db packages/shared
+   cd packages/db && DATABASE_URL="$PGPROD" bun run db:generate
+   DATABASE_URL="$PGPROD" bun run flags:seed
+   ```
+   `db:generate` has to run again because `**/generated/prisma` is gitignored.
+4. **Fail-safe:** `SELECT "key" FROM "FeatureFlag" WHERE "label" IS NULL;` — read it — then
+   `UPDATE "FeatureFlag" SET "label" = "key" WHERE "label" IS NULL;`. This catches a flag created
+   *after* the dump, which step 2 cannot know about.
+5. **Only now:** `ALTER TABLE "FeatureFlag" ALTER COLUMN "label" SET NOT NULL;`
+
+Putting step 5 in step 1's transaction is the specific mistake this ordering exists to prevent: one
+NULL label raises `23502` and rolls back the FK drop and the enum re-widening along with it.
+**Do not re-alias the v1 deployment until step 5 has committed** — the v1 datamodel declares `label
+String`, non-nullable. Same ordering rule as Step 39.
 
 ---
 
@@ -1682,8 +2584,10 @@ window, hard-aborts on any unresolved row, then `SET NOT NULL` on `skillId`, add
 
 > **`iconKey` has no home in v2.** The chip icon comes from `Skill.iconKey`. After this commits, the
 > only authoritative record of a per-badge icon is the **Step 7 JSON dump** plus **Step 20's P7
-> output**. This is the first step in the entire runbook whose undo is not a SQL statement.
-> **Re-read Step 20's P7 output now, before you run this.**
+> output**. This is the first step in the entire runbook whose undo is not a SQL statement **written
+> by hand** — it is a SQL statement *generated from the dump*, by the Step 8b generator, which is why
+> Step 8b is not optional. **Re-read Step 20's P7 output now, before you run this, and confirm you
+> have run Step 8b.**
 
 **Command.**
 
@@ -1707,9 +2611,30 @@ psql "$PGPROD" -v ON_ERROR_STOP=1 -f /tmp/v2/prod/hero-badges-contract.sql \
   late-bound, so `DROP COLUMN "name"` would **succeed** with the trigger installed and then every
   subsequent badge `INSERT` would die with `record "new" has no field "name"`. W-block asserts it.
 
-**Undo.** Lossy and partial. `name` reconstructs as `COALESCE(label, skill.name)`. `iconKey` comes
-back **only** as the skill's icon — correct only for the rows P7 reported as non-drifting. For the
-real values, read the Step 7 dump. The FK, the `NOT NULL` and the unique index drop cleanly.
+**Undo — two passes.** The FK, the `NOT NULL` and the unique index drop cleanly.
+
+1. **Shape and the approximate values**, in one transaction: the `REVERSE OF CONTRACT` block at the
+   foot of `hero-badges-contract.sql`, verbatim. It re-adds both columns, fills `name` as
+   `COALESCE(label, skill.name)` — which is **exact**, because `label` carried every override — and
+   fills `iconKey` from `Skill."iconKey"`, which is **not**. Filling both is what lets the same
+   transaction restore their `NOT NULL`.
+2. **The true per-badge `iconKey`**, out of the Step 7 dump. This is the executable form of what used
+   to read "for the real values, read the Step 7 dump", and Step 8b rehearses it on this exact table:
+
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
+jq -r -f v2-production/recover-from-dump.jq \
+   --arg table HeroSkillBadge --arg key id --arg cols 'iconKey' --arg mode update \
+   backups/PRE-CUTOVER-<stamp>.json > /tmp/v2/prod/recover-badge-iconkey.sql
+less /tmp/v2/prod/recover-badge-iconkey.sql      # read it, then apply it like any contract file
+```
+
+Pass 2 is an `UPDATE` of an already-`NOT NULL` column, so it cannot reintroduce a `23502` and needs no
+special ordering. Run it anyway even when Step 20's P7 reported no drift — it costs one transaction
+and removes the only remaining guess. A badge **created after the Step 7 dump** is absent from the
+generated file; the guard names it and aborts, and for those rows pass 1's skill-icon value is all
+there is. Full text and caveats: the ROLLBACK and `REVERSE OF CONTRACT` blocks of
+`hero-badges-contract.sql`.
 
 ---
 
@@ -1893,10 +2818,24 @@ No cache flush is needed: all ten posts are DRAFT, so none is in any public ISR 
 payload. If you **did** publish during the window, `revalidateTag('blogs')` and
 `revalidateTag('blog:<slug>')`.
 
-**Undo.** `show` comes back only as a blanket `ADD COLUMN "show" BOOLEAN NOT NULL DEFAULT true;
-UPDATE "Blog" SET "show" = false;` — faithful today because all ten rows held `false`, and the
-per-row values also live in the dump. `publishedAt` comes back from `createdAt` (identical for the
-ten seed rows). A post published **after** this step is restored by neither.
+**Undo.** Two passes, same shape as Step 43. First the blanket restore, in one transaction:
+`ADD COLUMN "show" BOOLEAN NOT NULL DEFAULT true; UPDATE "Blog" SET "show" = false;` — faithful
+**today** because all ten rows held `false`, and the `DEFAULT true` means the column is `NOT NULL`
+from the start so nothing can raise `23502`. Then the per-row values, which are in the dump and now
+have a command:
+
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
+jq -r -f v2-production/recover-from-dump.jq \
+   --arg table Blog --arg key id --arg cols 'show' --arg mode update \
+   backups/PRE-CONTRACT-<stamp>.json > /tmp/v2/prod/recover-blog-show.sql
+less /tmp/v2/prod/recover-blog-show.sql           # read it, then apply it like any contract file
+```
+
+Use the **Step 38 PRE-CONTRACT** dump, not Step 7's: a post created during the window exists only in
+the later one, and that is exactly the row whose `show` the blanket `UPDATE` would get wrong.
+`publishedAt` comes back from `createdAt` (identical for the ten seed rows). A post published
+**after** this step is restored by neither.
 
 ---
 
@@ -1931,7 +2870,7 @@ psql "$PGPROD" -v ON_ERROR_STOP=1 -f /tmp/v2/prod/analytics-contract.sql \
   then re-summarise that day from the admin (the upsert is idempotent).
 
 **Optional and worth it:** flip the `analytics.enabled` flag **off** before stage 2 and back on
-after. While it is off, `collect/route.ts:103` returns before touching Postgres, so the
+after. While it is off, `collect/route.ts:110` returns before touching Postgres, so the
 `ACCESS EXCLUSIVE` window on the rewrite is **provably empty** and the public site only loses a
 beacon.
 
@@ -1946,8 +2885,27 @@ back) — which is why stage 3 is a rename: `analytics-read.ts:258`'s `utmTracke
 `track/utm/route.ts:95,:103` would 500 on the **public origin** for every pageview. `EventType`
 widens with `ALTER TYPE ADD VALUE IF NOT EXISTS`. `meta` comes back empty (lossless — it was
 non-null on zero rows). `DailyStat.id` comes back with **fresh uuids** (nothing ever referenced the
-old ones). `lastSeenAt` comes back reading `CURRENT_TIMESTAMP` — **unrecoverable**, and cosmetic,
-since v1 has no reader for it either.
+old ones). `lastSeenAt` comes back reading `CURRENT_TIMESTAMP`, then the real values come back **from
+the Step 38 dump**, same shape as Steps 43 and 47:
+
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
+jq -r -f v2-production/recover-from-dump.jq \
+   --arg table AnalyticsSession --arg key id --arg cols 'lastSeenAt' --arg mode update \
+   backups/PRE-CONTRACT-<stamp>.json > /tmp/v2/prod/recover-lastseenat.sql
+```
+
+It is **not unrecoverable** — it is in the Step 38 dump like everything else, and it is cosmetic
+besides, since neither version reads it. Sessions created *after* that dump are the only rows the
+generator cannot cover, and the guard names them rather than silently skipping them. Keep
+"unrecoverable" for the case that genuinely is: the `AdminRole` `ALTER TYPE ADD VALUE` at
+contact-admin-audit T0.
+
+`AnalyticsSession` is the **largest** table anything in this runbook points the generator at — check
+`jq '[.tables[]|select(.name=="AnalyticsSession").rows|length]'` on the dump first. One `UPDATE` per
+session means the generated file stops being something you can read end to end somewhere in the low
+thousands, and "read it before you apply it" is the whole safety model. For a cosmetic column, the
+honest answer at that size is to not bother.
 
 ---
 
@@ -1984,20 +2942,91 @@ psql "$PGPROD" -v ON_ERROR_STOP=1 -f /tmp/v2/prod/settings-contract.sql \
 `SiteConfig` still exists it is **one `SELECT` away from reverting every setting v2 has written.**
 C1 is the only statement in this file that v1 survives.
 
+**The price of that drop is that C1's undo is two blocks, not one, and the undo note used to name
+only one of them.** C1 drops **three** objects — the trigger `SiteConfig_resync_v2`, the trigger
+function `site_settings_resync_v2_trg()` and the worker `site_settings_resync_v2()`
+(`settings-contract.sql:128-130`). STEP B of `settings-expand.sql` recreates only the first two, and
+the trigger function's whole body is `PERFORM public.site_settings_resync_v2()`
+(`settings-expand.sql:583`). plpgsql resolves that call **at execution time, not at creation time**,
+so re-running STEP B alone *succeeds* and looks like a clean undo — and then the next
+`INSERT`/`UPDATE`/`DELETE` on `SiteConfig` raises `42883 function
+public.site_settings_resync_v2() does not exist` inside the statement-level trigger. On a v1
+rollback that is **every admin settings save**: Prisma surfaces it as `P2010` and aborts the whole
+23-upsert transaction, so the admin cannot change any setting at all. The worker function has to
+come back first. That is what the undo below does.
+
 **C4 is fatal to v1 from that instant.** Every public route 500s (`42P01` inside the root layout),
 the nine v1 admin read sites 500 the same way, and both v1 writers fail `P2021`. v2 is unaffected:
 `git grep prisma.siteConfig` on the working tree returns nothing; the only surviving `siteConfig`
 identifiers are the cache tag at `packages/shared/src/tags.ts:6` and a local variable in
 `apps/web/app/page.tsx`.
 
-**Undo.** Between C1 and C4 nothing has moved — re-run **STEP B** of `settings-expand.sql` to
-restore the dual write at zero data risk. After C4 and before Step 56 the undo is **one statement**:
+**Undo.** Two cases. **Neither of them is "re-run STEP B".**
+
+**Between C1 and C4** nothing has moved, so the undo is to put the dual write back — all three
+objects, worker function first, in **one** transaction:
+
+```sql
+BEGIN;
+SET LOCAL lock_timeout = '3s';
+-- 1. the worker, verbatim from settings-expand.sql A5 (lines 379-502): the whole
+--    CREATE OR REPLACE FUNCTION public.site_settings_resync_v2() ... $fn$; block.
+--    Copy it; do NOT re-run the rest of STEP A, which also creates types and a
+--    table and runs a backfill.
+-- 2. then STEP B's body (settings-expand.sql:580-593) WITHOUT its own BEGIN/COMMIT:
+--    CREATE OR REPLACE FUNCTION public.site_settings_resync_v2_trg() ...
+--    DROP TRIGGER IF EXISTS "SiteConfig_resync_v2" ON public."SiteConfig";
+--    CREATE TRIGGER "SiteConfig_resync_v2" AFTER INSERT OR UPDATE OR DELETE
+--      ON public."SiteConfig" FOR EACH STATEMENT
+--      EXECUTE FUNCTION public.site_settings_resync_v2_trg();
+COMMIT;
+```
+
+Then **prove it**, because a trigger that raises `42883` looks identical to a working one until
+something writes. **Do not "test" it by calling the worker for real.** Between C1 and C4, `SiteConfig`
+is frozen at the last v1 save while `SiteSettings` holds everything v2 has written since, and the
+worker copies `SiteConfig` **→** `SiteSettings`. A bare `SELECT site_settings_resync_v2();` there is
+the exact "one `SELECT` away from reverting every v2 setting" that C1 exists to prevent. Probe it
+inside a transaction you throw away:
+
+```sql
+SELECT proname FROM pg_proc WHERE proname LIKE 'site_settings_resync_v2%' ORDER BY 1;
+-- expect BOTH rows: site_settings_resync_v2, site_settings_resync_v2_trg.
+-- One row is the 42883 trap, restored.
+
+SELECT tgname, tgenabled FROM pg_trigger
+ WHERE tgrelid = 'public."SiteConfig"'::regclass AND NOT tgisinternal;
+-- expect: SiteConfig_resync_v2 / O
+
+BEGIN;
+  SELECT public.site_settings_resync_v2() AS rows_would_change;   -- a number, not 42883
+ROLLBACK;                                                          -- MANDATORY
+```
+
+The `ROLLBACK` is what makes that probe legal. A non-zero `rows_would_change` is not an error — it is
+the size of the divergence you are about to have to reconcile by hand, and it is worth writing into
+the run log before you throw it away.
+
+One transaction, worker first, is the point: the two functions and the trigger are a unit, and the
+only failure mode this step has is putting back two of the three. `CREATE OR REPLACE` on both makes
+the block re-runnable, and the `DROP TRIGGER IF EXISTS` in front of the `CREATE TRIGGER` is what
+keeps a retry from failing with `42710`. Zero data risk either way — no column, type or row changes.
+
+**After C4 and before Step 56**, the schema move comes first, then the same block:
+
 ```sql
 BEGIN; ALTER TABLE legacy_v1."SiteConfig" SET SCHEMA public; COMMIT;
 ```
-which makes v1 servable again **with the original uuid ids intact** — but `SiteConfig` is then
-**STALE** with respect to anything the admin saved while v2 was live, because no reverse trigger is
-installed (deliberately). **Reconcile from `SiteSettings` by hand before trusting the v1 site.**
+
+which makes v1 servable again **with the original uuid ids intact**. That order is not optional: the
+worker's body reads unqualified `"SiteConfig"`, so recreating it while the table is still in
+`legacy_v1` gives you a function that creates fine and then raises `42P01` on first call — the same
+trap as above, one table further down. Re-install the dual write only if you are also reverting the
+code deploy. Either way `SiteConfig` is then **STALE** with respect to anything the admin saved while
+v2 was live, because no reverse trigger is installed (deliberately). **Reconcile from `SiteSettings`
+by hand before trusting the v1 site** — and note that the resync runs in the *wrong* direction for
+that job: it copies `SiteConfig` → `SiteSettings`, so installing it before you reconcile would
+overwrite v2's values with v1's stale ones. Reconcile first, install second.
 
 ---
 
@@ -2042,15 +3071,24 @@ for p in / /sitemap.xml /blog /robots.txt; do
 done
 ```
 
-Then repeat **Step 34's full render checklist** and **Step 36's full write checklist**, plus:
+Then repeat, in full and in this order:
+- **Step 35's page list**, including the log-out / log-back-in that opens it. `AdminUser` lost
+  nothing in CONTRACT, but this is the last chance to find out cheaply.
+- **Step 36's fifteen writes.** Every row, not a sample. The three that matter most *after* CONTRACT
+  are the ones whose v1 column is now gone: `/about` (Education, `startYear` dropped at Step 45),
+  `/messages` mark-read (`ContactMessage.read` dropped at Step 39) and `/hero` badges
+  (`iconKey` dropped at Step 43).
+- **Step 37b's two irreversible writes, again.** They were proved before CONTRACT; this proves
+  CONTRACT did not break them. `MediaAsset` and `MessageReply` are both touched by contract files.
 - Submit the public contact form once and confirm the message appears in `/messages`.
-- Upload one small file to `/media`, confirm it appears, then delete it — and confirm the R2 object
-  is gone. This is the first time since Step 10 that an R2 write is safe.
-- Send one reply from `/messages` to your own address. First safe SMTP write since Step 10.
+- **Step 34's render checklist**, last, so the page you look at reflects every write above.
 
 **Expected output.** All 200, everything renders, every write succeeds.
 
-**Gate.** Everything. This is the acceptance test for the whole cutover.
+**Gate.** Everything. This is the acceptance test for the whole cutover. If you deferred Step 37b —
+against its instruction — then this is the **first** exercise of the R2 and SMTP paths, it is
+happening past Step 43, and a failure here has no free rollback. Note that in the run log before you
+start, so the next reader knows which of the two situations they are in.
 
 **Undo.** There is no clean undo at this point. If something is wrong, fix it forward; the Step 38
 dump is the floor.
@@ -2097,10 +3135,12 @@ drops in Step 56.** Verify it restores into a scratch branch exactly as in Step 
 | `SiteSettings` has not drifted | `select "updatedAt" from "SiteSettings";` | It should move only when you save. |
 | The audit trail | `/history` | Confirms v2 writes all five retyped `AuditEvent` columns. |
 | R2 orphans | `/media` bucket view | Any upload that failed mid-flight during either freeze left bytes in the bucket. Re-adopt or delete them. |
+| **Silent flag failure** | Vercel function logs on `apps/web`, filtered to the literal string **`[flags] read failed`** | This is the one schema failure that produces **no** visible symptom. `apps/web/app/lib/flags.ts:15-17` catches its own error and returns `defaultFlagMap()`, so a broken `FeatureFlag` read serves registry defaults on a page that looks perfect. No 5xx, no missing section. The log line is the only evidence. |
+| **The build still prerenders** | The `Generating static pages (N/N)` line in every `apps/web` deployment log | `next build` reads the database (Step 4). Every future deploy is therefore also a schema test — and the first one to fail will fail *at build*, before it can reach the public. Treat a red build here as good news, and check `N` against the value from Step 31 / Step 55. |
 
-**Gate for "stable".** 7 days with: no public 5xx attributable to schema, at least three `RollupRun`
-rows with `status='ok'`, `MaintenanceState.lastResult` with no `error:` prefix on any key, and one
-successful scheduled publish or a deliberate manual one.
+**Gate for "stable".** 7 days with: no public 5xx attributable to schema, **zero `[flags] read
+failed` lines**, at least three `RollupRun` rows with `status='ok'`, `MaintenanceState.lastResult`
+with no `error:` prefix on any key, and one successful scheduled publish or a deliberate manual one.
 
 **Undo.** N/A.
 
@@ -2111,32 +3151,124 @@ successful scheduled publish or a deliberate manual one.
 **What it does.** Every file in this runbook was **hand-run**, so `_prisma_migrations` knows about
 none of it. The next `prisma migrate dev` will try to create `SiteSettings` again.
 
-**Command.**
+**HARD PREREQUISITE — read before you type anything.** Do not run this step until **both** Vercel
+dashboard build commands are known to be free of `prisma migrate deploy`. That is Step 3's run-log
+entry, and Step 55 is what actually strips them. The reason is an ordering hazard in the original
+draft of this step, which said "committing the files you actually ran, then mark each applied":
+
+> Committing `prisma/migrations/<ts>_<cluster>_v2_contract/migration.sql` triggers a deploy. If
+> either dashboard build command runs `prisma migrate deploy`, that deploy **executes the contract
+> files against an already-contracted production**. The EXPAND files are largely `IF NOT EXISTS`- and
+> `DO $$`-guarded and would mostly no-op. The CONTRACT `DROP COLUMN`s are **not guarded** — they
+> would run a second time, and `DROP COLUMN` without `IF EXISTS` raises, which fails the build, while
+> any that *do* carry `IF EXISTS` silently succeed on columns that were re-created by a rollback.
+> Step 31's gate explicitly tolerates a `migrate deploy` in the dashboard command for the first
+> deploy. This step is where that tolerance turns into a weapon.
+
+So: **resolve first, commit second.** The migration directories exist on disk, uncommitted, for the
+whole of the resolve pass.
+
+**Command — in this order.**
 
 ```bash
 cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
-# For each cluster, stage the equivalent migration directory:
-#   prisma/migrations/<timestamp>_<cluster>_v2_expand/migration.sql
-#   prisma/migrations/<timestamp>_<cluster>_v2_contract/migration.sql
-# committing the files you actually ran, then mark each applied WITHOUT running it:
-DATABASE_URL="$PGPROD" bunx prisma migrate resolve --applied <timestamp>_<cluster>_v2_expand
-DATABASE_URL="$PGPROD" bunx prisma migrate resolve --applied <timestamp>_<cluster>_v2_contract
-# Verify:
-psql "$PGPROD" -v ON_ERROR_STOP=1 -c '
-select "migration_name","finished_at" from "_prisma_migrations" order by "started_at" desc limit 25;'
+
+# 1. Create the directories WITHOUT committing them. One pair per cluster,
+#    holding the exact bytes you ran from /tmp/v2/prod/:
+#      prisma/migrations/<timestamp>_<cluster>_v2_expand/migration.sql
+#      prisma/migrations/<timestamp>_<cluster>_v2_contract/migration.sql
+#    Timestamps must sort AFTER 20260822130000_add_links_rollup_media, the
+#    newest of the 24 existing migrations.
+git status --porcelain prisma/migrations        # they must all show as ?? untracked
+
+# 2. Record them as applied WITHOUT running them. `resolve --applied` only
+#    inserts a _prisma_migrations row; it never executes the file.
+for name in $(ls prisma/migrations | grep '_v2_\(expand\|contract\)$'); do
+  echo "resolving $name"
+  DATABASE_URL="$PGPROD" bunx prisma migrate resolve --applied "$name" || break
+done
+
+# 3. Verify the table, BEFORE the commit. (see the read-only probe below)
+
+# 4. ONLY NOW commit the directories.
+git add prisma/migrations && git commit
 ```
 
-**Expected output.** 24 pre-existing migrations plus your new ones, all with a `finished_at`.
+**Step 3's read, explicitly.** `psql` is not installed, and the probe in Step 21.3 deliberately
+**refuses the production host** — do not delete that line to get past this. Reading
+`_prisma_migrations` on production is a legitimate need, so use a *different*, narrower tool: a probe
+that accepts production but can only ever read. It admits a single statement beginning with `select`,
+and it sets `default_transaction_read_only = on` before issuing it, so the server itself rejects a
+write even if the regex were wrong.
 
-**Gate.** `bun run db:verify --from=PROD_DATABASE_URL` is still clean (Step 50's known-pendings
-only). **Nothing at runtime consults `_prisma_migrations`** — this is bookkeeping, off the critical
-path, and safe to defer.
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
+TARGET=PROD_DATABASE_URL Q='select "migration_name", "finished_at", "applied_steps_count"
+  from "_prisma_migrations" order by "started_at" desc limit 30' bun -e '
+import "dotenv/config";
+import { Client } from "pg";
+const q = process.env.Q!.trim();
+if (!/^select\b/i.test(q) || /;/.test(q.slice(0, -1))) {
+  console.error("refusing: this probe accepts one SELECT and nothing else");
+  process.exit(1);
+}
+const u = process.env[process.env.TARGET!]!;
+const h = (x: string) => new URL(x.replace(/^postgres(ql)?:\/\//, "https://")).hostname;
+console.log("READ-ONLY probe against", h(u));
+const c = new Client({ connectionString: u });
+await c.connect();
+await c.query("set default_transaction_read_only = on");
+console.table((await c.query(q)).rows);
+await c.end();
+'
+```
+
+**Expected output.** 24 pre-existing migrations (`ls prisma/migrations | wc -l` is 25 today: 24
+directories plus `migration_lock.toml`) plus one row per new directory, every row with a
+`finished_at` and `applied_steps_count = 0`. A `0` there is correct and is the signature of
+`resolve --applied` rather than a real run.
+
+**Gate.** Three:
+- `bun run db:verify --from=PROD_DATABASE_URL` is still clean (Step 50's known-pendings only).
+- No deploy was triggered between step 1 and step 3. If one was — someone pushed, or a preview
+  branch merged — check its build log for `migrate deploy` before touching anything else.
+- **The recorded history actually reproduces the live schema.** This is the check that catches a
+  migration directory whose bytes differ from what you ran. The reviewer-suggested form of this
+  command **does not work**; verified:
+  ```
+  $ bunx prisma migrate diff --from-migrations ./prisma/migrations \
+      --to-schema ./prisma/schema.prisma --exit-code
+  Error: You must set `datasource.shadowDatabaseUrl` in your `prisma.config.ts`
+         if you want to diff a migrations directory.
+  ```
+  `--from-migrations` replays the whole history into a shadow database, so it needs one.
+  Do it deliberately and on something disposable:
+  1. Cut a **fresh, empty** Neon branch. Put its URL in `.env` as `SHADOW_DATABASE_URL`.
+  2. Temporarily add to `prisma.config.ts`'s `datasource` block:
+     `shadowDatabaseUrl: env("SHADOW_DATABASE_URL"),`
+  3. `bunx prisma migrate diff --from-migrations ./prisma/migrations --to-schema
+     ./prisma/schema.prisma --exit-code` → **exit 0 / "No difference detected"**. Exit 2 means the
+     files you committed do not add up to `schema.prisma`; read the diff and fix the *files*, never
+     the database.
+  4. Revert the `prisma.config.ts` edit and delete the shadow branch. **Never point
+     `shadowDatabaseUrl` at production or at the staging branch — Prisma drops and recreates
+     everything in a shadow database.**
+
+  Two known-acceptable entries in that diff, the same two `db:verify` always reports:
+  `MediaAsset_key_prefix_idx` and `NoteNode_path_prefix_idx` (`scripts/verify-schema.ts:37` —
+  `prisma db pull` cannot see a btree operator class). Anything else is real.
+
+**Nothing at runtime consults `_prisma_migrations`** — this is bookkeeping, off the critical path,
+and safe to defer. Deferring it is *safer* than doing it early, for the reason in the prerequisite.
 
 **Leave the repo in a state where nobody can run `prisma db push`.** It would silently remove
 **every CHECK constraint** and **drop `Skill_name_lower_key`**. Prefer `migrate deploy`. Consider a
 guard in the `db:push` script.
 
-**Undo.** `prisma migrate resolve --rolled-back <name>`.
+**Undo.** `DATABASE_URL="$PGPROD" bunx prisma migrate resolve --rolled-back <name>` for each, and
+`git reset --soft HEAD~1` if you had already committed. Deleting the directories after resolving
+leaves orphan `_prisma_migrations` rows, which is harmless but confusing — roll back first, then
+delete.
 
 ---
 
@@ -2149,11 +3281,26 @@ explicitly `turbo run build --filter=web` / `--filter=docs`) and clear the custo
 **then trigger one deploy and read the log.**
 
 **Expected output.** The build log shows `db#build` running `prisma generate` from the **turbo
-graph**, with no dashboard command involved, and both apps build.
+graph**, with no dashboard command involved, and both apps build. The `web` log again shows
+`Generating static pages (N/N)`.
 
-**Gate.** Both projects reach Ready, Step 51's smoke still passes, and `DATABASE_URL` is still
-present in the Production **build** environment (`prisma.config.ts` resolves `env("DATABASE_URL")`
-at config load and fails without it, even though generate never connects).
+**Gate.** Five:
+- Both projects reach Ready and Step 51's smoke still passes.
+- `DATABASE_URL` is still present in the Production **build** environment. `prisma.config.ts`
+  resolves `env("DATABASE_URL")` at config load and fails without it even though generate never
+  connects — **and separately, `next build` does connect and read** (Step 4, gate 2), so this
+  variable is load-bearing twice over, for two different reasons.
+- `REVALIDATE_SECRET` is still ≥ 32 characters in the Production build environment. It is validated
+  at module load in `packages/config/src/env.ts:13`, during the prerender, so a build that lost it
+  fails here with `Invalid environment variables` and nothing about the message says "Vercel
+  setting".
+- **`N` in `Generating static pages (N/N)` equals the `N` you wrote down at Step 31**, unless you
+  published a blog post in between. A different `N` with no publish behind it means the dashboard
+  command you just removed was doing something to the build you did not know about — read the whole
+  log before promoting.
+- This is the **first deploy that runs without the dashboard command**, so it is also the first that
+  cannot have silently re-run a `migrate deploy`. Re-run Step 50's drift check and, if you have
+  reached Step 54, the `_prisma_migrations` read from Step 54 step 3: both must be unchanged.
 
 **Undo.** Restore the original commands from your Step 3 run-log entry.
 
@@ -2188,10 +3335,71 @@ psql "$PGPROD" -v ON_ERROR_STOP=1 -c 'DROP TABLE IF EXISTS "_v2_backup_project_i
 into a scratch branch (Step 8's procedure). After 56a, `git grep prisma.siteConfig` on the working
 tree must still return nothing.
 
-**Undo.** For 56a: `CREATE TABLE "SiteConfig" ("id" TEXT NOT NULL, "key" TEXT NOT NULL, "value"
-TEXT NOT NULL, CONSTRAINT "SiteConfig_pkey" PRIMARY KEY ("id")); CREATE UNIQUE INDEX
-"SiteConfig_key_key" ON "SiteConfig"("key");` then `bun run db:restore` for that one table with the
-original ids. For 56b and 56c: restore from the dump. **After Step 56 the dump is the only copy.**
+**Undo.** All three are "recreate the shape, then reload the rows from a dump", and **`bun run
+db:restore` is not the tool for any of them** — it refuses a production target
+(`scripts/restore.ts:37-40`) and has no per-table mode, so it would `TRUNCATE` and reload all 43
+tables (`:144-147`, `:150-216`) and destroy everything written since the dump. Use the Step 8b
+generator, which is why Step 8b exists.
+
+**56a.** Shape first, in one transaction:
+
+```sql
+BEGIN;
+CREATE TABLE "SiteConfig" ("id" TEXT NOT NULL, "key" TEXT NOT NULL, "value" TEXT NOT NULL,
+  CONSTRAINT "SiteConfig_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "SiteConfig_key_key" ON "SiteConfig"("key");
+COMMIT;
+```
+
+then the 26 rows, with their **original uuid ids**:
+
+```bash
+cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
+jq -r -f v2-production/recover-from-dump.jq \
+   --arg table SiteConfig --arg key id --arg cols '*' --arg mode insert \
+   backups/PRE-CONTRACT-<stamp>.json > /tmp/v2/prod/recover-siteconfig.sql
+less /tmp/v2/prod/recover-siteconfig.sql          # read it, then apply it like any contract file
+```
+
+**It must be the Step 38 or Step 7 dump, not Step 52's.** `scripts/dump.ts:31-33` selects
+`table_schema = 'public'` only, and Step 49's C4 moved `SiteConfig` to `legacy_v1` — so **no
+post-cutover dump contains this table at all**, and the generator will refuse with `no table named
+"SiteConfig" in this dump` rather than produce a wrong file. That refusal is the check; do not work
+around it by hand-writing the inserts.
+
+**56b.** `UtmTracker` comes back the same way, and the **table name in the dump changes with the
+dump**: Step 48 renamed it, so it is `UtmTracker` in the Step 7 and Step 38 dumps and
+`UtmTracker__retired_v2` in Step 52's. Pass whichever name that dump actually holds to `--arg table`,
+recreate the table under the name you want, and remember the generator writes `INSERT INTO <the
+--arg table name>` — so if you recover the renamed rows into a table called `UtmTracker`, generate
+from a dump where it is called `UtmTracker`. Because Step 48 is a **rename** and not a drop, the Step
+52 dump is the only one holding rows beaconed after Step 38, which is exactly the window the public
+`track/utm` beacon kept writing through.
+
+**56c.** `_v2_backup_project_images` is scaffolding `projects-expand.sql:569-578` created, and it is
+**not** simply derivable from `ProjectImage`. `projects-contract.sql:240-251` restores
+`Project."images"` as `COALESCE(<array_agg from ProjectImage>, <the backup row>, '{}')` — so for a
+project whose gallery is populated the live `ProjectImage` rows are the source and the backup is
+redundant, but for a project with **no** gallery rows the backup is the only copy of what v1 stored.
+Before dropping it, check that case is empty:
+
+```sql
+SELECT b."projectId", b."images"
+  FROM "_v2_backup_project_images" b
+ WHERE array_length(b."images", 1) > 0
+   AND NOT EXISTS (SELECT 1 FROM "ProjectImage" g WHERE g."projectId" = b."projectId");
+-- 0 rows: the drop loses nothing. Any rows: those arrays exist ONLY here and in
+-- the dump, and the dump is a `Project."images"` column that Step 46 has dropped
+-- — so read them into the run log first.
+```
+
+To recreate it, re-run `projects-expand.sql`'s `CREATE TABLE` plus its `INSERT ... SELECT "id",
+"images" FROM "Project"` — which only works while `Project."images"` still exists, i.e. only before
+Step 46. After Step 46 the generator over a pre-Step-46 dump is the path, against `Project`:
+`--arg table Project --arg key id --arg cols 'images' --arg mode update`, after re-adding the column.
+
+**After Step 56 the dump is the only copy — and since Step 8b, "the dump" means a command you have
+run.**
 
 ---
 
@@ -2264,10 +3472,26 @@ bun run dev
    `Skill_name_lower_key`**, the functional unique index enforcing case-insensitive skill identity.
    After any push, re-run `CREATE UNIQUE INDEX "Skill_name_lower_key" ON "Skill" (lower("name"));`
    and re-apply the CHECKs. Prefer `migrate deploy`.
-3. **`packages/db/seed.ts` has sixteen `deleteMany` calls** and `scripts/install-hero-v2.ts` does a
-   `deleteMany({version:'v2'})`. Neither has a `DATABASE_URL` host guard. `schema-v2.md:913`
-   ("Disarm the tooling") is the highest-leverage hour of follow-up work in the whole plan and it is
-   still undone. Do it before you next run a seed.
+3. **`packages/db/seed.ts` has nineteen `deleteMany` calls, not sixteen** — counted:
+   `seed.ts:7-25`, one per table, in FK order. **The nineteenth is
+   `prisma.adminUser.deleteMany()` (`seed.ts:25`), which deletes the only login.** A stray
+   `bun run seed` against production does not merely lose content, it locks you out of the admin
+   that would let you notice. `scripts/install-hero-v2.ts` additionally does a
+   `deleteMany({version:'v2'})`.
+
+   Neither has a `DATABASE_URL` host guard, while `scripts/apply-sql.ts:31-38` and
+   `scripts/restore.ts:32-39` both do — so the two *safe* scripts are guarded and the two
+   *destructive* ones are not. `schema-v2.md:913` ("Disarm the tooling") is the highest-leverage
+   hour of follow-up work in the whole plan and it is still undone. Do it before you next run a seed,
+   and copy the guard from `apply-sql.ts` rather than inventing one.
+
+   The good news, verified: `seed.ts` is fully v2 — it writes `siteSettings`, `projectImage`,
+   `projectSkill` and `experienceSkill`, and names no `SiteConfig`, no `Blog.show`, no `Skill.show`
+   and no `Project.images`. `bunx tsc --noEmit -p tsconfig.check.json` passes on it, which is what
+   Step 4's edit 5 exists to keep true. Three other writers, all harmless:
+   `scripts/seed-flags.ts` (create-only, leaves off-registry rows alone),
+   `apps/docs/scripts/update-about-copy.ts` (two idempotent `update`s) and `/analytics`'s
+   `catchUpRollups()` (Step 35).
 
 **Undo.** N/A. You are done.
 

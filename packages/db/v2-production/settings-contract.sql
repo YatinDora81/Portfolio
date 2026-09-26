@@ -121,6 +121,12 @@ SELECT c."key", c."value" AS last_v1_value FROM "SiteConfig" c ORDER BY c."key";
 -- body is not dependency-checked, so moving or dropping "SiteConfig" leaves the
 -- function silently broken and, worse, callable. Dropping it is what makes it
 -- impossible to accidentally revert every v2 setting with one SELECT.
+--
+-- THREE objects go, so THREE must come back. The undo of C1 is NOT "re-run STEP
+-- B of settings-expand.sql" — STEP B recreates only the trigger and the trigger
+-- function, whose body is a late-bound PERFORM of the worker dropped on line 130.
+-- Two of three is a trigger that raises 42883 on the next "SiteConfig" write.
+-- Read the ROLLBACK block at the foot of this file BEFORE you run C1.
 
 BEGIN;
 SET LOCAL lock_timeout = '3s';
@@ -272,32 +278,110 @@ FROM "SiteSettings";
 -- ############################################################################
 -- ROLLBACK
 -- ############################################################################
--- Between C1 and C4 (nothing has moved yet): re-run STEP B of
--- settings-expand.sql to put the function and trigger back. Zero data risk.
+-- Between C1 and C4 (nothing has moved yet): put the dual write back. Zero data
+-- risk, but it is THREE objects, not two, and the order matters.
 --
--- After C4, before C5 — undo is one statement, and it makes v1 servable again:
+-- ** "re-run STEP B" IS NOT THE UNDO OF C1. ** C1 above drops the trigger, the
+-- trigger function AND the worker function (lines 128-130). STEP B of
+-- settings-expand.sql (:577-595) recreates only the trigger and the trigger
+-- function, and the trigger function's entire body is
+--   PERFORM public.site_settings_resync_v2();                (expand.sql:583)
+-- plpgsql resolves that call at EXECUTION time, not at creation time. So STEP B
+-- on its own succeeds, reports CREATE FUNCTION / CREATE TRIGGER, and looks like a
+-- clean undo — and then the next INSERT/UPDATE/DELETE on "SiteConfig" raises
+--   42883 function public.site_settings_resync_v2() does not exist
+-- inside the statement-level trigger. On a v1 rollback that is every admin
+-- settings save: Prisma reports P2010 and aborts the whole 23-upsert
+-- transaction, so the admin cannot change any setting at all. Two of three
+-- objects is worse than none, because none fails loudly at C1 and two fails
+-- later, on a write, under a different name.
+--
+-- The undo, one transaction, worker first:
+--   BEGIN;
+--   SET LOCAL lock_timeout = '3s';
+--     -- 1. the worker, VERBATIM from settings-expand.sql A5 (:379-502): the
+--     --    whole CREATE OR REPLACE FUNCTION public.site_settings_resync_v2()
+--     --    ... $fn$; block. Copy that block only. Do NOT re-run the rest of
+--     --    STEP A: A1-A3 create types and the "SiteSettings" table, A6 inserts
+--     --    the singleton and A7 runs the backfill, none of which belongs in an
+--     --    undo of C1.
+--     -- 2. then STEP B's body (:580-593), WITHOUT its own BEGIN/COMMIT:
+--     --      CREATE OR REPLACE FUNCTION public.site_settings_resync_v2_trg() ...
+--     --      DROP TRIGGER IF EXISTS "SiteConfig_resync_v2" ON public."SiteConfig";
+--     --      CREATE TRIGGER "SiteConfig_resync_v2" AFTER INSERT OR UPDATE OR
+--     --        DELETE ON public."SiteConfig" FOR EACH STATEMENT
+--     --        EXECUTE FUNCTION public.site_settings_resync_v2_trg();
+--   COMMIT;
+-- Both CREATEs are OR REPLACE and the CREATE TRIGGER is preceded by DROP TRIGGER
+-- IF EXISTS, so the block is re-runnable: a retry cannot fail with 42710.
+--
+-- Then prove all three came back. A restored-but-broken trigger is invisible
+-- until something writes:
+--   SELECT proname FROM pg_proc
+--    WHERE proname LIKE 'site_settings_resync_v2%' ORDER BY 1;
+--   -- expect BOTH rows. One row is the 42883 trap, restored.
+--   SELECT tgname, tgenabled FROM pg_trigger
+--    WHERE tgrelid = 'public."SiteConfig"'::regclass AND NOT tgisinternal;
+--   -- expect: SiteConfig_resync_v2 / O
+--
+-- DO NOT prove it by calling the worker for real. Between C1 and C4 "SiteConfig"
+-- is frozen at the last v1 save while "SiteSettings" holds everything v2 has
+-- written since, and this function copies "SiteConfig" -> "SiteSettings". A bare
+--   SELECT public.site_settings_resync_v2();
+-- there is precisely the "one SELECT away from reverting every v2 setting" that
+-- C1's header warns about. If you want to see it execute, throw the transaction
+-- away:
+--   BEGIN;
+--     SELECT public.site_settings_resync_v2() AS rows_would_change;
+--   ROLLBACK;                       -- MANDATORY
+-- A non-zero rows_would_change is not an error; it is the size of the divergence
+-- you would have to reconcile by hand. Write it in the run log, then discard it.
+--
+-- After C4, before C5 — the schema move first, which alone makes v1 servable:
 --   BEGIN;
 --     ALTER TABLE legacy_v1."SiteConfig" SET SCHEMA public;
 --   COMMIT;
---   -- then, if you are also reverting the code deploy, re-run STEP B of
---   -- settings-expand.sql, and be aware "SiteConfig" is now STALE with respect
---   -- to anything the admin saved while v2 was live: nothing in v2 writes
---   -- "SiteConfig" (apps/docs/app/lib/actions/site-config.ts:61,
---   -- apps/docs/app/lib/actions/links.ts:11 both write prisma.siteSettings).
---   -- Reconcile by hand from "SiteSettings" before you trust the v1 site:
+--   -- then, ONLY if you are also reverting the code deploy, re-install the dual
+--   -- write with the two-part block above. The move MUST come first: the
+--   -- worker's body reads unqualified "SiteConfig", so creating it while the
+--   -- table is still in legacy_v1 gives you a function that creates cleanly and
+--   -- raises 42P01 on first call — the same late-binding trap as 42883, one
+--   -- object further down.
+--   -- And reconcile BEFORE you install, not after: "SiteConfig" is now STALE
+--   -- with respect to anything the admin saved while v2 was live, because
+--   -- nothing in v2 writes "SiteConfig" (apps/docs/app/lib/actions/
+--   -- site-config.ts:61, apps/docs/app/lib/actions/links.ts:11 both write
+--   -- prisma.siteSettings). The resync runs SiteConfig -> SiteSettings, i.e.
+--   -- the wrong direction for this job, so a trigger installed first would
+--   -- overwrite v2's values with v1's stale ones on the first v1 save.
 --   --   SELECT ... FROM "SiteSettings"   (W4 above prints everything you need)
 --   -- There is no reverse trigger installed, by choice: it would have to run on
 --   -- production for the whole post-deploy soak to be useful, and it is only
 --   -- useful in a scenario where you are already hand-editing 23 values.
 --
--- After C5: the table is gone. Recreate it from the read-only JSON dump —
+-- After C5: the table is gone. Recreate the shape, then reload the 26 rows from
+-- the JSON dump. `bun run db:restore` CANNOT do this and must not be attempted:
+-- scripts/restore.ts:37-40 refuses any target resolving to PROD_DATABASE_URL,
+-- and it has no per-table mode — :144-147 TRUNCATEs every dumped table present
+-- in the target and :150-216 reloads all of them, which would destroy everything
+-- written since the dump. Use the generator instead (RUNBOOK.md Step 8b
+-- rehearses this exact shape; do not first learn it here):
 --   CREATE TABLE "SiteConfig" (
 --     "id" TEXT NOT NULL, "key" TEXT NOT NULL, "value" TEXT NOT NULL,
 --     CONSTRAINT "SiteConfig_pkey" PRIMARY KEY ("id"));
 --   CREATE UNIQUE INDEX "SiteConfig_key_key" ON "SiteConfig"("key");
--- then `bun run db:restore` for that one table, with the ORIGINAL uuid ids.
--- Nothing references those ids, but keeping them keeps the database comparable
--- with the dump.
+-- then, from the repo root:
+--   cd packages/db
+--   jq -r -f v2-production/recover-from-dump.jq \
+--      --arg table SiteConfig --arg key id --arg cols '*' --arg mode insert \
+--      backups/PRE-CONTRACT-<stamp>.json > /tmp/v2/prod/recover-siteconfig.sql
+--   # read it, then apply it exactly the way you applied this file
+-- Use a PRE-CONTRACT (Step 38) or PRE-CUTOVER (Step 7) dump. A POST-CUTOVER
+-- dump does NOT contain this table: scripts/dump.ts:31-33 selects
+-- table_schema = 'public' only, and after C4 "SiteConfig" lives in legacy_v1.
+-- insert mode emits every dumped column with ON CONFLICT ("id") DO NOTHING, so
+-- the ORIGINAL uuid ids come back and a re-run is a no-op. Nothing references
+-- those ids, but keeping them keeps the database comparable with the dump.
 --
 -- Rolling back EXPAND itself (only sane while v1 is still deployed):
 --   BEGIN;

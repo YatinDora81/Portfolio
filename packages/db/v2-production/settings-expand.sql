@@ -45,6 +45,82 @@
 -- not lost at DEPLOY. See the note above STEP B for its failure modes.
 --
 -- ----------------------------------------------------------------------------
+-- "HEAD:" AND "git HEAD" IN THIS FILE MEAN COMMIT 0050cc9.
+-- ----------------------------------------------------------------------------
+-- Every v1 citation in this file was written when 0050cc9 was the tip. The v2
+-- work has since been committed, so `git HEAD` is f760425 and `git show
+-- HEAD:<path>` returns the v2 file — which for this cluster means the OPPOSITE of
+-- what the citation intends: the v2 tree has no `prisma.siteConfig` call at all.
+-- Read every v1 claim with `git show 0050cc9:<path>` and nothing else. 0050cc9 is
+-- what Vercel is serving while STEP B's trigger is installed. Working-tree/v2
+-- paths are cited bare, with no prefix.
+--
+-- ----------------------------------------------------------------------------
+-- V1 EVIDENCE RE-VERIFIED AT 0050cc9        (spot check 5 of 5, 2026-09-27)
+--
+-- WHY THIS FILE IS ONE OF THE FIVE. STEP B is the only statement in the entire
+-- EXPAND that installs a TRIGGER on a table the DEPLOYED code writes. Every other
+-- EXPAND statement is invisible to v1 by construction — Prisma never names a
+-- column it does not know about. A trigger is different: it runs INSIDE the v1
+-- write's transaction, and if the function it calls raises, the v1 write fails.
+-- Nothing about Prisma's column lists protects against that.
+--
+-- RE-CHECKED WITH `git show 0050cc9:<path>`, NOT by reading the working tree:
+--
+--  1. THE BLAST RADIUS OF A RAISING TRIGGER IS THE WHOLE ADMIN SAVE, NOT ONE ROW.
+--     CONFIRMED, and it is worse than "one setting fails to save":
+--       0050cc9:apps/docs/app/lib/actions/site-config.ts:104-111
+--         await prisma.$transaction([ ...clean.map(siteConfig.upsert),
+--                                     ...unclaimed.map(siteConfig.update) ])
+--     One interactive transaction carrying every changed setting. The trigger is
+--     AFTER ... FOR EACH STATEMENT, so it fires once per upsert inside that
+--     transaction — twenty-odd times on a full save — and a single raise aborts
+--     the transaction, so NO setting is stored and the admin sees a raw Prisma
+--     P2010. The second v1 writer is a single-statement upsert and fails alone:
+--       0050cc9:apps/docs/app/lib/actions/links.ts:11-15  resumeUrl upsert
+--     This is the argument for the file's own "skip STEP B and freeze instead"
+--     escape hatch, and the reason that hatch is offered rather than buried.
+--
+--  2. THE PUBLIC SITE IS NOT EXPOSED TO IT, because the public path is read-only.
+--     CONFIRMED:
+--       0050cc9:apps/web/app/layout.tsx:69   getSiteConfig(), in the ROOT layout
+--       0050cc9:apps/web/app/lib/data.ts:70-72  readSiteConfig() ->
+--                                               prisma.siteConfig.findMany()
+--     A statement-level AFTER INSERT/UPDATE/DELETE trigger cannot fire on a
+--     SELECT, so no public request can reach the function no matter how badly it
+--     is written. What the public IS exposed to is the CREATE TRIGGER's ACCESS
+--     EXCLUSIVE lock on "SiteConfig" — and that read is uncached
+--     (`readSiteConfig` is wrapped by unstable_cache, but an ISR regeneration
+--     still executes it) and UNCAUGHT: unlike getFlags, there is no try/catch and
+--     no fallback, so data.ts:70 is the one public database read in the whole app
+--     that turns a database problem into a 500 on every route. That is why STEP B
+--     is alone in its own one-statement transaction, last, under lock_timeout.
+--
+--  3. THE FUNCTION CANNOT RAISE ON THE DATA IT WILL ACTUALLY SEE, which is the
+--     substance behind item 1's reassurance. Confirmed by reading STEP A's
+--     resync body against v1's value space: every numeric is clamped into its
+--     CHECK range, heroDotColor is regex-guarded to '' on a miss, catNapStyle is
+--     coerced to a label, and heroPhotos is filtered to non-blank newline-free
+--     elements — and v1's own reader does the same clamping in TypeScript
+--     (0050cc9:apps/web/app/lib/data.ts:65-68 clampedInt, :82-85 the
+--     catNapSeconds clamp, :81 the CAT_NAP_STYLES membership test), so the two
+--     sides agree on what a legal value is. A missing "SiteSettings" row makes the
+--     resync a 0-row no-op rather than an error, and A6 has already created it.
+--
+--  4. NO RECURSION IS POSSIBLE. CONFIRMED by grep at 0050cc9: v1 contains no
+--     writer of "SiteSettings" at all — the table does not exist at that commit —
+--     so the trigger's UPDATE cannot re-enter "SiteConfig". No pg_trigger_depth()
+--     guard is needed, and adding one would only hide a future cycle.
+--
+-- VERDICT: every statement in this file is safe against the code actually
+-- deployed at 0050cc9. Nothing in the argument needed correcting; only the
+-- `HEAD:` labels did. Note separately that this file's PREREQUISITE THAT IS NOT
+-- SQL section below is now stale in a harmless direction: its three build edits
+-- were committed in 83743d2 and 6493c8f. RUNBOOK Step 4 is the live version of
+-- that list and it has five edits, not three.
+-- ----------------------------------------------------------------------------
+--
+-- ----------------------------------------------------------------------------
 -- PREREQUISITE THAT IS NOT SQL — do this BEFORE the deploy half
 -- ----------------------------------------------------------------------------
 -- A clean clone cannot build today: **/generated/prisma is gitignored, and

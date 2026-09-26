@@ -4,7 +4,24 @@
 -- Nothing here is destructive of data. Nothing here breaks v1.
 -- =====================================================================
 --
--- V1 = git HEAD (0050cc9). Every claim below cites HEAD, not the working tree.
+-- V1 = COMMIT 0050cc9. Every `HEAD:` citation in this file means 0050cc9 and
+-- nothing else. That was true when the file was written; it is NOT true now.
+-- The v2 work has since been committed, so HEAD is f760425 and `git show
+-- HEAD:<path>` returns the v2 file. Read every v1 claim below with
+--     git show 0050cc9:<path>
+-- The v1 evidence in this file was re-checked that way on 2026-09-26; the
+-- results are recorded in the "V1 EVIDENCE RE-VERIFIED AT 0050cc9" block that
+-- follows this header. Working-tree/v2 paths are cited bare, with no prefix.
+--
+-- LOCK AND STATEMENT TIMEOUTS. This file previously set neither, which made
+-- RUNBOOK.md:19 ("every ALTER runs under lock_timeout = '3s'") false for it.
+-- Each stage below now opens with a plain `SET` pair, matching hero-expand.sql.
+-- Plain SET, not SET LOCAL: measured on a Neon branch 2026-09-26, a standalone
+-- `SET LOCAL lock_timeout` — which is exactly what `psql -f` sends, one
+-- statement per message — returns `WARNING: SET LOCAL can only be used in
+-- transaction blocks` and leaves the session value unchanged. Plain SET was
+-- measured to persist across separate queries on both the pooled and the direct
+-- Neon endpoint, so it works under `psql -f` and under a node-pg runner alike.
 --
 -- THE ONE SENTENCE THAT MATTERS: after this whole file, a v1 collect POST
 -- (apps/web/app/api/collect/route.ts) and a v1 rollup write
@@ -27,7 +44,7 @@
 --   3  CREATE INDEX CONCURRENTLY      cannot be inside a transaction
 --
 -- OPTIONAL BUT CHEAP: before stage 1, flip the admin feature flag
--- `analytics.enabled` off. apps/web/app/api/collect/route.ts:103 and
+-- `analytics.enabled` off. apps/web/app/api/collect/route.ts:110 and
 -- apps/web/app/api/track/utm/route.ts:53 both return early on it, so no
 -- analytics write reaches Postgres at all while it is off, and the public
 -- site is unaffected (the flag only removes a beacon). The toggle fires a
@@ -36,8 +53,63 @@
 -- every statement is milliseconds on tables of 414 to 4803 rows -- but it
 -- removes even the theoretical lock wait on the hottest write path.
 -- Note it does NOT stop the rollup or retention: schedulePostResponseWork()
--- is called at collect/route.ts:100, BEFORE the flag check at :103.
+-- is called at collect/route.ts:108, BEFORE the flag check at :110.
 --
+-- =====================================================================
+-- V1 EVIDENCE RE-VERIFIED AT 0050cc9        (spot check 1 of 5, 2026-09-26)
+--
+-- WHY THIS FILE IS ONE OF THE FIVE. Stage 1.4 drops a PRIMARY KEY and a UNIQUE
+-- INDEX out from under a live writer that reaches Postgres from public traffic.
+-- If v1's rollup named either object, EXPAND would break the deployed code --
+-- and the failure is silent, because rollupDay()'s catch turns it into
+-- recordRun(...,'error') and /api/collect still returns 204.
+--
+-- RE-CHECKED WITH `git show 0050cc9:<path>`, NOT by reading the working tree:
+--
+--  1. The v1 rollup INSERT supplies "id" explicitly and arbitrates on the
+--     TRIPLE, not on a named constraint.
+--       0050cc9:packages/db/src/rollup.ts:217
+--         gen_random_uuid()::text, ${date}::date, ${r.dimension}, ${r.key},
+--       0050cc9:packages/db/src/rollup.ts:225
+--         "id", "date", "dimension", "key",
+--       0050cc9:packages/db/src/rollup.ts:230
+--         ON CONFLICT ("date", "dimension", "key") DO UPDATE SET
+--     A column-list ON CONFLICT re-infers its arbiter from whatever unique
+--     index covers those columns at plan time, and 1.4 adds the new PRIMARY KEY
+--     BEFORE dropping the old unique, inside one transaction. Verified safe.
+--     Line-number drift worth knowing: the v2 file has the same line numbers,
+--     so `HEAD:rollup.ts:225` today shows the v2 list WITHOUT "id". Reading
+--     that one line at HEAD instead of 0050cc9 would have inverted the whole
+--     argument for the SET DEFAULT at 1.3.
+--
+--  2. The second v1 reader of "DailyStat"."id" is real, and is the reason the
+--     column survives EXPAND instead of being dropped here.
+--       0050cc9:packages/db/src/maintenance.ts:99-101
+--         const anySummary = await prisma.dailyStat.findFirst({ ...
+--           select: { id: true },
+--     Confirmed present at 0050cc9. Dropping "id" in EXPAND would throw 42703
+--     inside pruneAnalytics.
+--
+--  3. The compound-unique READ compiles to plain columns, so dropping the named
+--     unique index cannot break it.
+--       0050cc9:packages/db/src/rollup.ts:258
+--         where: { date_dimension_key: { date: dayStart, dimension: "total", ... } }
+--     Prisma derives the same compound input name from @@id as from @@unique and
+--     emits a three-column WHERE either way; it never names the index.
+--
+--  4. The two tables whose ACCESS EXCLUSIVE window is public-facing, confirmed
+--     unchanged between 0050cc9 and the working tree (so the lock argument is
+--     the same under both versions):
+--       0050cc9:apps/web/app/r/[slug]/route.ts  -- byte-identical to HEAD
+--         (`git diff --quiet 0050cc9 HEAD -- apps/web/app/r/[slug]/route.ts`)
+--       0050cc9:apps/web/app/api/collect/route.ts:108  schedulePostResponseWork()
+--         before the flag check at :110 -- so the flag does not stop the rollup.
+--
+-- VERDICT: every statement in this file is safe against the code actually
+-- deployed at 0050cc9. No claim needed correcting; only the `HEAD:` labels did.
+-- =====================================================================
+
+
 -- =====================================================================
 -- STAGE 0. PREFLIGHT. Reads only. Do not proceed past a surprise.
 -- =====================================================================
@@ -156,7 +228,21 @@ SELECT
 
 -- =====================================================================
 -- STAGE 1. ONE TRANSACTION. Additive DDL only.
+--
+-- lock_timeout = 3s is the public-safety guarantee, and on this cluster it
+-- guards one genuinely live table: 1.4's primary-key swap takes ACCESS
+-- EXCLUSIVE on "DailyStat" while the beacon-driven rollup can be mid-INSERT
+-- (0050cc9:packages/db/src/rollup.ts:224-230, reached from
+-- 0050cc9:apps/web/app/api/collect/route.ts:108 in after()), and 1.2's
+-- ADD CONSTRAINT takes it on "TrackedLink", which every /r/<slug> hit reads
+-- under force-dynamic (0050cc9:apps/web/app/r/[slug]/route.ts:28). Failing at
+-- 3s and retrying is strictly better than queueing those reads behind us.
+-- 60s statement_timeout: the largest table here is 4803 rows, so any statement
+-- that runs for a minute is wedged, not slow.
 -- =====================================================================
+SET lock_timeout = '3s';
+SET statement_timeout = '60s';
+
 BEGIN;
 
 -- Fail fast rather than half-way. Mirrors P1/P2/P3 so the transaction
@@ -398,7 +484,14 @@ COMMIT;
 -- DROP the constraint if the value turns out to be a legitimate new channel
 -- (in which case it belongs in packages/shared/src/attribution.ts and in
 -- this CHECK together, before either ships).
+--
+-- The SET pair is repeated because stage 1's COMMIT does not clear it but a
+-- reconnect does, and these five statements are the ones an operator is most
+-- likely to re-run on their own later.
 -- =====================================================================
+SET lock_timeout = '3s';
+SET statement_timeout = '60s';
+
 ALTER TABLE "AnalyticsSession" VALIDATE CONSTRAINT "AnalyticsSession_channel_check";
 ALTER TABLE "TrackedLink"      VALIDATE CONSTRAINT "TrackedLink_channel_check";
 ALTER TABLE "DailyStat"        VALIDATE CONSTRAINT "DailyStat_dimension_check";
@@ -428,7 +521,32 @@ ALTER TABLE "RollupRun"        VALIDATE CONSTRAINT "RollupRun_triggeredBy_check"
 -- If this is interrupted it leaves an INVALID index. Check with:
 --   SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid;
 -- and DROP INDEX it before retrying. It cannot corrupt anything.
+--
+-- *** THIS STATEMENT MUST BE SUBMITTED ON ITS OWN. ***
+-- "cannot be in a transaction" is stronger than it reads, and the new
+-- node-pg runner is exactly the shape that trips it. MEASURED on a Neon
+-- branch, 2026-09-26, identically on the pooled and the direct endpoint:
+--   client.query("select 1; create index concurrently ...")
+--     -> 25001  CREATE INDEX CONCURRENTLY cannot run inside a transaction block
+--   client.query("commit;  create index concurrently ...")
+--     -> 25001  (the leading COMMIT does NOT help: the remainder of the
+--                message is a fresh implicit transaction block)
+--   client.query("create index concurrently ...")            -> SUCCEEDS
+-- A multi-statement simple query IS a transaction block. So a runner that
+-- sends this whole file as one string cannot apply stage 3 at all, and a
+-- runner that wraps the file in its own BEGIN cannot either. Stage 3 has to
+-- be its own request, whether that is `psql -c`, a third `\i`, or a separate
+-- client.query(). RUNBOOK.md Step 13's gate says so.
+--
+-- statement_timeout is deliberately 0 here, not 60s. CREATE INDEX
+-- CONCURRENTLY waits for concurrent transactions to drain twice; a
+-- statement_timeout that fires mid-build is the one way to manufacture the
+-- INVALID index this comment warns about. lock_timeout stays at 3s -- failing
+-- to take the lock costs nothing and leaves no index behind.
 -- =====================================================================
+SET lock_timeout = '3s';
+SET statement_timeout = 0;
+
 CREATE INDEX CONCURRENTLY IF NOT EXISTS "AnalyticsSession_rawContent_startedAt_idx"
   ON "AnalyticsSession" ("rawContent", "startedAt");
 

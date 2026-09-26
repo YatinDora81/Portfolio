@@ -60,6 +60,20 @@
 --          about this one line.
 --
 -- =============================================================================
+-- "git HEAD" AND "HEAD:" IN THIS FILE MEAN COMMIT 0050cc9.
+-- =============================================================================
+-- Every v1 citation below was written when 0050cc9 was the tip. The v2 work has
+-- since been committed, so `git HEAD` is f760425 and `git show HEAD:<path>`
+-- returns the v2 file — which inverts the seven-write-sites argument completely,
+-- because v2 is precisely the version that stopped naming "read". Read every v1
+-- claim with `git show 0050cc9:<path>` and nothing else. 0050cc9 is the commit
+-- this file's four confirmation gates exist to prove you are NO LONGER running.
+-- Working-tree/v2 paths are cited bare. Re-verified 2026-09-27: the public write
+-- site is 0050cc9:apps/web/app/api/contact/route.ts:174 (create) with
+-- `read: verdict.isSpam` at :182, and the swallowing catch that turns a failure
+-- into HTTP 500 {"error":"Failed to send message"} is at :234-235.
+--
+-- =============================================================================
 -- WHY "read" CANNOT BE DROPPED WHILE v1 IS DEPLOYED
 -- =============================================================================
 --
@@ -250,7 +264,36 @@ SELECT count(*) AS "contactMessages" FROM "ContactMessage";
 -- DDL + DML. One transaction. Step 3 is last on purpose: run this file statement
 -- by statement outside a transaction and you still cannot destroy anything until
 -- both harmless steps have succeeded.
+--
+-- LOCK AND STATEMENT TIMEOUTS. This file previously set neither, which made
+-- RUNBOOK.md's headline promise ("every ALTER runs under lock_timeout = '3s' so a
+-- blocked statement fails instead of queueing the site behind it") false for it,
+-- and made STOP-THE-LINE S3 unreachable: with lock_timeout unset the Neon default
+-- is 0, i.e. wait forever.
+--
+-- Plain SET, not SET LOCAL, and placed BEFORE the BEGIN. SET LOCAL outside a
+-- transaction block only emits `WARNING: SET LOCAL can only be used in
+-- transaction blocks` and applies nothing, so putting it before the BEGIN — where
+-- it also covers a statement-by-statement paste — requires the plain form.
+--
+-- Which lock this actually buys anything on. Step 3's DROP COLUMN takes ACCESS
+-- EXCLUSIVE on "ContactMessage", and the PUBLIC contact form writes that table on
+-- every submission (0050cc9:apps/web/app/api/contact/route.ts:174 create). A
+-- request for that lock that QUEUES behind a slow submission parks every
+-- subsequent write behind it, and a queued public POST is a visitor staring at a
+-- spinner. Step 1's sweep touches "FeatureFlag", which is read on every uncached
+-- public render (0050cc9:apps/web/app/layout.tsx:70 ->
+-- 0050cc9:apps/web/app/lib/flags.ts:13). Failing at 3s and retrying costs
+-- nothing: every statement in this file is idempotent.
+--
+-- 60s statement_timeout: the largest table here is "ContactMessage" at a few
+-- hundred rows and the DROP COLUMN is metadata-only (Postgres marks the attribute
+-- dropped, it does not rewrite). Anything that runs for a minute is wedged behind
+-- a lock it already holds, not slow.
 -- =============================================================================
+
+SET lock_timeout = '3s';
+SET statement_timeout = '60s';
 
 BEGIN;
 

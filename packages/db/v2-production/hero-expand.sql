@@ -27,6 +27,98 @@
 -- "retype it in CONTRACT" option: the home page and /hero would 500 from the
 -- first cache miss after the deploy.
 --
+-- ----------------------------------------------------------------------------
+-- "HEAD" IN THIS FILE MEANS COMMIT 0050cc9. IT NO LONGER MEANS `git HEAD`.
+-- ----------------------------------------------------------------------------
+-- Every v1 citation in this file was written when 0050cc9 was the tip. The v2
+-- work has since been committed, so `git HEAD` is f760425 and `git show
+-- HEAD:<path>` returns the v2 file — and for this file that inverts the argument
+-- completely, because the v2 client is the one that DOES emit
+-- CAST($1::text AS "SiteVersion"). Read every v1 claim with
+--     git show 0050cc9:<path>
+-- and nothing else. 0050cc9 is what Vercel is serving while T2 runs.
+-- Working-tree/v2 paths are cited bare, with no prefix.
+--
+-- ----------------------------------------------------------------------------
+-- V1 EVIDENCE RE-VERIFIED AT 0050cc9        (spot check 2 of 5, 2026-09-27)
+--
+-- WHY THIS FILE IS ONE OF THE FIVE, and arguably the riskiest statement in the
+-- whole EXPAND: T2 RETYPES four columns that the deployed code reads and writes,
+-- on tables the PUBLIC home page reads on every ISR regeneration. Every other
+-- EXPAND file either adds something the old client never mentions or relaxes
+-- something. This one changes the type of a live column under a live client, and
+-- its safety rests entirely on a claim about what @prisma/adapter-pg puts on the
+-- wire. If that claim is wrong, the home page 500s from the first cache miss.
+--
+-- RE-CHECKED WITH `git show 0050cc9:<path>`, NOT by reading the working tree.
+-- Every line number below was confirmed to be exactly where this header already
+-- said it was; none needed moving.
+--
+--  1. THE FOUR COLUMNS ARE PLAIN `String` IN THE DEPLOYED DATAMODEL, which is
+--     what makes a raw enum label an acceptable read value.
+--       0050cc9:packages/db/prisma/schema.prisma:12   version String  @unique
+--       0050cc9:packages/db/prisma/schema.prisma:22   version String  @default("v2")
+--       0050cc9:packages/db/prisma/schema.prisma:32   version String  @default("v2")
+--       0050cc9:packages/db/prisma/schema.prisma:44   version String?
+--     Note :12's @unique — the retype rebuilds that unique index in place. And
+--     :44's nullability is why the home-page read has to be an OR over NULL (see
+--     item 3). The three `@@index([version, sortOrder])` at :24, :34 and :46 are
+--     likewise rebuilt, keeping their names.
+--
+--  2. NO v1 WRITE CAN PRODUCE A LABEL OUTSIDE ('v1','v2'). CONFIRMED, and this is
+--     the claim that licenses dropping the four *_version_check constraints:
+--       0050cc9:apps/docs/app/lib/actions/staging.ts:362  function versionReq(...)
+--         -> `if (v !== "v1" && v !== "v2") fail(...)` before Prisma is called
+--       0050cc9:apps/docs/app/lib/actions/staging.ts:368  function versionOpt(...)
+--         -> same, plus undefined/null/"" -> null
+--     The three v1 creates that omit "updatedAt" and are the reason the draft's
+--     DROP DEFAULT must not run here are also exactly where this header says:
+--       0050cc9:apps/docs/app/lib/actions/staging.ts:482  tx.heroTitle.create
+--       0050cc9:apps/docs/app/lib/actions/staging.ts:493  tx.heroSkillBadge.create
+--       0050cc9:apps/docs/app/lib/actions/staging.ts:561  tx.socialLink.create
+--       0050cc9:apps/docs/app/lib/actions/social-links.ts:21  socialLink.create
+--
+--  3. THE PUBLIC READ PATH IS REAL AND IT IS UNCAUGHT. This is why T2 gets its
+--     own short transaction rather than riding in a multi-cluster one.
+--       0050cc9:apps/web/app/lib/data.ts:135  where: { version }
+--       0050cc9:apps/web/app/lib/data.ts:139  where: { version }
+--       0050cc9:apps/web/app/lib/data.ts:143  where: { OR: [{ version }, { version: null }] }
+--       0050cc9:apps/web/app/lib/data.ts:76-77 `c.version === "v2"` / `=== "v1"`
+--     :76-77 is the one that matters most for the READ direction: it is a
+--     JavaScript string comparison against the value the driver hands back. It
+--     keeps working only because adapter-pg reports every user enum OID as
+--     ColumnTypeEnum.Text, so the value arrives as the raw label "v1"/"v2" and
+--     not as an object. `getHeroData` is NOT unstable_cache'd, so it hits the
+--     database on every regeneration — there is no cache to hide a mistake here.
+--
+--  4. ORDER BY "version" KEEPS ITS MEANING. CONFIRMED at the cited line, and the
+--     second v1 reader that depends on label order was also confirmed:
+--       0050cc9:apps/docs/app/(dashboard)/hero/page.tsx:14
+--         heroContent.findMany({ orderBy: { version: "asc" } })
+--       0050cc9:apps/docs/app/(dashboard)/dashboard/page.tsx:17-18
+--         heroContent.findFirst({ where: { live: "live" }, select: { version: true } })
+--         then `row?.version === "v1" ? "v1" : "v2"`
+--     Enum sort order is DECLARATION order, not collation order, so this is only
+--     safe because "SiteVersion" is declared ('v1','v2') — the same order the
+--     text collation produced. Declaring it ('v2','v1') would silently reverse
+--     the admin's version list while every other statement in this file still
+--     passed. Read the CREATE TYPE below with that in mind.
+--
+--  5. THE WIRE-FORMAT CLAIM was re-checked in node_modules, not taken on trust:
+--     pg-protocol serializer does `const types = query.types || emptyArray` then
+--     `addInt16(types.length)`, and @prisma/adapter-pg passes
+--     `types: { getTypeParser }` — an object with no `.length` — so
+--     `addInt16(undefined)` writes two zero bytes. Zero parameter type OIDs, so
+--     every $n is resolved from its use site exactly like a bare literal. This is
+--     version-sensitive in a way the rest of this file is not: it is a property of
+--     pg 8.20 + adapter-pg as vendored in `bun.lock`, and `bun.lock` is tracked
+--     and unchanged by this cutover. If either is ever upgraded, re-derive this
+--     before running anything of this shape again.
+--
+-- VERDICT: T2 is safe against the code actually deployed at 0050cc9. Nothing in
+-- the argument needed correcting; only the `HEAD` label did.
+-- ----------------------------------------------------------------------------
+--
 -- WHY T2 IS STILL SAFE FOR THE DEPLOYED v1 CODE (this is the whole question):
 --   * v1 emits NO casts and never names a type. Captured from the v1 client
 --     generated from git HEAD's schema:
