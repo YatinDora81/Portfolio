@@ -175,7 +175,7 @@ async function main() {
   mkdirSync(dir, { recursive: true });
   appendFileSync(
     `${dir}/${started.slice(0, 10)}.log`,
-    `${started} ${target}/${database} ${basename(file)} ${statements} statements tables ${rows[0]!.n}->${after[0]!.n}\n`,
+    `${started} ${target}/${database} ${basename(file as string)} ${statements} statements tables ${rows[0]!.n}->${after[0]!.n}\n`,
   );
 }
 
