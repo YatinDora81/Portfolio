@@ -16,6 +16,7 @@
   "private": true,
   "scripts": {
     "build": "prisma generate",
+    "check-types": "tsc --noEmit -p tsconfig.check.json",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "seed": "bun seed.ts",
