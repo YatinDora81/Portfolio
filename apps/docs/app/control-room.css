@@ -1455,12 +1455,15 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 .nt-sib:hover { border-color: var(--c1); color: var(--accT) }
 .nt-att { margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--line2) }
 .nt-att-lb { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 10px }
-.nt-att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px }
+.nt-att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px }
+.nt-att-grid:has(> :only-child) { grid-template-columns: 1fr }
 .nt-att-fig { margin: 0 }
 .nt-att-fig img {
-  display: block; width: 100%; height: auto; border: 1px solid var(--line2);
-  border-radius: var(--r1); transition: border-color .14s
+  display: block; width: 100%; height: auto; max-height: 420px; object-fit: contain;
+  object-position: left top; background: var(--bg2, transparent);
+  border: 1px solid var(--line2); border-radius: var(--r1); transition: border-color .14s
 }
+.nt-att-grid:has(> :only-child) .nt-att-fig img { max-height: 560px }
 .nt-att-fig a:hover img { border-color: var(--c1) }
 .nt-att-fig figcaption { margin-top: 5px; font-size: 12px; color: var(--dim) }
 .nt-att-files { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px }
