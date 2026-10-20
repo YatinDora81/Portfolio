@@ -11,6 +11,7 @@ import {
   type ExportRow,
 } from "@/lib/notes/export";
 import { zipSync } from "@/lib/notes/zip";
+import { cdnUrl } from "@/lib/utils";
 
 // zip.ts needs node:zlib and Buffer
 export const runtime = "nodejs";
@@ -70,7 +71,7 @@ const toExportRow = (r: DbRow): ExportRow => ({
   attachments: [...r.attachments]
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((a) => ({
-      url: a.asset.url,
+      url: cdnUrl(a.asset.url),
       filename: a.asset.filename,
       mimeType: a.asset.mimeType,
       caption: a.caption,

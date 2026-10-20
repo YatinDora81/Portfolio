@@ -4,6 +4,7 @@ import { useOptimistic, useRef, useState, useTransition } from "react";
 import { IconChevronDown, IconChevronUp, IconPaperclip } from "@tabler/icons-react";
 import { attachToNote, detachFromNote, reorderAttachments, setAttachmentCaption } from "@/lib/actions/notes";
 import { completeUpload, signUpload } from "@/lib/actions/media";
+import { cdnUrl } from "@/lib/utils";
 import type { VaultAttachment } from "@/lib/notes/view-types";
 
 const ACCEPT = "image/jpeg,image/png,image/webp,image/avif,image/gif,application/pdf";
@@ -143,7 +144,7 @@ export function AttachmentEditor({ nodeId, items }: { nodeId: string; items: Vau
           {shown.map((a, i) => (
             <li className="nt-att-row" key={a.id}>
               <span className="nt-att-kind">{isImage(a.mimeType) ? "IMG" : "PDF"}</span>
-              <a className="nt-att-name" href={a.url} target="_blank" rel="noreferrer">
+              <a className="nt-att-name" href={cdnUrl(a.url)} target="_blank" rel="noreferrer">
                 {a.filename}
               </a>
               <input

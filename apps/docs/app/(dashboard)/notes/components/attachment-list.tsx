@@ -1,3 +1,4 @@
+import { cdnUrl } from "@/lib/utils";
 import type { VaultAttachment } from "@/lib/notes/view-types";
 
 const isImage = (mimeType: string) => mimeType.startsWith("image/");
@@ -31,13 +32,13 @@ export function AttachmentList({ items }: { items: VaultAttachment[] }) {
         <div className="nt-att-grid">
           {images.map((a) => (
             <figure className="nt-att-fig" key={a.id}>
-              <a href={a.url} target="_blank" rel="noreferrer">
+              <a href={cdnUrl(a.url)} target="_blank" rel="noreferrer">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   alt={a.altText || a.caption || a.filename}
                   height={a.height ?? undefined}
                   loading="lazy"
-                  src={a.url}
+                  src={cdnUrl(a.url)}
                   width={a.width ?? undefined}
                 />
               </a>
@@ -51,7 +52,7 @@ export function AttachmentList({ items }: { items: VaultAttachment[] }) {
         <ul className="nt-att-files">
           {files.map((a) => (
             <li key={a.id}>
-              <a className="nt-att-file" href={a.url} target="_blank" rel="noreferrer">
+              <a className="nt-att-file" href={cdnUrl(a.url)} target="_blank" rel="noreferrer">
                 <span className="nt-att-kind">{kindLabel(a.mimeType)}</span>
                 <span className="nt-att-name">{a.caption || a.filename}</span>
                 <span className="nt-att-size">{sizeLabel(a.bytes)}</span>
