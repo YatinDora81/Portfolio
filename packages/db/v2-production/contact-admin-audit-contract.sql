@@ -218,22 +218,22 @@ SELECT "id", "status", "readAt", "repliedAt", "createdAt"
 SELECT 'relation' AS "source", "cl"."relname" AS "dependent", "cl"."relkind"::text AS "kind"
   FROM "pg_depend" "d"
   JOIN "pg_class" "cl" ON "cl"."oid" = "d"."objid"
- WHERE "d"."refobjid" = 'ContactMessage'::regclass
+ WHERE "d"."refobjid" = '"ContactMessage"'::regclass
    AND "d"."refobjsubid" = (SELECT "attnum" FROM "pg_attribute"
-                             WHERE "attrelid" = 'ContactMessage'::regclass AND "attname" = 'read')
+                             WHERE "attrelid" = '"ContactMessage"'::regclass AND "attname" = 'read')
 UNION ALL
 SELECT 'constraint', "co"."conname", "co"."contype"::text
   FROM "pg_constraint" "co"
- WHERE "co"."conrelid" = 'ContactMessage'::regclass
+ WHERE "co"."conrelid" = '"ContactMessage"'::regclass
    AND (SELECT "attnum" FROM "pg_attribute"
-         WHERE "attrelid" = 'ContactMessage'::regclass AND "attname" = 'read') = ANY("co"."conkey")
+         WHERE "attrelid" = '"ContactMessage"'::regclass AND "attname" = 'read') = ANY("co"."conkey")
 UNION ALL
 SELECT 'index', "i"."relname", 'i'
   FROM "pg_index" "x"
   JOIN "pg_class" "i" ON "i"."oid" = "x"."indexrelid"
- WHERE "x"."indrelid" = 'ContactMessage'::regclass
+ WHERE "x"."indrelid" = '"ContactMessage"'::regclass
    AND (SELECT "attnum" FROM "pg_attribute"
-         WHERE "attrelid" = 'ContactMessage'::regclass AND "attname" = 'read') = ANY("x"."indkey"::smallint[]);
+         WHERE "attrelid" = '"ContactMessage"'::regclass AND "attname" = 'read') = ANY("x"."indkey"::smallint[]);
 
 -- P4. The name columns EXPAND added are all still here, so step 1 can run.
 --     EXPECTED: 3 rows, all text / YES.
@@ -362,7 +362,7 @@ SELECT "column_name", "data_type", "is_nullable", "column_default"
 SELECT "i"."relname" AS "index", pg_get_indexdef("i"."oid") AS "definition"
   FROM "pg_index" "x"
   JOIN "pg_class" "i" ON "i"."oid" = "x"."indexrelid"
- WHERE "x"."indrelid" = 'ContactMessage'::regclass
+ WHERE "x"."indrelid" = '"ContactMessage"'::regclass
  ORDER BY 1;
 
 -- V3. No name column is left behind. EXPECTED: 0 rows from every branch.
@@ -385,7 +385,7 @@ SELECT count(*) AS "contactMessages" FROM "ContactMessage";
 SELECT "i"."relname" AS "index", pg_get_indexdef("i"."oid") AS "definition"
   FROM "pg_index" "x"
   JOIN "pg_class" "i" ON "i"."oid" = "x"."indexrelid"
- WHERE "x"."indrelid" = 'AuditChange'::regclass
+ WHERE "x"."indrelid" = '"AuditChange"'::regclass
  ORDER BY 1;
 
 -- V6. The end-to-end proof, and the only one that matters: submit the live
