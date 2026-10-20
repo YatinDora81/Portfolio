@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { saveAnswer } from "@/lib/actions/notes";
+import type { VaultAttachment } from "@/lib/notes/view-types";
+import { AttachmentEditor } from "./attachment-editor";
 import { hrefFor } from "@/lib/notes/view-types";
 import { unsavedDraft, useNoteNav } from "./vault-provider";
 
@@ -11,9 +13,17 @@ export interface AnswerEditorProps {
   title: string;
   body: string;
   tags: string[];
+  attachments: VaultAttachment[];
 }
 
-export default function AnswerEditor({ nodeId, href, title, body, tags }: AnswerEditorProps) {
+export default function AnswerEditor({
+  nodeId,
+  href,
+  title,
+  body,
+  tags,
+  attachments,
+}: AnswerEditorProps) {
   const go = useNoteNav();
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -124,6 +134,8 @@ export default function AnswerEditor({ nodeId, href, title, body, tags }: Answer
           onChange={(e) => setDraftTags(e.target.value)}
         />
       </div>
+
+      <AttachmentEditor nodeId={nodeId} items={attachments} />
 
       <div className="nt-acts">
         <button className="btn pri" type="button" disabled={pending || !dirty} onClick={save}>

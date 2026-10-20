@@ -34,6 +34,7 @@ export function AnswerView({
         title={node.title}
         body={answer.body}
         tags={answer.tags}
+        attachments={node.attachments}
       >
         <h1 className="nt-title">{node.title}</h1>
 

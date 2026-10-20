@@ -1476,6 +1476,26 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 }
 .nt-att-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .nt-att-size { flex: none; color: var(--faint); font-size: 11.5px }
+.nt-att-pick { font-size: 12px; color: var(--dim) }
+.nt-att-pick::file-selector-button {
+  margin-right: 10px; padding: 5px 11px; font: inherit; font-size: 12px; color: var(--dim);
+  background: none; border: 1px solid var(--line2); border-radius: var(--r1); cursor: pointer;
+  transition: border-color .14s, color .14s
+}
+.nt-att-pick::file-selector-button:hover { border-color: var(--c1); color: var(--accT) }
+.nt-att-rows { list-style: none; margin: 9px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px }
+.nt-att-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 9px; font-size: 12.5px;
+  border: 1px solid var(--line2); border-radius: var(--r1)
+}
+.nt-att-row .nt-att-name { flex: none; max-width: 26ch; color: var(--dim) }
+.nt-att-row .nt-att-name:hover { color: var(--accT) }
+.nt-att-cap {
+  flex: 1; min-width: 0; padding: 3px 7px; font: inherit; font-size: 12px; color: var(--ink);
+  background: none; border: 1px solid transparent; border-radius: 3px
+}
+.nt-att-cap:hover { border-color: var(--line2) }
+.nt-att-cap:focus { outline: none; border-color: var(--c1) }
 .nt-acts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--line2) }
 .nt-stamp { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint) }
 
