@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import { renderMarkdown } from "@/lib/notes/markdown";
 import type { NextQuestion } from "@/lib/notes/vault-view";
 import { NOTES_ROOT, type Crumb, type QuestionView } from "@/lib/notes/view-types";
+import { AttachmentList } from "./attachment-list";
 import { ConfidenceDots } from "./confidence-dots";
 import { EditorLoader } from "./editor-loader";
 import { NoteActions, RevealInTree } from "./note-actions";
@@ -46,6 +47,8 @@ export function AnswerView({
             ? renderMarkdown(answer.body)
             : <p className="nt-empty">No answer yet. Edit to write one.</p>}
         </div>
+
+        <AttachmentList items={node.attachments} />
 
         {siblings.length ? (
           <nav className="nt-sibs" aria-label={`Other questions in ${parentTitle}`}>

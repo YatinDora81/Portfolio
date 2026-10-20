@@ -217,3 +217,89 @@ export async function setConfidence(nodeId: string, value: number): Promise<Void
     ),
   );
 }
+
+export async function attachToNote(
+  nodeId: string,
+  assetId: string,
+  caption?: string,
+): Promise<VoidResult> {
+  await requireSession();
+  const trimmed = caption?.trim();
+  return voided(
+    await write(async (tx) => {
+      const node = await tx.noteNode.findUnique({
+        where: { id: nodeId },
+        select: { kind: true, deletedAt: true },
+      });
+      if (!node || node.deletedAt) throw new NoteError("That note no longer exists");
+      if (node.kind !== "QUESTION") throw new NoteError("Only questions can carry attachments");
+
+      const asset = await tx.mediaAsset.findUnique({ where: { id: assetId }, select: { id: true } });
+      if (!asset) throw new NoteError("That file no longer exists");
+
+      const already = await tx.noteAttachment.findUnique({
+        where: { nodeId_assetId: { nodeId, assetId } },
+        select: { id: true },
+      });
+      if (already) throw new NoteError("That file is already attached");
+
+      const last = await tx.noteAttachment.findFirst({
+        where: { nodeId },
+        orderBy: { sortOrder: "desc" },
+        select: { sortOrder: true },
+      });
+
+      await tx.noteAttachment.create({
+        data: {
+          nodeId,
+          assetId,
+          caption: trimmed ? trimmed : null,
+          sortOrder: (last?.sortOrder ?? -1) + 1,
+        },
+      });
+    }),
+  );
+}
+
+export async function detachFromNote(attachmentId: string): Promise<VoidResult> {
+  await requireSession();
+  return voided(
+    await write((tx) =>
+      tx.noteAttachment.delete({ where: { id: attachmentId } }).then(() => undefined),
+    ),
+  );
+}
+
+export async function reorderAttachments(nodeId: string, orderedIds: string[]): Promise<VoidResult> {
+  await requireSession();
+  return voided(
+    await write(async (tx) => {
+      const live = await tx.noteAttachment.findMany({
+        where: { nodeId },
+        select: { id: true },
+      });
+      const known = new Set(live.map((a) => a.id));
+      const next = orderedIds.filter((id) => known.has(id));
+      if (next.length !== known.size) throw new NoteError("That list is out of date, reload the note");
+
+      for (const [i, id] of next.entries()) {
+        await tx.noteAttachment.update({ where: { id }, data: { sortOrder: i } });
+      }
+    }),
+  );
+}
+
+export async function setAttachmentCaption(
+  attachmentId: string,
+  caption: string,
+): Promise<VoidResult> {
+  await requireSession();
+  const trimmed = caption.trim();
+  return voided(
+    await write((tx) =>
+      tx.noteAttachment
+        .update({ where: { id: attachmentId }, data: { caption: trimmed ? trimmed : null } })
+        .then(() => undefined),
+    ),
+  );
+}

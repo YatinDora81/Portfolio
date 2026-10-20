@@ -18,7 +18,7 @@ const MEMO_LIFETIME_MS = 10_000;
 let memo: { at: number; sources: ReferenceSource[] } | null = null;
 
 async function readSources(): Promise<ReferenceSource[]> {
-  const [projects, blogs, experiences, settings] = await Promise.all([
+  const [projects, blogs, experiences, notes, settings] = await Promise.all([
     prisma.project.findMany({
       select: {
         title: true,
@@ -32,6 +32,10 @@ async function readSources(): Promise<ReferenceSource[]> {
     }),
     prisma.experience.findMany({
       select: { company: true, logoUrl: true, logo: { select: { key: true } } },
+    }),
+    prisma.noteAttachment.findMany({
+      where: { node: { deletedAt: null } },
+      select: { node: { select: { title: true } }, asset: { select: { key: true } } },
     }),
     prisma.siteSettings.findUniqueOrThrow({
       where: { id: 1 },
@@ -55,6 +59,10 @@ async function readSources(): Promise<ReferenceSource[]> {
     ...experiences.map((e) => ({
       label: `Experience · ${e.company}`,
       text: [e.logoUrl ?? "", e.logo?.key ?? ""].join("\n"),
+    })),
+    ...notes.map((n) => ({
+      label: `Note · ${n.node.title}`,
+      text: n.asset.key,
     })),
     { label: `Site setting · ${KEYS.avatarUrl.label}`, text: settings.avatarUrl },
     { label: `Site setting · ${KEYS.heroPhotos.label}`, text: settings.heroPhotos.join("\n") },

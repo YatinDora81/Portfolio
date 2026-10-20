@@ -19,8 +19,16 @@ export interface ExportAnswer {
   lastRevisedAt: string | null;
 }
 
+export interface ExportAttachment {
+  url: string;
+  filename: string;
+  mimeType: string;
+  caption: string | null;
+}
+
 export interface ExportRow extends ExportNode {
   answer: ExportAnswer | null;
+  attachments?: ExportAttachment[];
 }
 
 export const EXPORT_FORMATS = ["md", "json", "zip"] as const;
@@ -50,12 +58,36 @@ const yamlList = (items: string[]): string =>
 
 const oneLine = (s: string): string => s.replace(/\s+/g, " ").trim();
 
+const isImage = (mimeType: string): boolean => mimeType.startsWith("image/");
+
+// one line: the frontmatter reader splits each line on the first ": ", so a
+// block sequence would not survive the round trip. json is valid yaml flow.
+const attachmentsFlow = (items: ExportAttachment[]): string =>
+  JSON.stringify(
+    items.map((a) => ({
+      filename: a.filename,
+      mimeType: a.mimeType,
+      url: a.url,
+      ...(a.caption ? { caption: a.caption } : {}),
+    })),
+  );
+
+function attachmentsSection(items: ExportAttachment[]): string {
+  if (!items.length) return "";
+  const lines = items.map((a) => {
+    const label = oneLine(a.caption ?? a.filename);
+    return isImage(a.mimeType) ? `![${label}](${a.url})` : `- [${label}](${a.url})`;
+  });
+  return `\n## Files\n\n${lines.join("\n")}\n`;
+}
+
 export const confidenceLabel = (c: number): string =>
   CONF_LABELS[Math.max(0, Math.min(CONF_LABELS.length - 1, Math.trunc(c) || 0))]!;
 
 export function questionMarkdown(
   node: Pick<ExportNode, "title" | "path">,
   answer: ExportAnswer | null,
+  attachments: ExportAttachment[] = [],
 ): string {
   const front = [
     "---",
@@ -64,11 +96,13 @@ export function questionMarkdown(
     `tags: ${yamlList(answer?.tags ?? [])}`,
     `confidence: ${yamlString(confidenceLabel(answer?.confidence ?? 0))}`,
     `lastRevisedAt: ${answer?.lastRevisedAt ? yamlString(answer.lastRevisedAt) : "null"}`,
+    ...(attachments.length ? [`attachments: ${attachmentsFlow(attachments)}`] : []),
     "---",
   ].join("\n");
 
   const body = (answer?.body ?? "").replace(/\s+$/, "");
-  return `${front}\n\n# ${oneLine(node.title)}\n${body ? `\n${body}\n` : ""}`;
+  const files = attachmentsSection(attachments);
+  return `${front}\n\n# ${oneLine(node.title)}\n${body ? `\n${body}\n` : ""}${files}`;
 }
 
 export function treeOrder<T extends { id: string; parentId: string | null; sortOrder: number }>(

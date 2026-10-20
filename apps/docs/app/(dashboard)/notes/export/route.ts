@@ -28,6 +28,13 @@ const EXPORT_SELECT = {
   sortOrder: true,
   deletedAt: true,
   answer: { select: { body: true, tags: true, confidence: true, lastRevisedAt: true } },
+  attachments: {
+    select: {
+      caption: true,
+      sortOrder: true,
+      asset: { select: { url: true, filename: true, mimeType: true } },
+    },
+  },
 } as const;
 
 type DbRow = {
@@ -41,6 +48,11 @@ type DbRow = {
   sortOrder: number;
   deletedAt: Date | null;
   answer: { body: string; tags: string[]; confidence: number; lastRevisedAt: Date | null } | null;
+  attachments: {
+    caption: string | null;
+    sortOrder: number;
+    asset: { url: string; filename: string; mimeType: string };
+  }[];
 };
 
 const toExportRow = (r: DbRow): ExportRow => ({
@@ -55,6 +67,14 @@ const toExportRow = (r: DbRow): ExportRow => ({
   answer: r.answer
     ? { ...r.answer, lastRevisedAt: r.answer.lastRevisedAt?.toISOString() ?? null }
     : null,
+  attachments: [...r.attachments]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((a) => ({
+      url: a.asset.url,
+      filename: a.asset.filename,
+      mimeType: a.asset.mimeType,
+      caption: a.caption,
+    })),
 });
 
 const fail = (status: number, message: string) =>
@@ -87,7 +107,7 @@ const send = (body: string | Uint8Array<ArrayBuffer>, format: ExportFormat, file
 function buildZip(rows: ExportRow[], under: string): Uint8Array<ArrayBuffer> {
   const entries = rows
     .filter((r) => r.kind === "QUESTION")
-    .map((r) => ({ name: zipEntryName(r.path, "md", under), data: questionMarkdown(r, r.answer) }));
+    .map((r) => ({ name: zipEntryName(r.path, "md", under), data: questionMarkdown(r, r.answer, r.attachments) }));
 
   entries.push({ name: "vault.json", data: vaultJson(rows) });
 
@@ -131,7 +151,7 @@ export async function GET(request: Request) {
     if (format === "zip") return fail(400, "A single question exports as md or json, not zip.");
     const name = safeFilename(node.title, format);
     return send(
-      format === "json" ? vaultJson([root]) : questionMarkdown(root, root.answer),
+      format === "json" ? vaultJson([root]) : questionMarkdown(root, root.answer, root.attachments),
       format,
       name,
     );

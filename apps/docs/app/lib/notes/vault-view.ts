@@ -1,6 +1,13 @@
 import { ancestorPaths, buildTree, type TreeRow } from "./paths";
 import { confLabel } from "./query";
-import { hrefFor, type ChildRow, type Crumb, type FolderView, type QuestionView } from "./view-types";
+import {
+  hrefFor,
+  type ChildRow,
+  type Crumb,
+  type FolderView,
+  type QuestionView,
+  type VaultAttachment,
+} from "./view-types";
 
 export interface VaultAnswer {
   body: string;
@@ -9,8 +16,11 @@ export interface VaultAnswer {
   lastRevisedAt: string | null;
 }
 
+export type { VaultAttachment } from "./view-types";
+
 export interface VaultRow extends TreeRow {
   answer: VaultAnswer | null;
+  attachments: VaultAttachment[];
 }
 
 export interface VaultPayload {
@@ -184,6 +194,7 @@ export function questionViewIn(ix: VaultIndex, row: VaultRow): QuestionView {
       confidence: row.answer?.confidence ?? 0,
       lastRevisedAt: row.answer?.lastRevisedAt ?? null,
     },
+    attachments: row.attachments ?? [],
   };
 }
 

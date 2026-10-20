@@ -561,7 +561,8 @@ model NoteNode {
   deletedAt DateTime?
   trashRoot Boolean   @default(false)
 
-  answer NoteAnswer?
+  answer      NoteAnswer?
+  attachments NoteAttachment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -585,6 +586,25 @@ model NoteAnswer {
 
   @@index([confidence])
   @@index([tags], type: Gin, map: "NoteAnswer_tags_idx")
+}
+
+model NoteAttachment {
+  id String @id @default(uuid())
+
+  nodeId String
+  node   NoteNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  assetId String
+  asset   MediaAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  caption   String?
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@unique([nodeId, assetId])
+  @@index([nodeId, sortOrder])
+  @@index([assetId])
 }
 
 enum NoteKind {
@@ -616,6 +636,7 @@ model MediaAsset {
   projectImages   ProjectImage[]
   experienceLogos Experience[]
   blogCovers      Blog[]
+  noteAttachments NoteAttachment[]
 
   @@index([createdAt])
   @@index([uploadedById])

@@ -331,3 +331,76 @@ describe("zipEntryName", () => {
     expect(zipEntryName("/other/x", "md", "/dsa/")).toBe("other/x.md");
   });
 });
+
+describe("questionMarkdown attachments", () => {
+  const file = (f = {}) => ({
+    url: "https://cdn.example.com/n/a.png",
+    filename: "a.png",
+    mimeType: "image/png",
+    caption: null,
+    ...f,
+  });
+
+  test("no attachments leaves the document byte for byte unchanged", () => {
+    const a = answer({ body: "b" });
+    expect(questionMarkdown({ title: "T", path: "/t" }, a, [])).toBe(
+      questionMarkdown({ title: "T", path: "/t" }, a),
+    );
+  });
+
+  test("no attachments adds no front matter key", () => {
+    expect(frontMatter(questionMarkdown({ title: "T", path: "/t" }, answer())).attachments).toBeUndefined();
+  });
+
+  test("the front matter entry stays on one line so the reader can split it", () => {
+    const md = questionMarkdown({ title: "T", path: "/t" }, answer(), [file(), file({ filename: "b.pdf", mimeType: "application/pdf" })]);
+    const line = frontMatter(md).attachments!;
+    expect(line).not.toInclude("\n");
+    expect(JSON.parse(line)).toHaveLength(2);
+  });
+
+  test("the front matter entry round trips through JSON.parse", () => {
+    const md = questionMarkdown({ title: "T", path: "/t" }, answer(), [file({ caption: "a cat" })]);
+    expect(JSON.parse(frontMatter(md).attachments!)[0]).toEqual({
+      filename: "a.png",
+      mimeType: "image/png",
+      url: "https://cdn.example.com/n/a.png",
+      caption: "a cat",
+    });
+  });
+
+  test("a caption that is null is omitted rather than serialised", () => {
+    const md = questionMarkdown({ title: "T", path: "/t" }, answer(), [file()]);
+    expect(JSON.parse(frontMatter(md).attachments!)[0]).not.toHaveProperty("caption");
+  });
+
+  test("images embed and other files link", () => {
+    const md = questionMarkdown({ title: "T", path: "/t" }, answer(), [
+      file(),
+      file({ filename: "spec.pdf", mimeType: "application/pdf", url: "https://cdn.example.com/n/spec.pdf" }),
+    ]);
+    expect(md).toInclude("![a.png](https://cdn.example.com/n/a.png)");
+    expect(md).toInclude("- [spec.pdf](https://cdn.example.com/n/spec.pdf)");
+  });
+
+  test("a caption is preferred over the filename as the label", () => {
+    const md = questionMarkdown({ title: "T", path: "/t" }, answer(), [file({ caption: "the diagram" })]);
+    expect(md).toInclude("![the diagram](");
+    expect(md).not.toInclude("![a.png](");
+  });
+
+  test("a multi line caption is flattened so the markdown stays valid", () => {
+    const md = questionMarkdown({ title: "T", path: "/t" }, answer(), [file({ caption: "one\ntwo" })]);
+    expect(md).toInclude("![one two](");
+  });
+
+  test("the files section comes after the body", () => {
+    const md = questionMarkdown({ title: "T", path: "/t" }, answer({ body: "the body" }), [file()]);
+    expect(md.indexOf("the body")).toBeLessThan(md.indexOf("## Files"));
+  });
+
+  test("attachments survive an empty body", () => {
+    const md = questionMarkdown({ title: "T", path: "/t" }, answer(), [file()]);
+    expect(md).toInclude("## Files");
+  });
+});

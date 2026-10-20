@@ -1453,6 +1453,29 @@ a.abt-l:hover .abt-go { color: var(--accT) }
   border: 1px solid var(--line2); border-radius: var(--r1); transition: border-color .14s, color .14s
 }
 .nt-sib:hover { border-color: var(--c1); color: var(--accT) }
+.nt-att { margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--line2) }
+.nt-att-lb { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 10px }
+.nt-att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px }
+.nt-att-fig { margin: 0 }
+.nt-att-fig img {
+  display: block; width: 100%; height: auto; border: 1px solid var(--line2);
+  border-radius: var(--r1); transition: border-color .14s
+}
+.nt-att-fig a:hover img { border-color: var(--c1) }
+.nt-att-fig figcaption { margin-top: 5px; font-size: 12px; color: var(--dim) }
+.nt-att-files { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px }
+.nt-att-file {
+  display: flex; align-items: center; gap: 10px; padding: 8px 11px; font-size: 12.5px;
+  color: var(--dim); border: 1px solid var(--line2); border-radius: var(--r1);
+  transition: border-color .14s, color .14s
+}
+.nt-att-file:hover { border-color: var(--c1); color: var(--accT) }
+.nt-att-kind {
+  flex: none; font-family: var(--mono, monospace); font-size: 10px; letter-spacing: .06em;
+  padding: 2px 6px; border: 1px solid var(--line2); border-radius: 3px; color: var(--faint)
+}
+.nt-att-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.nt-att-size { flex: none; color: var(--faint); font-size: 11.5px }
 .nt-acts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--line2) }
 .nt-stamp { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint) }
 

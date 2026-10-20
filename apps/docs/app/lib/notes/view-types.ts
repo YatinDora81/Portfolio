@@ -14,6 +14,20 @@ export interface AnswerData {
   lastRevisedAt: string | null;
 }
 
+export interface VaultAttachment {
+  id: string;
+  assetId: string;
+  url: string;
+  filename: string;
+  mimeType: string;
+  bytes: number;
+  width: number | null;
+  height: number | null;
+  altText: string;
+  caption: string | null;
+  sortOrder: number;
+}
+
 export interface QuestionView {
   id: string;
   title: string;
@@ -21,6 +35,7 @@ export interface QuestionView {
   href: string;
   crumbs: Crumb[];
   answer: AnswerData;
+  attachments: VaultAttachment[];
 }
 
 export interface ChildRow {
