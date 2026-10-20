@@ -33,6 +33,7 @@ dist
 # Generated code
 **/generated/prisma
 PERFORMANCE.md
+optimize.md
 
 # Debug
 npm-debug.log*
