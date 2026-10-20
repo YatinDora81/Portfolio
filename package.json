@@ -10,9 +10,9 @@
     "postinstall": "bun run --cwd packages/db db:generate"
   },
   "devDependencies": {
-    "prettier": "^3.7.4",
-    "turbo": "^2.8.14",
-    "typescript": "5.9.2"
+    "prettier": "^3.9.10",
+    "turbo": "^2.11.9",
+    "typescript": "5.9.3"
   },
   "engines": {
     "node": ">=20.19.0"

@@ -29,11 +29,11 @@
     "db:verify": "bun scripts/verify-schema.ts"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.4.2",
-    "@prisma/client": "^7.8.0",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
     "@repo/shared": "*",
     "@repo/typescript-config": "*",
-    "dotenv": "^17.3.1",
+    "dotenv": "^17.4.2",
     "pg": "^8.20.0",
     "server-only": "^0.0.1"
   },
@@ -42,7 +42,7 @@
     "@types/bun": "latest",
     "@types/pg": "^8.18.0",
     "bcryptjs": "^3.0.3",
-    "prisma": "^7.8.0"
+    "prisma": "^7.10.1"
   },
   "peerDependencies": {
     "typescript": "^5"

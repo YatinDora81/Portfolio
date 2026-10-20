@@ -24,14 +24,14 @@
   },
   "dependencies": {
     "@repo/config": "*",
-    "jose": "^6.0.11",
+    "jose": "^6.2.13",
     "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
-    "@types/node": "^22.15.3",
-    "eslint": "^9.39.1",
+    "@types/node": "^22.20.5",
+    "eslint": "^9.39.5",
     "typescript": "5.9.2"
   }
 }
