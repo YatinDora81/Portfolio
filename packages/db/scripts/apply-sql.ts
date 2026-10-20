@@ -1,7 +1,9 @@
-import "dotenv/config";
+import { config } from "dotenv";
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
 import { Client } from "pg";
+
+config({ path: new URL("../.env", import.meta.url).pathname });
 
 const args = new Map<string, string>();
 for (const raw of process.argv.slice(2)) {
@@ -23,19 +25,30 @@ if (!url) {
 }
 
 const hostOf = (u: string) => new URL(u.replace(/^postgres(ql)?:\/\//, "https://")).hostname;
+const endpointOf = (u: string) => hostOf(u).split(".")[0]!.replace(/-pooler$/, "");
 const target = hostOf(url);
+const targetEndpoint = endpointOf(url);
 const apply = args.get("apply") === "true";
-const protectedHosts = [process.env.PROD_DATABASE_URL, process.env.PROTECTED_DATABASE_URL]
+const protectedEndpoints = [process.env.PROD_DATABASE_URL, process.env.PROTECTED_DATABASE_URL]
   .filter(Boolean)
-  .map((u) => hostOf(u as string));
+  .map((u) => endpointOf(u as string));
+
+if (!protectedEndpoints.length) {
+  console.error(
+    "refusing: neither PROD_DATABASE_URL nor PROTECTED_DATABASE_URL is loaded, so the target cannot be proven not to be production",
+  );
+  process.exit(1);
+}
 
 const database = new URL(url.replace(/^postgres(ql)?:\/\//, "https://")).pathname.replace(/^\//, "");
-const isProtected = protectedHosts.includes(target);
-const confirmed = args.get("i-know-this-is-production") === database;
+const isProtected = protectedEndpoints.includes(targetEndpoint);
+const confirmed = args.get("i-am-sure") === targetEndpoint;
 
 if (isProtected && !confirmed) {
-  console.error(`refusing: ${toVar} resolves to ${target}, which PROD_DATABASE_URL protects`);
-  console.error(`to run against it deliberately, pass --i-know-this-is-production=${database}`);
+  console.error(
+    `refusing: ${toVar} resolves to endpoint ${targetEndpoint}, which PROD_DATABASE_URL protects`,
+  );
+  console.error(`to run against it deliberately, pass --i-am-sure=<endpoint-id>`);
   process.exit(1);
 }
 

@@ -1,6 +1,8 @@
-import "dotenv/config";
+import { config } from "dotenv";
 import { readFileSync } from "node:fs";
 import { Client } from "pg";
+
+config({ path: new URL("../.env", import.meta.url).pathname });
 
 type Dump = {
   generatedAt: string;
@@ -28,14 +30,25 @@ if (!url) {
 }
 
 const hostOf = (u: string) => new URL(u.replace(/^postgres(ql)?:\/\//, "https://")).hostname;
+const endpointOf = (u: string) => hostOf(u).split(".")[0]!.replace(/-pooler$/, "");
 const target = hostOf(url);
+const targetEndpoint = endpointOf(url);
 const apply = args.get("apply") === "true";
-const protectedHosts = [process.env.PROD_DATABASE_URL, process.env.PROTECTED_DATABASE_URL]
+const protectedEndpoints = [process.env.PROD_DATABASE_URL, process.env.PROTECTED_DATABASE_URL]
   .filter(Boolean)
-  .map((u) => hostOf(u as string));
+  .map((u) => endpointOf(u as string));
 
-if (protectedHosts.includes(target)) {
-  console.error(`refusing: ${toVar} resolves to ${target}, which PROD_DATABASE_URL protects`);
+if (!protectedEndpoints.length) {
+  console.error(
+    "refusing: neither PROD_DATABASE_URL nor PROTECTED_DATABASE_URL is loaded, so the target cannot be proven not to be production",
+  );
+  process.exit(1);
+}
+
+if (protectedEndpoints.includes(targetEndpoint)) {
+  console.error(
+    `refusing: ${toVar} resolves to endpoint ${targetEndpoint}, which PROD_DATABASE_URL protects`,
+  );
   process.exit(1);
 }
 
