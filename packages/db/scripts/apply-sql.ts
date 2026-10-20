@@ -17,7 +17,13 @@ if (!file) {
   process.exit(1);
 }
 
-const toVar = args.get("to") ?? "NEW_DATABASE_URL";
+const toVar = args.get("to");
+if (!toVar) {
+  console.error("pass --to=<ENV_VAR> naming the target, e.g. --to=DATABASE_URL");
+  console.error("there is no default: this script applies DDL to whatever it is pointed at");
+  process.exit(1);
+}
+
 const url = process.env[toVar];
 if (!url) {
   console.error(`${toVar} is not set`);

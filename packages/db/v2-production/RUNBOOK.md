@@ -349,7 +349,7 @@ hosts to local:
 
 ```bash
 cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
-for v in DATABASE_URL PROD_DATABASE_URL NEW_DATABASE_URL; do
+for v in DATABASE_URL PROD_DATABASE_URL SCRATCH_DATABASE_URL; do
   printf '%-18s %s\n' "$v" \
     "$(grep "^$v=" .env | cut -d= -f2- | tr -d '"'"'"'" | sed -E 's#^postgres(ql)?://[^@]*@##; s#/.*##')"
 done
@@ -380,11 +380,11 @@ not. Group C is never validated, so a miss is silently wrong behaviour rather th
 | C | `GOOGLE_SHEET_ID`, `GOOGLE_SHEET_TAB`, `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY` | docs | `/refer-emails` sheet sync | `apps/docs/app/lib/sheet.ts:97-100` |
 
 **Expected output.** **Two** distinct local hosts, not three — verified on this tree:
-`DATABASE_URL` and `NEW_DATABASE_URL` are currently the *same* branch (`ep-aged-cake-a1ipqgrh`,
+`DATABASE_URL` and `SCRATCH_DATABASE_URL` are currently the *same* branch (`ep-aged-cake-a1ipqgrh`,
 database `neondb`), and `PROD_DATABASE_URL` is the other one (`ep-withered-bird-a1tz5xe6`,
 `neondb`). `apps/web/.env` and `apps/docs/.env` also point `DATABASE_URL` at
 `ep-aged-cake-a1ipqgrh`. Three hosts is the state you reach **after** Step 9 repoints
-`NEW_DATABASE_URL` at a fresh branch cut from production; if you see three before Step 9, someone
+`SCRATCH_DATABASE_URL` at a fresh branch cut from production; if you see three before Step 9, someone
 already cut it.
 
 `PROD_DATABASE_URL`'s host is the one that must match Vercel **Production**. Local `DATABASE_URL`
@@ -461,12 +461,12 @@ Also copy it somewhere off this machine. It is the floor under the whole night.
 `PROD_DATABASE_URL` (`scripts/restore.ts:32-39`), so restore into a **throwaway** Neon branch.
 
 **Command.** Create a fresh Neon branch from production in the console, put its URL in
-`packages/db/.env` as `NEW_DATABASE_URL`, then:
+`packages/db/.env` as `SCRATCH_DATABASE_URL`, then:
 
 ```bash
 cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
-bun run db:restore --file=backups/PRE-CUTOVER-<stamp>.json --to=NEW_DATABASE_URL          # dry run
-bun run db:restore --file=backups/PRE-CUTOVER-<stamp>.json --to=NEW_DATABASE_URL --apply=true
+bun run db:restore --file=backups/PRE-CUTOVER-<stamp>.json --to=SCRATCH_DATABASE_URL          # dry run
+bun run db:restore --file=backups/PRE-CUTOVER-<stamp>.json --to=SCRATCH_DATABASE_URL --apply=true
 ```
 
 **Expected output.** The dry run prints source, target and per-table counts and says
@@ -474,7 +474,7 @@ bun run db:restore --file=backups/PRE-CUTOVER-<stamp>.json --to=NEW_DATABASE_URL
 row counts as the dump.
 
 **Gate.** Row counts after restore match the dump for all 43 tables. If `db:restore` prints
-`refusing: ... which PROD_DATABASE_URL protects`, you pointed `NEW_DATABASE_URL` at production —
+`refusing: ... which PROD_DATABASE_URL protects`, you pointed `SCRATCH_DATABASE_URL` at production —
 fix it, do not work around the guard.
 
 **What this step does NOT prove.** It proves the dump is complete and parseable. It does **not**
@@ -505,14 +505,14 @@ that will waste your evening. The generator reads the **dump**, which is v1-shap
 lands on a **branch**, and `db:restore` does not change a target's shape — `scripts/restore.ts` keeps
 only the dump columns the target already has (`ignoring <cols>`) and leaves target-only columns at
 their default. So restoring the PRE-CUTOVER dump into a branch that has already had EXPAND **and**
-CONTRACT run against it (which is what the `NEW_DATABASE_URL` branch is after Step 9) gives you v1
+CONTRACT run against it (which is what the `SCRATCH_DATABASE_URL` branch is after Step 9) gives you v1
 *data* in a v2 *shape* — and the `HeroSkillBadge.iconKey` rehearsal then dies on apply with
 `42703 column "iconKey" of relation "HeroSkillBadge" does not exist`, which looks like the generator
 is broken and is not.
 
 ```bash
 cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
-bun run db:dump --from=NEW_DATABASE_URL --out=/tmp/v2/prod/8b-shape.json | tail -2
+bun run db:dump --from=SCRATCH_DATABASE_URL --out=/tmp/v2/prod/8b-shape.json | tail -2
 jq -r '[.tables[]|select(.name=="HeroSkillBadge")|.columns[].name]|join(" ")' /tmp/v2/prod/8b-shape.json
 jq -r '[.tables[].name]|index("SiteConfig")' /tmp/v2/prod/8b-shape.json
 ```
@@ -520,7 +520,7 @@ jq -r '[.tables[].name]|index("SiteConfig")' /tmp/v2/prod/8b-shape.json
 - `iconKey` and `name` present, `SiteConfig` present (a number, not `null`) → **v1 shape**. Run
   part A, which is the real rehearsal of Steps 43 and 56a.
 - Either one absent → **post-CONTRACT shape.** Either cut a fresh Neon branch from production, point
-  `NEW_DATABASE_URL` at it and re-run Step 8, or skip to part B, which proves the same mechanism on a
+  `SCRATCH_DATABASE_URL` at it and re-run Step 8, or skip to part B, which proves the same mechanism on a
   column that exists in both shapes. **Do not skip both.**
 
 **Part A — the real thing, on a v1-shaped branch.**
@@ -532,7 +532,7 @@ mkdir -p /tmp/v2/prod
 # 1. Break the branch on purpose, the way Step 43 breaks production. No BEGIN/COMMIT
 #    in this one: db:apply-sql supplies its own (scripts/apply-sql.ts:54-56).
 printf '%s\n' 'UPDATE "HeroSkillBadge" SET "iconKey" = $$WRONG$$;' > /tmp/v2/prod/rehearsal-break.sql
-bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/rehearsal-break.sql --apply=true
+bun run db:apply-sql --to=SCRATCH_DATABASE_URL --file=/tmp/v2/prod/rehearsal-break.sql --apply=true
 
 # 2. Generate the recovery from the dump. This writes a file; it opens no connection.
 jq -r -f v2-production/recover-from-dump.jq \
@@ -543,8 +543,8 @@ jq -r -f v2-production/recover-from-dump.jq \
 less /tmp/v2/prod/rehearsal-badge-iconkey.sql
 
 # 4. Apply it to the branch.
-bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/rehearsal-badge-iconkey.sql
-bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/rehearsal-badge-iconkey.sql --apply=true
+bun run db:apply-sql --to=SCRATCH_DATABASE_URL --file=/tmp/v2/prod/rehearsal-badge-iconkey.sql
+bun run db:apply-sql --to=SCRATCH_DATABASE_URL --file=/tmp/v2/prod/rehearsal-badge-iconkey.sql --apply=true
 
 # 5. Rehearse the insert shape too — it is what Step 56a's undo needs, and it is a
 #    different code path (INSERT ... ON CONFLICT DO NOTHING, all columns).
@@ -552,17 +552,17 @@ jq -r -f v2-production/recover-from-dump.jq \
    --arg table SiteConfig --arg key id --arg cols '*' --arg mode insert \
    backups/PRE-CUTOVER-<stamp>.json > /tmp/v2/prod/rehearsal-siteconfig.sql
 less /tmp/v2/prod/rehearsal-siteconfig.sql
-bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/rehearsal-siteconfig.sql --apply=true
+bun run db:apply-sql --to=SCRATCH_DATABASE_URL --file=/tmp/v2/prod/rehearsal-siteconfig.sql --apply=true
 ```
 
 **Part B — shape-independent, works on any branch.** `HeroSkillBadge.label` exists in both v1 and v2,
 so this exercises generate → break → recover → verify without needing a v1-shaped target. **This
-exact sequence has been run against the `NEW_DATABASE_URL` child branch and the restored labels came
+exact sequence has been run against the `SCRATCH_DATABASE_URL` child branch and the restored labels came
 back byte-identical to the dump**, so a clean pass is the expected result, not a lucky one.
 
 ```bash
 cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
-bun run db:dump --from=NEW_DATABASE_URL --out=/tmp/v2/prod/8b-before.json | tail -2
+bun run db:dump --from=SCRATCH_DATABASE_URL --out=/tmp/v2/prod/8b-before.json | tail -2
 
 jq -r -f v2-production/recover-from-dump.jq \
    --arg table HeroSkillBadge --arg key id --arg cols 'label' --arg mode update \
@@ -570,10 +570,10 @@ jq -r -f v2-production/recover-from-dump.jq \
 less /tmp/v2/prod/8b-recover.sql
 
 printf '%s\n' 'UPDATE "HeroSkillBadge" SET "label" = $$WRONG$$;' > /tmp/v2/prod/8b-break.sql
-bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/8b-break.sql --apply=true
-bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/8b-recover.sql --apply=true
+bun run db:apply-sql --to=SCRATCH_DATABASE_URL --file=/tmp/v2/prod/8b-break.sql --apply=true
+bun run db:apply-sql --to=SCRATCH_DATABASE_URL --file=/tmp/v2/prod/8b-recover.sql --apply=true
 
-bun run db:dump --from=NEW_DATABASE_URL --out=/tmp/v2/prod/8b-after.json | tail -2
+bun run db:dump --from=SCRATCH_DATABASE_URL --out=/tmp/v2/prod/8b-after.json | tail -2
 for f in before after; do
   jq -S '[.tables[]|select(.name=="HeroSkillBadge")|.rows[]|{id,label}]|sort_by(.id)' \
      /tmp/v2/prod/8b-$f.json > /tmp/v2/prod/8b-$f.cmp
@@ -592,7 +592,7 @@ jq '(.tables[]|select(.name=="HeroSkillBadge").rows) += [{"id":"ghost-row","labe
 jq -r -f v2-production/recover-from-dump.jq \
    --arg table HeroSkillBadge --arg key id --arg cols 'label' --arg mode update \
    /tmp/v2/prod/8b-ghost.json > /tmp/v2/prod/8b-ghost.sql
-bun run db:apply-sql --to=NEW_DATABASE_URL --file=/tmp/v2/prod/8b-ghost.sql --apply=true; echo "exit=$?"
+bun run db:apply-sql --to=SCRATCH_DATABASE_URL --file=/tmp/v2/prod/8b-ghost.sql --apply=true; echo "exit=$?"
 ```
 
 Expected: `P0001 recover aborted: HeroSkillBadge row(s) [ghost-row] in the dump no longer exist.
@@ -683,10 +683,10 @@ that is correct but worth confirming empirically.
 
 ```bash
 # Cut a NEW Neon branch from production in the console. Put its URL in
-# packages/db/.env as NEW_DATABASE_URL. Then, for the EXPAND files in the
+# packages/db/.env as SCRATCH_DATABASE_URL. Then, for the EXPAND files in the
 # Step 13-23 order:
 cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
-export PGREHEARSE="$(grep '^NEW_DATABASE_URL=' .env | cut -d= -f2- | tr -d '"'"'"'")"
+export PGREHEARSE="$(grep '^SCRATCH_DATABASE_URL=' .env | cut -d= -f2- | tr -d '"'"'"'")"
 for f in analytics contact-admin-audit media-flags-reval-github about-quotes-notes \
          blogs projects skills-joins hero-badges experience-education hero settings; do
   echo "=== $f ==="
@@ -696,27 +696,27 @@ done
 ```
 
 Then, **with the v1 code** — `git stash && bun install && bun run db:generate` — point a local dev
-server at `NEW_DATABASE_URL` and load the public home page and the admin `/hero`, `/site-config`,
+server at `SCRATCH_DATABASE_URL` and load the public home page and the admin `/hero`, `/site-config`,
 `/quotes`, `/projects`. Then `git stash pop`.
 
 Then run the CONTRACT files in the Step 39–49 order against the same branch, with the v2 code.
 
 **Expected output.** Every EXPAND file commits. The v1 site renders correctly against the expanded
-schema. Every CONTRACT file commits. `bun run db:verify --from=NEW_DATABASE_URL` comes back clean
+schema. Every CONTRACT file commits. `bun run db:verify --from=SCRATCH_DATABASE_URL` comes back clean
 except the two known-pending opclass indexes.
 
 **Gate.** All of the above. Any `RAISE EXCEPTION` you see here you would have seen on production at
 2 a.m. instead. Fix the cause, re-cut the branch, rehearse again.
 
-**Before the first `-f`, prove the branch is a v1 clone.** `NEW_DATABASE_URL` as shipped in
+**Before the first `-f`, prove the branch is a v1 clone.** `SCRATCH_DATABASE_URL` as shipped in
 `packages/db/.env` is **not** a production clone — it is the same branch local `DATABASE_URL` uses
 (`ep-aged-cake-a1ipqgrh`, `neondb`), and it already holds the **v2 canonical** schema: 43 tables,
 `Education.startYear integer NOT NULL`, `Experience.startedOn date NOT NULL`, no `startDate` /
 `endDate` / `isCurrent`. Rehearsing against it does not test anything this runbook does, and section
 E of `experience-education-expand.sql` will fail `42883` because `public.v2_year_to_int` takes `text`
-and would be handed an `integer`. **Repoint `NEW_DATABASE_URL` at a genuinely fresh branch cut from
+and would be handed an `integer`. **Repoint `SCRATCH_DATABASE_URL` at a genuinely fresh branch cut from
 production first**, then confirm with the read-only probe (Step 21.3's form,
-`TARGET=NEW_DATABASE_URL`): `Education.startYear` must come back `text`, and `Experience` must still
+`TARGET=SCRATCH_DATABASE_URL`): `Education.startYear` must come back `text`, and `Experience` must still
 have `startDate` / `endDate` / `isCurrent`. Every preflight in every file is written against that
 shape.
 
@@ -1493,10 +1493,10 @@ The first invocation is a dry run: it prints the target host and the table count
 nothing. **Read the host and confirm it is not production** before adding `--apply=true`.
 
 **One ordering trap, because of how `.env` is set up right now.** `DATABASE_URL` and
-`NEW_DATABASE_URL` are currently the **same branch** (Step 6). Step 9 tells you to repoint
-`NEW_DATABASE_URL` at a *fresh* branch cut from production — do that first, and do not run this
+`SCRATCH_DATABASE_URL` are currently the **same branch** (Step 6). Step 9 tells you to repoint
+`SCRATCH_DATABASE_URL` at a *fresh* branch cut from production — do that first, and do not run this
 rename until Step 9's rehearsal is finished, or you will rename columns out from under the
-rehearsal's own EXPAND run. If you have already repointed `NEW_DATABASE_URL`, only `DATABASE_URL`
+rehearsal's own EXPAND run. If you have already repointed `SCRATCH_DATABASE_URL`, only `DATABASE_URL`
 matters here: it is the one the **build** reads.
 
 **21.4 — re-prove the build, in full.** Step 5's green build is now stale: it was taken against a
@@ -3413,7 +3413,7 @@ run.**
 # The Neon child branch and every rehearsal/scratch branch: delete in the Neon
 # console. Confirm first that NOTHING still points at them:
 cd /Users/yatindora/Developer/web-projects/portfolio/packages/db
-grep -n 'DATABASE_URL\|NEW_DATABASE_URL' .env ../../apps/web/.env ../../apps/docs/.env \
+grep -n 'DATABASE_URL\|SCRATCH_DATABASE_URL' .env ../../apps/web/.env ../../apps/docs/.env \
   | sed 's/=.*/=<redacted>/'
 
 # The drafts. They assumed a throwaway target and are now actively misleading --

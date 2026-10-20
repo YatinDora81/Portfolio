@@ -7,7 +7,7 @@ for (const raw of process.argv.slice(2)) {
   args.set(k!, rest.join("=") || "true");
 }
 
-const fromVar = args.get("from") ?? "NEW_DATABASE_URL";
+const fromVar = args.get("from") ?? "DATABASE_URL";
 const url = process.env[fromVar];
 if (!url) {
   console.error(`${fromVar} is not set`);

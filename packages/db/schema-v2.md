@@ -946,7 +946,7 @@ running a single statement against production, in four steps, each with its own 
 
     bun run db:dump                      whole database -> one JSON, read-only
     bun run db:transform --in= --out=    old-shape JSON -> new-shape JSON, no database involved
-    bun run db:apply-sql --file=         run a .sql file against NEW_DATABASE_URL
+    bun run db:apply-sql --file=         run a .sql file against SCRATCH_DATABASE_URL
     bun run db:restore --file=           JSON -> database
     bun run db:verify                    compare a database against this schema
 
