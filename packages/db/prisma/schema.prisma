@@ -133,8 +133,8 @@ model Education {
   scoreType   ScoreType?
   score       String?
   scoreTotal  String?
-  startYear   Int
-  endYear     Int?
+  startYear   Int        @map("startYearInt")
+  endYear     Int?       @map("endYearInt")
   sortOrder   Int
 
   createdAt DateTime @default(now())
