@@ -14,6 +14,10 @@ interface PreviewProject {
   technologies: string[];
   images: string[];
   logoUrl: string | null;
+  buildState: "SHIPPED" | "BUILDING" | "PAUSED";
+  buildVersion: string | null;
+  etaLabel: string | null;
+  milestones: { label: string; state: "DONE" | "DOING" | "NEXT" }[];
 }
 
 export function ProjectsSections({ version, previewProjects, children }: {

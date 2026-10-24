@@ -1,4 +1,4 @@
-import type { ContentStatus } from "db";
+import type { BuildState, ContentStatus, MilestoneState } from "db";
 
 export const CONTENT_STATUSES = ["DRAFT", "SCHEDULED", "PUBLISHED", "ARCHIVED"] as const;
 
@@ -137,4 +137,168 @@ export function resolveLifecycle(
 
 export function transportError(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "The server could not be reached.";
+}
+
+export const BUILD_STATES = ["SHIPPED", "BUILDING", "PAUSED"] as const;
+
+export const MILESTONE_STATES = ["DONE", "DOING", "NEXT"] as const;
+
+export const BUILD_LABEL: Record<BuildState, string> = {
+  SHIPPED: "Shipped",
+  BUILDING: "Building",
+  PAUSED: "Paused",
+};
+
+export const BUILD_SUB: Record<BuildState, string> = {
+  SHIPPED: "default",
+  BUILDING: "in flight",
+  PAUSED: "honest stop",
+};
+
+export const BUILD_NOTE: Record<BuildState, string> = {
+  SHIPPED:
+    "The row renders as it does today — green dot, live link, latency on the prod tab, highlights in the fold. Nothing below this is read, and nothing below this is deleted either.",
+  BUILDING:
+    "The cover becomes the working drawing, the dot turns amber, the live link and the health probe both stand down. The domain still prints — that is the plan — but nothing links to it.",
+  PAUSED:
+    "Still on the site and still honest, with no momentum claimed. The amber drains to grey, the ping stops, and the eta is dropped rather than shown slipped.",
+};
+
+export const MILESTONE_CAP = 3;
+
+export const MILESTONE_LABEL_MAX = 10;
+
+export const ETA_MAX = 24;
+
+export const BUILD_VERSION_MAX = 16;
+
+export const BUILD_STALE_DAYS = 90;
+
+export const BUILD_NAG_DAYS = 45;
+
+export function isBuildState(value: unknown): value is BuildState {
+  return typeof value === "string" && (BUILD_STATES as readonly string[]).includes(value);
+}
+
+export function isMilestoneState(value: unknown): value is MilestoneState {
+  return typeof value === "string" && (MILESTONE_STATES as readonly string[]).includes(value);
+}
+
+export interface MilestoneRow {
+  id?: string;
+  label: string;
+  state: MilestoneState;
+  sortOrder: number;
+}
+
+export type ResolvedBuild =
+  | {
+      ok: true;
+      buildState: BuildState;
+      buildVersion: string | null;
+      etaLabel: string | null;
+      milestones: MilestoneRow[];
+    }
+  | { ok: false; error: string };
+
+export function resolveBuild(
+  rawState: unknown,
+  rawVersion: unknown,
+  rawEta: unknown,
+  rawMilestones: unknown
+): ResolvedBuild {
+  if (!isBuildState(rawState)) {
+    return {
+      ok: false,
+      error: `The build state did not arrive (got ${JSON.stringify(rawState)}), so nothing was saved.`,
+    };
+  }
+
+  const version = typeof rawVersion === "string" ? rawVersion.trim() : "";
+  if (version.length > BUILD_VERSION_MAX) {
+    return {
+      ok: false,
+      error: `The version prints on a corner tab, so it has to stay under ${BUILD_VERSION_MAX} characters. Nothing was saved.`,
+    };
+  }
+
+  const eta = typeof rawEta === "string" ? rawEta.trim() : "";
+  if (eta.length > ETA_MAX) {
+    return {
+      ok: false,
+      error: `The eta has to fit ${ETA_MAX} characters. Nothing was saved.`,
+    };
+  }
+  if (eta && !Number.isNaN(Date.parse(eta))) {
+    return {
+      ok: false,
+      error: `"${eta}" reads as a date. Write it as prose — "shipping ~ Nov" — so a slip shows as neglect rather than as a lie. Nothing was saved.`,
+    };
+  }
+
+  if (!Array.isArray(rawMilestones)) {
+    return { ok: false, error: "The milestone rows did not arrive, so nothing was saved." };
+  }
+
+  const milestones: MilestoneRow[] = [];
+  for (const raw of rawMilestones) {
+    const row = raw as { id?: unknown; label?: unknown; state?: unknown };
+    const label = typeof row.label === "string" ? row.label.trim() : "";
+    if (!label) continue;
+    if (label.length > MILESTONE_LABEL_MAX) {
+      return {
+        ok: false,
+        error: `"${label}" is ${label.length} characters. A pane label clips past ${MILESTONE_LABEL_MAX}, so nothing was saved.`,
+      };
+    }
+    if (!isMilestoneState(row.state)) {
+      return {
+        ok: false,
+        error: `"${label}" has no usable state (got ${JSON.stringify(row.state)}), so nothing was saved.`,
+      };
+    }
+    milestones.push({
+      ...(typeof row.id === "string" && row.id ? { id: row.id } : {}),
+      label,
+      state: row.state,
+      sortOrder: milestones.length,
+    });
+  }
+
+  if (milestones.length > MILESTONE_CAP) {
+    return {
+      ok: false,
+      error: `The cover draws ${MILESTONE_CAP} panes, so a ${MILESTONE_CAP + 1}th milestone would be stored and never shown. Nothing was saved.`,
+    };
+  }
+
+  return {
+    ok: true,
+    buildState: rawState,
+    buildVersion: version || null,
+    etaLabel: eta || null,
+    milestones,
+  };
+}
+
+export function buildWarning(
+  buildState: BuildState,
+  milestones: { label: string; state: MilestoneState }[]
+): string | null {
+  if (buildState === "SHIPPED") return null;
+  const doing = milestones.filter((m) => m.state === "DOING");
+  if (!milestones.length) {
+    return "No milestones, so the cover draws an empty shell. It is still honest — it just says nothing about how far the build got.";
+  }
+  if (doing.length > 1) {
+    return `${doing.length} milestones are marked doing. The dimension line names one surface, so it names none of them instead.`;
+  }
+  if (!doing.length && buildState === "BUILDING") {
+    return "Nothing is marked doing, so the drawing has no amber pane and the caption under it stays blank. That is the honest signal for Paused — on Building it usually means a milestone needs flipping.";
+  }
+  return null;
+}
+
+export function daysSince(instant: Date, now: number = Date.now()): number {
+  return Math.max(0, Math.floor((now - instant.getTime()) / 86_400_000));
 }

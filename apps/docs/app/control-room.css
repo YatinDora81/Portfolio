@@ -1920,6 +1920,98 @@ a.abt-l:hover .abt-go { color: var(--accT) }
 
 .lc-after-field { margin-top: -10px; margin-bottom: 18px }
 
+.ad-build > .f { margin-bottom: 12px }
+.ad-seg {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 3px;
+  background: var(--bg2); border: 1px solid var(--line2); border-radius: var(--r2)
+}
+.ad-seg .ad-seg-o {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; min-height: 40px; padding: 5px 4px; border-radius: calc(var(--r2) - 3px); cursor: pointer;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim); transition: background .14s, color .14s, box-shadow .14s
+}
+.ad-seg .ad-seg-o input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0 }
+.ad-seg .ad-seg-o em {
+  font-style: normal; font-size: 8.5px; letter-spacing: .04em; text-transform: none; color: var(--faint)
+}
+.ad-seg .ad-seg-o:hover { color: var(--ink) }
+.ad-seg .ad-seg-o:has(input:focus-visible) { outline: 2px solid var(--c1); outline-offset: 1px }
+.ad-seg .ad-seg-o:has(input:checked) {
+  background: var(--card); color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line2), 0 1px 2px rgba(17, 17, 22, .07)
+}
+.ad-seg .ad-seg-o:has(input:checked) em { color: inherit; opacity: .7 }
+.ad-seg .ad-seg-o[data-state='SHIPPED']:has(input:checked) { color: var(--goodT) }
+.ad-seg .ad-seg-o[data-state='BUILDING']:has(input:checked) { color: var(--ambT) }
+.dark .ad-seg .ad-seg-o:has(input:checked) { box-shadow: inset 0 0 0 1px var(--line2) }
+
+.ad-g {
+  display: flex; flex-direction: column; gap: 13px; padding: 13px; margin-bottom: 4px;
+  border: 1px solid var(--line2); border-radius: var(--r2); background: var(--bg1)
+}
+.ad-g .f { margin-bottom: 0 }
+.ad-g > .f-row { gap: 12px }
+.ad-g .in, .ad-g .ta { background: var(--card) }
+.dark .ad-g .in, .dark .ad-g .ta { background-color: var(--well) }
+.ad-gh { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap }
+.ad-gh h3 { font-size: 12.5px; font-weight: 650; letter-spacing: -.01em }
+.ad-gh h3 code { font-family: var(--mono); font-size: 11px; font-weight: 450; color: var(--dim) }
+.ad-gh p { flex: 1 1 18ch; font-size: 11.5px; line-height: 1.55; color: var(--faint) }
+.ad-count { font-family: var(--mono); font-size: 9.5px; color: var(--faint); float: right }
+
+.ad-rep { display: flex; flex-direction: column; gap: 8px }
+.ad-row {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'ord main del'; gap: 10px; align-items: start;
+  padding: 10px 11px; border: 1px solid var(--line2); border-radius: var(--r2); background: var(--card)
+}
+.dark .ad-row { background: var(--bg1) }
+.ad-row .in { background: var(--bg1) }
+.dark .ad-row .in { background-color: var(--well) }
+.ad-ord {
+  grid-area: ord; display: grid; grid-template-columns: auto auto; align-content: start;
+  justify-items: center; gap: 0 1px; padding-top: 1px
+}
+.ad-ord .row-i { grid-column: 1 / -1; width: auto }
+.ad-main { grid-area: main; min-width: 0; display: flex; flex-direction: column; gap: 7px }
+.ad-del { grid-area: del }
+
+.ad-ms-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(132px, 172px); gap: 7px; align-items: center }
+.ad-ms {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; padding: 2px;
+  border: 1px solid var(--line2); border-radius: var(--r1); background: var(--bg2)
+}
+.ad-ms > label {
+  position: relative; display: grid; place-items: center; padding: 5px 2px; border-radius: 5px; cursor: pointer;
+  font-family: var(--mono); font-size: 9px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--faint); transition: background .13s, color .13s, box-shadow .13s
+}
+.ad-ms > label input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0 }
+.ad-ms > label:hover { color: var(--ink) }
+.ad-ms > label:has(input:focus-visible) { outline: 2px solid var(--c1); outline-offset: 1px }
+.ad-ms > label:has(input:checked) { background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line2) }
+.ad-ms > label[data-ms='DONE']:has(input:checked) { color: var(--goodT) }
+.ad-ms > label[data-ms='DOING']:has(input:checked) { color: var(--ambT) }
+
+@media (max-width: 560px) {
+  .ad-g { padding: 10px }
+  .ad-seg .ad-seg-o { letter-spacing: .04em; font-size: 10px }
+  .ad-seg .ad-seg-o em { display: none }
+  .ad-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'main main' 'ord del';
+    column-gap: 0; row-gap: 8px
+  }
+  .ad-ord {
+    grid-auto-flow: column; grid-template-columns: none; justify-content: start; align-items: center;
+    align-self: center; gap: 0 4px; width: 100%; padding-top: 7px; border-top: 1px dashed var(--line2)
+  }
+  .ad-ord .row-i { grid-column: auto }
+  .ad-del { align-self: center; padding-top: 7px; border-top: 1px dashed var(--line2) }
+  .ad-ms-wrap { grid-template-columns: minmax(0, 1fr) }
+}
+
 .msg-tabs { border: 1px solid var(--line2); border-radius: var(--r3); background: var(--card); margin-bottom: 14px }
 .msg-tabs .filt { display: inline-flex; align-items: center; gap: 6px; text-decoration: none }
 .msg-tabs .filt b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--dim) }

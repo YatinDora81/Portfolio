@@ -6,14 +6,17 @@ import { Card, CardHead } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   IconPlus, IconFolderCode, IconGripVertical, IconArrowUpRight, IconAlertTriangle,
-  IconClock, IconPencil,
+  IconClock, IconPencil, IconTool,
 } from "@tabler/icons-react";
+import { livingEta } from "@repo/shared/dates";
 import { previewLinkBlockedReason } from "@/lib/actions/preview-link";
 import { StatusBadge } from "@/components/lifecycle/status-badge";
 import { StatusTabs } from "@/components/lifecycle/status-tabs";
 import { RowActions } from "@/components/lifecycle/row-actions";
 import { RunDueButton } from "@/components/lifecycle/run-due-button";
-import { STATUS_LABEL, isContentStatus, istLabel } from "@/lib/lifecycle";
+import {
+  BUILD_LABEL, BUILD_STALE_DAYS, STATUS_LABEL, daysSince, isContentStatus, istLabel,
+} from "@/lib/lifecycle";
 import { cn } from "@/lib/utils";
 import { ProjectGrid } from "./grid";
 import { ProjectsSections } from "./sections";
@@ -43,6 +46,7 @@ export default async function ProjectsPage({ searchParams }: {
           select: { externalUrl: true, asset: { select: { url: true } } },
         },
         health: { select: { status: true, latencyMs: true, checkedAt: true } },
+        milestones: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
       },
     }),
     prisma.siteSettings.findUniqueOrThrow({ where: { id: 1 }, select: { projectsVersion: true } }),
@@ -69,7 +73,31 @@ export default async function ProjectsPage({ searchParams }: {
   const rows = active === null ? projects : projects.filter((p) => p.status === active);
 
   const withCover = projects.filter(p => p.gallery.length > 0).length;
-  const withDemo = projects.filter(p => p.live).length;
+  const withDemo = projects.filter(p => p.live && p.buildState === "SHIPPED").length;
+
+  const inFlight = projects.filter(p => p.buildState !== "SHIPPED");
+
+  const buildLine = (p: (typeof projects)[number]): { text: string; bad: boolean } | null => {
+    if (p.buildState === "SHIPPED") return null;
+    const word = BUILD_LABEL[p.buildState].toLowerCase();
+    const doing = p.milestones.filter(m => m.state === "DOING");
+    const count = `${p.milestones.length} milestone${p.milestones.length === 1 ? "" : "s"}`;
+
+    if (doing.length !== 1) {
+      return {
+        text: doing.length
+          ? `${word} · ${count}, ${doing.length} marked doing — the cover names none of them`
+          : `${word} · ${count}, none marked doing`,
+        bad: false,
+      };
+    }
+
+    const stale = daysSince(doing[0]!.updatedAt);
+    return {
+      text: `${word} · ${doing[0]!.label}: doing for ${stale} day${stale === 1 ? "" : "s"}`,
+      bad: stale >= BUILD_STALE_DAYS,
+    };
+  };
 
   return (
     <div className="view">
@@ -104,6 +132,10 @@ export default async function ProjectsPage({ searchParams }: {
           technologies: p.skills.map(s => s.skill.name),
           images: galleryUrls(p.gallery),
           logoUrl: p.logoUrl,
+          buildState: p.buildState,
+          buildVersion: p.buildVersion,
+          etaLabel: p.buildState === "BUILDING" ? livingEta(p.etaLabel, p.updatedAt, now) : null,
+          milestones: p.milestones.map(m => ({ label: m.label, state: m.state })),
         }))}
       >
         {overdue.length > 0 && (
@@ -198,6 +230,20 @@ export default async function ProjectsPage({ searchParams }: {
                           </div>
                         )}
 
+                        {(() => {
+                          const build = buildLine(p);
+                          if (!build) return null;
+                          return (
+                            <div className={cn("lc-line", build.bad && "bad")}>
+                              {build.bad
+                                ? <IconAlertTriangle size={12} stroke={1.7} />
+                                : <IconTool size={12} stroke={1.7} />}
+                              {build.text}
+                              {build.bad && " — the drawing looks identical either way"}
+                            </div>
+                          );
+                        })()}
+
                         <RowActions
                           kind="project"
                           id={p.id}
@@ -245,6 +291,10 @@ export default async function ProjectsPage({ searchParams }: {
               <div className="wk-fig">
                 <b className={withDemo ? undefined : "q"}>{withDemo}</b>
                 <span>with a live demo</span>
+              </div>
+              <div className="wk-fig">
+                <b className={inFlight.length ? undefined : "q"}>{inFlight.length}</b>
+                <span>still building</span>
               </div>
               <div className="sp" />
               <span className="hint">

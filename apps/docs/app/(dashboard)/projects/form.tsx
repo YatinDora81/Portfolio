@@ -2,13 +2,14 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { ContentStatus } from "db";
+import type { BuildState, ContentStatus } from "db";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusField } from "@/components/lifecycle/status-field";
+import { BuildField, type MilestoneDraft } from "@/components/lifecycle/build-field";
 import { createProject, updateProject } from "@/lib/actions/projects";
 import { publishSite } from "@/lib/actions/publish";
 import { scheduleProblem, transportError, utcToIstInput } from "@/lib/lifecycle";
@@ -23,6 +24,11 @@ interface ProjectData {
   skillIds: string[]; bullets: Bullet[];
   status: ContentStatus;
   publishAtIso: string | null;
+  buildState: BuildState;
+  buildVersion: string | null;
+  etaLabel: string | null;
+  milestones: MilestoneDraft[];
+  neglect: string | null;
 }
 
 export function ProjectForm({ project, allSkills }: {
@@ -45,6 +51,10 @@ export function ProjectForm({ project, allSkills }: {
   const [publishAtIst, setPublishAtIst] = useState(
     project?.publishAtIso ? utcToIstInput(new Date(project.publishAtIso)) : ""
   );
+  const [buildState, setBuildState] = useState<BuildState>(project?.buildState ?? "SHIPPED");
+  const [buildVersion, setBuildVersion] = useState(project?.buildVersion || "");
+  const [etaLabel, setEtaLabel] = useState(project?.etaLabel || "");
+  const [milestones, setMilestones] = useState<MilestoneDraft[]>(project?.milestones ?? []);
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [pubError, setPubError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -74,6 +84,10 @@ export function ProjectForm({ project, allSkills }: {
       bullets: bullets.map((b, i) => ({ ...b, sortOrder: i })),
       status,
       publishAtIst: publishAtIst || null,
+      buildState,
+      buildVersion: buildVersion || null,
+      etaLabel: etaLabel || null,
+      milestones: milestones.map((m, i) => ({ ...m, sortOrder: i })),
     };
     startTransition(async () => {
       try {
@@ -126,6 +140,26 @@ export function ProjectForm({ project, allSkills }: {
         <div className="f-row">
           <Input label="GitHub URL" mono value={github} onChange={e => setGithub(e.target.value)} placeholder="https://github.com/…" />
           <Input label="Live URL" mono value={live} onChange={e => setLive(e.target.value)} placeholder="https://…" />
+        </div>
+
+        <BuildField
+          buildState={buildState}
+          onBuildState={setBuildState}
+          buildVersion={buildVersion}
+          onBuildVersion={setBuildVersion}
+          etaLabel={etaLabel}
+          onEtaLabel={setEtaLabel}
+          milestones={milestones}
+          onMilestones={setMilestones}
+          liveUrl={live}
+          bulletCount={bullets.filter(b => b.content.trim()).length}
+          neglect={project?.neglect ?? null}
+        />
+
+        <div className="lc-note lc-after-field">
+          Build state is what the row claims once a visitor can reach it; Status, further down, is
+          whether they can reach it at all. A half-built project wants <b>Published</b> and{" "}
+          <b>Building</b> together — that pairing is the whole point of the field.
         </div>
 
         <Input

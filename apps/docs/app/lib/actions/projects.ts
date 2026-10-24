@@ -4,7 +4,7 @@ import { prisma } from "db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
-import { resolveLifecycle } from "@/lib/lifecycle";
+import { resolveBuild, resolveLifecycle } from "@/lib/lifecycle";
 
 async function requireSession() {
   if (!(await getSession())) redirect("/login");
@@ -21,6 +21,10 @@ interface ProjectData {
   bullets: { id?: string; content: string; sortOrder: number }[];
   status: string;
   publishAtIst: string | null;
+  buildState: string;
+  buildVersion: string | null;
+  etaLabel: string | null;
+  milestones: { id?: string; label: string; state: string; sortOrder: number }[];
 }
 
 type Saved = { ok: boolean; error?: string };
@@ -30,6 +34,9 @@ export async function createProject(data: ProjectData): Promise<Saved> {
 
   const lifecycle = resolveLifecycle(data.status, data.publishAtIst);
   if (!lifecycle.ok) return { ok: false, error: lifecycle.error };
+
+  const build = resolveBuild(data.buildState, data.buildVersion, data.etaLabel, data.milestones);
+  if (!build.ok) return { ok: false, error: build.error };
 
   const images = data.images.filter(Boolean);
   const { _max } = await prisma.project.aggregate({ _max: { sortOrder: true } });
@@ -45,6 +52,9 @@ export async function createProject(data: ProjectData): Promise<Saved> {
       status: lifecycle.status,
       publishAt: lifecycle.publishAt,
       publishedAt: lifecycle.status === "PUBLISHED" ? new Date() : null,
+      buildState: build.buildState,
+      buildVersion: build.buildVersion,
+      etaLabel: build.etaLabel,
       gallery: {
         create: images.map((externalUrl, sortOrder) => ({ externalUrl, sortOrder })),
       },
@@ -53,6 +63,13 @@ export async function createProject(data: ProjectData): Promise<Saved> {
       },
       bullets: {
         create: data.bullets.map((b) => ({ content: b.content, sortOrder: b.sortOrder })),
+      },
+      milestones: {
+        create: build.milestones.map((m) => ({
+          label: m.label,
+          state: m.state,
+          sortOrder: m.sortOrder,
+        })),
       },
     },
   });
@@ -65,6 +82,9 @@ export async function updateProject(id: string, data: ProjectData): Promise<Save
 
   const lifecycle = resolveLifecycle(data.status, data.publishAtIst);
   if (!lifecycle.ok) return { ok: false, error: lifecycle.error };
+
+  const build = resolveBuild(data.buildState, data.buildVersion, data.etaLabel, data.milestones);
+  if (!build.ok) return { ok: false, error: build.error };
 
   const images = data.images.filter(Boolean);
 
@@ -81,6 +101,9 @@ export async function updateProject(id: string, data: ProjectData): Promise<Save
         logoUrl: data.logoUrl || null,
         status: lifecycle.status,
         publishAt: lifecycle.publishAt,
+        buildState: build.buildState,
+        buildVersion: build.buildVersion,
+        etaLabel: build.etaLabel,
         ...(lifecycle.status === "PUBLISHED" && current?.publishedAt == null
           ? { publishedAt: new Date() }
           : {}),
@@ -117,6 +140,48 @@ export async function updateProject(id: string, data: ProjectData): Promise<Save
           data: { content: bullet.content, sortOrder: bullet.sortOrder, projectId: id },
         });
       }
+    }
+
+    const keptMilestones = build.milestones.filter((m) => m.id).map((m) => m.id!);
+    await tx.projectMilestone.deleteMany({
+      where: { projectId: id, id: { notIn: keptMilestones } },
+    });
+
+    const stored = keptMilestones.length
+      ? await tx.projectMilestone.findMany({
+          where: { projectId: id, id: { in: keptMilestones } },
+          select: { id: true, label: true, state: true, sortOrder: true, updatedAt: true },
+        })
+      : [];
+    const before = new Map(stored.map((m) => [m.id, m]));
+
+    for (const milestone of build.milestones) {
+      const was = milestone.id ? before.get(milestone.id) : undefined;
+
+      if (!was) {
+        await tx.projectMilestone.create({
+          data: {
+            label: milestone.label,
+            state: milestone.state,
+            sortOrder: milestone.sortOrder,
+            projectId: id,
+          },
+        });
+        continue;
+      }
+
+      const said = was.label === milestone.label && was.state === milestone.state;
+      if (said && was.sortOrder === milestone.sortOrder) continue;
+
+      await tx.projectMilestone.update({
+        where: { id: was.id },
+        data: {
+          label: milestone.label,
+          state: milestone.state,
+          sortOrder: milestone.sortOrder,
+          ...(said ? { updatedAt: was.updatedAt } : {}),
+        },
+      });
     }
   });
   revalidatePath("/projects");
