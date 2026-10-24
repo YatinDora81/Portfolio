@@ -6,7 +6,6 @@ import { NoteLink, unsavedDraft, useNoteNav } from "./vault-provider";
 
 // wheel pixels past the bottom before the move fires
 const THRESHOLD = 480;
-const TOUCH_GAIN = 2.2;
 const IDLE_RESET_MS = 700;
 const COOLDOWN_MS = 800;
 
@@ -24,7 +23,6 @@ export function ScrollAdvance({ next }: { next: NextQuestion | null }) {
     if (!next || !foot || !pane) return;
 
     let progress = 0;
-    let touchY: number | null = null;
     let idle: ReturnType<typeof setTimeout> | undefined;
     let fired = false;
 
@@ -93,38 +91,11 @@ export function ScrollAdvance({ next }: { next: NextQuestion | null }) {
       arm(dy);
     };
 
-    const onTouchStart = (e: TouchEvent) => {
-      touchY = e.touches[0]?.clientY ?? null;
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (touchY === null || !pane.contains(e.target as Node)) return;
-      const y = e.touches[0]?.clientY ?? touchY;
-      const delta = touchY - y;
-      touchY = y;
-      if (delta > 0 && Date.now() < coolUntil) {
-        e.preventDefault();
-        return;
-      }
-      if (delta > 0 && atBottom()) {
-        e.preventDefault();
-        arm(delta * TOUCH_GAIN);
-      }
-    };
-
-    const onTouchEnd = () => {
-      touchY = null;
-      if (progress < THRESHOLD) reset();
-    };
-
     const onScroll = () => {
       if (progress && !atBottom()) reset();
     };
 
     window.addEventListener("wheel", onWheel, { passive: false });
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
-    window.addEventListener("touchend", onTouchEnd, { passive: true });
     const host = scroller();
     pane.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -133,9 +104,6 @@ export function ScrollAdvance({ next }: { next: NextQuestion | null }) {
     return () => {
       clearTimeout(idle);
       window.removeEventListener("wheel", onWheel);
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", onTouchEnd);
       pane.removeEventListener("scroll", onScroll);
       window.removeEventListener("scroll", onScroll);
       host.removeEventListener("scroll", onScroll);
@@ -153,7 +121,10 @@ export function ScrollAdvance({ next }: { next: NextQuestion | null }) {
   return (
     <nav ref={footRef} className="nt-adv" aria-label="Continue reading">
       <div className="nt-adv-row">
-        <span className="nt-adv-lb">keep scrolling</span>
+        <span className="nt-adv-lb">
+          <span className="nt-adv-wheel">keep scrolling</span>
+          <span className="nt-adv-tap">up next</span>
+        </span>
         <NoteLink className="nt-adv-next" href={next.href}>
           {next.sameFolder ? "next" : `next · ${next.parentTitle}`} — {next.title}
         </NoteLink>

@@ -34,8 +34,9 @@ import type { VaultItem } from "@/lib/notes/vault-view";
 import { hrefFor, NOTES_ROOT, notePathOf, type NoteKind } from "@/lib/notes/view-types";
 import { cn } from "@/lib/utils";
 import { ImportButton } from "./import-dialog";
+import { useTreeDrawer } from "./tree-drawer";
 import { TreeMenu, type MenuTarget } from "./tree-menu";
-import { useNoteNav, useVault } from "./vault-provider";
+import { unsavedDraft, useNoteNav, useVault } from "./vault-provider";
 
 interface Flat {
   node: VaultItem;
@@ -87,6 +88,7 @@ export function NoteTree() {
   const router = useRouter();
   const pathname = usePathname();
   const go = useNoteNav();
+  const drawer = useTreeDrawer();
   const [pending, startTransition] = useTransition();
 
   const activePath = useMemo(() => notePathOf(pathname) ?? "", [pathname]);
@@ -547,6 +549,7 @@ export function NoteTree() {
       case "Enter":
         e.preventDefault();
         if (node.kind === "FOLDER") toggle(node.id, true);
+        if (!unsavedDraft.current) drawer.hide();
         go(hrefFor(node.path));
         break;
       case " ":
@@ -602,12 +605,19 @@ export function NoteTree() {
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
       if (t?.closest(".modal") || document.querySelector(".veil")) return;
       e.preventDefault();
+      if (window.matchMedia("(max-width: 700px)").matches) drawer.show();
       filterRef.current?.focus();
       filterRef.current?.select();
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, []);
+  }, [drawer]);
+
+  useEffect(() => {
+    if (!drawer.open) return;
+    if (!window.matchMedia("(hover: hover)").matches) return;
+    filterRef.current?.focus();
+  }, [drawer.open]);
 
   const goSearch = (q: string) =>
     router.push(`${NOTES_ROOT}/search?q=${encodeURIComponent(q.trim())}`);
@@ -716,6 +726,7 @@ export function NoteTree() {
                 toggle(node.id);
                 return;
               }
+              if (!unsavedDraft.current) drawer.hide();
               go(hrefFor(node.path));
             }}
             onContextMenu={(e) => {
@@ -761,7 +772,7 @@ export function NoteTree() {
   };
 
   return (
-    <div className="nt-tp">
+    <div className={cn("nt-tp", drawer.open && "open")} id="nt-tree-panel">
       <div className="nt-tp-head">
         <span className="nt-tp-eyebrow">{pending ? "working…" : "vault"}</span>
         <button
@@ -791,6 +802,15 @@ export function NoteTree() {
           onClick={() => setExpanded(new Set())}
         >
           <IconFoldUp size={15} />
+        </button>
+        <button
+          type="button"
+          className="nt-iconbtn nt-tp-x"
+          title="Close the vault"
+          aria-label="Close the vault"
+          onClick={drawer.hide}
+        >
+          <IconX size={15} />
         </button>
       </div>
 

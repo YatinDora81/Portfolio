@@ -93,13 +93,20 @@ const bare = (href: string) => href.split(/[?#]/)[0]!;
 
 export const unsavedDraft = { current: false };
 
+function scrollerOf(el: HTMLElement): HTMLElement {
+  for (let node: HTMLElement | null = el; node; node = node.parentElement) {
+    if (/(auto|scroll)/.test(getComputedStyle(node).overflowY)) return node;
+  }
+  return (document.scrollingElement ?? document.documentElement) as HTMLElement;
+}
+
 export function NotePaneShell({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const landed = useRef(false);
   const pathname = usePathname();
 
   useEffect(() => {
-    ref.current?.scrollTo({ top: 0 });
+    if (ref.current) scrollerOf(ref.current).scrollTo({ top: 0 });
 
     if (!landed.current) {
       landed.current = true;

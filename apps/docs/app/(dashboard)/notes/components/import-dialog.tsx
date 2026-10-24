@@ -287,6 +287,7 @@ export function ImportButton({
         open={open}
         onClose={close}
         wide
+        className="nt-imp-modal"
         icon={IconFileImport}
         title="Import notes"
         footer={

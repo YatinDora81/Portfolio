@@ -170,7 +170,9 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
         <div className="nt-rev-fill" style={{ width: `${((i + 1) / deck.length) * 100}%` }} />
       </div>
 
-      <h1 className="nt-rev-q">{card.title}</h1>
+      <h1 className="nt-rev-q">
+        <Link href={card.href}>{card.title}</Link>
+      </h1>
 
       {shown ? (
         <div ref={revealed} tabIndex={-1} className="nt-rev-ans nt-answer">
@@ -178,7 +180,8 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
         </div>
       ) : (
         <button ref={veil} type="button" className="nt-rev-veil" onClick={() => setShown(true)}>
-          Space to reveal
+          <span className="nt-rev-wheel">Space to reveal</span>
+          <span className="nt-rev-tap">Tap to reveal</span>
         </button>
       )}
 
@@ -196,7 +199,10 @@ export function ReviseDeck({ cards }: { cards: ReviseCard[] }) {
         ))}
       </div>
 
-      <p className="nt-rev-kb">1–4 to rate · Esc opens the note</p>
+      <p className="nt-rev-kb">
+        <span className="nt-rev-wheel">1–4 to rate · Esc opens the note</span>
+        <span className="nt-rev-tap">tap a rating · the question opens the note</span>
+      </p>
       {alert}
     </div>
   );

@@ -23,9 +23,10 @@ export function RevealInTree({ path }: { path: string }) {
       className="nt-reveal"
       onClick={() => {
         window.dispatchEvent(new CustomEvent("notes:reveal", { detail: { path } }));
-        // let the expand commit before we aim at the row
         requestAnimationFrame(() =>
-          document.querySelector(".nt-scroll .nt-item.sel")?.scrollIntoView({ block: "center" }),
+          requestAnimationFrame(() =>
+            document.querySelector(".nt-scroll .nt-item.sel")?.scrollIntoView({ block: "center" }),
+          ),
         );
       }}
     >

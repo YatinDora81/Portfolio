@@ -158,8 +158,8 @@ export function nextQuestionIn(ix: VaultIndex, row: VaultRow): NextQuestion | nu
   };
 }
 
-export function childRowsIn(ix: VaultIndex, row: VaultRow): ChildRow[] {
-  return (ix.kids.get(row.id) ?? []).map((k) => ({
+function asChildRows(ix: VaultIndex, list: VaultRow[]): ChildRow[] {
+  return list.map((k) => ({
     id: k.id,
     kind: k.kind,
     title: k.title,
@@ -169,6 +169,29 @@ export function childRowsIn(ix: VaultIndex, row: VaultRow): ChildRow[] {
         ? `${ix.below.get(k.path)?.questions ?? 0} q`
         : confLabel(k.answer?.confidence ?? 0),
   }));
+}
+
+export function childRowsIn(ix: VaultIndex, row: VaultRow): ChildRow[] {
+  return asChildRows(ix, ix.kids.get(row.id) ?? []);
+}
+
+export function rootRowsIn(ix: VaultIndex): ChildRow[] {
+  return asChildRows(ix, ix.kids.get(ROOT_KEY) ?? []);
+}
+
+export function rootStatsIn(ix: VaultIndex): FolderView["stats"] {
+  let questions = 0;
+  let folders = 0;
+  let solid = 0;
+  for (const row of ix.rows) {
+    if (row.kind !== "QUESTION") {
+      folders++;
+      continue;
+    }
+    questions++;
+    if ((row.answer?.confidence ?? 0) >= SOLID) solid++;
+  }
+  return { questions, folders, solidPct: questions ? Math.round((solid / questions) * 100) : 0 };
 }
 
 export function folderStatsIn(ix: VaultIndex, path: string): FolderView["stats"] {

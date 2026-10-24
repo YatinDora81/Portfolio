@@ -10,6 +10,7 @@ import { hrefFor, isReservedNotePath, NOTES_ROOT, notePathOf } from "@/lib/notes
 import { AnswerView } from "./answer-view";
 import { FolderOverview } from "./folder-overview";
 import { NotesBlank } from "./notes-blank";
+import { VaultRoot } from "./vault-root";
 import { NoteLink, useNoteNav, useVault } from "./vault-provider";
 
 export function NotePane() {
@@ -41,7 +42,9 @@ export function NotePane() {
   }, [row, notePath]);
 
   if (isReservedNotePath(pathname)) return null;
-  if (notePath === "") return <NotesBlank vaultEmpty={ix.vaultEmpty} />;
+  if (notePath === "") {
+    return ix.rows.length === 0 ? <NotesBlank vaultEmpty={ix.vaultEmpty} /> : <VaultRoot />;
+  }
   if (notePath === null || !row) return <Gone />;
   // keyed so control state does not carry over between notes
   if (row.kind === "FOLDER") return <FolderOverview key={row.id} node={folderViewIn(ix, row)} />;
