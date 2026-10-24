@@ -85,3 +85,6 @@ CLAUDE.md
 
 # Database dumps
 backups/
+
+# Scratch / design prototypes
+tmp/
