@@ -1,7 +1,10 @@
 import { prisma } from "./src/index";
 import bcrypt from "bcryptjs";
+import { confirmTarget } from "./scripts/confirm-target";
+
 async function seed() {
-  console.log("Seeding database...");
+  const endpoint = confirmTarget("seed wipes and rewrites 20 tables, including Project, Blog, Skill, SiteSettings and AdminUser,");
+  console.log(`Seeding database... (${endpoint})`);
 
   // Clean up in reverse dependency order
   await prisma.experienceBullet.deleteMany();

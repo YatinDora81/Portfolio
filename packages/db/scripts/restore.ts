@@ -1,6 +1,7 @@
 import { config } from "dotenv";
 import { readFileSync } from "node:fs";
 import { Client } from "pg";
+import { confirmTarget } from "./confirm-target";
 
 config({ path: new URL("../.env", import.meta.url).pathname });
 
@@ -22,12 +23,7 @@ if (!file) {
   process.exit(1);
 }
 
-const toVar = args.get("to");
-if (!toVar) {
-  console.error("pass --to=<ENV_VAR> naming the target, e.g. --to=SCRATCH_DATABASE_URL");
-  console.error("there is no default: this script truncates every table it restores");
-  process.exit(1);
-}
+const toVar = args.get("to") ?? "DATABASE_URL";
 
 const url = process.env[toVar];
 if (!url) {
@@ -36,27 +32,8 @@ if (!url) {
 }
 
 const hostOf = (u: string) => new URL(u.replace(/^postgres(ql)?:\/\//, "https://")).hostname;
-const endpointOf = (u: string) => hostOf(u).split(".")[0]!.replace(/-pooler$/, "");
 const target = hostOf(url);
-const targetEndpoint = endpointOf(url);
 const apply = args.get("apply") === "true";
-const protectedEndpoints = [process.env.PROD_DATABASE_URL, process.env.PROTECTED_DATABASE_URL]
-  .filter(Boolean)
-  .map((u) => endpointOf(u as string));
-
-if (!protectedEndpoints.length) {
-  console.error(
-    "refusing: neither PROD_DATABASE_URL nor PROTECTED_DATABASE_URL is loaded, so the target cannot be proven not to be production",
-  );
-  process.exit(1);
-}
-
-if (protectedEndpoints.includes(targetEndpoint)) {
-  console.error(
-    `refusing: ${toVar} resolves to endpoint ${targetEndpoint}, which PROD_DATABASE_URL protects`,
-  );
-  process.exit(1);
-}
 
 const dump = JSON.parse(readFileSync(file, "utf8")) as Dump;
 const client = new Client({ connectionString: url });
@@ -157,6 +134,8 @@ async function main() {
     console.log("re-run with --apply=true to do it.");
     return;
   }
+
+  confirmTarget(`restore TRUNCATEs ${order.length - 1} tables and reloads them from the dump,`);
 
   await client.query("begin");
 

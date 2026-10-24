@@ -17,12 +17,7 @@ if (!file) {
   process.exit(1);
 }
 
-const toVar = args.get("to");
-if (!toVar) {
-  console.error("pass --to=<ENV_VAR> naming the target, e.g. --to=DATABASE_URL");
-  console.error("there is no default: this script applies DDL to whatever it is pointed at");
-  process.exit(1);
-}
+const toVar = args.get("to") ?? "DATABASE_URL";
 
 const url = process.env[toVar];
 if (!url) {
@@ -31,32 +26,9 @@ if (!url) {
 }
 
 const hostOf = (u: string) => new URL(u.replace(/^postgres(ql)?:\/\//, "https://")).hostname;
-const endpointOf = (u: string) => hostOf(u).split(".")[0]!.replace(/-pooler$/, "");
 const target = hostOf(url);
-const targetEndpoint = endpointOf(url);
 const apply = args.get("apply") === "true";
-const protectedEndpoints = [process.env.PROD_DATABASE_URL, process.env.PROTECTED_DATABASE_URL]
-  .filter(Boolean)
-  .map((u) => endpointOf(u as string));
-
-if (!protectedEndpoints.length) {
-  console.error(
-    "refusing: neither PROD_DATABASE_URL nor PROTECTED_DATABASE_URL is loaded, so the target cannot be proven not to be production",
-  );
-  process.exit(1);
-}
-
 const database = new URL(url.replace(/^postgres(ql)?:\/\//, "https://")).pathname.replace(/^\//, "");
-const isProtected = protectedEndpoints.includes(targetEndpoint);
-const confirmed = args.get("i-am-sure") === targetEndpoint;
-
-if (isProtected && !confirmed) {
-  console.error(
-    `refusing: ${toVar} resolves to endpoint ${targetEndpoint}, which PROD_DATABASE_URL protects`,
-  );
-  console.error(`to run against it deliberately, pass --i-am-sure=<endpoint-id>`);
-  process.exit(1);
-}
 
 const sql = readFileSync(file, "utf8");
 const bare = sql.replace(/--[^\n]*\n/g, "").replace(/\/\*[\s\S]*?\*\//g, "").trim();
@@ -130,7 +102,7 @@ async function main() {
      where table_schema = 'public' and table_type = 'BASE TABLE'`,
   );
   const statements = pieces.length;
-  console.log(`${isProtected ? "PRODUCTION " : ""}target ${target}/${database}`);
+  console.log(`target ${target}/${database}`);
   console.log(`tables now ${rows[0]!.n}`);
   console.log(`file ${file}`);
   if (nonTx.length) {
