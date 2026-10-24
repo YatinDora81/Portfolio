@@ -9,6 +9,7 @@ async function seed() {
   await prisma.experienceSkill.deleteMany();
   await prisma.projectSkill.deleteMany();
   await prisma.projectImage.deleteMany();
+  await prisma.projectMilestone.deleteMany();
   await prisma.experience.deleteMany();
   await prisma.project.deleteMany();
   await prisma.heroSkillBadge.deleteMany();

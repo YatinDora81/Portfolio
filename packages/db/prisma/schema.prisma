@@ -224,17 +224,23 @@ model Project {
   publishAt   DateTime?
   publishedAt DateTime?
 
+  buildState   BuildState @default(SHIPPED)
+  buildVersion String?
+  etaLabel     String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bullets ProjectBullet[]
-  skills  ProjectSkill[]
-  gallery ProjectImage[]
-  health  ProjectHealth?
+  bullets    ProjectBullet[]
+  skills     ProjectSkill[]
+  gallery    ProjectImage[]
+  health     ProjectHealth?
+  milestones ProjectMilestone[]
 
   @@index([status, publishAt])
   @@index([status, publishedAt])
   @@index([logoAssetId])
+  @@index([buildState])
 }
 
 model ProjectBullet {
@@ -282,9 +288,36 @@ model ProjectHealth {
   checkedAt DateTime?
 }
 
+model ProjectMilestone {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  label     String
+  state     MilestoneState @default(NEXT)
+  sortOrder Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, sortOrder])
+}
+
 enum LiveProbeStatus {
   up
   down
+}
+
+enum BuildState {
+  SHIPPED
+  BUILDING
+  PAUSED
+}
+
+enum MilestoneState {
+  DONE
+  DOING
+  NEXT
 }
 
 model Blog {
