@@ -24,6 +24,15 @@ interface TechSkill {
   iconKey: string;
 }
 
+type BuildState = 'SHIPPED' | 'BUILDING' | 'PAUSED';
+
+type MilestoneState = 'DONE' | 'DOING' | 'NEXT';
+
+interface Milestone {
+  label: string;
+  state: MilestoneState;
+}
+
 interface ProjectData {
   title: string;
   summary: string;
@@ -34,11 +43,16 @@ interface ProjectData {
   logoUrl: string | null;
   images: string[];
   health?: { status: 'up' | 'down' | 'unknown'; ms: number | null };
+  buildState: BuildState;
+  buildVersion: string | null;
+  etaLabel: string | null;
+  milestones: Milestone[];
 }
 
 interface Endpoint {
   domain: string;
-  status: 'live' | 'source';
+  status: 'live' | 'source' | 'building' | 'paused';
+  href: string | null;
 }
 
 function parseBullet(content: string) {
@@ -59,10 +73,145 @@ function endpointOf(project: ProjectData): Endpoint | null {
     }
   };
   const live = parse(project.live);
-  if (live) return { domain: live.hostname.replace(/^www\./, ''), status: 'live' };
   const repo = parse(project.github);
-  if (repo) return { domain: `github.com${repo.pathname.replace(/\/$/, '')}`, status: 'source' };
+  const repoPath = repo ? `github.com${repo.pathname.replace(/\/$/, '')}` : null;
+
+  if (project.buildState !== 'SHIPPED') {
+    const domain = live ? live.hostname.replace(/^www\./, '') : repoPath;
+    if (!domain) return null;
+    const status = project.buildState.toLowerCase() as 'building' | 'paused';
+    const href = live ? project.live : repo ? project.github : null;
+    return { domain, status, href };
+  }
+  if (live) return { domain: live.hostname.replace(/^www\./, ''), status: 'live', href: project.live };
+  if (repoPath) return { domain: repoPath, status: 'source', href: project.github };
   return null;
+}
+
+const PANES = 3;
+
+const PANE_CLASS: Record<MilestoneState, string> = {
+  DONE: 'is-drawn',
+  DOING: 'is-doing',
+  NEXT: 'is-next',
+};
+
+const PANE_PHRASE: Record<MilestoneState, string> = {
+  DONE: 'is built',
+  DOING: 'is in flight',
+  NEXT: 'is not started',
+};
+
+function coverLabel(title: string, panes: (Milestone | undefined)[]) {
+  const named = panes.filter((m): m is Milestone => m !== undefined);
+  const head = `Working drawing of ${title}: the shell and header are drawn but not built`;
+  if (!named.length) return `${head}, and no surface inside is drawn yet.`;
+  return `${head}, ${named.map((m) => `${m.label} ${PANE_PHRASE[m.state]}`).join(', ')}.`;
+}
+
+function PaneFill({ state, wide }: { state: MilestoneState; wide: boolean }) {
+  if (state === 'NEXT') return null;
+  if (wide) {
+    return (
+      <div className="wb-week">
+        <i /><i><span /></i><i /><i><span /></i><i /><i><span /></i><i />
+      </div>
+    );
+  }
+  return (
+    <div className="wb-rows">
+      <i /><i />
+      {state === 'DOING' ? <i className="wb-draft" /> : <i />}
+    </div>
+  );
+}
+
+function Pane({ milestone, wide }: { milestone: Milestone | undefined; wide?: boolean }) {
+  const state = milestone?.state ?? 'NEXT';
+  return (
+    <div className={`wb-block ${PANE_CLASS[state]}`}>
+      {milestone && <span className="wb-lbl mono">{milestone.label}</span>}
+      <PaneFill state={state} wide={wide ?? false} />
+    </div>
+  );
+}
+
+function BlueprintCover({
+  title,
+  milestones,
+  slot,
+}: {
+  title: string;
+  milestones: Milestone[];
+  slot: string;
+}) {
+  const panes = Array.from({ length: PANES }, (_, i) => milestones[i]);
+  const doing = milestones.filter((m) => m.state === 'DOING');
+  const stage = doing.length === 1 ? doing[0]!.label : null;
+
+  return (
+    <div className={`wb-sheet ${slot}`} role="img" aria-label={coverLabel(title, panes)}>
+      <div className="wb-plan">
+        <div className="wb-block wb-rail is-outline">
+          <span />
+          <i /><i /><i /><i />
+        </div>
+        <div className="wb-col">
+          <div className="wb-block wb-top is-outline">
+            <i /><i /><span />
+          </div>
+          <div className="wb-body">
+            <Pane milestone={panes[0]} wide />
+            <div className="wb-side">
+              <Pane milestone={panes[1]} />
+              <Pane milestone={panes[2]} />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="wb-dim">
+        <span className="wb-tick" />
+        {stage ? (
+          <>
+            <i />
+            <span className="wb-stage mono">stage &middot; <b>{stage}</b></span>
+            <i />
+          </>
+        ) : (
+          <i />
+        )}
+        <span className="wb-tick" />
+      </div>
+    </div>
+  );
+}
+
+function LedgerTab({ version, plan }: { version: string | null; plan: boolean }) {
+  if (!plan && !version) return null;
+  return (
+    <span className="wb-tab wb-tab-in mono" aria-hidden="true">
+      &#9650;{plan ? ' plan' : ''}
+      {version && (
+        <>
+          {plan ? ' · ' : ' '}
+          <span className="wb-v">{version}</span>
+        </>
+      )}
+    </span>
+  );
+}
+
+function EtaMarker({ etaLabel, hasDemo }: { etaLabel: string | null; hasDemo: boolean }) {
+  if (hasDemo) {
+    if (!etaLabel) return null;
+    return <span className="wb-eta"><b>{etaLabel}</b></span>;
+  }
+  return (
+    <span className="wb-eta">
+      no demo yet
+      {etaLabel && <> &middot; <b>{etaLabel}</b></>}
+    </span>
+  );
 }
 
 const FEATURED = 3;
@@ -162,32 +311,46 @@ function ShowMore({ expanded, onToggle }: { expanded: boolean; onToggle: () => v
 
 function LedgerRow({
   project,
+  endpoint,
   index,
   isOpen,
   onToggle,
 }: {
   project: ProjectData;
+  endpoint: Endpoint | null;
   index: number;
   isOpen: boolean;
   onToggle: () => void;
 }) {
-  const link = project.live ?? project.github;
+  const shipped = project.buildState === 'SHIPPED';
+  const link = endpoint?.href ?? null;
   const cover = project.images[0];
+  const drawn = !shipped && !cover;
 
   return (
     <article
       id={`pj-${slugify(project.title)}`}
-      className={`pj-row expand scroll-mt-24${isOpen ? ' open' : ''}`}
+      className={`pj-row expand scroll-mt-24${shipped ? '' : ` wb-entry wb-${project.buildState.toLowerCase()}`}${isOpen ? ' open' : ''}`}
       onClick={tapToggle(onToggle)}
     >
-      <span className="pj-idx mono" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+      <span className="pj-idx mono" aria-hidden="true">
+        {String(index + 1).padStart(2, '0')}
+        {!shipped && <i>{project.buildState === 'PAUSED' ? 'paused' : 'wip'}</i>}
+      </span>
 
-      {cover && link ? (
+      {drawn ? (
+        <span className="pj-media wb-pad">
+          <LedgerTab version={project.buildVersion} plan />
+          <BlueprintCover title={project.title} milestones={project.milestones} slot="wb-fill" />
+        </span>
+      ) : cover && link ? (
         <a className="pj-media" href={link} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true">
+          {!shipped && <LedgerTab version={project.buildVersion} plan={false} />}
           <Image src={cover} alt="" width={300} height={188} sizes="(max-width: 720px) 420px, 300px" loading="lazy" />
         </a>
       ) : (
         <span className="pj-media">
+          {!shipped && <LedgerTab version={project.buildVersion} plan={false} />}
           {cover && (
             <Image src={cover} alt="" width={300} height={188} sizes="(max-width: 720px) 420px, 300px" loading="lazy" />
           )}
@@ -229,9 +392,10 @@ function LedgerRow({
         </p>
 
         <div className="pj-links mono">
+          {!shipped && <EtaMarker etaLabel={project.etaLabel} hasDemo={!!project.live} />}
           {project.live && (
             <a href={project.live} target="_blank" rel="noopener noreferrer">
-              <span className="pj-dot" aria-hidden="true" />live demo
+              <span className={shipped ? 'pj-dot' : 'pj-dot wip'} aria-hidden="true" />live demo
             </a>
           )}
           {project.github && (
@@ -249,6 +413,10 @@ function ProjectsLedger({ projects }: { projects: ProjectData[] }) {
   const [expanded, setExpanded] = useState(false);
   const [open, toggle] = useOpenSet(projects, setExpanded);
 
+  const endpoints = projects.map(endpointOf);
+  const shipped = projects.filter((p) => p.buildState === 'SHIPPED').length;
+  const inflight = projects.length - shipped;
+
   const featured = projects.slice(0, FEATURED);
   const rest = projects.slice(FEATURED);
 
@@ -256,6 +424,7 @@ function ProjectsLedger({ projects }: { projects: ProjectData[] }) {
     <LedgerRow
       key={project.title}
       project={project}
+      endpoint={endpoints[index] ?? null}
       index={index}
       isOpen={open.has(index)}
       onToggle={() => toggle(index)}
@@ -268,8 +437,9 @@ function ProjectsLedger({ projects }: { projects: ProjectData[] }) {
         <SectionHeading channel="04" label="projects" title="Build log." hint={`${projects.length} builds`} />
         {projects.length > 0 && (
           <p className="pj-note">
-            {projects.length} {projects.length === 1 ? 'thing' : 'things'} shipped end to end — hover
-            a row to spotlight it, tap or click for the highlights.
+            {shipped} {shipped === 1 ? 'thing' : 'things'} shipped end to end
+            {inflight > 0 && <>, {inflight} still on the board</>} — hover a row to spotlight it,
+            tap or click for the highlights.
           </p>
         )}
 
@@ -313,8 +483,10 @@ function LogEntry({
 }) {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: '0px 0px -6% 0px', amount: 0.05 });
-  const link = project.live ?? project.github;
+  const shipped = project.buildState === 'SHIPPED';
+  const link = endpoint?.href ?? null;
   const cover = project.images[0];
+  const drawn = !shipped && !cover;
   const domain = endpoint?.domain;
 
   const [typed, setTyped] = useState<string | null>(null);
@@ -346,7 +518,7 @@ function LogEntry({
     <article
       ref={ref}
       id={`pj-${slugify(project.title)}`}
-      className={`pjb-entry scroll-mt-24${shown ? ' in' : ''}${isOpen ? ' open' : ''}`}
+      className={`pjb-entry scroll-mt-24${shipped ? '' : ` wb-entry wb-${project.buildState.toLowerCase()}`}${shown ? ' in' : ''}${isOpen ? ' open' : ''}`}
       onClick={tapToggle(onToggle)}
     >
       <div className="pjb-dep mono">
@@ -357,6 +529,7 @@ function LogEntry({
         {endpoint && (
           <span className="pjb-s">
             {endpoint.status === 'live' && <span className="pj-dot" aria-hidden="true" />}
+            {!shipped && <span className="pj-dot wip" aria-hidden="true" />}
             {endpoint.status}
           </span>
         )}
@@ -382,7 +555,20 @@ function LogEntry({
               )}
             </span>
           )}
-          {cover && link ? (
+          {!shipped && (drawn || project.buildVersion) && (
+            <span className="pjb-prod wb-tab mono" aria-hidden="true">
+              &#9650;{drawn ? ' plan' : ''}
+              {project.buildVersion && (
+                <>
+                  {drawn ? ' · ' : ' '}
+                  <span className="wb-v">{project.buildVersion}</span>
+                </>
+              )}
+            </span>
+          )}
+          {drawn ? (
+            <BlueprintCover title={project.title} milestones={project.milestones} slot="pjb-thumb" />
+          ) : cover && link ? (
             <a className="pjb-thumb" href={link} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true">
               <Image src={cover} alt="" width={280} height={175} sizes="(max-width: 600px) 230px, 280px" loading="lazy" />
             </a>
@@ -432,6 +618,7 @@ function LogEntry({
           </div>
 
           <div className="pjb-links mono">
+            {!shipped && <EtaMarker etaLabel={project.etaLabel} hasDemo={!!project.live} />}
             {project.live && (
               <a href={project.live} target="_blank" rel="noopener noreferrer">
                 <ExternalLinkIcon className="" />live demo
@@ -456,9 +643,17 @@ function ProjectsBuildLog({ projects }: { projects: ProjectData[] }) {
 
   const endpoints = projects.map(endpointOf);
   const liveCount = endpoints.filter((e) => e?.status === 'live').length;
-  const allLive = projects.length > 0 && liveCount === projects.length;
+  const shipped = projects.filter((p) => p.buildState === 'SHIPPED').length;
+  const building = projects.filter((p) => p.buildState === 'BUILDING').length;
+  const paused = projects.length - shipped - building;
+  const allLive = shipped > 0 && liveCount === shipped;
   const timings = projects.map((p) => p.health?.ms).filter((ms): ms is number => typeof ms === 'number');
   const avgMs = timings.length ? Math.round(timings.reduce((a, b) => a + b, 0) / timings.length) : null;
+  const tally = [
+    shipped > 0 ? `${liveCount}/${shipped} live` : null,
+    building > 0 ? `${building} building` : null,
+    paused > 0 ? `${paused} paused` : null,
+  ].filter(Boolean).join(' · ');
 
   const featured = projects.slice(0, FEATURED);
   const rest = projects.slice(FEATURED);
@@ -481,8 +676,17 @@ function ProjectsBuildLog({ projects }: { projects: ProjectData[] }) {
         <SectionHeading channel="04" label="projects" title="Build log." hint={`${projects.length} builds`} />
         <p className="pj-note">
           <span className="mono" aria-hidden="true">&#8982;</span>{' '}
-          {allLive && 'every build below is deployed & running — '}
-          tap or hover a build for the highlights
+          {allLive && 'every shipped build below is deployed & running — '}
+          tap or hover a build for the highlights.
+          {building + paused > 0 && (
+            <>
+              {' '}
+              <span className="mono">
+                A drawn cover is a plan, not a screenshot: filled is built, amber is in flight,
+                dashed is not started.
+              </span>
+            </>
+          )}
         </p>
 
         <div className="pjb-log">
@@ -501,7 +705,7 @@ function ProjectsBuildLog({ projects }: { projects: ProjectData[] }) {
 
         {projects.length > 0 && (
           <p className="pjb-eol mono">
-            end of build log &middot; {liveCount}/{projects.length} live
+            end of build log &middot; {tally}
             {avgMs !== null && <> &middot; <span className="text-foreground">avg {avgMs} ms</span></>}
           </p>
         )}

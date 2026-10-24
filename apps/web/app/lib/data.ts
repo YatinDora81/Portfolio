@@ -2,6 +2,7 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { prisma } from "db";
 import { contentWhere } from "db/visibility";
+import { livingEta } from "@repo/shared/dates";
 import { tags } from "@repo/shared/tags";
 import { cdnUrl } from "./site";
 
@@ -228,13 +229,19 @@ async function readProjects(isPreview: boolean) {
         orderBy: { sortOrder: "asc" },
       },
       health: { select: { status: true, latencyMs: true } },
+      milestones: {
+        select: { label: true, state: true },
+        orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+      },
     },
   });
   const health = await Promise.all(
-    projects.map((p): BuildHealth | Promise<BuildHealth> =>
-      p.health?.status ? { status: p.health.status, ms: p.health.latencyMs } : probeLive(p.live),
-    ),
+    projects.map((p): BuildHealth | Promise<BuildHealth> => {
+      if (p.buildState !== "SHIPPED") return { status: "unknown", ms: null };
+      return p.health?.status ? { status: p.health.status, ms: p.health.latencyMs } : probeLive(p.live);
+    }),
   );
+  const now = new Date();
   return projects.map((p, i) => ({
     title: p.title,
     summary: p.summary,
@@ -248,6 +255,10 @@ async function readProjects(isPreview: boolean) {
     bullets: p.bullets.map((b) => b.content),
     technologies: p.skills.map((s) => s.skill),
     health: health[i] ?? { status: "unknown" as const, ms: null },
+    buildState: p.buildState,
+    buildVersion: p.buildVersion,
+    etaLabel: p.buildState === "BUILDING" ? livingEta(p.etaLabel, p.updatedAt, now) : null,
+    milestones: p.milestones,
   }));
 }
 
